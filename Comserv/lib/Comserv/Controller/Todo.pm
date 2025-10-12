@@ -5,6 +5,35 @@ use DateTime::Format::ISO8601;
 use Data::Dumper;
 use Comserv::Util::Logging; # Import the logging utility
 BEGIN { extends 'Catalyst::Controller'; }
+
+# Helper method to get status name from code
+sub get_status_name {
+    my ($self, $status_code) = @_;
+    my %status_map = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+    return $status_map{$status_code} // "Unknown ($status_code)";
+}
+
+# Helper method to get priority name from code (1-10 scale)
+sub get_priority_name {
+    my ($self, $priority_code) = @_;
+    my %priority_map = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    return $priority_map{$priority_code} // "Priority $priority_code";
+}
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -36,8 +65,8 @@ sub begin :Private {
         $c->detach;
     }
 
-    # Check if the user has the 'admin' role
-    unless (grep { $_ eq 'admin' } @$roles) {
+    # Check if the user has the 'admin' or 'developer' role
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
         # Stash the current path for potential use
@@ -186,9 +215,18 @@ sub todo :Path('/todo') :Args(0) {
             "Error fetching projects: $@");
     }
 
+    # Process todos to add status and priority names
+    my @processed_todos;
+    foreach my $todo (@todos) {
+        my %todo_data = $todo->get_columns;
+        $todo_data{status_name} = $self->get_status_name($todo->status);
+        $todo_data{priority_name} = $self->get_priority_name($todo->priority);
+        push @processed_todos, \%todo_data;
+    }
+
     # Add the todos and filter info to the stash
     $c->stash(
-        todos => \@todos,
+        todos => \@processed_todos,
         sitename => $c->session->{SiteName},
         filter_type => $filter_type,
         search_term => $search_term,
@@ -282,11 +320,33 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
+    # Build priority and status mappings for dropdowns
+    my %priority_options = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    
+    my %status_options = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+
     # Add the projects, sitename, and users to the stash
     $c->stash(
         projects        => $projects,        # Parent projects with nested sub-projects
         current_project => $current_project, # Selected project for the form (if any)
         users           => \@users,          # List of users to populate dropdown
+        build_priority  => \%priority_options, # Priority options for dropdown
+        build_status    => \%status_options,   # Status options for dropdown
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -370,12 +430,34 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Format the total time as 'HH:MM'
     my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
+    # Build priority and status mappings for dropdowns
+    my %priority_options = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    
+    my %status_options = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+
     # Add the todo, projects, and users to the stash
     $c->stash(
         record           => $todo,
         projects         => $projects,
         users            => \@users,
         accumulative_time => $accumulative_time,
+        build_priority   => \%priority_options, # Priority options for dropdown
+        build_status     => \%status_options,   # Status options for dropdown
         template         => 'todo/edit.tt'
     );
 
@@ -549,94 +631,130 @@ sub modify :Path('/todo/modify') :Args(1) {
 
 sub create :Local {
     my ( $self, $c ) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 'Creating new todo item');
 
-    # Retrieve the form data from the request
-    my $record_id = $c->request->params->{record_id};
-    my $sitename = $c->request->params->{sitename};
-    my $start_date = $c->request->params->{start_date};
-    my $parent_todo = $c->request->params->{parent_todo} || 0;
-    my $due_date = $c->request->params->{due_date} || DateTime->now->add(days => 7)->ymd; # Set default value if not provided
-    my $subject = $c->request->params->{subject};
+    # Retrieve and validate required fields
+    my @required_fields = ('subject', 'start_date', 'due_date', 'priority', 'status');
+    my $params = $c->request->params;
+    
+    # Validate required fields
+    my @missing_fields = grep { !defined $params->{$_} || $params->{$_} eq '' } @required_fields;
+    if (@missing_fields) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Missing required fields: " . join(', ', @missing_fields));
+        $c->stash->{error_msg} = "Missing required fields: " . join(', ', @missing_fields);
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
+    }
+
+    # Set default values
     my $schema = $c->model('DBEncy');
-    my $description = $c->request->params->{description};
-    my $estimated_man_hours = $c->request->params->{estimated_man_hours};
-    my $comments = $c->request->params->{comments};
-    my $accumulative_time = $c->request->params->{accumulative_time};
-    my $reporter = $c->request->params->{reporter};
-    my $company_code = $c->request->params->{company_code};
-    my $owner = $c->request->params->{owner};
-    my $developer = $c->request->params->{developer};
-    my $username_of_poster = $c->session->{username} || 'Shanta';
-    my $status = $c->request->params->{status};
-    my $priority = $c->request->params->{priority};
-    my $share = $c->request->params->{share} || 0;
-    my $last_mod_by = $c->session->{username} || 'default_user';
-    my $last_mod_date = $c->request->params->{last_mod_date};
-    my $group_of_poster = $c->session->{roles} || 'default_group';
-    my $project_id = $c->request->params->{project_id};
-    my $manual_project_id = $c->request->params->{manual_project_id};
-    my $date_time_posted = $c->request->params->{date_time_posted};
-
-    # If manual_project_id is not empty, use it as the project ID
-    my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
-
-    # Fetch the project_code using the selected_project_id
-    my $project_code;
-    if ($selected_project_id) {
-        my $project = $schema->resultset('Project')->find($selected_project_id);
-        $project_code = $project ? $project->project_code : 'default_code'; # Set a default code if not found
-    } else {
-        $project_code = 'default_code'; # Set a default code if no project ID is provided
-    }
-
-    # Check if accumulative_time is a valid integer
-    $accumulative_time = $c->request->params->{accumulative_time};
-    if (!defined $accumulative_time || $accumulative_time !~ /^\d+$/) {
-        $accumulative_time = 0;
-    }
-
-    # Get the current date
+    my $current_user = $c->session->{username} || 'system';
     my $current_date = DateTime->now->ymd;
-
-    # Retrieve user_id from session or another reliable source
-    my $user_id = $c->session->{user_id};
-    unless (defined $user_id) {
-        # Handle the case where user_id is not found
-        $c->response->body('User ID not found in session');
-        return;
+    
+    # Process project information
+    my $selected_project_id = $params->{manual_project_id} || $params->{project_id};
+    my $project_code = 'default_code';
+    
+    if ($selected_project_id) {
+        eval {
+            my $project = $schema->resultset('Project')->find($selected_project_id);
+            $project_code = $project->project_code if $project;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+                "Using project ID: $selected_project_id, code: $project_code");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+                "Error fetching project: $@");
+        }
     }
 
-    # Create a new todo record
-    my $todo = $schema->resultset('Todo')->create({
-        record_id => $record_id,
-        sitename => $sitename,
-        start_date => $start_date,
-        parent_todo => $parent_todo,
-        due_date => $due_date,
-        subject => $subject,
-        description => $description,
-        estimated_man_hours => $estimated_man_hours,
-        comments => $comments,
-        accumulative_time => $accumulative_time,
-        reporter => $reporter,
-        company_code => $company_code,
-        owner => $owner,
-        project_code => $project_code, # Ensure this is set
-        developer => $developer,
-        username_of_poster => $username_of_poster,
-        status => $status,
-        priority => $priority,
-        share => $share,
-        last_mod_by => $last_mod_by,
-        last_mod_date => $current_date,
-        user_id => $user_id, # Ensure this is set
-        group_of_poster => $group_of_poster,
-        project_id => $selected_project_id,
-        date_time_posted => $date_time_posted,
-    });
+    # Validate and format dates
+    my ($start_date, $due_date);
+    eval {
+        $start_date = $params->{start_date} ? DateTime::Format::ISO8601->parse_date($params->{start_date})->ymd : undef;
+        $due_date = $params->{due_date} ? DateTime::Format::ISO8601->parse_date($params->{due_date})->ymd : undef;
+        
+        if ($start_date && $due_date && $start_date > $due_date) {
+            die "Start date cannot be after due date";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Date validation failed: $@");
+        $c->stash->{error_msg} = "Invalid date: $@";
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
+    }
 
-    # Redirect the user to the index action
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    # Process accumulative time
+    my $accumulative_time = 0;
+    if (defined $params->{accumulative_time} && $params->{accumulative_time} =~ /^\d+$/) {
+        $accumulative_time = $params->{accumulative_time};
+    }
+
+    # Get user info
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            'User ID not found in session');
+        $c->stash->{error_msg} = 'User not authenticated';
+        $c->stash->{template} = 'user/login.tt';
+        $c->detach();
+    }
+
+    # Create a new todo record with error handling
+    my $todo;
+    eval {
+        $todo = $schema->resultset('Todo')->create({
+            record_id => $params->{record_id},
+            sitename => $c->session->{SiteName} || 'default_site',
+            start_date => $start_date,
+            parent_todo => $params->{parent_todo} || 0,
+            due_date => $due_date,
+            subject => $params->{subject},
+            description => $params->{description} || '',
+            estimated_man_hours => $params->{estimated_man_hours} || 0,
+            comments => $params->{comments} || '',
+            accumulative_time => $accumulative_time,
+            reporter => $params->{reporter} || $current_user,
+            company_code => $params->{company_code} || 'default',
+            owner => $params->{owner} || $current_user,
+            project_code => $project_code,
+            developer => $params->{developer} || $current_user,
+            username_of_poster => $current_user,
+            status => $params->{status} || 'new',
+            priority => $params->{priority} || 3, # Medium priority by default
+            share => $params->{share} ? 1 : 0,
+            last_mod_by => $current_user,
+            last_mod_date => $current_date,
+            user_id => $user_id,
+            group_of_poster => (ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) 
+                              ? $c->session->{roles}->[0] 
+                              : 'user',
+            project_id => $selected_project_id,
+            date_time_posted => $params->{date_time_posted} || $current_date,
+        });
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+            "Successfully created todo with ID: " . $todo->id);
+            
+    };
+    
+    # Check for errors from eval
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Failed to create todo: $error");
+        $c->stash->{error_msg} = "Failed to create todo: $error";
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
+    }
+
+    # Redirect to the todo list with success message
+    $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
+    $c->response->redirect($c->uri_for($self->action_for('todo')));
 }
 
 sub day :Path('/todo/day') :Args {
