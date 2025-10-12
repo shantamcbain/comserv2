@@ -669,8 +669,6 @@ sub do_create_account :Local {
             last_name   => $last_name,
             email       => $email,
             roles       => $roles,
-            active      => 1,
-            created_at  => \'NOW()',
         });
     };
 

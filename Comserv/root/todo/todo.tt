@@ -134,6 +134,7 @@
       <td>[% task.get_column('developer') %]</td>
       <td>[% task.get_column('priority') %]</td>
       <td>[% task.get_column('status') %]</td>
+
       <td>[% task.get_column('comments') %]</td>
       <td>[% task.get_column('accumulative_time') %]</td>
       <td class="action-buttons-cell">
