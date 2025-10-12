@@ -7,19 +7,14 @@
     // Configuration
     const config = {
         apiEndpoints: {
-            sendMessage: '/chat/send_message',
-            getMessages: '/chat/get_messages'
+            generateResponse: '/ai/generate'
         },
-        pollInterval: 5000, // How often to check for new messages (ms)
         maxRetries: 3,      // Max retries for failed API calls
     };
     
     // State
     let state = {
-        lastMessageId: 0,
-        isPolling: false,
         retryCount: 0,
-        pollTimer: null,
         isOpen: false
     };
     
@@ -34,7 +29,7 @@
         const chatButton = document.createElement('button');
         chatButton.id = 'chat-button';
         chatButton.className = 'chat-button';
-        chatButton.innerHTML = '<span class="chat-icon">💬</span> Chat with us';
+        chatButton.innerHTML = '<span class="chat-icon">🤖</span> Chat with AI';
         
         // Create chat panel (initially hidden)
         const chatPanel = document.createElement('div');
@@ -45,7 +40,7 @@
         // Create chat header
         const chatHeader = document.createElement('div');
         chatHeader.className = 'chat-header';
-        chatHeader.innerHTML = '<h3>Chat Support</h3><button id="close-chat">×</button>';
+        chatHeader.innerHTML = '<h3>AI Assistant</h3><button id="close-chat">×</button>';
         
         // Create chat messages area
         const chatMessages = document.createElement('div');
@@ -55,7 +50,7 @@
         // Add welcome message
         const welcomeMessage = document.createElement('div');
         welcomeMessage.className = 'message system-message';
-        welcomeMessage.textContent = 'Welcome to our chat support. Please leave a message and we\'ll get back to you soon.';
+        welcomeMessage.textContent = 'Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.';
         chatMessages.appendChild(welcomeMessage);
         
         // Create chat input area
@@ -68,7 +63,7 @@
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'chat-status';
         statusIndicator.className = 'chat-status';
-        statusIndicator.textContent = 'Connected';
+        statusIndicator.textContent = 'AI Ready';
         
         // Assemble the chat panel
         chatPanel.appendChild(chatHeader);
@@ -101,7 +96,7 @@
         });
     }
     
-    // Open chat panel and start polling
+    // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
@@ -110,14 +105,12 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
         
-        // Start polling for messages
-        startPolling();
-        
-        // Load existing messages
-        fetchMessages();
+        // Focus on the input field
+        const messageInput = document.getElementById('message-input');
+        messageInput.focus();
     }
     
-    // Close chat panel and stop polling
+    // Close chat panel
     function closeChat() {
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
@@ -125,140 +118,92 @@
         chatPanel.style.display = 'none';
         chatButton.style.display = 'flex';
         state.isOpen = false;
-        
-        // Stop polling
-        stopPolling();
     }
     
-    // Start polling for new messages
-    function startPolling() {
-        if (!state.isPolling) {
-            state.isPolling = true;
-            state.pollTimer = setInterval(fetchMessages, config.pollInterval);
-        }
-    }
-    
-    // Stop polling for new messages
-    function stopPolling() {
-        if (state.isPolling) {
-            clearInterval(state.pollTimer);
-            state.isPolling = false;
-        }
-    }
-    
-    // Fetch messages from the server
-    function fetchMessages() {
+    // Function to query AI and get response
+    function queryAI(prompt) {
         const statusIndicator = document.getElementById('chat-status');
-        statusIndicator.textContent = 'Connecting...';
+        statusIndicator.textContent = 'AI is thinking...';
+        statusIndicator.className = 'chat-status processing';
         
-        fetch(config.apiEndpoints.getMessages + '?last_id=' + state.lastMessageId)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Reset retry counter on success
-                    state.retryCount = 0;
-                    
-                    // Update status
-                    statusIndicator.textContent = 'Connected';
-                    statusIndicator.className = 'chat-status connected';
-                    
-                    // Process new messages
-                    if (data.messages && data.messages.length > 0) {
-                        data.messages.forEach(msg => {
-                            const className = msg.is_system_message ? 'system-message' : 'user-message';
-                            addMessage(msg.message, className);
-                            
-                            // Update last message ID
-                            if (msg.id > state.lastMessageId) {
-                                state.lastMessageId = msg.id;
-                            }
-                        });
-                    }
-                } else {
-                    console.error('Error fetching messages:', data.error);
-                    statusIndicator.textContent = 'Connection error';
-                    statusIndicator.className = 'chat-status error';
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching messages:', error);
-                statusIndicator.textContent = 'Connection error';
+        // Show a loading message
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'message ai-message loading';
+        loadingMessage.id = 'ai-loading';
+        loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> AI is thinking...';
+        document.getElementById('chat-messages').appendChild(loadingMessage);
+       document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+        
+        // Send to AI
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        
+        fetch(config.apiEndpoints.generateResponse, {
+            method: 'POST',
+            body: formData
+        })
+         .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Remove loading message
+            const loading = document.getElementById('ai-loading');
+            if (loading) {
+                loading.remove();
+            }
+            
+            if (data.success) {
+                // Reset retry counter on success
+                state.retryCount = 0;
+                
+                // Update status
+                statusIndicator.textContent = 'AI Ready';
+                statusIndicator.className = 'chat-status connected';
+                
+                // Add AI response
+                addMessage(data.response, 'ai-message');
+            } else {
+                console.error('Error getting AI response:', data.error);
+                statusIndicator.textContent = 'AI Error';
                 statusIndicator.className = 'chat-status error';
                 
-                // Retry logic
-                state.retryCount++;
-                if (state.retryCount > config.maxRetries) {
-                    stopPolling();
-                    statusIndicator.textContent = 'Connection failed';
-                }
-            });
+                // Show error in chat
+                addMessage('Sorry, I encountered an error. Please try again.', 'error-message');
+            }
+        })
+        .catch(error => {
+            // Remove loading message
+            const loading = document.getElementById('ai-loading');
+            if (loading) {
+                loading.remove();
+            }
+            
+            console.error('Error querying AI:', error);
+            statusIndicator.textContent = 'AI Error';
+            statusIndicator.className = 'chat-status error';
+            
+            // Show error in chat
+            addMessage('Sorry, I\'m having trouble connecting. Please try again.', 'error-message');
+        });
     }
     
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
-        const statusIndicator = document.getElementById('chat-status');
         const message = messageInput.value.trim();
         
         if (message) {
-            // Add user message to chat immediately for better UX
+            // Add user message to chat immediately
             addMessage(message, 'user-message');
             
             // Clear input
             messageInput.value = '';
             
-            // Update status
-            statusIndicator.textContent = 'Sending...';
-            
-            // Send to server
-            const formData = new FormData();
-            formData.append('message', message);
-            
-            fetch(config.apiEndpoints.sendMessage, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Message sent successfully
-                    statusIndicator.textContent = 'Message sent';
-                    statusIndicator.className = 'chat-status connected';
-                    
-                    // Update last message ID if provided
-                    if (data.message_id && data.message_id > state.lastMessageId) {
-                        state.lastMessageId = data.message_id;
-                    }
-                    
-                    // Fetch any new messages (including potential auto-responses)
-                    setTimeout(fetchMessages, 1000);
-                } else {
-                    console.error('Error sending message:', data.error);
-                    statusIndicator.textContent = 'Failed to send';
-                    statusIndicator.className = 'chat-status error';
-                    
-                    // Show error in chat
-                    addMessage('Error sending message. Please try again.', 'error-message');
-                }
-            })
-            .catch(error => {
-                console.error('Error sending message:', error);
-                statusIndicator.textContent = 'Failed to send';
-                statusIndicator.className = 'chat-status error';
-                
-                // Show error in chat
-                addMessage('Error sending message. Please try again.', 'error-message');
-            });
+            // Query AI for response
+            queryAI(message);
         }
     }
     
@@ -368,6 +313,21 @@
                 border-bottom-right-radius: 5px;
             }
             
+            .ai-message {
+                background-color: #e3f2fd;
+                color: #1976d2;
+                align-self: flex-start;
+                margin-right: auto;
+                border-bottom-left-radius: 5px;
+                border-left: 3px solid #2196f3;
+            }
+            
+            .ai-message.loading {
+                background-color: #f5f5f5;
+                color: #666;
+                font-style: italic;
+            }
+            
             .error-message {
                 background-color: #f8d7da;
                 color: #721c24;
@@ -390,6 +350,21 @@
             
             .chat-status.error {
                 color: #dc3545;
+            }
+            
+            .chat-status.processing {
+                color: #ffc107;
+            }
+            
+            .loading-dots {
+                display: inline-block;
+                animation: loadingDots 1.5s infinite;
+            }
+            
+            @keyframes loadingDots {
+                0%, 20% { opacity: 0.2; }
+                50% { opacity: 1; }
+                100% { opacity: 0.2; }
             }
             
             .chat-input {
