@@ -81,3 +81,256 @@
   vertical-align: top;
   text-align: center;
 }
+
+/* Todo list table styles */
+.week-view-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--spacing-large);
+  table-layout: fixed;
+}
+
+.week-view-table th,
+.week-view-table td {
+  padding: var(--spacing-small);
+  border: 1px solid var(--border-color);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.week-view-table th {
+  background-color: var(--table-header-bg);
+  font-weight: bold;
+}
+
+.week-view-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.week-view-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Action buttons cell */
+.action-buttons-cell {
+  width: 160px;
+  min-width: 160px;
+  white-space: nowrap;
+}
+
+.action-buttons-cell form {
+  display: inline-block;
+  margin: 0 1px;
+}
+
+/* Responsive table wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--spacing-medium);
+}
+
+/* Column width adjustments for better fit */
+.week-view-table th:nth-child(1), /* Sitename */
+.week-view-table td:nth-child(1) {
+  width: 80px;
+}
+
+.week-view-table th:nth-child(2), /* Project */
+.week-view-table td:nth-child(2) {
+  width: 100px;
+}
+
+.week-view-table th:nth-child(3), /* Parent todo */
+.week-view-table td:nth-child(3) {
+  width: 100px;
+}
+
+.week-view-table th:nth-child(4), /* Start Date */
+.week-view-table td:nth-child(4),
+.week-view-table th:nth-child(5), /* Due Date */
+.week-view-table td:nth-child(5) {
+  width: 90px;
+}
+
+.week-view-table th:nth-child(6), /* What needs to be done */
+.week-view-table td:nth-child(6) {
+  width: 200px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.week-view-table th:nth-child(7), /* Details */
+.week-view-table td:nth-child(7) {
+  width: 150px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.week-view-table th:nth-child(8), /* Who is responsible */
+.week-view-table td:nth-child(8) {
+  width: 100px;
+}
+
+.week-view-table th:nth-child(9), /* Priority */
+.week-view-table td:nth-child(9) {
+  width: 70px;
+}
+
+.week-view-table th:nth-child(10), /* Status */
+.week-view-table td:nth-child(10) {
+  width: 80px;
+}
+
+.week-view-table th:nth-child(11), /* Code needed for */
+.week-view-table td:nth-child(11) {
+  width: 100px;
+}
+
+.week-view-table th:nth-child(12), /* Accumulated time */
+.week-view-table td:nth-child(12) {
+  width: 80px;
+}
+
+/* Mobile responsiveness - progressive column hiding */
+@media (max-width: 1400px) {
+  /* Hide less critical columns on large screens */
+  .week-view-table th:nth-child(3),
+  .week-view-table td:nth-child(3),
+  .week-view-table th:nth-child(11),
+  .week-view-table td:nth-child(11) {
+    display: none;
+  }
+  
+  .week-view-table {
+    min-width: 500px;
+  }
+}
+
+@media (max-width: 1200px) {
+  /* Hide more columns on medium-large screens */
+  .week-view-table th:nth-child(2),
+  .week-view-table td:nth-child(2),
+  .week-view-table th:nth-child(3),
+  .week-view-table td:nth-child(3),
+  .week-view-table th:nth-child(8),
+  .week-view-table td:nth-child(8),
+  .week-view-table th:nth-child(11),
+  .week-view-table td:nth-child(11) {
+    display: none;
+  }
+  
+  .week-view-table {
+    min-width: 450px;
+  }
+}
+
+@media (max-width: 992px) {
+  /* Hide additional columns on medium screens */
+  .week-view-table th:nth-child(2),
+  .week-view-table td:nth-child(2),
+  .week-view-table th:nth-child(3),
+  .week-view-table td:nth-child(3),
+  .week-view-table th:nth-child(4),
+  .week-view-table td:nth-child(4),
+  .week-view-table th:nth-child(7),
+  .week-view-table td:nth-child(7),
+  .week-view-table th:nth-child(8),
+  .week-view-table td:nth-child(8),
+  .week-view-table th:nth-child(11),
+  .week-view-table td:nth-child(11) {
+    display: none;
+  }
+  
+  .week-view-table {
+    min-width: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Hide more columns on small screens - keep only essentials */
+  .week-view-table th:nth-child(1),
+  .week-view-table td:nth-child(1),
+  .week-view-table th:nth-child(2),
+  .week-view-table td:nth-child(2),
+  .week-view-table th:nth-child(3),
+  .week-view-table td:nth-child(3),
+  .week-view-table th:nth-child(4),
+  .week-view-table td:nth-child(4),
+  .week-view-table th:nth-child(7),
+  .week-view-table td:nth-child(7),
+  .week-view-table th:nth-child(8),
+  .week-view-table td:nth-child(8),
+  .week-view-table th:nth-child(11),
+  .week-view-table td:nth-child(11),
+  .week-view-table th:nth-child(12),
+  .week-view-table td:nth-child(12) {
+    display: none;
+  }
+  
+  .week-view-table {
+    min-width: 300px;
+  }
+  
+  .week-view-table th,
+  .week-view-table td {
+    padding: 4px;
+    font-size: 14px;
+  }
+  
+  .action-buttons-cell {
+    width: 120px;
+    min-width: 120px;
+  }
+  
+  .action-buttons-cell form {
+    margin: 1px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Very small screens - minimal columns */
+  .week-view-table {
+    min-width: 280px;
+  }
+  
+  .week-view-table th:nth-child(1),
+  .week-view-table td:nth-child(1),
+  .week-view-table th:nth-child(2),
+  .week-view-table td:nth-child(2),
+  .week-view-table th:nth-child(3),
+  .week-view-table td:nth-child(3),
+  .week-view-table th:nth-child(4),
+  .week-view-table td:nth-child(4),
+  .week-view-table th:nth-child(7),
+  .week-view-table td:nth-child(7),
+  .week-view-table th:nth-child(8),
+  .week-view-table td:nth-child(8),
+  .week-view-table th:nth-child(9),
+  .week-view-table td:nth-child(9),
+  .week-view-table th:nth-child(11),
+  .week-view-table td:nth-child(11),
+  .week-view-table th:nth-child(12),
+  .week-view-table td:nth-child(12) {
+    display: none;
+  }
+  
+  .week-view-table th,
+  .week-view-table td {
+    padding: 2px;
+    font-size: 12px;
+  }
+  
+  .action-buttons-cell {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  .action-buttons-cell .action-button {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+}

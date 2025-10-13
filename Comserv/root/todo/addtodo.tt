@@ -25,6 +25,20 @@
                 <option value="[% project.id %]" [% IF project.id == current_project.id %]selected[% END %]>
                     [% project.name %]
                 </option>
+                [% IF project.sub_projects && project.sub_projects.size > 0 %]
+                    [% FOREACH sub1 IN project.sub_projects %]
+                        <option value="[% sub1.id %]" [% IF sub1.id == current_project.id %]selected[% END %]>
+                            --- [% sub1.name %]
+                        </option>
+                        [% IF sub1.sub_projects && sub1.sub_projects.size > 0 %]
+                            [% FOREACH sub2 IN sub1.sub_projects %]
+                                <option value="[% sub2.id %]" [% IF sub2.id == current_project.id %]selected[% END %]>
+                                    ------ [% sub2.name %]
+                                </option>
+                            [% END %]
+                        [% END %]
+                    [% END %]
+                [% END %]
             [% END %]
           </select>
           <button type="button" class="btn btn-secondary" onclick="openAddProjectForm()" title="Add New Project">
@@ -35,7 +49,6 @@
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
-        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Only if project not in list">
     </div>
     <div>
         <label for="due_date">Due Date:</label>
@@ -117,14 +130,13 @@
             <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
         </select>
     </div>
-    <div>
-        <label for="priority">Priority:</label>
-        <select id="priority" name="priority" class="form-select">
-        [% FOREACH priority IN [1..10] %]
-        <option value="[% priority %]" [% IF priority == todo.priority %]selected[% END %]>[% priority %]</option>
-        [% END %]
-        </select>
-    </div>
+    [% INCLUDE 'todo/priority_input.tt' 
+        priority_value = todo.priority 
+        build_priority = build_priority
+        input_id = 'priority'
+        input_name = 'priority'
+        label = 'Priority:'
+    %]
     <div>
         <label for="share">Share:</label>
         <select id="share" name="share" class="form-select">
