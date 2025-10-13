@@ -32,6 +32,7 @@
             <li>Estimated Man Hours: [% project.estimated_man_hours %]</li>
             <li>Developer Name: [% project.developer_name %]</li>
             <li>Client Name: [% project.client_name %]</li>
+            <li>Comments: [% project.comments OR 'No comments' %]</li>
         </ul>
 
         [% IF project.todos && project.todos.size > 0 %]
@@ -67,8 +68,33 @@
                             [% todo.status %]
                         [% END %]
                     </td>
-                    <td>[% todo.priority %]</td>
-                    <td>[% todo.formatted_accumulated_time || '0h 0m' %]</td>
+                    <td>
+                        [% INCLUDE todo/priority_display.tt
+                            priority_value=todo.priority 
+                            build_priority={
+                                '1' = 'Critical',
+                                '2' = 'When we have time',
+                                '3' = 'Urgent',
+                                '4' = 'High',
+                                '5' = 'Medium',
+                                '6' = 'Medium-Low',
+                                '7' = 'Low',
+                                '8' = 'Very Low',
+                                '9' = 'Minimal',
+                                '10' = 'Optional'
+                            }
+                            input_class='priority-display'
+                            label=''
+                        %]
+                    </td>
+                    <td>
+                        [% IF todo.accumulated_time %]
+                            [% hours = todo.accumulated_time / 3600 %][% hours.int %]h 
+                            [% minutes = (todo.accumulated_time % 3600) / 60 %][% minutes.int %]m
+                        [% ELSE %]
+                            0h 0m
+                        [% END %]
+                    </td>
                     <td>
                         <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display:inline;">
                             <button type="submit" class="action-button edit">Edit</button>
@@ -351,5 +377,40 @@ button[onclick="window.location.href='/project';"]:hover {
     background-color: #f8d7da;
     color: #721c24;
     border: 1px solid #f5c6cb;
+}
+
+/* Priority display styling */
+.priority-display {
+    border: none;
+    background: none;
+    font-weight: bold;
+    padding: 0;
+    margin: 0;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: default;
+    width: auto;
+}
+
+/* Remove focus outline */
+.priority-display:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Style for the priority input wrapper */
+.form-group {
+    margin-bottom: 0;
+}
+
+/* Ensure the select element doesn't have extra spacing */
+select.priority-display {
+    padding-right: 0;
+}
+
+/* Make the priority display inline */
+.priority-display-wrapper {
+    display: inline-block;
 }
 </style>

@@ -97,8 +97,8 @@ sub index :Path(/todo) :Args(0) {
 sub auto :Private {
     my ($self, $c) = @_;
 
-    # Check if the user is logged in and is an admin
-    unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
+    # Check if the user is logged in and has admin or developer role
+    unless (defined $c->session->{username} && grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
         $c->response->redirect($c->uri_for('/'));
         return 0;
@@ -699,8 +699,8 @@ sub create :Local {
     # Validate and format dates
     my ($start_date, $due_date);
     eval {
-        $start_date = $params->{start_date} ? DateTime::Format::ISO8601->parse_date($params->{start_date})->ymd : undef;
-        $due_date = $params->{due_date} ? DateTime::Format::ISO8601->parse_date($params->{due_date})->ymd : undef;
+        $start_date = $params->{start_date} ? DateTime::Format::ISO8601->parse_datetime($params->{start_date})->ymd : undef;
+        $due_date = $params->{due_date} ? DateTime::Format::ISO8601->parse_datetime($params->{due_date})->ymd : undef;
         
         if ($start_date && $due_date && $start_date > $due_date) {
             die "Start date cannot be after due date";

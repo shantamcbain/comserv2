@@ -57,6 +57,20 @@
                 </select>
             </div>
 
+            [% IF is_csc_admin %]
+            <div class="filter-group">
+                <label for="sitename">Site Name:</label>
+                <select id="sitename" name="sitename">
+                    <option value="all" [% IF !sitename_filter || sitename_filter == 'all' %]selected[% END %]>All Sites</option>
+                    [% IF sites && sites.size > 0 %]
+                        [% FOREACH site IN sites %]
+                            <option value="[% site.name %]" [% IF sitename_filter == site.name %]selected[% END %]>[% site.name %]</option>
+                        [% END %]
+                    [% END %]
+                </select>
+            </div>
+            [% END %]
+
             <div class="filter-group">
                 <label for="search">Search:</label>
                 <input type="text" id="search" name="search" placeholder="Search in subject, description, comments..." value="[% search_term %]">
@@ -77,6 +91,8 @@
     <a href="/todo/month">Month View</a>
     <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
 </div>
+
+<div class="table-responsive">
 <table class="week-view-table">
   <tr>
     <th>Sitename</th>
@@ -124,38 +140,36 @@
         </tr>
     [% END %]
     <tr>
-      <td>[% task.get_column('sitename') %]</td>
-      <td>[% task.get_column('project_id') %]</td>
-      <td>[% task.get_column('parent_todo') %]</td>
-      <td>[% task.get_column('start_date') %]</td>
-      <td>[% task.get_column('due_date') %]</td>
-      <td>[% task.get_column('subject') %]</td>
-      <td>[% task.get_column('description') %]</td>
-      <td>[% task.get_column('developer') %]</td>
-
-      <td class="priority-[% task.get_column('priority') %]">[% task.priority_name %]</td>
-      <td class="status-[% task.get_column('status') %]">[% task.status_name %]</td>
-      <td>[% task.get_column('comments') %]</td>
-      <td>[% task.get_column('accumulative_time') %]</td>
+      <td>[% task.sitename %]</td>
+      <td>[% task.project_id %]</td>
+      <td>[% task.parent_todo %]</td>
+      <td>[% task.start_date %]</td>
+      <td>[% task.due_date %]</td>
+      <td>[% task.subject %]</td>
+      <td>[% task.description %]</td>
+      <td>[% task.developer %]</td>
+      <td>[% INCLUDE todo/priority_display.tt priority_value=task.priority %]</td>
+      <td>[% task.status %]</td>
+      <td>[% task.comments %]</td>
+      <td>[% task.accumulative_time %]</td>
       <td class="action-buttons-cell">
         <form action="/log/log_form" method="POST" target="_blank">
-          <input type="hidden" name="todo_record_id" value="[% task.get_column('record_id') %]">
-          <input type="hidden" name="site_name" value="[% task.get_column('sitename') %]">
-          <input type="hidden" name="start_date" value="[% task.get_column('start_date') %]">
-          <input type="hidden" name="due_date" value="[% task.get_column('due_date') %]">
-          <input type="hidden" name="abstract" value="[% task.get_column('subject') %]">
-          <input type="hidden" name="details" value="[% task.get_column('description') %]">
-          <input type="hidden" name="priority" value="[% task.get_column('priority') %]">
-          <input type="hidden" name="status" value="[% task.get_column('status') %]">
-          <input type="hidden" name="comments" value="[% task.get_column('comments') %]">
+          <input type="hidden" name="todo_record_id" value="[% task.record_id %]">
+          <input type="hidden" name="site_name" value="[% task.sitename %]">
+          <input type="hidden" name="start_date" value="[% task.start_date %]">
+          <input type="hidden" name="due_date" value="[% task.due_date %]">
+          <input type="hidden" name="abstract" value="[% task.subject %]">
+          <input type="hidden" name="details" value="[% task.description %]">
+          <input type="hidden" name="priority" value="[% task.priority %]">
+          <input type="hidden" name="status" value="[% task.status %]">
+          <input type="hidden" name="comments" value="[% task.comments %]">
           <button type="submit" class="action-button log-button">Add Log</button>
         </form>
         <form action="/todo/details" method="POST">
-          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+          <input type="hidden" name="record_id" value="[% task.record_id %]">
           <button type="submit" class="action-button details-button">Details</button>
         </form>
-        <form action="/todo/edit/[% task.get_column('record_id') %]" method="POST">
-          <input type="hidden" name="record_id" value="[% task.get_column('record_id') %]">
+        <form action="/todo/edit/[% task.record_id %]" method="GET" style="display: inline;">
           <button type="submit" class="action-button edit-button">Edit</button>
         </form>
       </td>
@@ -163,6 +177,7 @@
     [% counter = counter + 1 %]
 [% END %]
 </table>
+</div>
 <script>document.querySelectorAll('.week-view-table tbody tr').forEach(row => {
     row.addEventListener('click', () => {
         row.classList.toggle('highlight');

@@ -43,17 +43,6 @@
         <input type="date" id="due_date" name="due_date" value="[% record.get_column('due_date') %]">
     </div>
 
-    <div>
-        <label for="time_of_day">Time of Day:</label>
-        <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
-        [% IF record.get_column('time_of_day') %]
-            <span class="time-display">Scheduled for: [% record.get_column('time_of_day') %]</span>
-        [% ELSE %]
-            <span class="no-time">No specific time set</span>
-        [% END %]
-    </div>
-
-    <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% record.get_column('subject') %]">
     </div>
