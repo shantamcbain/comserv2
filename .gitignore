@@ -108,7 +108,8 @@ Comserv/script/simple_server.pl
 Comserv/script/start_server.pl
 Comserv/script/test_load.pl
 
-# Working copies and implementation summaries
+# Working copies and implementation summaries (Zencoder convenience files)
+*.md
 AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 *.md.new
 
