@@ -1,0 +1,199 @@
+/* Shared Todo View CSS - Consistent styling across Day, Week, and Month views */
+
+/* Common View Button Styles */
+.view-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.view-buttons a {
+    padding: 8px 15px;
+    background-color: var(--button-bg, #2196F3);
+    color: var(--button-text, white);
+    text-decoration: none;
+    border-radius: 4px;
+    text-align: center;
+    border: 1px solid var(--button-border, transparent);
+}
+
+.view-buttons a:hover {
+    background-color: var(--button-hover-bg, #0b7dda);
+}
+
+.view-buttons a.active {
+    background-color: var(--button-hover-bg, #0b7dda);
+    font-weight: bold;
+}
+
+/* Common Navigation Styles */
+.view-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+}
+
+.view-navigation a {
+    padding: 8px 16px;
+    background-color: var(--button-bg, #f2f2f2);
+    color: var(--button-text, #000000);
+    text-decoration: none;
+    border-radius: 4px;
+    border: 1px solid var(--button-border, #cccccc);
+}
+
+.view-navigation a:hover {
+    background-color: var(--button-hover-bg, #e0e0e0);
+}
+
+/* Common Todo Item Styling */
+.todo-item-shared {
+    background-color: var(--table-header-bg, #f1f1f1);
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #ddd);
+    position: relative;
+    overflow: hidden;
+}
+
+.todo-item-shared.priority-1 {
+    background-color: var(--warning-color);
+    border-color: var(--warning-color);
+}
+
+.todo-item-shared.priority-2 {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.todo-item-shared.priority-3 {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+/* Todo Subject Styling */
+.todo-subject-shared {
+    font-weight: bold;
+    margin-bottom: 3px;
+    color: var(--text-color, #333);
+}
+
+/* Todo Details Section */
+.todo-details-shared {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.8em;
+    color: var(--text-color, #333);
+}
+
+.todo-status-shared {
+    font-weight: bold;
+}
+
+.todo-status-shared.status-1 { color: var(--info-color, #2196F3); }
+.todo-status-shared.status-2 { color: var(--warning-color, #FF9800); }
+.todo-status-shared.status-3 { color: var(--success-color, #4CAF50); }
+
+.time-duration-shared {
+    font-size: 0.7em;
+    color: var(--secondary-text, #666);
+    font-style: italic;
+}
+
+/* Action Buttons */
+.todo-actions-shared {
+    display: flex;
+    gap: 5px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+}
+
+.action-button-shared {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.7em;
+    transition: all 0.2s ease;
+}
+
+.action-button-shared.log-button {
+    background-color: var(--info-color, #2196F3);
+    color: white;
+}
+
+.action-button-shared.details-button {
+    background-color: var(--secondary-color, #6c757d);
+    color: white;
+}
+
+.action-button-shared.edit-button {
+    background-color: var(--warning-color, #FF9800);
+    color: white;
+}
+
+.action-button-shared:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
+}
+
+/* Add Todo Button Styles */
+.add-todo-shared {
+    background-color: var(--primary-color, #4CAF50);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-todo-shared:hover {
+    background-color: var(--primary-hover-color, #45a049);
+}
+
+/* Responsive Base Styles */
+@media (max-width: 768px) {
+    .view-buttons {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .view-buttons a {
+        padding: 6px 12px;
+        font-size: 0.9em;
+    }
+    
+    .view-navigation {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .view-navigation a {
+        padding: 6px 12px;
+        font-size: 0.9em;
+    }
+    
+    .todo-actions-shared {
+        gap: 3px;
+    }
+    
+    .action-button-shared {
+        font-size: 0.6em;
+        padding: 3px 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .view-navigation {
+        flex-direction: column;
+    }
+    
+    .view-navigation a {
+        text-align: center;
+    }
+}
+
+/* Theme Integration Script */
+.theme-integration {
+    /* This class exists to ensure theme integration works across all views */
+}

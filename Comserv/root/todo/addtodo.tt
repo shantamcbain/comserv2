@@ -3,11 +3,48 @@
     Version: [% PageVersion %]
 [% END %]
 
+<style>
+    /* Form styling */
+    form div {
+        margin-bottom: 15px;
+    }
 
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+</style>
 
 <h1>Add a New To-do Item</h1>
 
 <form action="/todo/create" method="post">
+    <!-- record_id is auto-increment, no need for manual input -->
     <div>
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% SiteName OR 'Site Name' %]" readonly>
@@ -18,90 +55,20 @@
     </div>
     <div>
         <label for="project_id">Select Project:</label>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <select id="project_id" name="project_id" style="flex: 1;">
-            <option value="" [% IF !current_project.id %]selected[% END %]>None (No Project)</option>
-            [% FOREACH project IN projects %]
-                <option value="[% project.id %]" [% IF project.id == current_project.id %]selected[% END %]>
-                    [% project.name %]
-                </option>
-                [% IF project.sub_projects && project.sub_projects.size > 0 %]
-                    [% FOREACH sub1 IN project.sub_projects %]
-                        <option value="[% sub1.id %]" [% IF sub1.id == current_project.id %]selected[% END %]>
-                            --- [% sub1.name %]
-                        </option>
-                        [% IF sub1.sub_projects && sub1.sub_projects.size > 0 %]
-                            [% FOREACH sub2 IN sub1.sub_projects %]
-                                <option value="[% sub2.id %]" [% IF sub2.id == current_project.id %]selected[% END %]>
-                                    ------ [% sub2.name %]
-                                </option>
-                            [% END %]
-                        [% END %]
-                    [% END %]
-                [% END %]
-            [% END %]
-          </select>
-          <button type="button" class="btn btn-secondary" onclick="openAddProjectForm()" title="Add New Project">
-            <i class="fas fa-plus"></i> Add Project
-          </button>
-        </div>
+          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=current_project.id %]<br>
     </div>
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
+        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Enter numeric project ID if you know it, otherwise leave blank">
+        <small style="color: #666; font-size: 0.9em; display: block; margin-top: 2px;">
+            Only use this field if you know the exact numeric project ID. Otherwise, use the dropdown above.
+        </small>
     </div>
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
     </div>
-    <div>
-        <label for="time_of_day">Time of Day (optional):</label>
-        <div class="time-input-container">
-            <select id="time_preset" class="time-preset" onchange="setTimeFromPreset()" style="margin-bottom: 5px; padding: 5px; width: 100%;">
-                <option value="">-- Select Common Time --</option>
-                <option value="08:00">8:00 AM</option>
-                <option value="09:00">9:00 AM</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="12:00">12:00 PM</option>
-                <option value="13:00">1:00 PM</option>
-                <option value="14:00">2:00 PM</option>
-                <option value="15:00">3:00 PM</option>
-                <option value="16:00">4:00 PM</option>
-                <option value="17:00">5:00 PM</option>
-                <option value="18:00">6:00 PM</option>
-                <option value="19:00">7:00 PM</option>
-                <option value="20:00">8:00 PM</option>
-            </select>
-            <input type="time" id="time_of_day" name="time_of_day" value="[% todo.time_of_day OR '' %]" placeholder="HH:MM" style="width: 100%; padding: 5px;">
-        </div>
-        <small style="color: #666; font-size: 0.9em;">Select from common times or enter manually for day view organization</small>
-    </div>
-
-    <script>
-    function setTimeFromPreset() {
-        var preset = document.getElementById('time_preset');
-        var manual = document.getElementById('time_of_day');
-        if (preset.value) {
-            manual.value = preset.value;
-        }
-    }
-    
-    function openAddProjectForm() {
-        var url = window.location.origin + '/todo/add_project';
-        console.log("Opening Add Project URL: " + url);
-        var projectWindow = window.open(url, 'addProject', 'width=800,height=600,scrollbars=yes,resizable=yes');
-        
-        // Listen for project creation completion
-        window.addEventListener('message', function(event) {
-            if (event.data.type === 'projectCreated') {
-                console.log('Project created, refreshing project list');
-                // Reload the current page to refresh the project list
-                window.location.reload();
-            }
-        });
-    }
-    </script>
     <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% todo.subject OR '' %]">
@@ -130,13 +97,14 @@
             <option value="3" [% IF todo.status == 'DONE' %]selected[% END %]>DONE</option>
         </select>
     </div>
-    [% INCLUDE 'todo/priority_input.tt' 
-        priority_value = todo.priority 
-        build_priority = build_priority
-        input_id = 'priority'
-        input_name = 'priority'
-        label = 'Priority:'
-    %]
+    <div>
+        <label for="priority">Priority:</label>
+        <select id="priority" name="priority" class="form-select">
+        [% FOREACH key IN build_priority.keys.sort %]
+        <option value="[% key %]" [% IF key == todo.priority %]selected[% END %]>[% build_priority.$key %]</option>
+        [% END %]
+        </select>
+    </div>
     <div>
         <label for="share">Share:</label>
         <select id="share" name="share" class="form-select">

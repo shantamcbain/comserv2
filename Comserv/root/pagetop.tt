@@ -92,13 +92,13 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
-        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
-        </ul>
+         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+       </ul>
     </nav>
 </header>
 [% IF error_msg %]

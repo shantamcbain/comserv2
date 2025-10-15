@@ -161,6 +161,10 @@
             <li>Filter by status (new, in progress, completed, all)</li>
             <li>Search in subject, description, and comments</li>
         </ul>
+        
+        <div class="doc-note">
+            <p><strong>Important:</strong> By default, the Todo System displays only active todos (with status "new" or "in progress"). Completed todos are filtered out unless explicitly selected using the status filter. This ensures that the main view remains focused on actionable items while still allowing access to completed tasks when needed.</p>
+        </div>
     </div>
     
     <div class="doc-subsection">

@@ -334,3 +334,92 @@
     padding: 2px 4px;
   }
 }
+
+/* Month Calendar Responsive Styles */
+.month-calendar-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: var(--spacing-medium);
+}
+
+.month-calendar {
+  min-width: 700px; /* Minimum width to maintain calendar integrity */
+}
+
+/* Tablet responsive adjustments for month calendar */
+@media (max-width: 1024px) {
+  .month-calendar th,
+  .month-calendar td {
+    height: 80px;
+    padding: 6px;
+  }
+  
+  .month-calendar .todo-item {
+    font-size: 0.75em;
+    padding: 2px;
+    margin-bottom: 2px;
+  }
+  
+  .month-calendar .day-number {
+    font-size: 0.9em;
+  }
+}
+
+/* Mobile responsive adjustments for month calendar */
+@media (max-width: 768px) {
+  .month-calendar {
+    min-width: 600px;
+  }
+  
+  .month-calendar th,
+  .month-calendar td {
+    height: 60px;
+    padding: 4px;
+    font-size: 0.85em;
+  }
+  
+  .month-calendar .todo-item {
+    font-size: 0.7em;
+    padding: 1px 2px;
+    margin-bottom: 1px;
+  }
+  
+  .month-calendar .day-number {
+    font-size: 0.8em;
+  }
+  
+  .month-calendar form button {
+    font-size: 0.7em !important;
+    padding: 1px 3px !important;
+  }
+}
+
+/* Small mobile responsive adjustments for month calendar */
+@media (max-width: 480px) {
+  .month-calendar {
+    min-width: 500px;
+  }
+  
+  .month-calendar th,
+  .month-calendar td {
+    height: 50px;
+    padding: 2px;
+    font-size: 0.75em;
+  }
+  
+  .month-calendar .todo-item {
+    font-size: 0.65em;
+    padding: 1px;
+    margin-bottom: 1px;
+  }
+  
+  .month-calendar .day-number {
+    font-size: 0.7em;
+  }
+  
+  .month-calendar form button {
+    font-size: 0.6em !important;
+    padding: 1px 2px !important;
+  }
+}
