@@ -1103,6 +1103,400 @@ sub restore_file_from_backup {
     return $result;
 }
 
+# Software Update System - Main interface for comprehensive software updates
+sub software_update :Chained('base') :PathPart('software-update') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_update', 
+        "Starting software update interface");
+    
+    # Handle POST requests for update actions
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action');
+        
+        if ($action eq 'check_updates') {
+            my $result = $self->check_available_updates($c);
+            $c->stash(%$result);
+        } elsif ($action eq 'pull_updates') {
+            my $sudo_username = $c->req->param('sudo_username');
+            my $sudo_password = $c->req->param('sudo_password');
+            
+            if (!$sudo_username || !$sudo_password) {
+                $c->stash->{error_msg} = "System credentials required for git operations";
+                $c->stash->{show_password_form} = 1;
+            } else {
+                my $result = $self->execute_git_pull($c, $sudo_username, $sudo_password);
+                $c->stash(%$result);
+                # Clear the password from memory for security
+                delete $c->req->params->{sudo_password};
+            }
+        } elsif ($action eq 'deploy_updates') {
+            my $sudo_username = $c->req->param('sudo_username');
+            my $sudo_password = $c->req->param('sudo_password');
+            
+            if (!$sudo_username || !$sudo_password) {
+                $c->stash->{error_msg} = "System credentials required for deployment operations";
+                $c->stash->{show_password_form} = 1;
+            } else {
+                my $result = $self->execute_deployment($c, $sudo_username, $sudo_password);
+                $c->stash(%$result);
+                # Clear the password from memory for security
+                delete $c->req->params->{sudo_password};
+            }
+        } elsif ($action eq 'show_credentials_form') {
+            $c->stash->{show_password_form} = 1;
+        }
+    }
+    
+    # Get current software management status
+    my $software_status = $self->get_software_management_status($c);
+    
+    # Get update history
+    my $update_history = $self->get_update_history($c);
+    
+    # Get system requirements check
+    my $system_check = $self->check_system_requirements($c);
+    
+    if ($c->session->{debug_mode}) {
+        push @{$c->stash->{debug_msg}}, "Admin controller software_update view - Template: admin/software_update.tt";
+    }
+    
+    $c->stash(
+        template => 'admin/software_update.tt',
+        software_status => $software_status,
+        update_history => $update_history,
+        system_check => $system_check
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_update', 
+        "Completed software update interface");
+}
+
+# Check for available updates from the repository
+sub check_available_updates {
+    my ($self, $c) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        updates_available => 0,
+        update_details => []
+    };
+    
+    try {
+        # Fetch from remote to get latest information
+        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
+        $result->{output} .= "Fetch output:\n$fetch_output\n";
+        
+        # Check current branch
+        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
+        chomp $current_branch;
+        
+        # Check commits behind
+        my $commits_behind = `git -C ${\$c->path_to()} rev-list HEAD..origin/$current_branch --count 2>/dev/null`;
+        chomp $commits_behind;
+        
+        if ($commits_behind && $commits_behind > 0) {
+            $result->{updates_available} = $commits_behind;
+            $result->{success} = 1;
+            $result->{message} = "$commits_behind update(s) available";
+            
+            # Get details of pending commits
+            my $pending_commits = `git -C ${\$c->path_to()} log HEAD..origin/$current_branch --oneline --no-merges 2>/dev/null`;
+            my @commit_lines = split /\n/, $pending_commits;
+            
+            foreach my $commit (@commit_lines) {
+                if ($commit =~ /^([a-f0-9]+)\s+(.+)$/) {
+                    push @{$result->{update_details}}, {
+                        commit_hash => $1,
+                        commit_message => $2
+                    };
+                }
+            }
+            
+            $result->{output} .= "\nPending commits:\n$pending_commits";
+        } else {
+            $result->{success} = 1;
+            $result->{message} = "Your software is up to date";
+            $result->{output} .= "\nNo updates available";
+        }
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Error checking for updates: $error";
+        $result->{output} .= "\nError: $error";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'check_available_updates', 
+            "Error checking for updates: $error");
+    };
+    
+    return $result;
+}
+
+# Execute git pull with sudo credentials
+sub execute_git_pull {
+    my ($self, $c, $sudo_username, $sudo_password) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        backup_created => 0
+    };
+    
+    try {
+        # Create backup before pulling
+        my $backup_result = $self->create_pre_update_backup($c);
+        if ($backup_result->{success}) {
+            $result->{backup_created} = 1;
+            $result->{output} .= "Backup created: " . $backup_result->{backup_path} . "\n";
+        } else {
+            $result->{output} .= "Backup warning: " . $backup_result->{message} . "\n";
+        }
+        
+        # Execute git pull
+        my $app_dir = $c->path_to();
+        my $pull_command = "cd $app_dir && git pull origin";
+        
+        # Use echo to pipe password (insecure but functional for controlled environment)
+        my $full_command = "echo '$sudo_password' | sudo -S -u $sudo_username $pull_command 2>&1";
+        my $output = `$full_command`;
+        
+        $result->{output} .= "\nGit pull output:\n$output";
+        
+        # Check if pull was successful
+        if ($output =~ /Already up to date|Fast-forward|\d+ files? changed/) {
+            $result->{success} = 1;
+            $result->{message} = "Software updates pulled successfully";
+            $result->{success_msg} = "Code has been updated. Review changes before deploying.";
+        } else {
+            $result->{message} = "Git pull completed but may need review";
+            $result->{success_msg} = "Git pull executed. Please review output for any conflicts.";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
+            "Git pull executed by user: $sudo_username");
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Error during git pull: $error";
+        $result->{output} .= "\nError: $error";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
+            "Error during git pull: $error");
+    };
+    
+    return $result;
+}
+
+# Execute full deployment (dependencies + restart)
+sub execute_deployment {
+    my ($self, $c, $sudo_username, $sudo_password) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        output => '',
+        steps_completed => []
+    };
+    
+    try {
+        my $app_dir = $c->path_to();
+        
+        # Step 1: Check dependencies
+        $result->{output} .= "=== Step 1: Checking Dependencies ===\n";
+        my $deps_check = `cd $app_dir && perl Makefile.PL 2>&1`;
+        $result->{output} .= $deps_check;
+        push @{$result->{steps_completed}}, 'dependencies_checked';
+        
+        # Step 2: Install missing dependencies if any
+        $result->{output} .= "\n=== Step 2: Installing Dependencies ===\n";
+        my $deps_install = `cd $app_dir && cpanm --installdeps . 2>&1`;
+        $result->{output} .= $deps_install;
+        push @{$result->{steps_completed}}, 'dependencies_installed';
+        
+        # Step 3: Restart Starman service
+        $result->{output} .= "\n=== Step 3: Restarting Starman Service ===\n";
+        my ($restart_success, $restart_output) = $self->execute_starman_restart($c, $sudo_username, $sudo_password);
+        $result->{output} .= $restart_output;
+        
+        if ($restart_success) {
+            push @{$result->{steps_completed}}, 'service_restarted';
+            $result->{success} = 1;
+            $result->{message} = "Deployment completed successfully";
+            $result->{success_msg} = "Software has been deployed and service restarted.";
+        } else {
+            $result->{message} = "Deployment partially completed - service restart failed";
+            $result->{error_msg} = "Dependencies updated but service restart failed. Manual intervention may be required.";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_deployment', 
+            "Deployment executed with steps: " . join(', ', @{$result->{steps_completed}}));
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Error during deployment: $error";
+        $result->{output} .= "\nError: $error";
+        $result->{error_msg} = $result->{message};
+        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_deployment', 
+            "Error during deployment: $error");
+    };
+    
+    return $result;
+}
+
+# Create backup before updates
+sub create_pre_update_backup {
+    my ($self, $c) = @_;
+    
+    my $result = {
+        success => 0,
+        message => '',
+        backup_path => ''
+    };
+    
+    try {
+        my $app_dir = $c->path_to();
+        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime());
+        my $backup_dir = "$app_dir/Comserv/backups/pre_update_$timestamp";
+        
+        # Create backup directory
+        make_path($backup_dir) or die "Cannot create backup directory: $!";
+        
+        # Copy critical files
+        my @critical_files = (
+            'Comserv/comserv.psgi',
+            'Comserv/lib/Comserv.pm',
+            'Comserv/comserv.conf'
+        );
+        
+        foreach my $file (@critical_files) {
+            my $source = "$app_dir/$file";
+            next unless -f $source;
+            
+            my $target_dir = dirname("$backup_dir/$file");
+            make_path($target_dir) unless -d $target_dir;
+            
+            copy($source, "$backup_dir/$file") or warn "Failed to backup $file: $!";
+        }
+        
+        # Create manifest file
+        my $manifest = "$backup_dir/BACKUP_MANIFEST.txt";
+        open(my $fh, '>', $manifest) or die "Cannot create manifest: $!";
+        print $fh "Comserv Pre-Update Backup\n";
+        print $fh "Created: " . strftime("%Y-%m-%d %H:%M:%S", localtime()) . "\n";
+        print $fh "Git Commit: " . `git -C $app_dir rev-parse HEAD 2>/dev/null` || "Unknown\n";
+        print $fh "Files backed up:\n";
+        foreach my $file (@critical_files) {
+            print $fh "  $file\n" if -f "$app_dir/$file";
+        }
+        close($fh);
+        
+        $result->{success} = 1;
+        $result->{backup_path} = $backup_dir;
+        $result->{message} = "Backup created successfully";
+        
+    } catch {
+        my $error = $_;
+        $result->{message} = "Failed to create backup: $error";
+    };
+    
+    return $result;
+}
+
+# Get software update history
+sub get_update_history {
+    my ($self, $c) = @_;
+    
+    my @history = ();
+    
+    try {
+        # Get recent commits
+        my $log_output = `git -C ${\$c->path_to()} log --oneline -10 --no-merges 2>/dev/null`;
+        my @commits = split /\n/, $log_output;
+        
+        foreach my $commit (@commits) {
+            if ($commit =~ /^([a-f0-9]+)\s+(.+)$/) {
+                # Get commit details
+                my $commit_hash = $1;
+                my $commit_msg = $2;
+                my $commit_date = `git -C ${\$c->path_to()} show -s --format=%ci $commit_hash 2>/dev/null`;
+                chomp $commit_date;
+                
+                push @history, {
+                    hash => $commit_hash,
+                    message => $commit_msg,
+                    date => $commit_date,
+                    author => `git -C ${\$c->path_to()} show -s --format=%an $commit_hash 2>/dev/null` || 'Unknown'
+                };
+            }
+        }
+        
+    } catch {
+        # If git fails, return empty history
+    };
+    
+    return \@history;
+}
+
+# Check system requirements for updates
+sub check_system_requirements {
+    my ($self, $c) = @_;
+    
+    my $check = {
+        perl_version => 'Unknown',
+        disk_space => 'Unknown',
+        memory => 'Unknown',
+        git_version => 'Unknown',
+        requirements_met => 1,
+        warnings => []
+    };
+    
+    try {
+        # Check Perl version
+        $check->{perl_version} = $^V ? sprintf("v%vd", $^V) : 'Unknown';
+        
+        # Check disk space
+        my $df_output = `df -h . | tail -1`;
+        if ($df_output =~ /\s+(\d+)%\s+/) {
+            my $usage = $1;
+            $check->{disk_space} = "${usage}% used";
+            
+            if ($usage > 95) {
+                push @{$check->{warnings}}, "Critical: Disk space very low (${usage}% used)";
+                $check->{requirements_met} = 0;
+            } elsif ($usage > 85) {
+                push @{$check->{warnings}}, "Warning: Disk space getting low (${usage}% used)";
+            }
+        }
+        
+        # Check memory
+        my $free_output = `free -h | grep '^Mem:'`;
+        if ($free_output =~ /Mem:\s+(\S+)\s+(\S+)\s+(\S+)/) {
+            $check->{memory} = "$2 used of $1";
+        }
+        
+        # Check Git version
+        my $git_version = `git --version 2>/dev/null`;
+        chomp $git_version;
+        $check->{git_version} = $git_version || 'Not available';
+        
+        unless ($git_version) {
+            push @{$check->{warnings}}, "Git not available - required for updates";
+            $check->{requirements_met} = 0;
+        }
+        
+    } catch {
+        push @{$check->{warnings}}, "Error checking system requirements";
+    };
+    
+    return $check;
+}
+
 =head1 AUTHOR
 
 Shanta McBain

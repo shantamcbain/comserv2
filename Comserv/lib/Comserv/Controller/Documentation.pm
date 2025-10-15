@@ -8,6 +8,7 @@ use File::Basename;
 use File::Spec;
 use FindBin;
 use Time::Piece;
+use JSON;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -312,7 +313,7 @@ sub index :Path('/Documentation') :Args(0) {
 
     # Set up stash variables for the template
     $c->stash(
-        template => 'Documentation.tt',
+        template => 'admin/documentation/index.tt',
         pages => $structured_pages,
         sorted_pages => \@sorted_pages,
         user_role => $user_role,
@@ -556,6 +557,172 @@ sub view :Path('/Documentation') :Args(1) {
         error_msg => "Documentation page '$page' not found.",
         template => 'Documentation/error.tt'
     );
+}
+
+# Edit roles for a documentation page
+sub edit_roles :Path('/Documentation/edit_roles') :Args(1) {
+    my ($self, $c, $page_name) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_roles',
+        "Accessing edit roles for page: $page_name");
+    
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    # Ensure documentation has been scanned
+    $self->_ensure_scanned($c);
+    
+    # Get the page metadata
+    my $pages = $self->documentation_pages;
+    unless (exists $pages->{$page_name}) {
+        $c->response->status(404);
+        $c->stash(
+            error_msg => "Documentation page '$page_name' not found.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    my $page_metadata = $pages->{$page_name};
+    
+    # Available roles in the system
+    my @available_roles = qw(normal user editor admin developer);
+    
+    $c->stash(
+        template => 'admin/documentation/edit_roles.tt',
+        page_name => $page_name,
+        page_title => $self->_format_title($page_name),
+        page_metadata => $page_metadata,
+        available_roles => \@available_roles,
+        current_roles => $page_metadata->{roles} || [],
+    );
+}
+
+# Update roles for a documentation page
+sub update_roles :Path('/Documentation/update_roles') :Args(1) {
+    my ($self, $c, $page_name) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',
+        "Updating roles for page: $page_name");
+    
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    # Only handle POST requests
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->stash(
+            error_msg => "Method not allowed. POST required.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    # Ensure documentation has been scanned
+    $self->_ensure_scanned($c);
+    
+    # Get the page metadata
+    my $pages = $self->documentation_pages;
+    unless (exists $pages->{$page_name}) {
+        $c->response->status(404);
+        $c->stash(
+            error_msg => "Documentation page '$page_name' not found.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    # Get selected roles from form
+    my @selected_roles = $c->req->param('roles');
+    
+    # Validate roles
+    my @valid_roles = qw(normal user editor admin developer);
+    my @filtered_roles = grep { my $role = $_; grep { $_ eq $role } @valid_roles } @selected_roles;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',
+        "Selected roles for $page_name: " . join(', ', @filtered_roles));
+    
+    # Update the page metadata in memory
+    $pages->{$page_name}->{roles} = \@filtered_roles;
+    
+    # Load the documentation configuration
+    my $config_path = $c->path_to('root', 'Documentation', 'config', 'documentation_config.json');
+    my $config_data = {};
+    
+    if (-e $config_path) {
+        eval {
+            open my $fh, '<:encoding(UTF-8)', $config_path or die "Cannot open $config_path: $!";
+            my $json_content = do { local $/; <$fh> };
+            close $fh;
+            $config_data = JSON->new->utf8->decode($json_content);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_roles',
+                "Error reading config file: $@");
+        }
+    }
+    
+    # Update or create entry in config
+    $config_data->{pages} ||= {};
+    $config_data->{pages}->{$page_name} ||= {};
+    $config_data->{pages}->{$page_name}->{roles} = \@filtered_roles;
+    $config_data->{pages}->{$page_name}->{last_updated} = scalar localtime;
+    
+    # Save the updated configuration
+    eval {
+        open my $fh, '>:encoding(UTF-8)', $config_path or die "Cannot write to $config_path: $!";
+        print $fh JSON->new->utf8->pretty->encode($config_data);
+        close $fh;
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_roles',
+            "Error saving config file: $@");
+        $c->stash(
+            error_msg => "Error saving role changes: $@",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_roles',
+        "Successfully updated roles for $page_name");
+    
+    # Redirect back to documentation index with success message
+    $c->response->redirect($c->uri_for('/Documentation') . '?msg=roles_updated&page=' . $page_name);
+}
+
+# Check if user has admin access
+sub _check_admin_access {
+    my ($self, $c) = @_;
+    
+    # Check session roles
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+        return 1 if grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @{$c->session->{roles}};
+    }
+    
+    # Special case for site CSC
+    if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
+        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+            return 1;
+        }
+    }
+    
+    return 0;
 }
 
 # Ensure documentation scanning has been done

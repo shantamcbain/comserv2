@@ -89,7 +89,7 @@
       "description": "Documentation about the documentation system itself",
       "roles": ["admin", "developer"],
       "site_specific": false,
-      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation", "documentation_migration_to_tt", "documentation_tt_template"]
+      "pages": ["Documentation", "Documentation_System", "Documentation_Controller", "Documentation_Management", "documentation_system_guide", "documentation_guide", "documentation_config_guide", "documentation_migration_guide", "documentation_template", "documentation_index_adaptation", "documentation_migration_to_tt", "documentation_tt_template", "tt_file_standardization_guide"]
     },
     "templates": {
       "title": "Template Documentation",
@@ -181,6 +181,7 @@
     "2024-06-21-linux-commands-documentation": "Documentation/changelog/2024-06-21-linux-commands-documentation.md",
     "documentation_migration_to_tt": "Documentation/documentation_migration_to_tt.tt",
     "documentation_tt_template": "Documentation/documentation_tt_template.tt",
+    "tt_file_standardization_guide": "Documentation/tt_file_standardization_guide.tt",
     "2025-10-01-documentation-migration-to-tt": "Documentation/changelog/2025-10-01-documentation-migration-to-tt.tt",
     "2025-10-15-documentation-access-fixes": "Documentation/changelog/2025-10-15-documentation-access-fixes.tt",
     "2025-01-20-todo-system-documentation": "Documentation/changelog/2025-01-20-todo-system-documentation.tt",

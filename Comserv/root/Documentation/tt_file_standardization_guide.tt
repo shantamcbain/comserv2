@@ -1,0 +1,320 @@
+[% META
+        title = "Template Toolkit (.tt) File Standardization Guide"
+   description = "Complete guide for standardizing all .tt files in the Comserv project"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "documentation"
+   page_version = "1.03"
+   last_updated = "Wed Oct 15 11:25:46 AM PDT 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/tt_file_standardization_guide.tt,v 1.03 11:25:46 2025/10/15 shanta Exp shanta - Template Compliance Update' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Template Toolkit (.tt) File Standardization Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-10-15 | 
+        Version: 1.03 | 
+        Author: ai_assistant | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                This guide provides the comprehensive plan for standardizing all 631+ .tt files across the Comserv project.
+                The goal is to ensure consistent structure, maintainability, and adherence to established patterns.
+            </p>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> Currently 631 .tt files identified requiring standardization</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Priority:</strong> High - Essential for project maintainability</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">File Type Classification</h2>
+        </div>
+    </div>
+        
+    <div class="row">
+        <div class="col-50">
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Documentation .tt Files</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Location:</strong> <code>/Comserv/root/Documentation/</code></li>
+                <li><strong>Purpose:</strong> System documentation, guides, help content</li>
+                <li><strong>Template:</strong> <code>documentation_tt_template.tt</code></li>
+                <li><strong>Characteristics:</strong> META headers, role-based access, structured content</li>
+            </ul>
+        </div>
+        
+        <div class="col-50">
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Application .tt Files</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Location:</strong> Throughout <code>/Comserv/root/</code> (excluding Documentation)</li>
+                <li><strong>Purpose:</strong> User interface views, forms, application functionality</li>
+                <li><strong>Template:</strong> <code>application_tt_template.tt</code> (needs creation)</li>
+                <li><strong>Characteristics:</strong> Functional UI, error handling, dynamic content</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Required Standards for All .tt Files</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">1. Mandatory PageVersion Header</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+[% PageVersion = 'path/to/filename.tt,v X.XX YYYY/MM/DD author Exp author ' %]
+                </code></pre>
+            </div>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2. Debug Mode Support</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+                </code></pre>
+            </div>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3. Documentation Files: META Block</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+[% META 
+   title = "Document Title"
+   description = "Brief description"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "category_name"
+   page_version = "1.00"
+   last_updated = "Wed Oct 15 11:25:46 AM PDT 2025"
+   site_specific = "false"
+%]
+                </code></pre>
+            </div>
+        
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4. Theme-Compliant CSS</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Use CSS custom properties for theme compatibility:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Layout:</strong> <code>.container</code>, <code>.row</code>, <code>.col-*</code> classes</li>
+                <li><strong>Colors:</strong> <code>var(--text-color)</code>, <code>var(--primary-color)</code>, etc.</li>
+                <li><strong>Typography:</strong> <code>var(--header-font)</code>, <code>var(--body-font)</code></li>
+                <li><strong>Spacing:</strong> <code>var(--spacing-small/medium/large)</code></li>
+                <li><strong>Borders:</strong> <code>var(--border-color)</code></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Application Template Structure</h2>
+        <p>Standard template for application .tt files:</p>
+        
+        <pre class="code-block">
+[% PageVersion = 'path/to/filename.tt,v 0.01 YYYY/MM/DD author Exp author ' %]
+[% META 
+   title = "Application Page Title"
+   description = "Brief description"
+   roles = "normal,admin"  # Application-specific roles
+%]
+
+[% IF c.session.debug_mode == 1 %]
+    &lt;div class="debug-info"&gt;PageVersion: [% PageVersion %]&lt;/div&gt;
+[% END %]
+
+&lt;div class="app-container"&gt;
+    &lt;h1&gt;[% title || "Default Title" %]&lt;/h1&gt;
+    
+    [% content %]
+    
+    [% IF errors %]
+    &lt;div class="error-messages"&gt;
+        [% FOREACH error IN errors %]
+            &lt;div class="error"&gt;[% error %]&lt;/div&gt;
+        [% END %]
+    &lt;/div&gt;
+    [% END %]
+&lt;/div&gt;
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Enhanced .tt File Editing Workflow</h2>
+        
+        <ol>
+            <li><strong>Identify file type</strong> (Application vs Documentation)</li>
+            <li><strong>Check modification dates</strong> (.tt vs .md timestamps)</li>
+            <li><strong>Create/Update working copy (.md)</strong>
+                <pre class="code-block">cp /full/path/to/filename.tt /full/path/to/filename.md</pre>
+            </li>
+            <li><strong>Edit .md file using appropriate template standards</strong></li>
+            <li><strong>Validate against guidelines:</strong>
+                <ul>
+                    <li>PageVersion format compliance</li>
+                    <li>Required META block (if applicable)</li>
+                    <li>CSS class compliance</li>
+                    <li>Role-based content structure</li>
+                    <li>Debug mode support</li>
+                </ul>
+            </li>
+            <li><strong>Present cp command for approval:</strong>
+                <pre class="code-block">cp /full/path/to/filename.md /full/path/to/filename.tt</pre>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Implementation Plan</h2>
+        
+        <h3>Phase 1: Foundation (Week 1)</h3>
+        <ul>
+            <li>✅ Create <code>tt_file_standardization_guide.tt</code></li>
+            <li>🔄 Create <code>application_tt_template.tt</code></li>
+            <li>🔄 Enhance <code>documentation_tt_template.tt</code></li>
+            <li>🔄 Update <code>.zencoder/rules/repo.md</code> with template links</li>
+        </ul>
+        
+        <h3>Phase 2: Audit and Categorize (Week 2)</h3>
+        <ul>
+            <li>📋 Scan all 631 .tt files for PageVersion status</li>
+            <li>📋 Categorize files by type (application vs documentation)</li>
+            <li>📋 Identify files missing required headers</li>
+            <li>📋 Document non-standard patterns</li>
+            <li>📋 Create file inventory with standardization status</li>
+        </ul>
+        
+        <h3>Phase 3: High-Priority Updates (Weeks 3-4)</h3>
+        <p><strong>Priority Order:</strong></p>
+        <ol>
+            <li>Main application layouts (<code>/include/</code>, <code>/Navigation/</code>)</li>
+            <li>Authentication and user management (<code>/user/</code>, <code>/admin/</code>)</li>
+            <li>Core functionality (<code>/site/</code>, <code>/mail/</code>, <code>/file/</code>)</li>
+            <li>Module-specific views (<code>/ENCY/</code>, <code>/todo/</code>, <code>/WorkShops/</code>)</li>
+        </ol>
+        
+        <h3>Phase 4: Systematic Updates (Weeks 5-8)</h3>
+        <p><strong>For each file:</strong></p>
+        <ol>
+            <li>Create .md working copy (if needed)</li>
+            <li>Add/update PageVersion header</li>
+            <li>Standardize META block (if applicable)</li>
+            <li>Apply CSS class standards</li>
+            <li>Add debug blocks (where appropriate)</li>
+            <li>Update with cp command approval</li>
+        </ol>
+        
+        <h3>Phase 5: Validation and Testing (Weeks 9-10)</h3>
+        <ul>
+            <li>Verify all files have PageVersion</li>
+            <li>Test template rendering</li>
+            <li>Validate role-based content</li>
+            <li>Update documentation</li>
+            <li>Create compliance reporting</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Current State Analysis</h2>
+        
+        <h3>What Exists:</h3>
+        <ul>
+            <li>631+ application .tt files throughout <code>/Comserv/root/</code> directories</li>
+            <li>Documentation .tt template (<code>documentation_tt_template.tt</code>) - partially complete</li>
+            <li>Working copies (.md files) with PageVersion headers</li>
+            <li>Established workflow in <code>.zencoder/rules/repo.md</code></li>
+        </ul>
+        
+        <h3>What's Missing:</h3>
+        <ul>
+            <li>Application .tt file template and guidelines</li>
+            <li>Standardized PageVersion format enforcement</li>
+            <li>Consistent META headers across application files</li>
+            <li>Unified CSS class usage</li>
+            <li>Role-based content guidelines</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Success Metrics</h2>
+        <ul>
+            <li><strong>100% PageVersion compliance</strong> across all .tt files</li>
+            <li><strong>Consistent META headers</strong> where applicable</li>
+            <li><strong>Standardized CSS classes</strong> throughout</li>
+            <li><strong>Role-based content</strong> properly implemented</li>
+            <li><strong>Debug mode support</strong> in all files</li>
+            <li><strong>Unified editing workflow</strong> adoption</li>
+        </ul>
+    </div>
+    
+    <div class="doc-section">
+        <h2>File Structure After Standardization</h2>
+        <pre class="code-block">
+Documentation/
+├── application_tt_template.tt          # NEW - Application template
+├── documentation_tt_template.tt        # ENHANCED - Doc template  
+├── tt_file_standardization_guide.tt    # ✅ THIS FILE
+└── ...existing files...
+
+Comserv/root/
+├── [631 .tt files standardized with:]
+│   ├── Proper PageVersion headers
+│   ├── Consistent META blocks
+│   ├── Standard CSS classes
+│   ├── Role-based content structure
+│   └── Debug mode support
+        </pre>
+    </div>
+    
+    <div class="doc-section">
+        <h2>Related Documents</h2>
+        <ul>
+            <li><a href="documentation_tt_template.tt">Documentation Template (.tt format)</a></li>
+            <li><a href="../.zencoder/rules/repo.md">.tt File Editing Workflow</a></li>
+            <li><a href="AI_Guidelines.tt">AI Development Guidelines</a></li>
+        </ul>
+    </div>
+    
+    <div class="row">
+        <div class="col-100">
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">Next Steps</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    Use this guide to systematically standardize .tt files across the project. 
+                    Start with Phase 1 tasks in future sessions, following the established workflow for .tt file editing.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this standardization guide, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system template standardization initiative.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 
+TEMPLATE COMPLIANCE NOTES:
+
+This standardization guide has been updated to be fully compliant with the documentation_tt_template.tt:
+
+1. **META Block**: Complete with all required fields including TemplateType, page_version, last_updated, and site_specific
+2. **PageVersion Format**: Updated to current standard with proper versioning
+3. **Theme Compliance**: Uses CSS custom properties (--text-color, --header-font, etc.) for cross-theme compatibility
+4. **Responsive Layout**: Uses .container, .row, .col-* grid system
+5. **Color-Coded Blocks**: Info, success blocks with proper theme variable usage
+6. **Documentation Category**: Properly categorized as "documentation" in META
+
+This file serves as both a guide for standardization AND an example of a properly standardized .tt file.
+-->

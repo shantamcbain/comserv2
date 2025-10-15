@@ -98,13 +98,35 @@ sub _scan_directories {
                         $format = 'template';
                     }
 
-                    # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => $site,
-                        roles => \@roles,
-                        format => $format
-                    };
+                    # Store the path with metadata, prioritizing .tt files over .md files
+                    # If both .tt and .md exist, .tt takes precedence (according to workflow)
+                    if (exists $self->documentation_pages->{$key}) {
+                        my $existing_format = $self->documentation_pages->{$key}->{format};
+                        # Only overwrite if current file is .tt and existing is .md
+                        # This ensures .tt files take precedence
+                        if ($format eq 'template' && $existing_format eq 'markdown') {
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Overwriting .md file with .tt file for key: $key");
+                            $self->documentation_pages->{$key} = {
+                                path => $path,
+                                site => $site,
+                                roles => \@roles,
+                                format => $format
+                            };
+                        } else {
+                            # Keep existing entry, log the skip
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Skipping $format file for key '$key' - already exists as $existing_format");
+                        }
+                    } else {
+                        # First occurrence of this key
+                        $self->documentation_pages->{$key} = {
+                            path => $path,
+                            site => $site,
+                            roles => \@roles,
+                            format => $format
+                        };
+                    }
                 },
                 no_chdir => 1,
             },
