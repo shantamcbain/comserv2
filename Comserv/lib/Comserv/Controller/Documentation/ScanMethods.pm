@@ -71,11 +71,12 @@ sub _scan_directories {
 
                     # Determine site and role requirements
                     my $site = 'all';
-                    my @roles = ('normal', 'editor', 'admin', 'developer');
+                    my @roles;
 
                     # Check if this is site-specific documentation
                     if ($path =~ m{Documentation/sites/([^/]+)/}) {
                         $site = uc($1); # Convert site name to uppercase to match SiteName format
+                        @roles = ('admin', 'developer', 'editor'); # Site-specific docs restricted
                     }
 
                     # Check if this is role-specific documentation
@@ -87,6 +88,32 @@ sub _scan_directories {
                             @roles = ('developer');
                         } elsif ($role eq 'editor') {
                             @roles = ('editor', 'admin', 'developer');
+                        } elsif ($role eq 'normal') {
+                            @roles = ('normal', 'editor', 'admin', 'developer');
+                        }
+                    }
+                    
+                    # If no specific role directory, determine by path and content type
+                    unless (@roles) {
+                        if ($path =~ m{Documentation/admin/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/developer/}) {
+                            @roles = ('developer');
+                        } elsif ($path =~ m{Documentation/controllers/} || $path =~ m{Documentation/models/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/system/} || $path =~ m{Documentation/proxmox/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/session_history/}) {
+                            @roles = ('admin', 'developer', 'editor');
+                        } elsif ($path =~ m{Documentation/changelog/}) {
+                            @roles = ('admin', 'developer', 'editor');
+                        } elsif ($path =~ m{Documentation/ai_workflows/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/general/} || $path =~ m{Documentation/tutorials/}) {
+                            @roles = ('normal', 'editor', 'admin', 'developer');
+                        } else {
+                            # Default for root-level documentation - accessible to all authenticated users
+                            @roles = ('normal', 'editor', 'admin', 'developer');
                         }
                     }
                     

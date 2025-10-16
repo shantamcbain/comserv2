@@ -1,7 +1,7 @@
 [%# Admin Documentation Index Template %]
 [% META title = 'Admin Documentation Index' %]
 [% META description = 'Complete list of all documentation files for administrators' %]
-[% PageVersion = 'admin/documentation/index.tt,v 1.03 2025/10/15 14:04:01 system Exp system ' %]
+[% PageVersion = 'admin/documentation/index.tt,v 1.08 2025/01/18 08:45:00 system Exp system ' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -41,29 +41,17 @@
             margin: 0 15px;
         }
         
-        /* Global Theme Compatible Container */
+        /* Use global theme compatibility - remove local overrides */
         .theme-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            overflow: hidden;
+            /* Inherits from global documentation.css */
         }
         
         .container-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 20px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-            transition: background 0.3s ease;
+            /* Inherits from global documentation.css */
         }
         
         .container-header:hover {
-            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            /* Inherits from global documentation.css */
         }
         
         .container-header h2 {
@@ -73,8 +61,15 @@
         }
         
         .toggle-icon {
-            font-size: 1.2em;
+            /* CSS-based arrow that works without Font Awesome */
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 8px solid currentColor;
             transition: transform 0.3s ease;
+            vertical-align: middle;
         }
         
         .container-header.expanded .toggle-icon {
@@ -82,14 +77,11 @@
         }
         
         .container-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease, padding 0.3s ease;
-            background: #fafbfc;
+            /* Inherits from global documentation.css */
         }
         
         .container-content.expanded {
-            max-height: 2000px;
+            /* Inherits from global documentation.css with dynamic padding */
             padding: 20px;
         }
         
@@ -166,11 +158,77 @@
             color: #ef6c00;
         }
         
+        .role-badge.clickable {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .role-badge.clickable:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            opacity: 0.8;
+        }
+        
+        .file-card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e1e5e9;
+        }
+        
+        .edit-roles-btn {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .edit-roles-btn:hover {
+            background: #5a67d8;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .roles-edit-hint {
+            font-size: 10px;
+            color: #666;
+            font-style: italic;
+        }
+        
         .summary-info {
             text-align: center;
             color: #666;
             font-size: 14px;
             margin-bottom: 15px;
+        }
+        
+        /* Category-specific styles */
+        .badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .category-description {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #555;
+            font-style: italic;
         }
         
         @media (max-width: 768px) {
@@ -191,6 +249,7 @@
         <div class="user-context">
             <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
             <span class="context-item"><strong>Role:</strong> [% user_role || 'Unknown' %]</span>
+            <span class="context-item"><strong>Admin:</strong> [% is_admin ? 'Yes' : 'No' %]</span>
             <span class="context-item"><strong>Files Available:</strong> [% page_count || 0 %]</span>
         </div>
     </header>
@@ -199,7 +258,7 @@
     <div class="theme-container">
         <div class="container-header" onclick="toggleContainer(this)">
             <h2>All Files</h2>
-            <span class="toggle-icon">▼</span>
+            <span class="toggle-icon"></span>
         </div>
         <div class="container-content">
             <div class="summary-info">
@@ -209,7 +268,18 @@
             <div class="files-grid">
                 [% FOREACH page_name IN sorted_pages %]
                     [% page = pages.$page_name %]
+                    [% # Show all pages if admin, or pages without roles, or pages with matching user role %]
+                    [% show_page = 0 %]
                     [% IF page %]
+                        [% IF is_admin %]
+                            [% show_page = 1 %]
+                        [% ELSIF !page.roles || page.roles.size == 0 %]
+                            [% show_page = 1 %]
+                        [% ELSIF user_role && page.roles.grep("^${user_role}\$").size > 0 %]
+                            [% show_page = 1 %]
+                        [% END %]
+                    [% END %]
+                    [% IF show_page %]
                         <div class="file-card">
                             <div class="file-title">
                                 <a href="[% page.url %]">[% page.title || page_name %]</a>
@@ -221,12 +291,31 @@
                             <div class="file-roles">
                                 [% IF page.roles %]
                                     [% FOREACH role IN page.roles %]
-                                        <span class="role-badge [% role %]">[% role | ucfirst %]</span>
+                                        <span class="role-badge [% role %] [% IF is_admin %]clickable[% END %]" 
+                                              [% IF is_admin %]onclick="editRoles('[% page_name %]')"[% END %]
+                                              title="[% IF is_admin %]Click to edit roles for this page[% ELSE %]Role: [% role | ucfirst %][% END %]">
+                                            [% role | ucfirst %]
+                                        </span>
                                     [% END %]
                                 [% ELSE %]
-                                    <span class="role-badge">All Users</span>
+                                    <span class="role-badge [% IF is_admin %]clickable[% END %]" 
+                                          [% IF is_admin %]onclick="editRoles('[% page_name %]')"[% END %]
+                                          title="[% IF is_admin %]Click to edit roles for this page[% ELSE %]Accessible to all users[% END %]">
+                                        All Users
+                                    </span>
                                 [% END %]
                             </div>
+                            
+                            [% IF is_admin %]
+                                <div class="file-card-actions">
+                                    <div class="roles-edit-hint">
+                                        Click roles above to edit access permissions
+                                    </div>
+                                    <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-btn">
+                                        Edit Roles
+                                    </a>
+                                </div>
+                            [% END %]
                         </div>
                     [% END %]
                 [% END %]
@@ -243,6 +332,93 @@
             </div>
         </div>
     </div>
+
+    <!-- Category-based containers (Dynamic from JSON config) -->
+    [% FOREACH category_key IN sorted_categories %]
+        [% category = categories.$category_key %]
+        [% category_pages = categorized_pages.$category_key %]
+        [% # Filter category pages by user roles %]
+        [% accessible_pages = [] %]
+        [% FOREACH page IN category_pages %]
+            [% allow_page = 0 %]
+            [% IF is_admin %]
+                [% allow_page = 1 %]
+            [% ELSIF !page.roles || page.roles.size == 0 %]
+                [% allow_page = 1 %]
+            [% ELSIF user_role && page.roles.grep("^${user_role}\$").size > 0 %]
+                [% allow_page = 1 %]
+            [% END %]
+            [% IF allow_page %]
+                [% accessible_pages.push(page) %]
+            [% END %]
+        [% END %]
+        [% IF accessible_pages.size > 0 %]
+            <!-- Each category gets its own collapsible container -->
+            <div class="theme-container">
+                <div class="container-header" onclick="toggleContainer(this)">
+                    <h2>
+                        [% IF category.icon %]<i class="[% category.icon %]"></i> [% END %]
+                        [% category.title || category_key | ucfirst %]
+                        <span class="badge">[% accessible_pages.size %]</span>
+                    </h2>
+                    <span class="toggle-icon"></span>
+                </div>
+                <div class="container-content">
+                    [% IF category.description %]
+                        <div class="category-description">
+                            [% category.description %]
+                        </div>
+                    [% END %]
+                    
+                    <div class="summary-info">
+                        [% accessible_pages.size %] file[% IF accessible_pages.size != 1 %]s[% END %] in this category
+                    </div>
+                    
+                    <div class="files-grid">
+                        [% FOREACH page IN accessible_pages %]
+                            <div class="file-card">
+                                <div class="file-title">
+                                    <a href="[% page.url %]">[% page.title %]</a>
+                                </div>
+                                <div class="file-meta">
+                                    <strong>Path:</strong> [% page.path %]<br>
+                                    <strong>Site:</strong> [% page.site || 'all' %]
+                                </div>
+                                <div class="file-roles">
+                                    [% IF page.roles %]
+                                        [% FOREACH role IN page.roles %]
+                                            <span class="role-badge [% role %] [% IF is_admin %]clickable[% END %]" 
+                                                  [% IF is_admin %]onclick="editRoles('[% page.title %]')"[% END %]
+                                                  title="[% IF is_admin %]Click to edit roles for this page[% ELSE %]Role: [% role | ucfirst %][% END %]">
+                                                [% role | ucfirst %]
+                                            </span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        <span class="role-badge [% IF is_admin %]clickable[% END %]" 
+                                              [% IF is_admin %]onclick="editRoles('[% page.title %]')"[% END %]
+                                              title="[% IF is_admin %]Click to edit roles for this page[% ELSE %]Accessible to all users[% END %]">
+                                            All Users
+                                        </span>
+                                    [% END %]
+                                </div>
+                                
+                                [% IF is_admin %]
+                                    <div class="file-card-actions">
+                                        <div class="roles-edit-hint">
+                                            Click roles above to edit access permissions
+                                        </div>
+                                        <a href="/Documentation/edit_roles/[% page.title %]" class="edit-roles-btn">
+                                            Edit Roles
+                                        </a>
+                                    </div>
+                                [% END %]
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+        [% END %]
+    [% END %]
 </div>
 
 <script>
@@ -273,6 +449,11 @@ function toggleContainer(header) {
             content.style.overflowX = 'hidden';
         }
     }
+}
+
+// Function to handle role editing
+function editRoles(pageName) {
+    window.location.href = '/Documentation/edit_roles/' + encodeURIComponent(pageName);
 }
 
 // Initialize container as closed
