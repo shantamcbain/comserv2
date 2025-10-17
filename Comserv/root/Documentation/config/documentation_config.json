@@ -1,270 +1,233 @@
 {
-  "categories": {
-    "user_guides": {
-      "title": "User Guides",
-      "description": "Documentation for end users of the system",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_filter": "all"
-    },
-    "admin_guides": {
-      "title": "Administrator Guides",
-      "description": "Documentation for system administrators",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "developer_guides": {
-      "title": "Developer Documentation",
-      "description": "Documentation for developers",
-      "roles": ["developer", "admin"],
-      "site_filter": "all"
-    },
-    "tutorials": {
-      "title": "Tutorials",
-      "description": "Step-by-step guides for common tasks",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_filter": "all"
-    },
-    "mail_system": {
-      "title": "Mail System",
-      "description": "Documentation for the mail system",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "ui_features": {
-      "title": "UI Features",
-      "description": "Documentation for UI features and components",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "site_specific": {
-      "title": "Site-Specific Documentation",
-      "description": "Documentation specific to this site",
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site_filter": "site_specific"
-    },
-    "modules": {
-      "title": "Module Documentation",
-      "description": "Documentation for specific system modules",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "controllers": {
-      "title": "Controller Documentation",
-      "description": "Documentation for system controllers",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "models": {
-      "title": "Model Documentation",
-      "description": "Documentation for system models",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "changelog": {
-      "title": "Changelog",
-      "description": "System changes and updates",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "proxmox": {
-      "title": "Proxmox Documentation",
-      "description": "Documentation for Proxmox virtualization environment",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "documentation": {
-      "title": "Documentation System",
-      "description": "Documentation about the documentation system itself",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    },
-    "templates": {
-      "title": "Template Documentation",
-      "description": "Documentation for system templates",
-      "roles": ["admin", "developer"],
-      "site_filter": "all"
-    }
-  },
-  "pages": [
-    {
-      "id": "getting_started",
-      "title": "Getting Started",
-      "description": "Basic guide to using the system",
-      "path": "Documentation/roles/normal/getting_started.md",
-      "format": "markdown",
-      "categories": ["user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "account_management",
-      "title": "Account Management",
-      "description": "Managing user accounts",
-      "path": "Documentation/roles/normal/account_management.tt",
-      "format": "template",
-      "categories": ["user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "admin_guide",
-      "title": "Administrator Guide",
-      "description": "Guide for system administrators",
-      "path": "Documentation/roles/admin/admin_guide.md",
-      "format": "markdown",
-      "categories": ["admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "user_management",
-      "title": "User Management",
-      "description": "Managing system users",
-      "path": "Documentation/roles/admin/user_management.md",
-      "format": "markdown",
-      "categories": ["admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "api",
-      "title": "API Documentation",
-      "description": "System API reference",
-      "path": "Documentation/api.tt",
-      "format": "template",
-      "categories": ["developer_guides"],
-      "roles": ["developer", "admin"],
-      "site": "all"
-    },
-    {
-      "id": "api_reference",
-      "title": "API Reference",
-      "description": "Detailed API reference",
-      "path": "Documentation/roles/developer/api_reference.md",
-      "format": "markdown",
-      "categories": ["developer_guides"],
-      "roles": ["developer", "admin"],
-      "site": "all"
-    },
-    {
-      "id": "authentication_system",
-      "title": "Authentication System",
-      "description": "System authentication documentation",
-      "path": "Documentation/developer/authentication_system.md",
-      "format": "markdown",
-      "categories": ["developer_guides"],
-      "roles": ["developer", "admin"],
-      "site": "all"
-    },
-    {
-      "id": "customizing_profile",
-      "title": "Customizing Profile",
-      "description": "How to customize user profiles",
-      "path": "Documentation/tutorials/customizing_profile.md",
-      "format": "markdown",
-      "categories": ["tutorials"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "login_authentication",
-      "title": "Login Authentication",
-      "description": "Tutorial on authentication",
-      "path": "Documentation/tutorials/login_authentication.md",
-      "format": "markdown",
-      "categories": ["tutorials"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "todo_system_comprehensive",
-      "title": "Todo System Comprehensive Guide",
-      "description": "Complete guide to the todo system",
-      "path": "Documentation/todo_system_comprehensive.tt",
-      "format": "template",
-      "categories": ["modules", "admin_guides"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "Projects",
-      "title": "Project Management",
-      "description": "Project management documentation",
-      "path": "Documentation/Projects.tt",
-      "format": "template",
-      "categories": ["modules", "user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "Documentation_Controller",
-      "title": "Documentation Controller",
-      "description": "Documentation controller implementation",
-      "path": "Documentation/controllers/Documentation.md",
-      "format": "markdown",
-      "categories": ["controllers"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "main_changelog",
-      "title": "Main Changelog",
-      "description": "System changelog",
-      "path": "Documentation/main_changelog.md",
-      "format": "markdown",
-      "categories": ["changelog"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "2025-10-15-documentation-access-fixes",
-      "title": "2025-10-15 Documentation Access Fixes",
-      "description": "Documentation access fixes changelog entry",
-      "path": "Documentation/changelog/2025-10-15-documentation-access-fixes.tt",
-      "format": "template",
-      "categories": ["changelog"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "proxmox_integration",
-      "title": "Proxmox Integration",
-      "description": "Proxmox system integration documentation",
-      "path": "Documentation/proxmox_integration.md",
-      "format": "markdown",
-      "categories": ["proxmox"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "Documentation_System",
-      "title": "Documentation System",
-      "description": "Overview of the documentation system",
-      "path": "Documentation/roles/normal/Documentation_System.md",
-      "format": "markdown",
-      "categories": ["documentation", "user_guides"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "documentation_migration_to_tt",
-      "title": "Documentation Migration to TT",
-      "description": "Guide for migrating documentation to Template Toolkit format",
-      "path": "Documentation/documentation_migration_to_tt.tt",
-      "format": "template",
-      "categories": ["documentation"],
-      "roles": ["admin", "developer"],
-      "site": "all"
-    },
-    {
-      "id": "site_guide",
-      "title": "Site Guide",
-      "description": "Site-specific documentation guide",
-      "path": "Documentation/sites/mcoop/site_guide.md",
-      "format": "markdown",
-      "categories": ["site_specific"],
-      "roles": ["normal", "editor", "admin", "developer"],
-      "site": "mcoop"
-    }
-  ]
+   "pages" : {
+      "Admin" : {
+         "last_updated" : "Fri Oct 17 09:13:54 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      "controller_routing_guidelines" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Fri Oct 17 09:40:03 2025"
+      },
+      "ContentManagement" : {
+         "last_updated" : "Thu Oct 16 11:26:26 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      "BMasterController" : {
+         "last_updated" : "Thu Oct 16 10:15:13 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      "Pages" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Fri Oct 17 09:26:45 2025"
+      },
+      "proxmox_api" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Fri Oct 17 09:39:12 2025"
+      },
+      "opnsense_vm_proxmox_k83_setup" : {
+         "last_updated" : "Fri Oct 17 09:37:37 2025",
+         "roles" : [
+            "admin",
+            "developer"
+         ]
+      },
+      "AI" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Thu Oct 16 10:12:37 2025"
+      },
+      "admin" : {
+         "last_updated" : "Thu Oct 16 10:13:23 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      "admin_guides" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Fri Oct 17 09:28:15 2025"
+      },
+      "admintopmenu_guide" : {
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "last_updated" : "Thu Oct 16 10:14:38 2025"
+      },
+      "Api" : {
+         "last_updated" : "Fri Oct 17 09:14:19 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      }
+   },
+   "categories" : {
+      "developer_guides" : {
+         "description" : "Documentation for developers",
+         "title" : "Developer Documentation",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site_filter" : "all"
+      },
+      "documentation" : {
+         "site_filter" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "description" : "Documentation about the documentation system itself",
+         "title" : "Documentation System"
+      },
+      "admin_guides" : {
+         "site_filter" : "all",
+         "description" : "Documentation for system administrators",
+         "title" : "Administrator Guides",
+         "roles" : [
+            "admin",
+            "developer"
+         ]
+      },
+      "user_guides" : {
+         "description" : "Documentation for end users of the system",
+         "title" : "User Guides",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all"
+      },
+      "mail_system" : {
+         "site_filter" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "description" : "Documentation for the mail system",
+         "title" : "Mail System"
+      },
+      "ui_features" : {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "UI Features",
+         "description" : "Documentation for UI features and components",
+         "site_filter" : "all"
+      },
+      "controllers" : {
+         "title" : "Controller Documentation",
+         "description" : "Documentation for system controllers",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all"
+      },
+      "proxmox" : {
+         "site_filter" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "description" : "Documentation for Proxmox virtualization environment",
+         "title" : "Proxmox Documentation"
+      },
+      "tutorials" : {
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "Tutorials",
+         "description" : "Step-by-step guides for common tasks",
+         "site_filter" : "all"
+      },
+      "site_specific" : {
+         "site_filter" : "site_specific",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "title" : "Site-Specific Documentation",
+         "description" : "Documentation specific to this site"
+      },
+      "modules" : {
+         "site_filter" : "all",
+         "description" : "Documentation for specific system modules",
+         "title" : "Module Documentation",
+         "roles" : [
+            "admin",
+            "developer"
+         ]
+      },
+      "templates" : {
+         "site_filter" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "description" : "Documentation for system templates",
+         "title" : "Template Documentation"
+      },
+      "models" : {
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "description" : "Documentation for system models",
+         "title" : "Model Documentation",
+         "site_filter" : "all"
+      },
+      "changelog" : {
+         "site_filter" : "all",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "title" : "Changelog",
+         "description" : "System changes and updates"
+      }
+   }
 }

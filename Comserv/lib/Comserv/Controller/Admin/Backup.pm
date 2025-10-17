@@ -5,6 +5,8 @@ use namespace::autoclean;
 BEGIN { extends 'Catalyst::Controller'; }
 
 use Try::Tiny;
+use JSON;
+use POSIX;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::BackupManager;
 use Comserv::Util::Logging;
@@ -277,6 +279,134 @@ sub delete_backup :Local :Args(1) {
     $c->stash(
         template => 'admin/backup/delete.tt',
         backup_filename => $backup_filename
+    );
+}
+
+=head2 create_database_backup
+
+Create a database backup
+
+=cut
+
+sub create_database_backup :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    return unless $self->admin_auth->require_admin_access($c, 'create_database_backup');
+    
+    if ($c->req->method eq 'POST') {
+        my $backup_type = $c->req->param('database_type') || 'all';  # 'all', 'ency', 'forager'
+        my $compress = $c->req->param('compress') ? 1 : 0;
+        my $username = $c->session->{username} || 'system';
+        
+        my $timestamp = POSIX::strftime("%Y%m%d_%H%M%S", localtime);
+        my $backup_name = "database_backup_$timestamp";
+        
+        my $result = $self->backup_manager($c)->create_database_backup($c, $backup_name, {
+            type => $backup_type,
+            compress => $compress
+        });
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup', 
+            "Database backup ($backup_type) result: " . ($result->{success} ? 'SUCCESS' : 'FAILED'));
+        
+        if ($result->{success}) {
+            my $db_count = scalar @{$result->{databases_backed_up}};
+            my $db_names = join(', ', map { $_->{model} } @{$result->{databases_backed_up}});
+            
+            # Use flash for success message to persist across redirect
+            $c->flash->{success_msg} = "Database backup created successfully. Backed up $db_count database(s): $db_names";
+            
+            # Redirect to main interface on success
+            $c->response->redirect($c->uri_for('/admin/backup'));
+            return;
+        } else {
+            # On failure, remain on same page to show error message
+            $c->stash(error_msg => "Database backup failed: " . $result->{error});
+        }
+    }
+    
+    # Test database connections for the form
+    my $db_test_result = $self->backup_manager($c)->test_database_connection($c);
+    
+    $c->stash(
+        template => 'admin/backup/create_database.tt',
+        available_databases => $db_test_result->{available_databases} || []
+    );
+}
+
+=head2 download_backup
+
+Download a backup file
+
+=cut
+
+sub download_backup :Local :Args(1) {
+    my ($self, $c, $backup_filename) = @_;
+    
+    return unless $self->admin_auth->require_admin_access($c, 'download_backup');
+    
+    # Find the backup file
+    my $backup_dirs = $self->backup_manager($c)->backup_dirs;
+    my $backup_path = undef;
+    
+    for my $backup_dir (@$backup_dirs) {
+        my $potential_path = "$backup_dir/$backup_filename";
+        if (-f $potential_path) {
+            $backup_path = $potential_path;
+            last;
+        }
+    }
+    
+    unless ($backup_path && -f $backup_path) {
+        $c->stash(error_msg => "Backup file not found: $backup_filename");
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
+    
+    # Set up download
+    $c->response->header('Content-Type' => 'application/octet-stream');
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$backup_filename\"");
+    $c->response->header('Content-Length' => -s $backup_path);
+    
+    # Stream the file
+    open(my $fh, '<:raw', $backup_path) or do {
+        $c->stash(error_msg => "Cannot read backup file: $!");
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    };
+    
+    $c->response->body($fh);
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download_backup', 
+        "Downloaded backup file: $backup_filename");
+}
+
+=head2 test_database_connections
+
+Test database connections for backup readiness
+
+=cut
+
+sub test_database_connections :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    return unless $self->admin_auth->require_admin_access($c, 'test_database_connections');
+    
+    my $result = $self->backup_manager($c)->test_database_connection($c);
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_database_connections', 
+        "Database connection test completed. Available: " . scalar(@{$result->{available_databases} || []}));
+    
+    # Return JSON for AJAX calls
+    if ($c->req->header('Accept') =~ /json/) {
+        $c->response->content_type('application/json');
+        $c->response->body(JSON->new->pretty->encode($result));
+        return;
+    }
+    
+    $c->stash(
+        template => 'admin/backup/test_connections.tt',
+        test_result => $result
     );
 }
 

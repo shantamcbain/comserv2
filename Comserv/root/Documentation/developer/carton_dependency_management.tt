@@ -1,0 +1,295 @@
+[% META
+        title = "Carton Dependency Management for Catalyst Applications"
+   description = "Guide to standardizing Perl dependency management using Carton for consistent, reproducible environments"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "developer"
+   page_version = "1.00"
+   last_updated = "Fri Oct 17 09:00:46 AM PDT 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/developer/carton_dependency_management.tt,v 1.00 09:00:46 2025/10/17 shanta Exp shanta - Carton Dependency Management Documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Carton Dependency Management for Catalyst Applications</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-10-17 | 
+        Version: 1.0 | 
+        Author: Shanta | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This guide explains how to standardize Perl dependency management using Carton to ensure reproducible dependencies across development, staging, and production environments, eliminating version mismatches and system Perl conflicts.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Catalyst application already installed</li>
+                <li>Admin access to development and production VMs</li>
+                <li>Git repository access for committing dependency files</li>
+                <li>R710 Catalyst VM and workstation dev VM access</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Benefits</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Version Consistency</strong>: Identical dependencies across all environments</li>
+                <li><strong>Isolation</strong>: Local dependency installation prevents system conflicts</li>
+                <li><strong>Reproducibility</strong>: Exact dependency versions tracked in version control</li>
+                <li><strong>Safety</strong>: No system Perl modifications required</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Install Carton</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Install Carton globally on your system using cpanm.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Install Carton globally
+cpanm Carton
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Create cpanfile</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create a cpanfile in your Catalyst application's root directory to define all dependencies.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Create cpanfile in your Catalyst app's root directory
+# /home/shanta/PycharmProjects/comserv2/Comserv/cpanfile
+
+requires 'Catalyst::Runtime', '5.90129';
+requires 'Catalyst::Devel';
+requires 'Starman', '0.4015';
+requires 'DBIx::Class';
+requires 'Template';
+requires 'Moose';
+requires 'Email::Sender::Simple';
+requires 'JSON';
+requires 'YAML::XS';
+requires 'DateTime';
+requires 'Log::Log4perl';
+
+# Development dependencies (optional)
+on 'develop' => sub {
+    requires 'Test::More';
+    requires 'Test::Pod';
+    requires 'Test::Pod::Coverage';
+    requires 'Test::WWW::Mechanize::Catalyst';
+};
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Install Dependencies</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Install all dependencies into a local directory using Carton.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Navigate to your Catalyst application directory
+cd /home/shanta/PycharmProjects/comserv2/Comserv
+
+# Install dependencies locally
+carton install
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Advanced Usage</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Running Your Application with Carton</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Always use carton exec to run your application with the proper dependency isolation.</p>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Run with Starman server
+carton exec plackup -s Starman -p 5000 app.psgi
+
+# Run development server
+carton exec script/comserv_server.pl
+
+# Run any Perl script with isolated dependencies
+carton exec perl your_script.pl
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Version Control Integration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Commit dependency files to ensure consistent environments across all deployments.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Add dependency files to Git
+git add cpanfile cpanfile.snapshot
+git commit -m "Add Carton dependency management"
+git push origin main
+
+# Note: Do NOT commit the local/ directory - add it to .gitignore
+echo "local/" >> .gitignore
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Production Deployment</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Deploy with exact dependency versions on production servers.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# On production server after code deployment
+cd /path/to/catalyst/app
+carton install --deployment
+
+# This ensures exact versions from cpanfile.snapshot are used
+# and no development dependencies are installed
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Module Not Found After carton install</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Application fails to start with "Can't locate Module/Name.pm in @INC"</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Always use <code>carton exec</code> prefix when running your application or any Perl commands</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Version Conflicts Between Environments</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Code works in development but fails in production due to different module versions</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Ensure cpanfile.snapshot is committed and use <code>carton install --deployment</code> in production</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Carton Command Not Found</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> "carton: command not found" error</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Install Carton globally with <code>cpanm Carton</code> or ensure your Perl bin directory is in your PATH</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Command Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Command</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Purpose</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Environment</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">carton install</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Install all dependencies locally</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Development</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">carton install --deployment</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Install exact versions from snapshot</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">carton exec [command]</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Run command with local dependencies</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">All</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">carton list</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Show installed dependencies</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">All</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">carton update [module]</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Update specific module or all modules</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Development</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">Migration Checklist</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>✓ Install Carton globally on all servers</li>
+                    <li>✓ Create cpanfile with all current dependencies</li>
+                    <li>✓ Run <code>carton install</code> to generate local/ and cpanfile.snapshot</li>
+                    <li>✓ Update startup scripts to use <code>carton exec</code></li>
+                    <li>✓ Add cpanfile and cpanfile.snapshot to version control</li>
+                    <li>✓ Add local/ to .gitignore</li>
+                    <li>✓ Deploy and test in staging environment</li>
+                    <li>✓ Deploy to production using <code>--deployment</code> flag</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/developer/catalyst_deployment" style="color: var(--link-color);">Catalyst Deployment Guide</a></li>
+                    <li><a href="/Documentation/system/database_configuration" style="color: var(--link-color);">Database Configuration</a></li>
+                    <li><a href="/Documentation/admin/server_update_procedure" style="color: var(--link-color);">Server Update Procedure</a></li>
+                    <li><a href="https://metacpan.org/pod/Carton" style="color: var(--link-color);">Official Carton Documentation</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about dependency management, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system development guidelines.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 
+IMPLEMENTATION NOTES:
+
+This documentation covers the complete Carton workflow for Catalyst applications:
+
+1. **Dependency Management Benefits**:
+   - Eliminates version conflicts between dev/staging/prod
+   - Provides local dependency installation (no system Perl changes)
+   - Ensures reproducible builds across environments
+
+2. **Key Files**:
+   - cpanfile: Dependency declarations (human-readable)
+   - cpanfile.snapshot: Exact versions (auto-generated)
+   - local/: Installation directory (auto-created, not versioned)
+
+3. **Workflow**:
+   - Development: carton install (installs latest compatible versions)
+   - Production: carton install --deployment (uses exact snapshot versions)
+   - Execution: Always use carton exec prefix
+
+4. **Hardware Compatibility**:
+   - Works on existing R710 Catalyst VM
+   - Compatible with workstation dev VM
+   - No system modifications required
+
+This approach eliminates the manual CPAN update risks mentioned in the original request.
+-->
