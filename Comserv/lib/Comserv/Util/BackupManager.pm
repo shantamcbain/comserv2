@@ -6,7 +6,7 @@ use Moose;
 use Try::Tiny;
 use File::Copy;
 use File::Path qw(make_path);
-use File::Basename qw(dirname);
+use File::Basename qw(dirname basename);
 use File::stat;
 use Archive::Tar;
 use JSON qw(encode_json decode_json);
@@ -663,6 +663,339 @@ sub create_manual_backup {
         $result->{message} = "Manual backup failed: $error";
         $result->{output} .= "Backup error: $error\n";
     };
+    
+    return $result;
+}
+
+=head2 create_database_backup
+
+Create a backup of database(s)
+
+Args: $c (catalyst context), $backup_name, $options (optional HashRef)
+Returns: HashRef with success, error, dump_file, databases_backed_up
+
+Options:
+  - type: 'all', 'ency', 'forager' (default: 'all')
+  - compress: boolean (default: true)
+
+=cut
+
+sub create_database_backup {
+    my ($self, $c, $backup_name, $options) = @_;
+    
+    $options ||= {};
+    my $backup_type = $options->{type} || 'all';
+    my $compress = defined $options->{compress} ? $options->{compress} : 1;
+    
+    my $result = {
+        success => 0,
+        error => '',
+        dump_file => '',
+        databases_backed_up => []
+    };
+    
+    eval {
+        # Use the last (or only) backup directory
+        my $backup_dirs = $self->backup_dirs;
+        my $backup_dir = $backup_dirs->[-1];  # Use last directory (backups)
+        make_path($backup_dir) unless -d $backup_dir;
+        
+        # Get available database models based on backup type
+        my @database_models = ();
+        
+        if ($backup_type eq 'all' || $backup_type eq 'ency') {
+            # Try to get DBEncy model
+            eval { 
+                my $dbency = $c->model('DBEncy');
+                if ($dbency && $dbency->storage) {
+                    push @database_models, { name => 'DBEncy', model => $dbency };
+                    warn "DEBUG: Successfully loaded DBEncy model for backup";
+                } else {
+                    warn "DEBUG: DBEncy model loaded but no storage available";
+                }
+            };
+            if ($@) {
+                warn "Could not load DBEncy model: $@";
+            }
+        }
+        
+        if ($backup_type eq 'all' || $backup_type eq 'forager') {
+            # Try to get DBForager model  
+            eval {
+                my $dbforager = $c->model('DBForager');
+                if ($dbforager && $dbforager->storage) {
+                    push @database_models, { name => 'DBForager', model => $dbforager };
+                    warn "DEBUG: Successfully loaded DBForager model for backup";
+                } else {
+                    warn "DEBUG: DBForager model loaded but no storage available";
+                }
+            };
+            if ($@) {
+                warn "Could not load DBForager model: $@";
+            }
+        }
+        
+        unless (@database_models) {
+            die "No database models available for backup (type: $backup_type)";
+        }
+        
+        my @backup_files = ();
+        my @successful_backups = ();
+        
+        # Process each database model
+        for my $db_info (@database_models) {
+            my $model_name = $db_info->{name};
+            my $model = $db_info->{model};
+            
+            warn "DEBUG: Processing model $model_name";
+            
+            # Get DSN from model storage
+            my $dsn;
+            eval {
+                $dsn = $model->storage->connect_info->[0];
+                warn "DEBUG: Got DSN for $model_name: " . ($dsn || 'undefined');
+            };
+            if ($@) {
+                warn "DEBUG: Error getting DSN for $model_name: $@";
+            }
+            
+            unless ($dsn) {
+                warn "Cannot get DSN for $model_name, skipping";
+                next;
+            }
+            
+            # Parse DSN to extract database information
+            my ($db_type, $db_name, $host, $port, $user, $password);
+            
+            if ($dsn =~ /^dbi:mysql:database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
+                $db_type = 'mysql';
+                $db_name = $1;
+                $host = $2 || 'localhost';
+                $port = $3 || 3306;
+                
+                # Get user and password from connect_info
+                my $connect_info = $model->storage->connect_info;
+                $user = $connect_info->[1] || '';
+                $password = $connect_info->[2] || '';
+                
+            } elsif ($dsn =~ /^dbi:sqlite:(.+)$/i) {
+                $db_type = 'sqlite';
+                $db_name = $1;
+                
+            } else {
+                warn "Unsupported database type for $model_name: $dsn, skipping";
+                next;
+            }
+            
+            # Create individual dump file for this database
+            my $individual_dump_file = "$backup_dir/${backup_name}_${model_name}_database.sql";
+            push @backup_files, $individual_dump_file;
+            
+            # Create backup command based on database type
+            my $backup_command;
+            
+            if ($db_type eq 'mysql') {
+                # MySQL backup
+                my $host_param = ($host && $host ne 'localhost') ? "-h '$host'" : '';
+                my $port_param = ($port && $port != 3306) ? "-P $port" : '';
+                my $user_param = $user ? "-u '$user'" : '';
+                
+                # Handle password parameter securely
+                my $password_param = '';
+                if ($password) {
+                    # Escape single quotes in password for shell safety
+                    my $escaped_password = $password;
+                    $escaped_password =~ s/'/'\"'\"'/g;
+                    $password_param = "-p'$escaped_password'";
+                }
+                
+                $backup_command = "mysqldump $host_param $port_param $user_param $password_param --single-transaction --routines --triggers '$db_name' > '$individual_dump_file' 2>&1";
+                
+                # Test mysqldump availability
+                my $mysqldump_test = `which mysqldump 2>/dev/null`;
+                chomp($mysqldump_test);
+                unless ($mysqldump_test) {
+                    warn "mysqldump command not found for $model_name, skipping";
+                    next;
+                }
+                
+            } elsif ($db_type eq 'sqlite') {
+                # SQLite backup - copy the database file
+                if (-f $db_name) {
+                    $backup_command = "cp '$db_name' '$individual_dump_file'";
+                } else {
+                    warn "SQLite database file not found for $model_name: $db_name, skipping";
+                    next;
+                }
+            }
+            
+            # Execute backup command for this database
+            warn "DEBUG: Executing backup command for $model_name: $backup_command";
+            my $backup_output = `$backup_command`;
+            my $backup_result = $?;
+            
+            if ($backup_result != 0) {
+                warn "Backup command failed for $model_name with exit code: $backup_result";
+                if ($backup_output) {
+                    warn "Command output: $backup_output";
+                }
+                next; # Continue with next database instead of failing completely
+            }
+            
+            # Verify backup file was created
+            unless (-f $individual_dump_file && -s $individual_dump_file) {
+                warn "Backup file for $model_name was not created or is empty: $individual_dump_file";
+                next;
+            }
+            
+            # Record successful backup
+            push @successful_backups, {
+                model => $model_name,
+                database => $db_name,
+                file => $individual_dump_file,
+                size => -s $individual_dump_file
+            };
+        }
+        
+        # Check if we have any successful backups
+        if (@successful_backups == 0) {
+            die "No databases were successfully backed up";
+        }
+        
+        # Determine final backup file name
+        my $final_backup_file;
+        if (@backup_files > 1) {
+            # Create a combined dump file containing all individual backups
+            $final_backup_file = "$backup_dir/${backup_name}_all_databases.sql";
+            
+            # Combine all individual backup files
+            my $combine_command = "cat " . join(' ', map { "'$_'" } @backup_files) . " > '$final_backup_file'";
+            my $combine_result = system($combine_command);
+            
+            if ($combine_result == 0 && -f $final_backup_file && -s $final_backup_file) {
+                # Clean up individual files after successful combination
+                foreach my $individual_file (@backup_files) {
+                    unlink $individual_file if -f $individual_file;
+                }
+            } else {
+                # If combination failed, keep individual files and use the first one as primary
+                $final_backup_file = $backup_files[0] if @backup_files;
+            }
+        } else {
+            # Only one database backed up
+            $final_backup_file = $backup_files[0];
+        }
+        
+        # Compress if requested
+        if ($compress && $final_backup_file) {
+            my $compressed_file = "$final_backup_file.gz";
+            my $gzip_command = "gzip '$final_backup_file'";
+            my $gzip_result = system($gzip_command);
+            
+            if ($gzip_result == 0 && -f $compressed_file) {
+                $result->{dump_file} = $compressed_file;
+            } else {
+                $result->{dump_file} = $final_backup_file;
+            }
+        } else {
+            $result->{dump_file} = $final_backup_file;
+        }
+        
+        # Create metadata file for database backup
+        my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
+        my $meta_data = {
+            description => "Database backup ($backup_type databases)",
+            type => "database",
+            subtype => $backup_type,
+            filename => basename($result->{dump_file}),
+            created_by => 'system',
+            created_at => time(),
+            databases => \@successful_backups,
+            compressed => $compress
+        };
+        
+        my $meta_file = "$result->{dump_file}.meta";
+        open(my $fh, '>', $meta_file) or warn "Cannot create metadata file: $!";
+        print $fh encode_json($meta_data);
+        close($fh);
+        
+        $result->{success} = 1;
+        $result->{databases_backed_up} = \@successful_backups;
+        
+    };
+    
+    if ($@) {
+        $result->{error} = $@;
+    }
+    
+    return $result;
+}
+
+=head2 test_database_connection
+
+Test database connections for backup readiness
+
+Args: $c (catalyst context)
+Returns: HashRef with success, error, available_databases
+
+=cut
+
+sub test_database_connection {
+    my ($self, $c) = @_;
+    
+    my $result = {
+        success => 0,
+        error => '',
+        available_databases => []
+    };
+    
+    eval {
+        # Test DBEncy model
+        eval {
+            my $dbency = $c->model('DBEncy');
+            if ($dbency && $dbency->storage) {
+                my $dsn = $dbency->storage->connect_info->[0];
+                push @{$result->{available_databases}}, {
+                    name => 'DBEncy',
+                    dsn => $dsn,
+                    status => 'available'
+                };
+            }
+        };
+        if ($@) {
+            push @{$result->{available_databases}}, {
+                name => 'DBEncy', 
+                error => $@,
+                status => 'error'
+            };
+        }
+        
+        # Test DBForager model
+        eval {
+            my $dbforager = $c->model('DBForager');
+            if ($dbforager && $dbforager->storage) {
+                my $dsn = $dbforager->storage->connect_info->[0];
+                push @{$result->{available_databases}}, {
+                    name => 'DBForager',
+                    dsn => $dsn, 
+                    status => 'available'
+                };
+            }
+        };
+        if ($@) {
+            push @{$result->{available_databases}}, {
+                name => 'DBForager',
+                error => $@,
+                status => 'error'
+            };
+        }
+        
+        $result->{success} = 1;
+    };
+    
+    if ($@) {
+        $result->{error} = $@;
+    }
     
     return $result;
 }

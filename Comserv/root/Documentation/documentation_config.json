@@ -265,6 +265,26 @@
       "categories": ["site_specific"],
       "roles": ["normal", "editor", "admin", "developer"],
       "site": "mcoop"
+    },
+    {
+      "id": "carton_dependency_management",
+      "title": "Carton Dependency Management",
+      "description": "Guide to standardizing Perl dependency management using Carton for consistent, reproducible environments",
+      "path": "Documentation/developer/carton_dependency_management.tt",
+      "format": "template",
+      "categories": ["developer_guides"],
+      "roles": ["developer", "admin"],
+      "site": "all"
+    },
+    {
+      "id": "opnsense_vm_proxmox_k8s_setup",
+      "title": "OPNsense VM on R710 with Proxmox, Kubernetes & Docker Failover Setup",
+      "description": "Complete infrastructure guide for deploying OPNsense VM on Dell R710 with Proxmox, Docker-enabled Kubernetes cluster, and automatic failover to physical Dell 210",
+      "path": "Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt",
+      "format": "template",
+      "categories": ["developer_guides"],
+      "roles": ["developer", "admin"],
+      "site": "all"
     }
   ]
 }

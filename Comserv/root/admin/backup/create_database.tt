@@ -1,0 +1,211 @@
+[% META title = 'Create Database Backup' %]
+[% PageVersion = 'admin/backup/create_database.tt,v 1.1 2025/10/16 comserv Exp comserv' %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin/backup/create_database.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/admin') %]">Admin</a></li>
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/admin/backup') %]">Backup</a></li>
+                    <li class="breadcrumb-item active">Create Database Backup</li>
+                </ol>
+            </nav>
+
+            <h1><i class="fas fa-database"></i> Create Database Backup</h1>
+            <p class="lead">Create backups of your database(s) with customizable options.</p>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    [% IF success_msg %]
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> [% success_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    [% IF error_msg %]
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> [% error_msg %]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    [% END %]
+
+    <!-- Database Status -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Available Databases</h3>
+                </div>
+                <div class="card-body">
+                    [% IF available_databases.size > 0 %]
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Database</th>
+                                    <th>Status</th>
+                                    <th>Connection String</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH db IN available_databases %]
+                                <tr>
+                                    <td><strong>[% db.name %]</strong></td>
+                                    <td>
+                                        [% IF db.status == 'available' %]
+                                            <span class="badge bg-success"><i class="fas fa-check"></i> Available</span>
+                                        [% ELSE %]
+                                            <span class="badge bg-danger"><i class="fas fa-times"></i> Error</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF db.dsn %]
+                                            <code>[% db.dsn %]</code>
+                                        [% ELSE %]
+                                            <span class="text-danger">[% db.error || 'No connection info' %]</span>
+                                        [% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                    [% ELSE %]
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        No database connections found. Please check your database configuration.
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Form -->
+    [% IF available_databases.size > 0 %]
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Database Backup Options</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="[% c.uri_for('/admin/backup/create_database_backup') %]">
+                        <div class="mb-3">
+                            <label for="database_type" class="form-label">Database Selection</label>
+                            <select id="database_type" name="database_type" class="form-select" required>
+                                <option value="all">All Available Databases</option>
+                                [% FOREACH db IN available_databases %]
+                                [% IF db.status == 'available' %]
+                                <option value="[% db.name.lower.replace('db', '') %]">[% db.name %] Only</option>
+                                [% END %]
+                                [% END %]
+                            </select>
+                            <div class="form-text">
+                                Select which database(s) to backup. "All" will backup all available databases.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="compress" name="compress" checked>
+                                <label class="form-check-label" for="compress">
+                                    Compress backup files
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Compress the backup files with gzip to save space. Recommended for most cases.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <h5>Backup Information</h5>
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> What will be backed up:</h6>
+                                <ul>
+                                    <li><strong>MySQL databases:</strong> Full database dump including structure, data, routines, and triggers</li>
+                                    <li><strong>SQLite databases:</strong> Complete database file copy</li>
+                                    <li><strong>File format:</strong> SQL dump files (.sql) optionally compressed (.sql.gz)</li>
+                                    <li><strong>Location:</strong> Stored in the backup directory with timestamp</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-database"></i> Create Database Backup
+                            </button>
+                            <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Backup Management
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Backup Tips</h5>
+                </div>
+                <div class="card-body">
+                    <h6><i class="fas fa-lightbulb"></i> Best Practices</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-clock text-primary"></i>
+                            Schedule regular backups during off-peak hours
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success"></i>
+                            Test backup restoration periodically
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-download text-info"></i>
+                            Download important backups to external storage
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-trash text-warning"></i>
+                            Clean up old backups to free space
+                        </li>
+                    </ul>
+
+                    <hr>
+
+                    <h6><i class="fas fa-exclamation-triangle text-warning"></i> Important Notes</h6>
+                    <ul class="list-unstyled text-small">
+                        <li class="mb-1">• Backup process may take time for large databases</li>
+                        <li class="mb-1">• Ensure sufficient disk space before backup</li>
+                        <li class="mb-1">• Database must be accessible during backup</li>
+                        <li class="mb-1">• Compressed backups save space but take longer</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    [% END %]
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Backup...';
+            }
+        });
+    }
+});
+</script>

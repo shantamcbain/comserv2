@@ -955,6 +955,34 @@ sub _ensure_scanned {
     _categorize_pages($self, $c);
 }
 
+# Force a rescan of documentation (clears cache)
+sub rescan :Path('/Documentation/rescan') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/error.tt'
+        );
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rescan',
+        "Forcing documentation rescan");
+    
+    # Clear the cache
+    %{$self->documentation_pages} = ();
+    
+    # Force a rescan
+    _scan_directories($self, $c);
+    _categorize_pages($self, $c);
+    
+    # Redirect back to documentation index
+    $c->response->redirect($c->uri_for('/Documentation'));
+}
+
 # Helper method to format titles
 sub _format_title {
     my ($self, $name) = @_;

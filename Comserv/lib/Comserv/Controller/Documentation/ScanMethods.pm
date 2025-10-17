@@ -98,7 +98,7 @@ sub _scan_directories {
                         if ($path =~ m{Documentation/admin/}) {
                             @roles = ('admin', 'developer');
                         } elsif ($path =~ m{Documentation/developer/}) {
-                            @roles = ('developer');
+                            @roles = ('admin', 'developer');  # FIX: Allow admins to access developer docs
                         } elsif ($path =~ m{Documentation/controllers/} || $path =~ m{Documentation/models/}) {
                             @roles = ('admin', 'developer');
                         } elsif ($path =~ m{Documentation/system/} || $path =~ m{Documentation/proxmox/}) {
@@ -225,8 +225,8 @@ sub _categorize_pages {
                     "Added '$page_id' to admin_guides category");
             }
             
-            # Add to developer guides if it's in the developer roles directory
-            if ($category_key eq 'developer_guides' && $path =~ m{Documentation/roles/developer/}) {
+            # Add to developer guides if it's in the developer roles or developer directory
+            if ($category_key eq 'developer_guides' && ($path =~ m{Documentation/roles/developer/} || $path =~ m{Documentation/developer/})) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
                     "Added '$page_id' to developer_guides category");
