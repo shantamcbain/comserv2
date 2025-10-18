@@ -1,0 +1,209 @@
+[% META title = 'Test Database Connections' %]
+[% PageVersion = 'admin/backup/test_connections.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+
+[% IF c.session.debug_mode == 1 %]
+<div class="debug-info">
+  <p>Template: admin/backup/test_connections.tt</p>
+  <p>Last Modified: [% PageVersion %]</p>
+</div>
+[% END %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/admin') %]">Admin</a></li>
+                    <li class="breadcrumb-item"><a href="[% c.uri_for('/admin/backup') %]">Backup</a></li>
+                    <li class="breadcrumb-item active">Test Database Connections</li>
+                </ol>
+            </nav>
+
+            <h1><i class="fas fa-heartbeat"></i> Database Connection Test</h1>
+            <p class="lead">Verify database connectivity before performing backup operations.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Connection Test Results</h3>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="refreshConnections()">
+                        <i class="fas fa-sync-alt"></i> Refresh Test
+                    </button>
+                </div>
+                <div class="card-body">
+                    [% IF test_result.success %]
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Database Model</th>
+                                    <th>Status</th>
+                                    <th>Connection Details</th>
+                                    <th>Backup Ready</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH db IN test_result.available_databases %]
+                                <tr>
+                                    <td>
+                                        <strong>[% db.name %]</strong>
+                                        [% IF db.name.match('DBEncy') %]
+                                        <br><small class="text-muted">Encyclopedia Database</small>
+                                        [% ELSIF db.name.match('DBForager') %]
+                                        <br><small class="text-muted">Forager Database</small>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF db.status == 'available' %]
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check"></i> Connected
+                                            </span>
+                                        [% ELSE %]
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times"></i> Failed
+                                            </span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF db.dsn %]
+                                            <code>[% db.dsn %]</code>
+                                            [% IF db.dsn.match('mysql') %]
+                                            <br><small class="text-info"><i class="fas fa-info-circle"></i> MySQL Database</small>
+                                            [% ELSIF db.dsn.match('sqlite') %]
+                                            <br><small class="text-info"><i class="fas fa-info-circle"></i> SQLite Database</small>
+                                            [% END %]
+                                        [% ELSE %]
+                                            <span class="text-danger">No connection information</span>
+                                        [% END %]
+                                    </td>
+                                    <td>
+                                        [% IF db.status == 'available' %]
+                                            [% IF db.dsn.match('mysql') %]
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-database"></i> MySQL Ready
+                                            </span>
+                                            [% ELSIF db.dsn.match('sqlite') %]
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-file-archive"></i> SQLite Ready
+                                            </span>
+                                            [% ELSE %]
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-question"></i> Unknown Type
+                                            </span>
+                                            [% END %]
+                                        [% ELSE %]
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-exclamation-triangle"></i> Not Ready
+                                            </span>
+                                            [% IF db.error %]
+                                            <br><small class="text-danger">[% db.error %]</small>
+                                            [% END %]
+                                        [% END %]
+                                    </td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="mt-4">
+                        [% SET available_count = 0 %]
+                        [% FOREACH db IN test_result.available_databases %]
+                        [% IF db.status == 'available' %][% SET available_count = available_count + 1 %][% END %]
+                        [% END %]
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle"></i> Connection Summary</h6>
+                                    <p>Available databases: <strong>[% available_count %] of [% test_result.available_databases.size %]</strong></p>
+                                    [% IF available_count > 0 %]
+                                    <p class="text-success mb-0">
+                                        <i class="fas fa-check"></i> Ready for backup operations
+                                    </p>
+                                    [% ELSE %]
+                                    <p class="text-danger mb-0">
+                                        <i class="fas fa-exclamation-triangle"></i> No databases available for backup
+                                    </p>
+                                    [% END %]
+                                </div>
+                            </div>
+                            
+                            [% IF available_count > 0 %]
+                            <div class="col-md-8">
+                                <div class="alert alert-success">
+                                    <h6><i class="fas fa-rocket"></i> Ready to Proceed</h6>
+                                    <p>Your database connections are working properly. You can now:</p>
+                                    <div class="d-flex gap-2">
+                                        <a href="[% c.uri_for('/admin/backup/create_database_backup') %]" class="btn btn-success">
+                                            <i class="fas fa-database"></i> Create Database Backup
+                                        </a>
+                                        <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-outline-primary">
+                                            <i class="fas fa-arrow-left"></i> Back to Backup Management
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                    </div>
+
+                    [% ELSE %]
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Connection Test Failed</h5>
+                        <p>Unable to perform database connection test.</p>
+                        [% IF test_result.error %]
+                        <p><strong>Error:</strong> [% test_result.error %]</p>
+                        [% END %]
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshConnections() {
+    // Show loading state
+    const refreshBtn = document.querySelector('button[onclick="refreshConnections()"]');
+    const originalContent = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+    refreshBtn.disabled = true;
+    
+    // Reload the page to refresh connection tests
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+}
+
+// Auto-refresh connection test every 30 seconds if there are failures
+document.addEventListener('DOMContentLoaded', function() {
+    const failedConnections = document.querySelectorAll('.badge.bg-danger').length;
+    if (failedConnections > 0) {
+        console.log('Found failed connections, will auto-refresh in 30 seconds');
+        setTimeout(() => {
+            console.log('Auto-refreshing connection test...');
+            refreshConnections();
+        }, 30000);
+    }
+});
+</script>
+
+<style>
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+code {
+    font-size: 0.9em;
+}
+</style>

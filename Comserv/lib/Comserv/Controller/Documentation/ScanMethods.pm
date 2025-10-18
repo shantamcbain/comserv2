@@ -71,11 +71,12 @@ sub _scan_directories {
 
                     # Determine site and role requirements
                     my $site = 'all';
-                    my @roles = ('normal', 'editor', 'admin', 'developer');
+                    my @roles;
 
                     # Check if this is site-specific documentation
                     if ($path =~ m{Documentation/sites/([^/]+)/}) {
                         $site = uc($1); # Convert site name to uppercase to match SiteName format
+                        @roles = ('admin', 'developer', 'editor'); # Site-specific docs restricted
                     }
 
                     # Check if this is role-specific documentation
@@ -87,6 +88,32 @@ sub _scan_directories {
                             @roles = ('developer');
                         } elsif ($role eq 'editor') {
                             @roles = ('editor', 'admin', 'developer');
+                        } elsif ($role eq 'normal') {
+                            @roles = ('normal', 'editor', 'admin', 'developer');
+                        }
+                    }
+                    
+                    # If no specific role directory, determine by path and content type
+                    unless (@roles) {
+                        if ($path =~ m{Documentation/admin/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/developer/}) {
+                            @roles = ('admin', 'developer');  # FIX: Allow admins to access developer docs
+                        } elsif ($path =~ m{Documentation/controllers/} || $path =~ m{Documentation/models/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/system/} || $path =~ m{Documentation/proxmox/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/session_history/}) {
+                            @roles = ('admin', 'developer', 'editor');
+                        } elsif ($path =~ m{Documentation/changelog/}) {
+                            @roles = ('admin', 'developer', 'editor');
+                        } elsif ($path =~ m{Documentation/ai_workflows/}) {
+                            @roles = ('admin', 'developer');
+                        } elsif ($path =~ m{Documentation/general/} || $path =~ m{Documentation/tutorials/}) {
+                            @roles = ('normal', 'editor', 'admin', 'developer');
+                        } else {
+                            # Default for root-level documentation - accessible to all authenticated users
+                            @roles = ('normal', 'editor', 'admin', 'developer');
                         }
                     }
                     
@@ -98,13 +125,35 @@ sub _scan_directories {
                         $format = 'template';
                     }
 
-                    # Store the path with metadata
-                    $self->documentation_pages->{$key} = {
-                        path => $path,
-                        site => $site,
-                        roles => \@roles,
-                        format => $format
-                    };
+                    # Store the path with metadata, prioritizing .tt files over .md files
+                    # If both .tt and .md exist, .tt takes precedence (according to workflow)
+                    if (exists $self->documentation_pages->{$key}) {
+                        my $existing_format = $self->documentation_pages->{$key}->{format};
+                        # Only overwrite if current file is .tt and existing is .md
+                        # This ensures .tt files take precedence
+                        if ($format eq 'template' && $existing_format eq 'markdown') {
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Overwriting .md file with .tt file for key: $key");
+                            $self->documentation_pages->{$key} = {
+                                path => $path,
+                                site => $site,
+                                roles => \@roles,
+                                format => $format
+                            };
+                        } else {
+                            # Keep existing entry, log the skip
+                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_scan_directories',
+                                "Skipping $format file for key '$key' - already exists as $existing_format");
+                        }
+                    } else {
+                        # First occurrence of this key
+                        $self->documentation_pages->{$key} = {
+                            path => $path,
+                            site => $site,
+                            roles => \@roles,
+                            format => $format
+                        };
+                    }
                 },
                 no_chdir => 1,
             },
@@ -176,8 +225,8 @@ sub _categorize_pages {
                     "Added '$page_id' to admin_guides category");
             }
             
-            # Add to developer guides if it's in the developer roles directory
-            if ($category_key eq 'developer_guides' && $path =~ m{Documentation/roles/developer/}) {
+            # Add to developer guides if it's in the developer roles or developer directory
+            if ($category_key eq 'developer_guides' && ($path =~ m{Documentation/roles/developer/} || $path =~ m{Documentation/developer/})) {
                 push @{$category->{pages}}, $page_id unless grep { $_ eq $page_id } @{$category->{pages}};
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_categorize_pages',
                     "Added '$page_id' to developer_guides category");

@@ -199,7 +199,7 @@ sub project :Path('project') :Args(0) {
         success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',
         additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload
         use_fluid_container => 1, # Use fluid container for better card layout
-        debug_mode => 1 # Enable debug mode to see template version
+        debug_mode => 0 # Disable debug mode - template version hidden
     );
     
     # Log that we're using the project cards CSS

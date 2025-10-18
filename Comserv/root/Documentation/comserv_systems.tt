@@ -1,0 +1,599 @@
+[% # Standard Template Toolkit header for Documentation System
+   # File: root/Documentation/documentation_system.tt
+   # Purpose: Documentation system overview and guidelines
+   # Last Updated: 2025-01-27
+   # Version: 2.1
+%]
+[% PageVersion = 'Documentation/documentation_system.tt,v 2.1 2025/01/27 shanta Exp shanta - Documentation System' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container primary">
+    <div class="container-header">Documentation System</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+    
+    <div class="last-updated">
+        Last Updated: 2025-09-27 | 
+        Version: 2.1 | 
+        Author: Shanta | 
+        Status: Active
+    </div>
+
+    <div class="container info">
+        <div class="container-header">Overview</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The Comserv documentation system provides a structured way to organize and access documentation for different sites, roles, and modules. This document explains how the documentation system works, including visibility rules and organization principles.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info">
+        <div class="container-header">Documentation Types</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+        <p>The system supports several types of documentation:</p>
+        <ul>
+            <li><strong>General Application Documentation</strong>
+                <ul>
+                    <li>Common features like login, profile customization, etc.</li>
+                    <li>Visible to all sites and users</li>
+                    <li>Located in the main Documentation directory</li>
+                </ul>
+            </li>
+            <li><strong>Site-Specific Documentation</strong>
+                <ul>
+                    <li>Documentation specific to a particular site (e.g., MCOOP, CSC)</li>
+                    <li>Only visible to users of that specific site</li>
+                    <li>Located in the <code>Documentation/sites/{site_name}</code> directory</li>
+                </ul>
+            </li>
+            <li><strong>Role-Specific Documentation</strong>
+                <ul>
+                    <li>Documentation targeted at specific user roles (admin, developer, etc.)</li>
+                    <li>Only visible to users with the appropriate role</li>
+                    <li>Located in the <code>Documentation/roles/{role_name}</code> directory</li>
+                </ul>
+            </li>
+            <li><strong>Module Documentation</strong>
+                <ul>
+                    <li>Documentation for specific system modules</li>
+                    <li>Visibility depends on module access permissions</li>
+                    <li>Located in the main Documentation directory or module-specific directories</li>
+                </ul>
+            </li>
+            <li><strong>Controller Documentation</strong>
+                <ul>
+                    <li>Documentation for system controllers</li>
+                    <li>Located in the <code>Documentation/controllers</code> directory</li>
+                    <li>Primarily for developers and administrators</li>
+                </ul>
+            </li>
+            <li><strong>Changelog Documentation</strong>
+                <ul>
+                    <li>Documentation of system changes and updates</li>
+                    <li>Located in the <code>Documentation/changelog</code> directory</li>
+                    <li>Helps track system evolution and recent updates</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container warning">
+        <div class="container-header">⚠️ Visibility Rules</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system applies the following visibility rules:</p>
+        <ul>
+            <li><strong>CSC Site Administrators</strong>
+                <ul>
+                    <li>Can see ALL documentation across all sites and roles</li>
+                    <li>This is the only user group with complete documentation access</li>
+                </ul>
+            </li>
+            <li><strong>Site-Specific Visibility</strong>
+                <ul>
+                    <li>Users can only see documentation for their current site</li>
+                    <li>General documentation (site = 'all') is visible to all sites</li>
+                </ul>
+            </li>
+            <li><strong>Role-Based Visibility</strong>
+                <ul>
+                    <li>Users can only see documentation appropriate for their role</li>
+                    <li>Higher roles can see documentation for lower roles (e.g., admins can see normal user docs)</li>
+                </ul>
+            </li>
+            <li><strong>Module-Specific Visibility</strong>
+                <ul>
+                    <li>Module documentation visibility follows the same site and role rules</li>
+                    <li>Additional module-specific permissions may apply</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container primary">
+        <div class="container-header">Table of Contents</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#documentation-types">Documentation Types</a></li>
+            <li><a href="#visibility-rules">Visibility Rules</a></li>
+            <li><a href="#documentation-organization">Documentation Organization</a></li>
+            <li><a href="#file-formats">File Formats</a></li>
+            <li><a href="#configuration">Configuration</a></li>
+            <li><a href="#best-practices">Best Practices</a></li>
+            <li><a href="#adding-new-documentation">Adding New Documentation</a></li>
+            <li><a href="#accessing-documentation">Accessing Documentation</a></li>
+            <li><a href="#technical-implementation">Technical Implementation</a></li>
+            <li><a href="#template-structure">Template Structure</a></li>
+            <li><a href="#debugging">Debugging</a></li>
+            <li><a href="#future-enhancements">Future Enhancements</a></li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="documentation-organization">
+        <div class="container-header">Documentation Organization</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+
+        <p>Documentation is organized into the following categories:</p>
+        <ul>
+            <li><strong>User Guides</strong>
+                <ul>
+                    <li>Basic documentation for end users</li>
+                    <li>Includes getting started guides and FAQs</li>
+                    <li>Visible to all user roles</li>
+                </ul>
+            </li>
+            <li><strong>Administrator Guides</strong>
+                <ul>
+                    <li>Documentation for system administrators</li>
+                    <li>Includes installation and configuration guides</li>
+                    <li>Only visible to users with admin role</li>
+                </ul>
+            </li>
+            <li><strong>Developer Documentation</strong>
+                <ul>
+                    <li>Technical documentation for developers</li>
+                    <li>Includes API references and coding standards</li>
+                    <li>Only visible to users with developer role</li>
+                </ul>
+            </li>
+            <li><strong>Tutorials</strong>
+                <ul>
+                    <li>Step-by-step guides for common tasks</li>
+                    <li>Visibility depends on the complexity of the task</li>
+                </ul>
+            </li>
+            <li><strong>Site-Specific Documentation</strong>
+                <ul>
+                    <li>Documentation specific to the current site</li>
+                    <li>Only visible to users of that site</li>
+                </ul>
+            </li>
+            <li><strong>Module Documentation</strong>
+                <ul>
+                    <li>Documentation for specific system modules</li>
+                    <li>Visibility depends on module access permissions</li>
+                </ul>
+            </li>
+            <li><strong>Controllers Documentation</strong>
+                <ul>
+                    <li>Documentation for system controllers</li>
+                    <li>Only visible to developers and administrators</li>
+                </ul>
+            </li>
+            <li><strong>Models Documentation</strong>
+                <ul>
+                    <li>Documentation for system models</li>
+                    <li>Only visible to developers and administrators</li>
+                </ul>
+            </li>
+            <li><strong>Changelog</strong>
+                <ul>
+                    <li>System changes and updates</li>
+                    <li>Only visible to developers and administrators</li>
+                </ul>
+            </li>
+            <li><strong>Proxmox Documentation</strong>
+                <ul>
+                    <li>Documentation for Proxmox virtualization environment</li>
+                    <li>Only visible to administrators</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="file-formats">
+        <div class="container-header">File Formats</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system supports multiple file formats:</p>
+        <ul>
+            <li><strong>Markdown (.md)</strong>
+                <ul>
+                    <li>Used primarily as working copies for AI assistants</li>
+                    <li>Serve as staging area for edits and reviews</li>
+                    <li>Changes are reviewed then copied to .tt files for publication</li>
+                </ul>
+            </li>
+            <li><strong>Template Toolkit (.tt)</strong>
+                <ul>
+                    <li>Official, browser-friendly documentation format</li>
+                    <li>Used for documentation that requires dynamic content</li>
+                    <li>Can include variables, conditionals, and other TT features</li>
+                    <li>All published documentation should be in .tt files</li>
+                </ul>
+            </li>
+            <li><strong>Other Formats</strong>
+                <ul>
+                    <li>JSON, HTML, CSS, and other formats are supported</li>
+                    <li>Served with appropriate content types</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="configuration">
+        <div class="container-header">Configuration</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system uses a JSON configuration file to manage documentation categories and file paths:</p>
+        <ul>
+            <li><strong>documentation_config2.json</strong>
+                <ul>
+                    <li>Located in the <code>Documentation</code> directory</li>
+                    <li>Defines documentation categories and their properties</li>
+                    <li>Maps documentation keys to file paths</li>
+                    <li>Allows for centralized management of documentation structure</li>
+                </ul>
+            </li>
+            <li><strong>Configuration Structure</strong>
+                <ul>
+                    <li>Categories section defines all documentation categories</li>
+                    <li>Default paths section maps documentation keys to file paths</li>
+                    <li>This structure allows for easy reorganization of documentation</li>
+                </ul>
+            </li>
+            <li><strong>Updating Configuration</strong>
+                <ul>
+                    <li>When adding new documentation, update the configuration file</li>
+                    <li>When moving files, update the paths in the configuration</li>
+                    <li>Ensure all paths are correct and point to existing files</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="best-practices">
+        <div class="container-header">Best Practices</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>When creating documentation, follow these best practices:</p>
+        <ul>
+            <li><strong>Proper Placement</strong>
+                <ul>
+                    <li>Place documentation in the appropriate directory based on its type</li>
+                    <li>Use the site-specific directory for site-specific documentation</li>
+                    <li>Use the role-specific directory for role-specific documentation</li>
+                </ul>
+            </li>
+            <li><strong>Clear Metadata</strong>
+                <ul>
+                    <li>Include Template Toolkit headers with clear metadata</li>
+                    <li>Specify title, last updated date, version, and author</li>
+                    <li>Include status (Active, Draft, Deprecated) and purpose</li>
+                </ul>
+            </li>
+            <li><strong>Structured Content</strong>
+                <ul>
+                    <li>Use proper HTML structure with semantic tags</li>
+                    <li>Include navigation with table of contents</li>
+                    <li>Use appropriate CSS classes (info-box, warning-box, etc.)</li>
+                    <li>Use code blocks with proper markup for code examples</li>
+                </ul>
+            </li>
+            <li><strong>Comprehensive Coverage</strong>
+                <ul>
+                    <li>Cover all aspects of the feature or module</li>
+                    <li>Include examples and use cases</li>
+                    <li>Address common questions and issues</li>
+                </ul>
+            </li>
+            <li><strong>Regular Updates</strong>
+                <ul>
+                    <li>Keep documentation up-to-date with system changes</li>
+                    <li>Use Template Toolkit date functions for dynamic dates</li>
+                    <li>Archive or clearly mark deprecated documentation</li>
+                </ul>
+            </li>
+            <li><strong>Configuration Management</strong>
+                <ul>
+                    <li>Update the documentation_config2.json file when adding or moving documentation</li>
+                    <li>Ensure all paths in the configuration file are correct</li>
+                    <li>Test documentation visibility after configuration changes</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="adding-new-documentation">
+        <div class="container-header">Adding New Documentation</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>To add new documentation to the system:</p>
+        <ol>
+            <li><strong>Determine the Type</strong>
+                <ul>
+                    <li>Is it general, site-specific, role-specific, or module-specific?</li>
+                </ul>
+            </li>
+            <li><strong>Choose the Location</strong>
+                <ul>
+                    <li>Place the file in the appropriate directory</li>
+                    <li>Use a descriptive filename with .tt extension</li>
+                </ul>
+            </li>
+            <li><strong>Include Template Toolkit Headers</strong>
+                <ul>
+                    <li>Add Template Toolkit headers with metadata</li>
+                    <li>Include title, author, date, version, and status</li>
+                </ul>
+            </li>
+            <li><strong>Write the Content</strong>
+                <ul>
+                    <li>Follow the structured HTML format with proper CSS classes</li>
+                    <li>Include all necessary sections and information</li>
+                </ul>
+            </li>
+            <li><strong>Update Configuration</strong>
+                <ul>
+                    <li>Add the document to the documentation_config2.json file</li>
+                    <li>Specify the correct path and category</li>
+                </ul>
+            </li>
+            <li><strong>Test Visibility</strong>
+                <ul>
+                    <li>Verify that the document is visible to the intended audience</li>
+                    <li>Check that it appears in the appropriate category</li>
+                </ul>
+            </li>
+        </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="accessing-documentation">
+        <div class="container-header">Accessing Documentation</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>Users can access documentation through:</p>
+        <ul>
+            <li><strong>Documentation Index</strong>
+                <ul>
+                    <li>Available at <code>/documentation</code></li>
+                    <li>Shows all documentation visible to the current user</li>
+                </ul>
+            </li>
+            <li><strong>Direct URLs</strong>
+                <ul>
+                    <li>Access specific documents via <code>/documentation/page_name</code></li>
+                    <li>File extensions are optional (e.g., <code>/documentation/user_guide</code> or <code>/documentation/user_guide.md</code>)</li>
+                </ul>
+            </li>
+            <li><strong>Category Pages</strong>
+                <ul>
+                    <li>Access category-specific documentation via <code>/documentation/category/category_name</code></li>
+                    <li>Shows all documents in that category visible to the current user</li>
+                </ul>
+            </li>
+            <li><strong>Search</strong>
+                <ul>
+                    <li>Use the documentation search feature to find specific content</li>
+                    <li>Searches only within documentation visible to the current user</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="technical-implementation">
+        <div class="container-header">Technical Implementation</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system is implemented in the <code>Documentation.pm</code> controller with these key components:</p>
+        <ul>
+            <li><strong>Scanning Mechanism</strong>
+                <ul>
+                    <li>Scans documentation directories on application startup</li>
+                    <li>Builds metadata for each documentation file</li>
+                    <li>Uses the documentation_config2.json file for configuration</li>
+                </ul>
+            </li>
+            <li><strong>Filtering Logic</strong>
+                <ul>
+                    <li>Filters documentation based on user role and site</li>
+                    <li>Special case for CSC site admins who can see everything</li>
+                </ul>
+            </li>
+            <li><strong>Rendering System</strong>
+                <ul>
+                    <li>Renders Markdown files as working copies</li>
+                    <li>Processes Template Toolkit files with the TT view for publication</li>
+                    <li>Supports dynamic content with TT features</li>
+                </ul>
+            </li>
+            <li><strong>Access Control</strong>
+                <ul>
+                    <li>Enforces visibility rules based on site and role</li>
+                    <li>Provides appropriate error messages for unauthorized access</li>
+                </ul>
+            </li>
+            <li><strong>Modular Template Structure</strong>
+                <ul>
+                    <li>The main <code>index.tt</code> file has been refactored to improve maintainability</li>
+                    <li>Each documentation category now has its own separate template file</li>
+                    <li>This modular approach makes it easier to update specific sections without affecting others</li>
+                    <li>Template includes are used to assemble the complete documentation interface</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="template-structure">
+        <div class="container-header">Template Structure</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system's template structure has been refactored to improve maintainability and organization:</p>
+        <ul>
+            <li><strong>Main Index Template</strong>
+                <ul>
+                    <li>The main <code>index.tt</code> file now serves as a container for the documentation interface</li>
+                    <li>It includes modular template components for different sections</li>
+                    <li>This approach reduces complexity and makes the code more maintainable</li>
+                </ul>
+            </li>
+            <li><strong>Category Templates</strong>
+                <ul>
+                    <li>Each documentation category has its own dedicated template file</li>
+                    <li>Examples:
+                        <ul>
+                            <li><code>user_guides.tt</code> - Template for user documentation</li>
+                            <li><code>admin_guides.tt</code> - Template for administrator documentation</li>
+                            <li><code>developer_guides.tt</code> - Template for developer documentation</li>
+                            <li><code>tutorials.tt</code> - Template for tutorials</li>
+                            <li><code>site_specific.tt</code> - Template for site-specific documentation</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Shared Components</strong>
+                <ul>
+                    <li>Common UI elements are extracted into reusable components</li>
+                    <li>This includes navigation, search, and filtering controls</li>
+                    <li>These components can be included in multiple templates</li>
+                </ul>
+            </li>
+            <li><strong>Benefits of Modular Structure</strong>
+                <ul>
+                    <li>Easier maintenance: Changes to one category don't affect others</li>
+                    <li>Better organization: Code is logically grouped by functionality</li>
+                    <li>Improved readability: Smaller, focused template files</li>
+                    <li>Easier collaboration: Multiple developers can work on different sections</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="debugging">
+        <div class="container-header">Debugging</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>The documentation system includes debugging features to help troubleshoot issues:</p>
+        <ul>
+            <li><strong>Debug Mode</strong>
+                <ul>
+                    <li>Enable debug mode to see detailed information about documentation loading</li>
+                    <li>Debug messages are pushed to the stash and displayed in the template</li>
+                </ul>
+            </li>
+            <li><strong>Logging</strong>
+                <ul>
+                    <li>The system logs documentation scanning and categorization</li>
+                    <li>Check the application log for errors and warnings</li>
+                </ul>
+            </li>
+            <li><strong>Configuration Validation</strong>
+                <ul>
+                    <li>The system validates the documentation_config2.json file</li>
+                    <li>Errors in the configuration are logged</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container info" id="future-enhancements">
+        <div class="container-header">Future Enhancements</div>
+        <div class="container-content">
+            <div class="container-content-inner">
+                <p>Planned enhancements for the documentation system include:</p>
+        <ul>
+            <li><strong>Improved Search</strong>
+                <ul>
+                    <li>Full-text search across all documentation</li>
+                    <li>Advanced filtering options</li>
+                </ul>
+            </li>
+            <li><strong>Version Control</strong>
+                <ul>
+                    <li>Track changes to documentation over time</li>
+                    <li>View previous versions of documents</li>
+                </ul>
+            </li>
+            <li><strong>User Feedback</strong>
+                <ul>
+                    <li>Allow users to rate and comment on documentation</li>
+                    <li>Collect suggestions for improvements</li>
+                </ul>
+            </li>
+            <li><strong>Interactive Examples</strong>
+                <ul>
+                    <li>Add interactive code examples and demos</li>
+                    <li>Include video tutorials for complex topics</li>
+                </ul>
+            </li>
+            <li><strong>Documentation Analytics</strong>
+                <ul>
+                    <li>Track which documentation is most frequently accessed</li>
+                    <li>Identify gaps in documentation coverage</li>
+                </ul>
+            </li>
+            <li><strong>Further Template Improvements</strong>
+                <ul>
+                    <li>Additional modularization of template components</li>
+                    <li>Dynamic loading of documentation sections</li>
+                    <li>Improved mobile responsiveness</li>
+                </ul>
+            </li>
+        </ul>
+            </div>
+        </div>
+    </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="container primary">
+    <div class="container-header">ENCY System</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/ENCY.tt' %]
+        </div>
+    </div>
+</div>

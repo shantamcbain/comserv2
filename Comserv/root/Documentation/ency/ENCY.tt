@@ -1,0 +1,808 @@
+[% PageVersion = 'Documentation/ENCY.tt,v 0.03 2025/09/27 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="ency_top"><a href="#ency_top">ENCY Module - Encyclopedia of Biological Life</a></h1>
+
+<!-- Debug: Role Information -->
+[% IF c.session.debug_mode == 1 %]
+<div style="background: #ffeb3b; padding: 10px; margin: 10px 0; border: 2px solid #f57c00;">
+    <strong>DEBUG MODE - Role Information:</strong><br>
+    Username: [% c.session.username || 'Not set' %]<br>
+    Roles (raw): [% c.session.roles %]<br>
+    Roles (type): [% IF c.session.roles %][% IF c.session.roles.ref %]ARRAY[% ELSE %]STRING[% END %][% ELSE %]UNDEFINED[% END %]<br>
+    [% IF c.session.roles %]
+        [% IF c.session.roles.ref %]
+            Roles (joined): [% c.session.roles.join(', ') %]<br>
+            Has admin: [% c.session.roles.grep('admin').size ? 'YES' : 'NO' %]<br>
+            Has developer: [% c.session.roles.grep('developer').size ? 'YES' : 'NO' %]<br>
+            Has editor: [% c.session.roles.grep('editor').size ? 'YES' : 'NO' %]<br>
+        [% ELSE %]
+            Roles (string): [% c.session.roles %]<br>
+        [% END %]
+    [% END %]
+</div>
+[% END %]
+
+<h3>Quick Navigation</h3>
+<p>
+    [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+    <a href="#controller_section">ENCY Controller</a> | 
+    <a href="#model_section">ENCY Model</a> | 
+    [% END %]
+    <a href="#biological_scope">Biological Scope</a>
+    [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+     | <a href="#database_structure">Database Structure</a>
+    [% END %]
+    [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size || c.session.roles.grep('editor').size) %]
+     | <a href="#interconnection_tables">Interconnection Tables</a>
+    [% END %]
+     | <a href="#interconnections">Ecological Interconnections</a> | 
+    <a href="#environmental_impact">Environmental Impact</a>
+    [% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+     | <a href="#implementation_plan">Implementation Plan</a>
+    [% END %]
+</p>
+
+<p>The goal of ENCY (Encyclopedia of Biological Life) is to provide a comprehensive database of all forms of biological life and their interconnected relationships within planetary ecosystems. This system encompasses plants, animals, birds, insects, fungi, microorganisms, and chemical compounds, documenting their medicinal properties, ecological roles, environmental interactions, and contributions to planetary coexistence.</p>
+
+<p>The database tracks therapeutic actions, ecological relationships, environmental dependencies, conservation status, and the complex web of interactions that sustain life on Earth. It serves as a comprehensive resource for understanding biological systems, environmental stewardship, and the delicate balance necessary for planetary health.</p>
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+<div class="container primary">
+    <div class="container-header" id="controller_section">ENCY Controller Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/ency/ENCYController.tt' %]
+        </div>
+    </div>
+</div>
+[% END %]
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size || c.session.roles.grep('editor').size) %]
+<div class="container primary">
+    <div class="container-header" id="model_section">ENCY Model Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/ency/ENCYModel.tt' %]
+        </div>
+    </div>
+</div>
+[% END %]
+
+
+
+<div class="container warning">
+    <div class="container-header" id="biological_scope">Biological Scope & Migration Strategy</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+                <div class="alert alert-warning">
+                    <h3>⚠️ CRITICAL: Phased Migration Approach Required</h3>
+                    <p><strong>This expansion represents a major architectural change requiring careful migration planning:</strong></p>
+                </div>
+
+                <div class="migration-phases">
+                    <div class="phase-container">
+                        <h4>Phase 1: Foundation (Current State - Preserve Existing)</h4>
+                        <ul class="phase-list">
+                            <li><strong>Maintain Current Herb System:</strong> Keep existing plant/herb functionality fully operational</li>
+                            <li><strong>Database Compatibility:</strong> Ensure all existing herb data remains accessible</li>
+                            <li><strong>User Interface Continuity:</strong> Preserve current herb browsing and management features</li>
+                            <li><strong>Recipe System Integration:</strong> Complete herb-based recipe system as planned</li>
+                        </ul>
+                    </div>
+
+                    <div class="phase-container">
+                        <h4>Phase 2: Infrastructure Expansion (6-12 months)</h4>
+                        <ul class="phase-list">
+                            <li><strong>Database donotuse Extension:</strong> Add new biological entity tables alongside existing ones</li>
+                            <li><strong>Model Layer Enhancement:</strong> Create polymorphic models for different organism types</li>
+                            <li><strong>API Framework:</strong> Develop unified API structure for all biological entities</li>
+                            <li><strong>Migration Scripts:</strong> Create scripts to populate new tables with initial data</li>
+                        </ul>
+                    </div>
+
+                    <div class="phase-container">
+                        <h4>Phase 3: Feature Integration (12-18 months)</h4>
+                        <ul class="phase-list">
+                            <li><strong>Cross-Reference System:</strong> Link herbs to animals, insects, and ecological relationships</li>
+                            <li><strong>Search Enhancement:</strong> Expand search to cover all biological domains</li>
+                            <li><strong>Relationship Mapping:</strong> Implement ecological interconnection features</li>
+                            <li><strong>User Interface Evolution:</strong> Gradually introduce multi-domain browsing</li>
+                        </ul>
+                    </div>
+
+                    <div class="phase-container">
+                        <h4>Phase 4: Full Encyclopedia (18+ months)</h4>
+                        <ul class="phase-list">
+                            <li><strong>Complete Integration:</strong> Full Encyclopedia of Biological Life functionality</li>
+                            <li><strong>Advanced Analytics:</strong> Ecosystem analysis and environmental impact tracking</li>
+                            <li><strong>Conservation Tools:</strong> Species monitoring and protection features</li>
+                            <li><strong>Research Platform:</strong> Scientific data collaboration and peer review systems</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vision-scope">
+                <h3>Long-Term Vision Scope</h3>
+                <p><strong>Ultimate ENCY goals (beyond current herb system):</strong></p>
+                <div class="scope-grid">
+                    <div class="scope-card">
+                        <h4>Flora</h4>
+                        <p>All plant species including medicinal herbs, food plants, trees, grasses, aquatic plants, and microscopic plant life</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Fauna</h4>
+                        <p>Mammals, reptiles, amphibians, fish, and all animal species including their ecological roles and therapeutic contributions</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Avian</h4>
+                        <p>All bird species with focus on pollination, seed dispersal, pest control, and ecosystem balance</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Entomology</h4>
+                        <p>Insects, spiders, and arthropods including beneficial insects, pollinators, decomposers, and pest species</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Mycology</h4>
+                        <p>Fungi including medicinal mushrooms, mycorrhizal relationships, decomposers, and ecological partnerships</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Microbiology</h4>
+                        <p>Bacteria, viruses, protozoa, and microscopic life forms essential to ecosystem function</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Chemistry</h4>
+                        <p>Natural compounds, phytochemicals, toxins, nutrients, and chemical interactions within biological systems</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Environment</h4>
+                        <p>Ecosystems, habitats, climate interactions, pollution effects, and conservation status</p>
+                    </div>
+                    <div class="scope-card">
+                        <h4>Planetary Coexistence</h4>
+                        <p>Symbiotic relationships, food webs, nutrient cycles, and sustainable ecosystem management</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+<div class="container primary">
+    <div class="container-header" id="database_structure">Comprehensive Database Structure</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>Here is the comprehensive view of the biological database structure designed to encompass all life forms:</p>
+
+                <div class="database-structure">
+                    <div class="table-category">
+                        <h3>1. Core Biological Tables</h3>
+                        
+                        <div class="table-group">
+                            <div class="table-card">
+                                <h4>Plants</h4>
+                                <p class="table-description">This will be the main table where each plant entry is stored.</p>
+                                <div class="schema-display">
+                                    <div class="field">plant_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">botanical_name</div>
+                                    <div class="field">common_names</div>
+                                    <div class="field">key_name</div>
+                                    <div class="field">description</div>
+                                    <div class="field">image_url <span class="note">Should a table with a list of images be created?</span></div>
+                                    <div class="field">distribution</div>
+                                    <div class="field">comments</div>
+                                    <div class="field">history</div>
+                                    <div class="field">username_of_poster</div>
+                                    <div class="field">group_of_poster</div>
+                                    <div class="field">date_time_posted</div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>TherapeuticActions</h4>
+                                <p class="table-description">Stores different therapeutic actions associated with plants.</p>
+                                <div class="schema-display">
+                                    <div class="field">action_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">name</div>
+                                    <div class="field">description</div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>PlantTherapeuticActions</h4>
+                                <p class="table-description">A many-to-many relationship table linking plants to their therapeutic actions.</p>
+                                <div class="schema-display">
+                                    <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                    <div class="field">action_id <span class="key-type">(Foreign Key to TherapeuticActions)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>Constituents</h4>
+                                <p class="table-description">Stores information about the chemical components of plants.</p>
+                                <div class="schema-display">
+                                    <div class="field">constituent_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">name</div>
+                                    <div class="field">formula</div>
+                                    <div class="field">description</div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>PlantConstituents</h4>
+                                <p class="table-description">A many-to-many relationship table linking plants to their chemical constituents.</p>
+                                <div class="schema-display">
+                                    <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                    <div class="field">constituent_id <span class="key-type">(Foreign Key to Constituents)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>Cultivation</h4>
+                                <p class="table-description">Details methods and information about the cultivation of plants.</p>
+                                <div class="schema-display">
+                                    <div class="field">cultivation_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                    <div class="field">method</div>
+                                    <div class="field">soil_type</div>
+                                    <div class="field">sun_exposure</div>
+                                    <div class="field">watering</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-category">
+                        <h3>2. Specialized Tables</h3>
+                        
+                        <div class="table-group">
+                            <div class="table-card">
+                                <h4>Pollinators</h4>
+                                <p class="table-description">We want to know what part of the plant the pollinators are attracted to. Tracks the pollinators associated with each plant.</p>
+                                <div class="schema-display">
+                                    <div class="field">pollinator_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">name</div>
+                                    <div class="field">type <span class="note">(insect, animal, etc.)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>PlantPollinators</h4>
+                                <p class="table-description">Links plants to their pollinators.</p>
+                                <div class="schema-display">
+                                    <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                    <div class="field">pollinator_id <span class="key-type">(Foreign Key to Pollinators)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>PartsUsed</h4>
+                                <p class="table-description">Stores different parts of the plant that are used.</p>
+                                <div class="schema-display">
+                                    <div class="field">part_id <span class="key-type">(Primary Key)</span></div>
+                                    <div class="field">name</div>
+                                    <div class="field">description</div>
+                                </div>
+                            </div>
+
+                            <div class="table-card">
+                                <h4>PlantPartsUsed</h4>
+                                <p class="table-description">Links plants to the parts used.</p>
+                                <div class="schema-display">
+                                    <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                    <div class="field">part_id <span class="key-type">(Foreign Key to PartsUsed)</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+                <div class="table-category">
+                    <h3>3. Relational Integrity</h3>
+                    
+                    <div class="table-group">
+                        <div class="table-card">
+                            <h4>Formulas</h4>
+                            <p class="table-description">Details various formulas that include plants.</p>
+                            <div class="schema-display">
+                                <div class="field">formula_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">name</div>
+                                <div class="field">description</div>
+                                <div class="field">therapeutic action</div>
+                            </div>
+                        </div>
+
+                        <div class="table-card">
+                            <h4>PlantFormulas</h4>
+                            <p class="table-description">Links plants to the formulas they are part of.</p>
+                            <div class="schema-display">
+                                <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                                <div class="field">formula_id <span class="key-type">(Foreign Key to Formulas)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-category">
+                    <h3>4. User Roles and Access</h3>
+                    
+                    <div class="table-group">
+                        <div class="table-card">
+                            <h4>Users</h4>
+                            <p class="table-description">Tracks users in the system with roles.</p>
+                            <div class="schema-display">
+                                <div class="field">user_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">username</div>
+                                <div class="field">role <span class="note">(admin, researcher, etc.)</span></div>
+                                <div class="field">group</div>
+                            </div>
+                        </div>
+
+                        <div class="table-card">
+                            <h4>UserAccess</h4>
+                            <p class="table-description">Controls access based on roles.</p>
+                            <div class="schema-display">
+                                <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                                <div class="field">access_level</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-category">
+                    <h3>5. References and Ratings</h3>
+                    <p class="module-note">The ency module is divided into two parts: the controller and the model.</p>
+                    
+                    <div class="table-group">
+                        <div class="table-card">
+                            <h4>References</h4>
+                            <p class="table-description">This table will store references to scientific studies and other sources of information about the plants. If a reference is made to a plant, component therapeutic action, etc. we provide connection to that data here.</p>
+                            <div class="schema-display">
+                                <div class="field">reference_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">title</div>
+                                <div class="field">author</div>
+                                <div class="field">publication_date</div>
+                                <div class="field">url</div>
+                                <div class="field">description</div>
+                                <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                            </div>
+                        </div>
+
+                        <div class="table-card">
+                            <h4>Reference Ratings</h4>
+                            <p class="table-description">References are rated as well.</p>
+                            <div class="schema-display">
+                                <div class="field">rating_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                                <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                                <div class="field">rating</div>
+                                <div class="field">date_time_rated</div>
+                                <div class="field">comments</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+[% END %]
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size || c.session.roles.grep('editor').size) %]
+<div class="container success">
+    <div class="container-header">Extended Biological Entities</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+                <div class="entity-grid">
+                    <div class="entity-card">
+                        <h4>Diseases</h4>
+                        <p class="table-description">Comprehensive disease database affecting all life forms.</p>
+                        <div class="schema-display">
+                            <div class="field">disease_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">name</div>
+                            <div class="field">description</div>
+                            <div class="field">type <span class="note">(pathogenic, genetic, environmental, nutritional)</span></div>
+                            <div class="field">affected_organisms <span class="note">(plants, animals, fungi, insects)</span></div>
+                            <div class="field">symptoms</div>
+                            <div class="field">treatment_methods</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+
+                    <div class="entity-card">
+                        <h4>Animals</h4>
+                        <p class="table-description">Complete animal database including mammals, reptiles, amphibians, fish.</p>
+                        <div class="schema-display">
+                            <div class="field">animal_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">scientific_name</div>
+                            <div class="field">common_names</div>
+                            <div class="field">family_classification</div>
+                            <div class="field">habitat</div>
+                            <div class="field">diet_type</div>
+                            <div class="field">conservation_status</div>
+                            <div class="field">ecological_role</div>
+                            <div class="field">therapeutic_properties</div>
+                            <div class="field">symbiotic_relationships</div>
+                            <div class="field">environmental_impact</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+
+                    <div class="entity-card">
+                        <h4>Birds</h4>
+                        <p class="table-description">Dedicated avian database for pollination and ecosystem services.</p>
+                        <div class="schema-display">
+                            <div class="field">bird_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">scientific_name</div>
+                            <div class="field">common_names</div>
+                            <div class="field">migration_patterns</div>
+                            <div class="field">nesting_habits</div>
+                            <div class="field">diet_specialization</div>
+                            <div class="field">pollination_services</div>
+                            <div class="field">seed_dispersal_role</div>
+                            <div class="field">pest_control_contribution</div>
+                            <div class="field">conservation_status</div>
+                            <div class="field">environmental_dependencies</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+
+                    <div class="entity-card">
+                        <h4>Fungi</h4>
+                        <p class="table-description">Comprehensive fungal database including medicinal and ecological roles.</p>
+                        <div class="schema-display">
+                            <div class="field">fungi_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">scientific_name</div>
+                            <div class="field">common_names</div>
+                            <div class="field">type <span class="note">(mushroom, mold, yeast, mycorrhizal)</span></div>
+                            <div class="field">habitat</div>
+                            <div class="field">ecological_role</div>
+                            <div class="field">medicinal_properties</div>
+                            <div class="field">symbiotic_relationships</div>
+                            <div class="field">decomposition_role</div>
+                            <div class="field">toxicity_level</div>
+                            <div class="field">cultivation_methods</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+
+                    <div class="entity-card">
+                        <h4>Insects</h4>
+                        <p class="table-description">Complete insect database covering beneficial and pest species.</p>
+                        <div class="schema-display">
+                            <div class="field">insect_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">scientific_name</div>
+                            <div class="field">common_names</div>
+                            <div class="field">life_cycle_stage</div>
+                            <div class="field">habitat</div>
+                            <div class="field">food_source</div>
+                            <div class="field">pollination_role</div>
+                            <div class="field">pest_control_services</div>
+                            <div class="field">ecological_impact</div>
+                            <div class="field">seasonal_activity</div>
+                            <div class="field">conservation_status</div>
+                            <div class="field">beneficial_role</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+
+                    <div class="entity-card">
+                        <h4>Microorganisms</h4>
+                        <p class="table-description">Database for bacteria, viruses, protozoa, and microscopic life.</p>
+                        <div class="schema-display">
+                            <div class="field">microorganism_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">scientific_name</div>
+                            <div class="field">type <span class="note">(bacteria, virus, protozoa, archaea)</span></div>
+                            <div class="field">beneficial_role</div>
+                            <div class="field">pathogenic_potential</div>
+                            <div class="field">environmental_function</div>
+                            <div class="field">symbiotic_relationships</div>
+                            <div class="field">antibiotic_properties</div>
+                            <div class="field">fermentation_role</div>
+                            <div class="field">soil_health_impact</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                            <div class="field">user_id <span class="key-type">(Foreign Key to Users)</span></div>
+                            <div class="field">date_time_posted</div>
+                            <div class="field">comments</div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+</div>
+[% END %]
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size || c.session.roles.grep('editor').size) %]
+<div class="container info">
+    <div class="container-header" id="interconnection_tables">Ecological Interconnection Tables</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+                <p>Complex relationship mapping between all biological entities.</p>
+                
+                <div class="relationship-grid">
+                    <div class="relationship-card">
+                        <h4>Symbiotic Relationships</h4>
+                        <p class="table-description">Tracks mutualistic, parasitic, and commensal relationships between organisms.</p>
+                        <div class="schema-display">
+                            <div class="field">relationship_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">primary_organism_type <span class="note">(plant, animal, bird, insect, fungi, microorganism)</span></div>
+                            <div class="field">primary_organism_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">secondary_organism_type</div>
+                            <div class="field">secondary_organism_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">relationship_type <span class="note">(mutualistic, parasitic, commensal, competitive)</span></div>
+                            <div class="field">relationship_description</div>
+                            <div class="field">ecological_benefit</div>
+                            <div class="field">seasonal_variation</div>
+                            <div class="field">reference_id <span class="key-type">(Foreign Key to References)</span></div>
+                        </div>
+                    </div>
+
+                    <div class="relationship-card">
+                        <h4>Predator-Prey Relationships</h4>
+                        <p class="table-description">Food web and predation relationships across all organisms.</p>
+                        <div class="schema-display">
+                            <div class="field">predation_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">predator_type <span class="note">(animal, bird, insect, fungi, microorganism)</span></div>
+                            <div class="field">predator_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">prey_type</div>
+                            <div class="field">prey_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">predation_method</div>
+                            <div class="field">seasonal_activity</div>
+                            <div class="field">ecological_impact</div>
+                            <div class="field">population_control_role</div>
+                        </div>
+                    </div>
+
+                    <div class="relationship-card">
+                        <h4>Pollination Networks</h4>
+                        <p class="table-description">Complex pollination relationships between plants and pollinators.</p>
+                        <div class="schema-display">
+                            <div class="field">pollination_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                            <div class="field">pollinator_type <span class="note">(insect, bird, animal)</span></div>
+                            <div class="field">pollinator_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">pollination_efficiency</div>
+                            <div class="field">flower_parts_used</div>
+                            <div class="field">pollen_collection_method</div>
+                            <div class="field">seasonal_timing</div>
+                            <div class="field">co_evolutionary_adaptations</div>
+                        </div>
+                    </div>
+
+                    <div class="relationship-card">
+                        <h4>Seed Dispersal Networks</h4>
+                        <p class="table-description">Seed dispersal relationships for plant reproduction.</p>
+                        <div class="schema-display">
+                            <div class="field">dispersal_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">plant_id <span class="key-type">(Foreign Key to Plants)</span></div>
+                            <div class="field">disperser_type <span class="note">(bird, animal, insect, wind, water)</span></div>
+                            <div class="field">disperser_id <span class="key-type">(Foreign Key to respective table if applicable)</span></div>
+                            <div class="field">dispersal_method</div>
+                            <div class="field">dispersal_distance</div>
+                            <div class="field">germination_success_rate</div>
+                            <div class="field">habitat_colonization_role</div>
+                        </div>
+                    </div>
+
+                    <div class="relationship-card">
+                        <h4>Chemical Interactions</h4>
+                        <p class="table-description">Chemical compounds and their effects across organisms.</p>
+                        <div class="schema-display">
+                            <div class="field">interaction_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">source_organism_type <span class="note">(plant, animal, fungi, microorganism)</span></div>
+                            <div class="field">source_organism_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">compound_id <span class="key-type">(Foreign Key to Constituents)</span></div>
+                            <div class="field">target_organism_type</div>
+                            <div class="field">target_organism_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">interaction_type <span class="note">(therapeutic, toxic, attractive, repellent)</span></div>
+                            <div class="field">concentration_required</div>
+                            <div class="field">effect_description</div>
+                        </div>
+                    </div>
+
+                    <div class="relationship-card">
+                        <h4>Disease Vectors and Treatments</h4>
+                        <p class="table-description">Disease transmission and natural treatment relationships.</p>
+                        <div class="schema-display">
+                            <div class="field">vector_treatment_id <span class="key-type">(Primary Key)</span></div>
+                            <div class="field">disease_id <span class="key-type">(Foreign Key to Diseases)</span></div>
+                            <div class="field">vector_type <span class="note">(insect, animal, microorganism, environmental)</span></div>
+                            <div class="field">vector_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">treatment_organism_type <span class="note">(plant, fungi, animal, chemical)</span></div>
+                            <div class="field">treatment_organism_id <span class="key-type">(Foreign Key to respective table)</span></div>
+                            <div class="field">effectiveness_rating</div>
+                            <div class="field">treatment_method</div>
+                            <div class="field">side_effects</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+[% END %]
+
+<div class="container success" id="interconnections">
+    <div class="container-header">Ecological Interconnections</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>The ENCY system recognizes that all biological life exists within interconnected webs of relationships. Key interconnection principles:</p>
+            <div class="principles-grid">
+                <div class="principle-card">
+                    <h4>Nutrient Cycling</h4>
+                    <p>Plants absorb nutrients, herbivores consume plants, carnivores consume herbivores, decomposers break down organic matter</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Pollination Networks</h4>
+                    <p>Plants depend on insects, birds, and animals for reproduction, while pollinators depend on plants for food</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Symbiotic Relationships</h4>
+                    <p>Mycorrhizal fungi enhance plant nutrient uptake, nitrogen-fixing bacteria support plant growth</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Predator-Prey Balance</h4>
+                    <p>Natural pest control through predator species maintains ecosystem stability</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Chemical Communication</h4>
+                    <p>Pheromones, allelopathy, and chemical signals coordinate ecosystem interactions</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Habitat Interdependence</h4>
+                    <p>Species create and modify habitats that support other species</p>
+                </div>
+                <div class="principle-card">
+                    <h4>Seasonal Synchrony</h4>
+                    <p>Life cycles and behaviors are synchronized across species for optimal ecosystem function</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container info" id="environmental_impact">
+    <div class="container-header">Environmental Impact and Conservation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>ENCY tracks environmental factors and conservation status:</p>
+            <div class="environmental-grid">
+                <div class="environmental-card">
+                    <h4>Climate Change Effects</h4>
+                    <p>Temperature shifts, precipitation changes, seasonal timing disruptions</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Habitat Loss</h4>
+                    <p>Deforestation, urbanization, agricultural conversion impact tracking</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Pollution Impact</h4>
+                    <p>Chemical contamination, plastic pollution, noise pollution effects on species</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Conservation Status</h4>
+                    <p>Endangered, threatened, vulnerable, and stable population classifications</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Restoration Opportunities</h4>
+                    <p>Species and relationships that can be restored for ecosystem health</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Sustainable Practices</h4>
+                    <p>Human activities that support rather than disrupt natural systems</p>
+                </div>
+                <div class="environmental-card">
+                    <h4>Planetary Health Indicators</h4>
+                    <p>Key species and relationships that indicate overall ecosystem health</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF c.session.roles && (c.session.roles.grep('admin').size || c.session.roles.grep('developer').size) %]
+<div class="container warning" id="implementation_plan">
+    <div class="container-header">Implementation Plan (Next 3-6 Months)</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="alert alert-priority">
+                <p><strong>Priority: Complete Current Recipe System Integration Without Breaking Changes</strong></p>
+            </div>
+
+            <div class="implementation-phases">
+                <div class="phase-container">
+                    <h3>Phase 1A: Recipe System Completion (Current Sprint)</h3>
+                    <ol class="implementation-list">
+                        <li><strong>Recipe Database:</strong> Complete recipe tables integration with existing herb system</li>
+                        <li><strong>Recipe Controller:</strong> Implement CRUD operations for recipes using current herb data</li>
+                        <li><strong>Recipe Templates:</strong> Create user interface for recipe management</li>
+                        <li><strong>Herb-Recipe Integration:</strong> Link recipes to existing herb database entries</li>
+                        <li><strong>Testing:</strong> Ensure recipe system works seamlessly with current ENCY functionality</li>
+                    </ol>
+                </div>
+
+                <div class="phase-container">
+                    <h3>Phase 1B: Documentation & Architecture Preparation (Parallel)</h3>
+                    <ol class="implementation-list">
+                        <li><strong>Migration Strategy Refinement:</strong> Detail exact migration steps for database expansion</li>
+                        <li><strong>Backwards Compatibility Plan:</strong> Ensure all future changes maintain current functionality</li>
+                        <li><strong>API Design:</strong> Plan extensible API structure for future biological entities</li>
+                        <li><strong>Data Model Evolution:</strong> Design polymorphic approach for organism types</li>
+                        <li><strong>Performance Impact Analysis:</strong> Assess system resource requirements for expansion</li>
+                    </ol>
+                </div>
+
+                <div class="phase-container">
+                    <h3>Long-Term Roadmap (6+ Months)</h3>
+                    <p><strong>Full Encyclopedia Implementation - Phased Approach:</strong></p>
+                    <ol class="implementation-list">
+                        <li><strong>Infrastructure Foundation:</strong> Database schema extension with new biological entity tables</li>
+                        <li><strong>Species Integration:</strong> Gradual addition of animal, bird, insect, and fungi databases</li>
+                        <li><strong>Relationship Systems:</strong> Ecological interconnection and symbiotic relationship tracking</li>
+                        <li><strong>Conservation Features:</strong> Environmental impact and conservation status monitoring</li>
+                        <li><strong>Research Platform:</strong> Scientific collaboration and peer review integration</li>
+                        <li><strong>Advanced Analytics:</strong> Ecosystem analysis and environmental health indicators</li>
+                    </ol>
+                </div>
+
+                <div class="phase-container">
+                    <h3>Core Database donotuse Implementation</h3>
+                    <h4>Phase 1: Foundation Tables</h4>
+                    <div class="code-block">
+                        <pre><code>CREATE TABLE Plants (
+    plant_id INT PRIMARY KEY AUTO_INCREMENT,
+    botanical_name VARCHAR(255),
+    common_names TEXT,
+    key_name VARCHAR(255),
+    description TEXT,
+    image_url VARCHAR(255),
+    distribution TEXT,
+    comments TEXT,
+    history TEXT,
+    username_of_poster VARCHAR(255),
+    group_of_poster VARCHAR(255),
+    date_time_posted DATETIME
+);
+
+CREATE TABLE TherapeuticActions (
+    action_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255),
+    description TEXT
+);
+
+CREATE TABLE PlantTherapeuticActions (
+    plant_id INT,
+    action_id INT,
+    FOREIGN KEY (plant_id) REFERENCES Plants(plant_id),
+    FOREIGN KEY (action_id) REFERENCES TherapeuticActions(action_id)
+);</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="back-to-top">
+                <p id="return_top"><a href="#ency_top">Return to Top</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+[% END %]

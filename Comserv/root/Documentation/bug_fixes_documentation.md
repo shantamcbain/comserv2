@@ -106,6 +106,64 @@ The fixes were tested to ensure:
 4. **Documentation**: Maintain up-to-date documentation for all methods, especially those that handle authentication or file operations.
 5. **Refactoring**: Consider refactoring the Proxmox model to use a more consistent approach to authentication and token management.
 
+## 3. Todo Priority Display Template Consistency Fix
+
+### Issue Fixed
+
+1. **Priority Mapping Template Dependency**
+   - Problem: The priority display template (`priority_display.tt`) was dependent on controllers passing a `build_priority` hash, creating inconsistent behavior across different parts of the todo system.
+   - Impact: Some templates would fail to display priority names correctly if the controller didn't provide the required `build_priority` data.
+   - Solution: Made the `priority_display.md` template self-contained by defining the priority mapping internally within the template itself.
+
+2. **Inconsistent Priority Names**
+   - Problem: Priority mappings were not consistent across the application, with some showing numbers and others showing descriptive names.
+   - Solution: Standardized the priority mapping with the correct system: 1=Critical, 2=When we have time, 3=Urgent, 4=High, 5=Medium, 6=Medium-Low, 7=Low, 8=Very Low, 9=Minimal, 10=Optional.
+
+### Code Changes
+
+```perl
+# Updated priority_display.md template to be self-contained
+[% 
+    # Internal priority mapping - no controller dependency required
+    priority_names = {
+        1  => 'Critical',
+        2  => 'When we have time',
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium', 
+        6  => 'Medium-Low',
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    };
+%]
+
+# Display priority name or fallback to number
+[% priority_names.${priority} || "Priority ${priority}" %]
+```
+
+### Files Modified
+
+1. **Template**: `/Comserv/root/todo/priority_display.md` - Made self-contained with internal priority mapping
+2. **Controller**: `/Comserv/lib/Comserv/Controller/Todo.pm` - Already had correct priority mappings in `get_priority_name()` method and form dropdowns
+
+### Benefits
+
+1. **Template Independence**: The priority display component no longer requires specific controller support
+2. **Consistency**: All priority displays throughout the system now use the same correct mapping
+3. **Maintainability**: Reduces coupling between controllers and views
+4. **Future-proof**: New templates can use the priority display include without requiring controller modifications
+
+### Testing
+
+The fix ensures:
+
+1. Todo listing pages display correct priority names (Critical, When we have time, Urgent, etc.)
+2. Form dropdowns show consistent priority options
+3. All templates using the priority_display include work correctly regardless of controller support
+4. The system maintains backwards compatibility with existing functionality
+
 ## Conclusion
 
 These fixes address critical issues that were causing errors in the application logs. The changes maintain backward compatibility while improving code quality and reducing potential runtime errors.

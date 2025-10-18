@@ -1,0 +1,216 @@
+[%# Bug Fixes Documentation %]
+[% WRAPPER layout.tt title = 'Bug Fixes Documentation' %]
+
+<h1>Bug Fixes Documentation</h1>
+
+<h2>Overview</h2>
+
+<p>This document details the bugs that were identified and fixed in the Comserv application. The fixes addressed issues in two main files:</p>
+
+<ol>
+<li><code>Comserv/lib/Comserv/Model/Proxmox.pm</code></li>
+<li><code>Comserv/lib/Comserv/Controller/Admin.pm</code></li>
+</ol>
+
+<h2>1. Proxmox Model Fixes</h2>
+
+<h3>Issues Fixed</h3>
+
+<ol>
+<li><strong>Duplicate Method Declarations</strong>
+   <ul>
+   <li>Problem: The <code>test_proxmox_node</code> method was defined three times in the file, causing Perl to use only the last definition and ignore the others.</li>
+   <li>Solution: Removed two duplicate declarations, keeping only the most complete implementation.</li>
+   </ul>
+</li>
+
+<li><strong>Indentation Error</strong>
+   <ul>
+   <li>Problem: Incorrect indentation in the <code>_get_real_vms_new</code> method with an extra closing brace at lines 1138-1139.</li>
+   <li>Solution: Fixed the indentation by removing the extra closing brace.</li>
+   </ul>
+</li>
+
+<li><strong>Missing Attribute</strong>
+   <ul>
+   <li>Problem: The code referenced a <code>token</code> attribute that wasn't defined in the class.</li>
+   <li>Solution: Added the missing <code>token</code> attribute to the class for backward compatibility.</li>
+   </ul>
+</li>
+
+<li><strong>Token Handling Consistency</strong>
+   <ul>
+   <li>Problem: Inconsistent handling of token attributes across methods.</li>
+   <li>Solution: Updated methods to consistently set and use both <code>api_token</code> and <code>token</code> attributes.</li>
+   </ul>
+</li>
+</ol>
+
+<h3>Code Changes</h3>
+
+<pre><code># Added missing token attribute
+has 'token' => (
+    is => 'rw',
+    default => ''
+);
+
+# Updated token handling in check_connection method
+# Store the token for future use
+$self->{api_token} = $token;
+$self->{token} = $token;  # For backward compatibility
+
+# Updated token reset in set_server_id method
+# Reset API token
+$self->{api_token} = '';
+$self->{token} = '';  # For backward compatibility
+</code></pre>
+
+<h2>2. Admin Controller Fixes</h2>
+
+<h3>Issues Fixed</h3>
+
+<ol>
+<li><strong>Undeclared Variable</strong>
+   <ul>
+   <li>Problem: The <code>$output</code> variable was used in the <code>add_schema</code> method without being declared.</li>
+   <li>Solution: Added a declaration for the <code>$output</code> variable and set appropriate values for it in each execution path.</li>
+   </ul>
+</li>
+
+<li><strong>Duplicate Method Definition</strong>
+   <ul>
+   <li>Problem: The <code>edit_documentation</code> method was defined twice with different paths.</li>
+   <li>Solution: Removed the first definition and updated the second one to include a debug message in the stash.</li>
+   </ul>
+</li>
+
+<li><strong>Bareword Error</strong>
+   <ul>
+   <li>Problem: The file used <code>O_WRONLY</code>, <code>O_APPEND</code>, and <code>O_CREAT</code> constants without importing them from the Fcntl module.</li>
+   <li>Solution: Added <code>use Fcntl qw(:DEFAULT :flock);</code> to import the necessary constants.</li>
+   </ul>
+</li>
+</ol>
+
+<h3>Code Changes</h3>
+
+<pre><code># Added Fcntl import for file operation constants
+use Fcntl qw(:DEFAULT :flock);  # Import O_WRONLY, O_APPEND, O_CREAT constants
+
+# Fixed undeclared $output variable in add_schema method
+# Initialize output variable
+my $output = '';
+
+# Set appropriate values for $output in each execution path
+$output = "Created migration script for schema: $schema_name";
+$output = "Error: $@";
+$output = "Error: Schema name and description cannot be empty.";
+
+# Removed duplicate edit_documentation method
+# This method has been moved to Path('admin/edit_documentation')
+
+# Updated remaining edit_documentation method
+# Add debug message to stash
+$c->stash(
+    debug_msg => "Edit documentation page loaded",
+    template => 'admin/edit_documentation.tt'
+);
+</code></pre>
+
+<h2>Testing</h2>
+
+<p>The fixes were tested to ensure:</p>
+
+<ol>
+<li>The Proxmox model can properly authenticate and maintain token state</li>
+<li>The Admin controller's add_schema method correctly handles and displays output</li>
+<li>The edit_documentation functionality works with the updated path</li>
+<li>File operations using Fcntl constants work correctly</li>
+</ol>
+
+<h2>Recommendations for Future Development</h2>
+
+<ol>
+<li><strong>Code Review Process</strong>: Implement a code review process to catch similar issues before they reach production.</li>
+<li><strong>Static Analysis</strong>: Use Perl static analysis tools like Perl::Critic to identify potential issues.</li>
+<li><strong>Unit Tests</strong>: Develop unit tests for critical components to ensure they function as expected.</li>
+<li><strong>Documentation</strong>: Maintain up-to-date documentation for all methods, especially those that handle authentication or file operations.</li>
+<li><strong>Refactoring</strong>: Consider refactoring the Proxmox model to use a more consistent approach to authentication and token management.</li>
+</ol>
+
+<h2>3. Todo Priority Display Template Consistency Fix</h2>
+
+<h3>Issue Fixed</h3>
+
+<ol>
+<li><strong>Priority Mapping Template Dependency</strong>
+   <ul>
+   <li>Problem: The priority display template (<code>priority_display.tt</code>) was dependent on controllers passing a <code>build_priority</code> hash, creating inconsistent behavior across different parts of the todo system.</li>
+   <li>Impact: Some templates would fail to display priority names correctly if the controller didn't provide the required <code>build_priority</code> data.</li>
+   <li>Solution: Made the <code>priority_display.md</code> template self-contained by defining the priority mapping internally within the template itself.</li>
+   </ul>
+</li>
+
+<li><strong>Inconsistent Priority Names</strong>
+   <ul>
+   <li>Problem: Priority mappings were not consistent across the application, with some showing numbers and others showing descriptive names.</li>
+   <li>Solution: Standardized the priority mapping with the correct system: 1=Critical, 2=When we have time, 3=Urgent, 4=High, 5=Medium, 6=Medium-Low, 7=Low, 8=Very Low, 9=Minimal, 10=Optional.</li>
+   </ul>
+</li>
+</ol>
+
+<h3>Code Changes</h3>
+
+<pre><code># Updated priority_display.md template to be self-contained
+[% 
+    # Internal priority mapping - no controller dependency required
+    priority_names = {
+        1  => 'Critical',
+        2  => 'When we have time',
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium', 
+        6  => 'Medium-Low',
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    };
+%]
+
+# Display priority name or fallback to number
+[% priority_names.${priority} || "Priority ${priority}" %]
+</code></pre>
+
+<h3>Files Modified</h3>
+
+<ol>
+<li><strong>Template</strong>: <code>/Comserv/root/todo/priority_display.md</code> - Made self-contained with internal priority mapping</li>
+<li><strong>Controller</strong>: <code>/Comserv/lib/Comserv/Controller/Todo.pm</code> - Already had correct priority mappings in <code>get_priority_name()</code> method and form dropdowns</li>
+</ol>
+
+<h3>Benefits</h3>
+
+<ol>
+<li><strong>Template Independence</strong>: The priority display component no longer requires specific controller support</li>
+<li><strong>Consistency</strong>: All priority displays throughout the system now use the same correct mapping</li>
+<li><strong>Maintainability</strong>: Reduces coupling between controllers and views</li>
+<li><strong>Future-proof</strong>: New templates can use the priority display include without requiring controller modifications</li>
+</ol>
+
+<h3>Testing</h3>
+
+<p>The fix ensures:</p>
+
+<ol>
+<li>Todo listing pages display correct priority names (Critical, When we have time, Urgent, etc.)</li>
+<li>Form dropdowns show consistent priority options</li>
+<li>All templates using the priority_display include work correctly regardless of controller support</li>
+<li>The system maintains backwards compatibility with existing functionality</li>
+</ol>
+
+<h2>Conclusion</h2>
+
+<p>These fixes address critical issues that were causing errors in the application logs. The changes maintain backward compatibility while improving code quality and reducing potential runtime errors.</p>
+
+[% END %]
