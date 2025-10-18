@@ -1,12 +1,22 @@
+[% # Debug output
+   "<!-- Projects: " _ Dumper.dump(projects) _ " -->";
+   "<!-- Selected ID: $selected_project_id, Type: " _ (selected_project_id ? selected_project_id.type : 'undefined') _ " -->";
+%]
+
 [% MACRO display_project_options(projects, selected_project_id, level) BLOCK %]
     [% FOREACH project IN projects.sort('name') %]
         [% SET indent = '' %]
         [% FOREACH i IN [1 .. level] %]
             [% indent = indent _ '--- ' %]
         [% END %]
+        [% # Add status to debug info
+           debug_info = "ID: " _ project.id _
+                      " (Status: " _ (project.status || 'unknown') _ ")" _
+                      ", Selected: " _ (selected_project_id || 'UNDEFINED') %]
         <option value="[% project.id %]"
-            [% IF project.id == selected_project_id %]style="font-weight: bold;" selected[% END %]>
-            [% indent %][% project.name %]
+            [% IF project.id == selected_project_id %]style="font-weight: bold;" selected[% END %]
+            title="[% debug_info %]">
+            [% indent %][% project.name %] (Status: [% project.status || 'none' %])
         </option>
         [% IF project.sub_projects.size %]
             [% display_project_options(project.sub_projects, selected_project_id, level + 1) %]
@@ -14,8 +24,9 @@
     [% END %]
 [% END %]
 
-
-<select id="project_id" name="project_id">
-    <option value="" [% IF !selected_project_id %]selected[% END %]>None</option>
+<select id="[% field_name || 'parent_id' %]" name="[% field_name || 'parent_id' %]" [% IF field_name == 'project_id' %]style="flex: 1;"[% END %]>
+    <option value="" [% IF (not selected_project_id.defined or selected_project_id == '' or selected_project_id == 0 or selected_project_id == '0') %]selected[% END %]>
+        [% IF field_name == 'project_id' %]None (No Project)[% ELSE %]None (Top-level Project)[% END %]
+    </option>
     [% display_project_options(projects, selected_project_id, 0) %]
 </select>

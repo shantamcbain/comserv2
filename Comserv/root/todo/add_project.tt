@@ -66,4 +66,32 @@ function openAddSiteForm() {
     console.log("Opening URL: " + url);
     window.open(url, '_blank');
 }
+
+// Check if this window was opened as a popup and notify parent on successful creation
+window.addEventListener('load', function() {
+    // Check for success message or redirect that indicates project was created
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === '1' || window.location.pathname.includes('/project/')) {
+        if (window.opener) {
+            console.log('Notifying parent window of project creation');
+            window.opener.postMessage({type: 'projectCreated'}, '*');
+            window.close();
+        }
+    }
+});
+
+// Override form submission to handle success notification
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[action="/project/create_project"]');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Let the form submit normally, but add a flag to detect success
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'popup_mode';
+            input.value = '1';
+            form.appendChild(input);
+        });
+    }
+});
 </script>

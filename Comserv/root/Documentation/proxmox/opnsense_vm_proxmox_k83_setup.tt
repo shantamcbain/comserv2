@@ -1,0 +1,286 @@
+[% META
+        title = "OpenSense VM Proxmox K83 Setup"
+   description = "Complete setup guide for OpenSense VM on Proxmox K83 server"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "proxmox"
+   page_version = "1.00"
+   last_updated = "Fri Oct 17 09:27:21 AM PDT 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/proxmox/opnsense_vm_proxmox_k83_setup.tt,v 0.01 09:27:21 2025/10/17 shanta Exp shanta - OpenSense VM Proxmox K83 Setup Documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">OpenSense VM Proxmox K83 Setup</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: October 17, 2025 | 
+        Version: 1.0 | 
+        Author: AI Assistant | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This documentation provides a complete guide for setting up OpenSense firewall as a virtual machine on the Proxmox K83 server. This setup provides network security and routing capabilities for the infrastructure.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Access to Proxmox K83 server (https://10.0.1.83:8006)</li>
+                <li>OpenSense ISO image downloaded</li>
+                <li>Administrative privileges on Proxmox</li>
+                <li>Network configuration requirements defined</li>
+                <li>Minimum 2GB RAM and 20GB storage allocated</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Firewall Protection</strong>: Advanced packet filtering and security rules</li>
+                <li><strong>VPN Server</strong>: OpenVPN and WireGuard support</li>
+                <li><strong>Network Routing</strong>: Inter-VLAN routing and traffic management</li>
+                <li><strong>Web Interface</strong>: User-friendly web-based management</li>
+                <li><strong>High Availability</strong>: VM-based deployment for easy backup/restore</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Download OpenSense ISO</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Download the latest OpenSense ISO from the official website and upload it to the Proxmox ISO library.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Upload ISO to Proxmox via web interface:
+# Datacenter > k83 > local (k83) > ISO Images > Upload
+# Or via command line:
+wget https://mirror.opnsense.org/releases/23.7/OPNsense-23.7-OpenSSL-dvd-amd64.iso
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Create Virtual Machine</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create a new VM in Proxmox with the following specifications:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>VM ID: 200 (or next available)</li>
+                <li>Name: opnsense-fw</li>
+                <li>OS Type: Other</li>
+                <li>ISO Image: Select uploaded OpenSense ISO</li>
+                <li>Memory: 2048 MB (minimum)</li>
+                <li>Hard Disk: 20 GB (IDE or SCSI)</li>
+                <li>Network: Bridge to vmbr0 (WAN) and vmbr1 (LAN)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Network Configuration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Configure network interfaces for proper WAN/LAN separation.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Add two network interfaces to VM:
+# Network Device 0: Bridge vmbr0 (WAN interface)
+# Network Device 1: Bridge vmbr1 (LAN interface)
+# Both should use VirtIO (paravirtualized) model
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Installation Process</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Initial Boot and Installation</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Start the VM and follow the OpenSense installation wizard:</p>
+            
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Boot from ISO and select "Install (UFS)"</li>
+                <li>Accept license agreement</li>
+                <li>Select keyboard layout</li>
+                <li>Choose "Install" when prompted</li>
+                <li>Select disk for installation</li>
+                <li>Set root password (use strong password)</li>
+                <li>Complete installation and reboot</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Initial Configuration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">After first boot, configure basic network settings via console:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Console configuration menu:
+# 1) Assign interfaces (WAN: vtnet0, LAN: vtnet1)
+# 2) Set interface IP addresses
+#    - WAN: Configure for your network (DHCP or static)
+#    - LAN: 192.168.1.1/24 (typical default)
+# 8) Shell (for advanced configuration if needed)
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Web Interface Setup</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Accessing the Web GUI</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Once network configuration is complete, access the web interface:</p>
+            
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>URL: https://[LAN_IP] (typically https://192.168.1.1)</li>
+                <li>Default username: root</li>
+                <li>Password: [set during installation]</li>
+                <li>Accept self-signed certificate warning</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Initial Web Setup Wizard</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Complete the setup wizard for basic configuration:</p>
+            
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Set hostname and domain</li>
+                <li>Configure time zone and NTP servers</li>
+                <li>Configure WAN interface (static IP, DHCP, or PPPoE)</li>
+                <li>Configure LAN interface and DHCP range</li>
+                <li>Set admin password</li>
+                <li>Complete wizard and reboot if prompted</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Advanced Configuration</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Firewall Rules</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Configure firewall rules for security and access control via System > Settings > Firewall.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">VPN Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Configure OpenVPN or WireGuard for remote access via VPN menu.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">VLAN Configuration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Set up VLANs for network segmentation via Interfaces > VLANs.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: VM Won't Boot</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> VM fails to start or boot from ISO</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Check ISO is properly uploaded, verify VM hardware settings (especially CPU type), ensure sufficient resources are allocated</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Network Interface Not Detected</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> OpenSense doesn't see network interfaces during setup</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Change network adapter model to VirtIO, ensure bridges are properly configured in Proxmox</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Can't Access Web Interface</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Web interface unreachable after installation</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Verify LAN IP configuration via console, check firewall rules, ensure client is on correct network segment</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Configuration Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Setting</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Recommended Value</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Notes</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VM Memory</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2048 MB</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Minimum for stable operation</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VM Storage</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">20 GB</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Allows for logs and updates</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Network Model</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VirtIO</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Best performance in KVM</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">CPU Cores</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Adequate for most networks</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/proxmox_api" style="color: var(--link-color);">Proxmox API Documentation</a></li>
+                    <li><a href="/Documentation/proxmox_commands" style="color: var(--link-color);">Proxmox Command Reference</a></li>
+                    <li><a href="/Documentation/proxmox_ip_configuration" style="color: var(--link-color);">Proxmox IP Configuration</a></li>
+                    <li><a href="https://docs.opnsense.org/" style="color: var(--link-color);">Official OpenSense Documentation</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this setup, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv Proxmox infrastructure documentation.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 
+PROXMOX K83 OPENSENSE SETUP NOTES:
+
+This documentation provides complete setup instructions for deploying OpenSense
+firewall as a VM on the Proxmox K83 server. Key considerations:
+
+1. **Resource Allocation**: 
+   - 2GB RAM minimum for stable operation
+   - 20GB storage for system, logs, and updates
+   - 2 CPU cores adequate for most network loads
+
+2. **Network Configuration**:
+   - Requires two network interfaces (WAN/LAN)
+   - VirtIO drivers provide best performance
+   - Bridge configuration must match Proxmox setup
+
+3. **Security Considerations**:
+   - Change default passwords immediately
+   - Configure firewall rules based on security policy
+   - Regular updates and security patches
+
+4. **High Availability**:
+   - VM-based deployment allows easy backup/restore
+   - Consider VM replication for critical environments
+   - Regular configuration backups recommended
+
+5. **Integration with Infrastructure**:
+   - Coordinate with existing network topology
+   - Plan VLAN segmentation strategy
+   - Consider DNS and DHCP service placement
+-->

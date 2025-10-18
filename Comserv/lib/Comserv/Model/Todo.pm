@@ -89,6 +89,51 @@ sub get_todos_for_date {
     return \@todos;
 }
 
+sub get_all_todos_for_calendar {
+    my ($self, $c, $SiteName) = @_;
+
+    # Refactor to handle roles safely
+    my $roles = $c->session->{roles} || [];
+
+    # Validate that roles are an array reference
+    if (ref $roles ne 'ARRAY') {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
+            "Expected roles to be an ARRAY but got: " . ref($roles) || 'undef');
+        $c->stash->{error_msg} = "Invalid roles format in session. Please log in again.";
+        $c->res->redirect($c->uri_for('/user/login'));
+        $c->detach;
+    }
+
+    # Check if user has admin or developer role
+    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
+            'Unauthorized access attempt by user without admin/developer role');
+        return [];
+    }
+
+    $SiteName = $c->session->{'SiteName'};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
+        "Fetching all todos for calendar views. Site name: $SiteName");
+
+    # Get a DBIx::Class::Schema object
+    my $schema = $c->model('DBEncy');
+
+    # Get a DBIx::Class::ResultSet object for the 'Todo' table
+    my $rs = $schema->resultset('Todo');
+
+    # Fetch ALL todos for the given site (including completed ones for calendar views)
+    # No row limit, no status filter - calendar views need to see everything
+    my @todos = $rs->search(
+        { sitename => $SiteName },
+        { order_by => { -asc => ['priority', 'start_date'] } }
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar',
+        "Found " . scalar(@todos) . " todos for calendar views");
+
+    return \@todos;
+}
+
 
 sub fetch_todo_record {
     my ($self, $c, $record_id) = @_;

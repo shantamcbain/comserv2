@@ -112,7 +112,7 @@ sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my $forager_data = $c->model('DBForager')->get_herbal_data();
 
     # Pass the data to the template
-    my $herbal_data = $forager_data;
+    my $herbal_data = $forager_data;  # Add 'my' here
     $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {

@@ -1,36 +1,67 @@
 
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/pagetop.tt -->
-[% PageVersion = 'pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
-[%# PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
 
+[% PageVersion = 'root/pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
 [% SET roles = c.session.roles || [] %]
 [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
 
 [% IF is_admin || c.session.debug_mode == 1 %]
-<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
-    Domain: <strong>[% c.req.uri.host %]</strong> | 
-    Client IP: <strong>[% c.req.address %]</strong> | 
-    Server: <strong>[% server_hostname %]</strong> | 
-    Server IP: <strong>[% server_ip %]</strong>[% IF db_connections && db_connections.size > 0 %] | 
-    Databases: [% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% END %]
-    [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
-</div>
-[% END %]
-
-[% IF c.session.debug_mode == 1 %]
-<div class="debug">
-    [% INCLUDE 'debug.tt' %]
-</div>
-
-[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
-    <div class="debug-messages" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
-        <h4>Debug Messages</h4>
-        [% FOREACH msg IN c.stash.debug_msg %]
-            <p class="debug" style="margin: 2px 0; font-family: monospace;">Debug [% loop.index %]: [% msg %]</p>
-        [% END %]
+<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; color: #495057;">
+    [% IF is_admin %]
+    <div style="text-align: right;">
+        Domain: <strong>[% c.req.uri.host %]</strong> | 
+        Client IP: <strong>[% c.req.address %]</strong> | 
+        Server: <strong>[% server_hostname %]</strong> | 
+        Server IP: <strong>[% server_ip %]</strong>[% IF db_connections && db_connections.size > 0 %] | 
+        Databases: [% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% END %]
+        [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %] |
+        <button id="css-edit-toggle" style="background: #4a90e2; color: white; border: none; border-radius: 3px; padding: 2px 10px; margin-left: 10px; cursor: pointer; font-size: 12px;">
+            <i class="fas fa-paint-brush"></i> Toggle CSS Edit
+        </button>
     </div>
+</div>
 [% END %]
 [% END %]
+
+<!-- Add Font Awesome for the paint brush icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Include Theme Editor JavaScript -->
+[% IF is_admin %]
+<script src="[% c.uri_for('/static/js/theme-editor.js') %]"></script>
+[% END %]
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('css-edit-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            document.body.classList.toggle('css-edit-mode');
+            const isEditMode = document.body.classList.contains('css-edit-mode');
+            this.innerHTML = isEditMode ? '<i class="fas fa-times"></i> Exit Edit Mode' : '<i class="fas fa-paint-brush"></i> Toggle CSS Edit';
+            this.style.backgroundColor = isEditMode ? '#e74c3c' : '#4a90e2';
+            
+            // Initialize theme editor if entering edit mode
+            if (isEditMode && typeof ThemeEditor !== 'undefined') {
+                if (!window.themeEditor) {
+                    window.themeEditor = new ThemeEditor();
+                    window.themeEditor.init();
+                }
+            }
+        });
+    }
+});
+</script>
+
+<style>
+.css-edit-mode * {
+    outline: 2px solid rgba(52, 152, 219, 0.3) !important;
+    position: relative;
+}
+.css-edit-mode *:hover {
+    outline: 2px solid #e74c3c !important;
+    cursor: crosshair;
+}
+</style>
 
 <header>
     <h1>
@@ -60,18 +91,16 @@
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
         <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
-
-        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
-        </ul>
+         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+       </ul>
     </nav>
 </header>
-[% IF error_msg %]<div class="alert error">[% error_msg %]</div>[% END %]
-[% IF success_msg %]<div class="alert success">[% success_msg %]</div>[% END %]
 [% IF error_msg %]
 <p class="error">Error: [% error_msg %]</p>
 [% END %]
@@ -79,8 +108,8 @@
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
 [% END %]
-    [% IF c.stash.success_msg %]
-        [% FOREACH msg IN c.stash.success_msg %]
+    [% IF c.stash.debug_msg %]
+        [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
         [% END %]
     [% END %]

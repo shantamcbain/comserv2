@@ -1,5 +1,5 @@
 [% META title = 'View Backup Details' %]
-[% PageVersion = 'admin/backup/view.tt,v 1.0 2025/01/27 comserv Exp comserv' %]
+[% PageVersion = 'admin/backup/view.tt,v 1.2 2025/10/16 comserv Exp comserv' %]
 
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
@@ -40,7 +40,7 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Backup Management
+                Back to Backup Management
             </a>
         </div>
     </div>
@@ -97,7 +97,7 @@
                             </table>
                             [% ELSE %]
                             <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No metadata available for this backup.
+                                No metadata available for this backup.
                             </div>
                             [% END %]
                         </div>
@@ -114,11 +114,16 @@
                 <div class="card-body">
                     <div class="d-grid gap-2">
                         <a href="[% c.uri_for('/admin/backup_restore') %]" class="btn btn-info">
-                            <i class="fas fa-undo"></i> Restore from this Backup
+                            Restore from this Backup
                         </a>
-                        <a href="[% c.uri_for('/admin/backup_delete', backup_info.filename) %]" 
-                           class="btn btn-outline-danger">
-                            <i class="fas fa-trash"></i> Delete this Backup
+                        <a href="[% c.uri_for('/admin/backup/download_backup', backup_info.filename) %]" 
+                           class="btn btn-success">
+                            Download this Backup
+                        </a>
+                        <a href="[% c.uri_for('/admin/backup/delete_backup', backup_info.filename) %]" 
+                           class="btn btn-outline-danger"
+                           onclick="return confirm('Are you sure you want to permanently delete this backup? This action cannot be undone.')">
+                            Delete this Backup
                         </a>
                     </div>
                 </div>
@@ -177,7 +182,6 @@
     <div class="row">
         <div class="col-md-12">
             <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i>
                 <strong>Backup not found.</strong> The requested backup file could not be located.
             </div>
         </div>

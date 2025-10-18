@@ -1,19 +1,17 @@
 #!/usr/bin/env perl
 
-use FindBin;
-
 BEGIN {
     $ENV{CATALYST_SCRIPT_GEN} = 40;
-    
+
     # Ensure we're using the correct Perl version via perlbrew
     my $required_perl_version = "perl-5.40.0";
     my $current_perl = $^X;
-    
+
     # Check if we're already using the correct perlbrew Perl
     if ($current_perl !~ /perlbrew.*\Q$required_perl_version\E/) {
         # Try to find and use the correct perlbrew Perl
         my $perlbrew_perl = "$ENV{HOME}/perl5/perlbrew/perls/$required_perl_version/bin/perl";
-        
+
         if (-x $perlbrew_perl) {
             print "Switching to perlbrew Perl $required_perl_version...\n";
             # Re-execute with the correct Perl version
@@ -47,17 +45,17 @@ BEGIN {
     use lib "$FindBin::Bin/../local/lib/perl5";
     $ENV{PERL5LIB} = "$FindBin::Bin/../local/lib/perl5:$ENV{PERL5LIB}";
     $ENV{PATH} = "$FindBin::Bin/../local/bin:$ENV{PATH}";
-    
+
     # Add architecture-specific paths early
     use Config;
     my $archname = $Config{archname};
     my $version = $Config{version};
-    
+
     # Add all possible architecture paths to @INC
     use lib "$FindBin::Bin/../local/lib/perl5/$archname";
     use lib "$FindBin::Bin/../local/lib/perl5/$version/$archname";
     use lib "$FindBin::Bin/../local/lib/perl5/$version";
-    
+
     # Also add the actual installed architecture path (for systems where archname differs)
     # This handles cases where the actual installed path uses a different architecture name
     my @arch_paths = (
@@ -67,13 +65,13 @@ BEGIN {
         "$FindBin::Bin/../local/lib/perl5/site_perl/$version",
         "$FindBin::Bin/../local/lib/perl5/site_perl/$version/$archname"
     );
-    
+
     foreach my $path (@arch_paths) {
         if (-d $path) {
             unshift @INC, $path;
         }
     }
-    
+
     # Debug: Print the paths being added
     if ($ENV{CATALYST_DEBUG}) {
         print "Debug: Adding architecture paths to \@INC:\n";
@@ -96,7 +94,7 @@ print "Installing dependencies from cpanfile...\n";
 my $cpanfile_path = "$FindBin::Bin/../cpanfile";
 if (-e $cpanfile_path) {
     print "Found cpanfile at: $cpanfile_path\n";
-    
+
     # Check if cpanm is installed
     my $cpanm_check = system("which cpanm > /dev/null 2>&1");
     if ($cpanm_check != 0) {
@@ -104,11 +102,11 @@ if (-e $cpanfile_path) {
         system("curl -L https://cpanmin.us | perl - --sudo App::cpanminus") == 0
             or die "Failed to install cpanm. Please install it manually with: curl -L https://cpanmin.us | perl - --sudo App::cpanminus\n";
     }
-    
+
     # Install all dependencies from cpanfile first
     print "Installing all dependencies from cpanfile...\n";
     my $cpanfile_result = system("cpanm --local-lib=$FindBin::Bin/../local --installdeps $FindBin::Bin/..");
-    
+
     # Force reinstall XS modules to ensure they're compiled with current Perl version
     print "Force reinstalling XS modules to ensure compatibility...\n";
     my @xs_modules = ('YAML::XS', 'JSON::XS');
@@ -116,31 +114,31 @@ if (-e $cpanfile_path) {
         print "Force reinstalling $xs_module...\n";
         system("cpanm --local-lib=$FindBin::Bin/../local --force --reinstall $xs_module");
     }
-    
+
     # If there were issues with cpanfile installation, try installing critical modules individually
     if ($cpanfile_result != 0) {
         warn "Some dependencies from cpanfile may not have been installed correctly.\n";
         print "Installing critical modules individually...\n";
-        
+
         # First, install the base modules that other modules depend on
         print "Installing base modules...\n";
         my $base_result = system("cpanm --local-lib=$FindBin::Bin/../local Module::Runtime Class::Load Moose");
-        
+
         # Then install email-related modules
         print "Installing email-related modules...\n";
-        
+
         # Define a list of essential modules without duplicates
         my @essential_modules = (
             # Base modules
             "Module::Runtime",
             "Class::Load",
             "Moose",
-            
+
             # Email modules
             "Email::Abstract",
             "Email::Address",
             "Email::Date::Format",
-            "Email::MIME", 
+            "Email::MIME",
             "Email::MIME::ContentType",
             "Email::MIME::Encodings",
             "Email::MessageID",
@@ -151,7 +149,7 @@ if (-e $cpanfile_path) {
             "Email::MIME::Creator",
             "Catalyst::View::Email",
             "Catalyst::View::Email::Template",
-            
+
             # Core Catalyst modules
             "Catalyst::Runtime",
             "Catalyst::Model",
@@ -162,16 +160,16 @@ if (-e $cpanfile_path) {
             "Catalyst::Plugin::Authentication",
             "DBIx::Class",
             "Template",
-            
+
             # Network modules
             "Net::CIDR",
-            
+
             # YAML modules
             "YAML::XS"
         );
-        
+
         my @failed_modules = ();
-        
+
         foreach my $module (@essential_modules) {
             print "Installing $module...\n";
             my $result = system("cpanm --local-lib=$FindBin::Bin/../local $module");
@@ -182,11 +180,11 @@ if (-e $cpanfile_path) {
                 print "Successfully installed $module\n";
             }
         }
-        
+
         if (@failed_modules) {
             warn "Some essential modules may not have been installed correctly.\n";
             print "Retrying failed modules with force flag...\n";
-            
+
             foreach my $module (@failed_modules) {
                 print "Force installing $module...\n";
                 my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
@@ -202,22 +200,22 @@ if (-e $cpanfile_path) {
         }
     } else {
         print "All dependencies from cpanfile installed successfully\n";
-        
+
         # Try again with force flag for any problematic modules
         print "Running a final check with force flag to ensure all modules are installed...\n";
         system("cpanm --local-lib=$FindBin::Bin/../local --force --installdeps $FindBin::Bin/..");
     }
-    
+
     # Add the newly installed modules' path to @INC
     unshift @INC, "$FindBin::Bin/../local/lib/perl5";
-    
+
     # Also add architecture-specific paths
     use Config;
     my $archname = $Config{archname};
     my $version = $Config{version};
     unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if -d "$FindBin::Bin/../local/lib/perl5/$archname";
     unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi" if -d "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
-    
+
     print "Installation complete. New modules are now available.\n";
 } else {
     warn "cpanfile not found at $cpanfile_path. Skipping dependency installation.\n";
@@ -235,7 +233,7 @@ if ($@) {
 
     # Add the newly installed module's path to @INC
     unshift @INC, "$FindBin::Bin/../local/lib/perl5";
-    
+
     # Also add architecture-specific paths
     use Config;
     my $archname = $Config{archname};
@@ -311,7 +309,7 @@ foreach my $module (@other_modules) {
 
 if (@missing_modules && !$already_tried_install) {
     print "Installing missing modules: " . join(', ', @missing_modules) . "\n";
-    
+
     foreach my $module (@missing_modules) {
         print "Installing $module...\n";
         my $result = system("cpanm --local-lib=$FindBin::Bin/../local --force $module");
@@ -322,12 +320,12 @@ if (@missing_modules && !$already_tried_install) {
             $need_restart = 1;
         }
     }
-    
+
     if ($need_restart) {
         # Create marker file to prevent infinite loops
         open my $fh, '>', $install_marker or warn "Could not create install marker: $!";
         close $fh if $fh;
-        
+
         # Restart the script to ensure the newly installed modules are properly loaded
         print "Restarting script to load the newly installed modules...\n";
         exec($^X, $0, @ARGV);
@@ -336,7 +334,7 @@ if (@missing_modules && !$already_tried_install) {
 } elsif (@missing_modules && $already_tried_install) {
     # We've already tried installing, but modules are still missing
     # Continue anyway but warn about missing functionality
-    warn "Warning: The following modules are still missing after installation attempt: " . 
+    warn "Warning: The following modules are still missing after installation attempt: " .
          join(', ', @missing_modules) . "\n";
     warn "Some functionality may be limited.\n";
 }
@@ -345,4 +343,52 @@ Catalyst::ScriptRunner->run('Comserv', 'Server');
 
 1;
 
-# ... (rest of your POD documentation)
+=head1 NAME
+
+comserv_server.pl - Catalyst Test Server
+
+=head1 SYNOPSIS
+
+comserv_server.pl [options]
+
+   -d --debug           force debug mode
+   -f --fork            handle each request in a new process
+                        (defaults to false)
+   -? --help            display this help and exits
+   -h --host            host (defaults to all)
+   -p --port            port (defaults to 3000)
+   -k --keepalive       enable keep-alive connections
+   -r --restart         restart when files get modified
+                        (defaults to false)
+   -rd --restart_delay  delay between file checks
+                        (ignored if you have Linux::Inotify2 installed)
+   -rr --restart_regex  regex match files that trigger
+                        a restart when modified
+                        (defaults to '\.yml$|\.yaml$|\.conf|\.pm$')
+   --restart_directory  the directory to search for
+                        modified files, can be set multiple times
+                        (defaults to '[SCRIPT_DIR]/..')
+   --follow_symlinks    follow symlinks in search directories
+                        (defaults to false. this is a no-op on Win32)
+   --background         run the process in the background
+   --pidfile            specify filename for pid file
+
+ See also:
+   perldoc Catalyst::Manual
+   perldoc Catalyst::Manual::Intro
+
+=head1 DESCRIPTION
+
+Run a Catalyst Testserver for this application.
+
+=head1 AUTHORS
+
+Catalyst Contributors, see Catalyst.pm
+
+=head1 COPYRIGHT
+
+This library is free software. You can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
+

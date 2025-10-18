@@ -378,3 +378,191 @@ nav {
 .submenu-add-button i {
   margin-right: 5px;
 }
+
+/* =============================================================================
+   DROPDOWN MENU SPECIFIC STYLES
+   Moved from individual TopDropList*.tt files - Sun Oct 12 04:04:38 PM PDT 2025
+   ============================================================================= */
+
+/* Login Menu Specific Styles */
+.horizontal-dropdown .user-menu {
+  background-color: transparent;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.horizontal-dropdown .login-menu {
+  background-color: transparent;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.horizontal-dropdown .username {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.horizontal-dropdown .username i {
+  margin-right: 5px;
+}
+
+.horizontal-dropdown .login-text {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.horizontal-dropdown .login-text i {
+  margin-right: 5px;
+}
+
+/* User info header in dropdown */
+.user-info-header {
+  padding: 10px 15px;
+  background-color: var(--dropdown-header-bg, #f8f9fa);
+  border-bottom: 1px solid var(--border-color, #e9ecef);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dropdown-username {
+  font-weight: bold;
+  color: var(--text-color, #495057);
+}
+
+.dropdown-role-badge {
+  font-size: 0.8em;
+  color: var(--text-muted, #6c757d);
+  font-style: italic;
+  background-color: var(--badge-bg, #e9ecef);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Enhanced dropdown content styles */
+.dropdown-content .menu-item {
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-color, #333);
+  transition: background-color 0.2s;
+}
+
+.dropdown-content .menu-item:hover {
+  background-color: var(--nav-hover-bg, #f8f9fa);
+}
+
+.dropdown-content .menu-item i {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
+}
+
+.dropdown-content .logout {
+  color: var(--danger-color, #dc3545);
+}
+
+.dropdown-content .logout:hover {
+  background-color: var(--light-gray, #f5f5f5);
+}
+
+/* Dropdown divider */
+.dropdown-divider {
+  height: 1px;
+  margin: 5px 0;
+  overflow: hidden;
+  background-color: var(--border-color, #e9ecef);
+}
+
+/* Submenu sections */
+.submenu-section {
+  border-top: 1px solid var(--border-color, #dee2e6);
+  margin-top: 5px;
+  padding-top: 5px;
+}
+
+.submenu-section-title {
+  display: block;
+  padding: 4px 25px;
+  font-size: 0.8em;
+  font-weight: bold;
+  color: var(--text-muted, #6c757d);
+  text-transform: uppercase;
+}
+
+/* Submenu links */
+.submenu-link {
+  padding: 8px 25px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-color, #495057);
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.submenu-link:hover {
+  background-color: var(--nav-hover-bg, #e9ecef);
+}
+
+.submenu-link i {
+  margin-right: 6px;
+  width: 14px;
+  text-align: center;
+}
+
+/* Edit links */
+.edit-link {
+  font-size: 0.8em;
+  color: var(--text-muted, #6c757d);
+  margin-left: 10px;
+  text-decoration: none;
+  padding: 2px 5px;
+}
+
+.edit-link:hover {
+  color: var(--text-color, #495057);
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   ICON STYLES - Consolidated from all dropdown files
+   Using emoji fallbacks - replace with Font Awesome classes when available
+   ============================================================================= */
+
+/* User & Authentication Icons */
+.icon-user:before { content: "👤"; }
+.icon-sign-in-alt:before { content: "🔑"; }
+.icon-sign-out-alt:before { content: "🚪"; }
+.icon-user-plus:before { content: "👤➕"; }
+.icon-key:before { content: "🔑"; }
+
+/* Navigation & Management Icons */
+.icon-add:before { content: "➕"; }
+.icon-manage:before { content: "⚙️"; }
+.icon-cog:before { content: "⚙️"; }
+.icon-link:before { content: "🔗"; }
+.icon-sync:before { content: "🔄"; }
+
+/* HelpDesk & Support Icons */
+.icon-helpdesk:before { content: "🆘"; }
+.icon-ticket:before { content: "🎫"; }
+.icon-contact:before { content: "📞"; }
+.icon-status:before { content: "📊"; }
+
+/* Documentation & Knowledge Base Icons */
+.icon-docs:before { content: "📖"; }
+.icon-kb:before { content: "📚"; }
+.icon-faq:before { content: "❓"; }
+
+/* System & Admin Icons */
+.icon-home:before { content: "🏠"; }
+.icon-terminal:before { content: "💻"; }
+.icon-admin:before { content: "👨‍💼"; }
+.icon-admin-links:before { content: "⚙️"; }
+.icon-tachometer-alt:before { content: "📊"; }
+
+/* Member & User Management Icons */
+.icon-member:before { content: "👥"; }
+.icon-user-help:before { content: "👤🆘"; }

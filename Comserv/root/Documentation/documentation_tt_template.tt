@@ -1,144 +1,196 @@
-[% META 
-   title = "Documentation Template Toolkit (.tt) Template"
-   description = "Template for creating new documentation using Template Toolkit format"
+[% META
+        title = "Template Documentation"
+   description = "Documentation for system templates"
    roles = "admin,developer"
-   category = "documentation"
+   TemplateType = "Documentation"
+   category = "templates"
+   page_version = "1.02"
+   last_updated = "Wed Oct 15 11:17:04 AM PDT 2025"
+   site_specific = "false"
 %]
+[% PageVersion = 'Documentation/documentation_tt_template.tt,v 0.02 11:17:04 2025/10/15 shanta Exp shanta - Theme-Compliant Documentation Template' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<div class="doc-page">
-    <h1>Documentation Template Toolkit (.tt) Template</h1>
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Documentation Page Title</h1>
     
-    <div class="doc-section">
-        <h2>Overview</h2>
-        <p>
-            This template provides the structure and format for creating new documentation files using 
-            Template Toolkit (.tt) format. Use this as a starting point for all new documentation.
-        </p>
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-10-15 | 
+        Version: 3.0 | 
+        Author: [Author Name] | 
+        Status: [Status]
     </div>
-    
-    <div class="doc-section">
-        <h2>Basic Template Structure</h2>
-        <p>Copy and modify the following template for new documentation files:</p>
-        
-        <pre class="code-block">
-[% META 
-   title = "Your Document Title"
-   description = "Brief description of the document"
-   roles = "comma,separated,roles"  # e.g., "normal,admin,developer"
-   category = "category_name"       # e.g., "user_guides", "admin_guides", etc.
-%]
 
-&lt;div class="doc-page"&gt;
-    &lt;h1&gt;Your Document Title&lt;/h1&gt;
-    
-    &lt;div class="doc-section"&gt;
-        &lt;h2&gt;First Section Title&lt;/h2&gt;
-        &lt;p&gt;
-            Your content goes here. You can use HTML formatting for:
-            &lt;strong&gt;bold text&lt;/strong&gt;, &lt;em&gt;italic text&lt;/em&gt;, 
-            &lt;code&gt;inline code&lt;/code&gt;, etc.
-        &lt;/p&gt;
-        
-        &lt;ul&gt;
-            &lt;li&gt;List item one&lt;/li&gt;
-            &lt;li&gt;List item two&lt;/li&gt;
-        &lt;/ul&gt;
-    &lt;/div&gt;
-    
-    &lt;div class="doc-section"&gt;
-        &lt;h2&gt;Second Section Title&lt;/h2&gt;
-        &lt;p&gt;More content here...&lt;/p&gt;
-        
-        &lt;pre class="code-block"&gt;
-# Code block example
-function example() {
-    return "This is a code example";
-}
-        &lt;/pre&gt;
-    &lt;/div&gt;
-    
-    &lt;!-- Add more sections as needed --&gt;
-&lt;/div&gt;
-        </pre>
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Brief overview of what this documentation covers. This should be 1-2 sentences explaining the purpose and scope.</p>
+        </div>
     </div>
-    
-    <div class="doc-section">
-        <h2>Metadata Explanation</h2>
-        <p>The META block at the top of the file contains important metadata:</p>
-        
-        <ul>
-            <li><strong>title</strong>: The document title (appears in navigation and browser title)</li>
-            <li><strong>description</strong>: Brief description of the document (used in listings and search results)</li>
-            <li><strong>roles</strong>: Comma-separated list of roles that can access this document:
-                <ul>
-                    <li>normal - Regular users</li>
-                    <li>editor - Content editors</li>
-                    <li>admin - System administrators</li>
-                    <li>developer - System developers</li>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Requirement 1</li>
+                <li>Requirement 2</li>
+                <li>System access level needed</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Feature 1</strong>: Description of feature</li>
+                <li><strong>Feature 2</strong>: Description of feature</li>
+                <li><strong>Feature 3</strong>: Description of feature</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Initial Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Detailed instructions for the first step.</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Example code or command
+example_command --parameter value
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Configuration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Instructions for configuration step.</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Configure option A</li>
+                <li>Set parameter B</li>
+                <li>Verify setting C</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Verification</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">How to verify everything is working correctly.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Advanced Usage</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Advanced Feature 1</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Description and usage instructions for advanced features.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Integration with Other Systems</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">How this feature integrates with other parts of the application.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Common Issue 1</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Description of symptoms</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Step by step solution</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Common Issue 2</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Description of symptoms</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Step by step solution</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Configuration Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Parameter</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">parameter_1</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">string</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">"default_value"</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description of parameter</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">parameter_2</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">true</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description of parameter</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/related_doc_1" style="color: var(--link-color);">Related Documentation 1</a></li>
+                    <li><a href="/Documentation/related_doc_2" style="color: var(--link-color);">Related Documentation 2</a></li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a></li>
                 </ul>
-            </li>
-            <li><strong>category</strong>: The category this document belongs to (must match one of the defined categories in documentation_config.json)</li>
-        </ul>
+            </div>
+        </div>
     </div>
-    
-    <div class="doc-section">
-        <h2>CSS Classes</h2>
-        <p>Use these CSS classes for consistent styling:</p>
-        
-        <ul>
-            <li><code>doc-page</code> - Main container for the entire document</li>
-            <li><code>doc-section</code> - Container for each major section</li>
-            <li><code>section-toggle</code> - For collapsible section headers</li>
-            <li><code>section-content</code> - Content of collapsible sections</li>
-            <li><code>code-block</code> - For code examples</li>
-            <li><code>note-box</code> - For important notes or warnings</li>
-            <li><code>admin-only</code> - For content visible only to admins</li>
-            <li><code>developer-only</code> - For content visible only to developers</li>
-        </ul>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Template Toolkit Features</h2>
-        <p>You can use Template Toolkit directives for dynamic content:</p>
-        
-        <pre class="code-block">
-[% IF c.check_user_roles('admin') %]
-    &lt;div class="admin-only"&gt;
-        This content is only visible to administrators.
-    &lt;/div&gt;
-[% END %]
 
-[% # Include another template file %]
-[% INCLUDE 'path/to/another/template.tt' %]
-
-[% # Loop through items %]
-[% FOREACH item IN items %]
-    &lt;div&gt;[% item.name %]&lt;/div&gt;
-[% END %]
-        </pre>
-    </div>
-    
-    <div class="doc-section">
-        <h2>Adding to Documentation System</h2>
-        <p>After creating a new .tt file:</p>
-        
-        <ol>
-            <li>Save it in the appropriate directory under <code>/Documentation/</code></li>
-            <li>Add the file key to the appropriate category in <code>documentation_config.json</code></li>
-            <li>Add the file path to the <code>default_paths</code> section in <code>documentation_config.json</code></li>
-        </ol>
-        
-        <p>Example addition to documentation_config.json:</p>
-        
-        <pre class="code-block">
-"categories": {
-  "your_category": {
-    "pages": ["existing_page_1", "existing_page_2", "your_new_page"]
-  }
-},
-"default_paths": {
-  "your_new_page": "Documentation/path/to/your_new_page.tt"
-}
-        </pre>
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- 
+THEME COMPLIANCE NOTES FOR DEVELOPERS:
+
+This template is fully theme-compliant using the actual Comserv theme system:
+
+1. **CSS Variables Used**: All styling uses CSS custom properties from base.css:
+   - --text-color, --background-color, --primary-color, --secondary-color
+   - --header-font, --body-font, --font-size-* variables
+   - --spacing-small, --spacing-medium, --spacing-large for consistent spacing
+   - --border-color, --table-header-bg, --warning-color, --success-color, --info-color
+
+2. **Layout System**: Uses the responsive grid system from layout.css:
+   - .container for main content wrapper
+   - .row for horizontal groupings
+   - .col-100, .col-50 for responsive column layouts
+
+3. **Color-Coded Content Blocks**: 
+   - Warning blocks use --warning-color with left border accent
+   - Info blocks use --info-color with left border accent  
+   - Success blocks use --success-color with left border accent
+
+4. **Responsive Design**: Layout automatically adapts on mobile using layout.css media queries
+
+5. **Theme Variables Available**:
+   From theme_definitions.json, any site can override:
+   - Colors: primary-color, secondary-color, accent-color, text-color, etc.
+   - Typography: header-font, body-font, font-size-base, font-size-large, etc.
+   - UI Elements: button-bg, nav-bg, table-header-bg, border-color, etc.
+
+6. **Cross-Theme Compatibility**: Works correctly with:
+   - Default theme (standard blue/white)
+   - CSC theme (cyan backgrounds)  
+   - USBM theme (green accent colors)
+   - APIS theme (yellow/orange beekeeping theme)
+   - Any future themes added to theme_definitions.json
+
+Usage: Replace placeholder content but maintain the CSS variable usage patterns.
+-->

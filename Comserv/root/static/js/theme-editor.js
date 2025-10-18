@@ -1,6 +1,6 @@
 /**
- * Enhanced Theme Editor JavaScript
- * Provides interactive theme editing capabilities
+ * Enhanced Theme Editor with CSS Inspection
+ * Combines theme variable management with direct element styling
  */
 
 class ThemeEditor {
@@ -12,6 +12,9 @@ class ThemeEditor {
         this.modal = null;
         this.backgroundPopup = null;
         this.currentBgImage = null;
+        this.originalStyles = new Map();
+        this.isInspectorActive = false;
+        this.highlightedElement = null;
     }
     
     init() {
@@ -30,8 +33,300 @@ class ThemeEditor {
         // Initialize the background popup
         this.initBackgroundPopup();
 
+        // Initialize the inspector UI
+        this.initInspectorUI();
+
         // Apply initial styles
         this.applyThemeStyles();
+        
+        // Add keyboard shortcut for toggling inspector
+        this.addKeyboardShortcuts();
+    }
+    
+    initInspectorUI() {
+        // Create main container
+        this.inspectorContainer = document.createElement('div');
+        this.inspectorContainer.id = 'theme-inspector';
+        this.inspectorContainer.style.cssText = `
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 350px;
+            background: #fff;
+            border: 1px solid #ccc;
+            box-shadow: -2px -2px 10px rgba(0,0,0,0.1);
+            z-index: 10000;
+            max-height: 80vh;
+            display: none;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        // Create header
+        const header = document.createElement('div');
+        header.style.cssText = `
+            padding: 10px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Theme Inspector';
+        title.style.margin = '0';
+        
+        this.toggleBtn = document.createElement('button');
+        this.toggleBtn.textContent = 'Close';
+        this.toggleBtn.style.cssText = `
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+            border-radius: 4px;
+            cursor: pointer;
+        `;
+        this.toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Close button clicked');
+            // Force close the inspector
+            this.forceCloseInspector();
+        });
+        
+        // Add backup onclick handler for compatibility
+        this.toggleBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Backup close handler triggered');
+            this.forceCloseInspector();
+        };
+        
+        header.appendChild(title);
+        header.appendChild(this.toggleBtn);
+        
+        // Create content area
+        const content = document.createElement('div');
+        content.id = 'inspector-content';
+        content.style.cssText = `
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+        `;
+        
+        // Create element info section
+        const elementInfo = document.createElement('div');
+        elementInfo.id = 'element-info';
+        elementInfo.innerHTML = `
+            <div class="info-row">
+                <label>Selected Element:</label>
+                <span id="selected-element">None</span>
+            </div>
+            <div class="info-row">
+                <label>Element ID:</label>
+                <span id="element-id">-</span>
+            </div>
+            <div class="info-row">
+                <label>Classes:</label>
+                <span id="element-classes">-</span>
+            </div>
+            <div class="info-row">
+                <label>Theme Variable:</label>
+                <select id="theme-var-select">
+                    <option value="">-- Select or create --</option>
+                    ${Object.keys(this.themeVariables).map(varName => 
+                        `<option value="${varName}">${varName}</option>`
+                    ).join('')}
+                </select>
+                <button id="create-var">+</button>
+            </div>
+        `;
+        
+        // Create style editor section
+        const styleEditor = document.createElement('div');
+        styleEditor.id = 'style-editor';
+        styleEditor.innerHTML = `
+            <h4>Styles</h4>
+            <div id="style-properties">
+                <p>Select an element to edit its styles</p>
+            </div>
+        `;
+        
+        // Create action buttons
+        const actions = document.createElement('div');
+        actions.style.cssText = `
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        `;
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save to Theme';
+        saveBtn.className = 'btn btn-primary';
+        saveBtn.onclick = () => this.saveToTheme();
+        
+        const resetBtn = document.createElement('button');
+        resetBtn.textContent = 'Reset';
+        resetBtn.className = 'btn btn-secondary';
+        resetBtn.onclick = () => this.resetStyles();
+        
+        actions.appendChild(saveBtn);
+        actions.appendChild(resetBtn);
+        
+        // Assemble the UI
+        content.appendChild(elementInfo);
+        content.appendChild(styleEditor);
+        this.inspectorContainer.appendChild(header);
+        this.inspectorContainer.appendChild(content);
+        this.inspectorContainer.appendChild(actions);
+        
+        // Add to body
+        document.body.appendChild(this.inspectorContainer);
+        
+        // Add styles
+        this.addInspectorStyles();
+        
+        // Add floating toggle button
+        this.addFloatingButton();
+        
+        // Ensure inspector starts in closed state
+        this.isInspectorActive = false;
+        this.inspectorContainer.style.display = 'none';
+    }
+    
+    addInspectorStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .info-row {
+                margin-bottom: 8px;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            .info-row label {
+                font-weight: bold;
+                min-width: 100px;
+            }
+            .style-property {
+                display: flex;
+                margin-bottom: 5px;
+                align-items: center;
+            }
+            .style-property label {
+                width: 120px;
+                font-size: 12px;
+                color: #555;
+            }
+            .style-property input, 
+            .style-property select {
+                flex-grow: 1;
+                padding: 4px 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            .style-property button {
+                margin-left: 5px;
+                padding: 2px 6px;
+                font-size: 12px;
+            }
+            #theme-inspector button {
+                padding: 6px 12px;
+                border: 1px solid #ccc;
+                background: #f5f5f5;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            #theme-inspector button:hover {
+                background: #e5e5e5;
+            }
+            #theme-inspector button.primary {
+                background: #007bff;
+                color: white;
+                border-color: #0056b3;
+            }
+            #theme-inspector button.primary:hover {
+                background: #0069d9;
+            }
+            .highlighted {
+                outline: 2px dashed #4a90e2 !important;
+                position: relative;
+            }
+            .highlighted::after {
+                content: attr(data-css-selector);
+                position: absolute;
+                top: -20px;
+                left: 0;
+                background: #4a90e2;
+                color: white;
+                font-size: 10px;
+                padding: 2px 5px;
+                border-radius: 3px;
+                white-space: nowrap;
+                z-index: 10001;
+            }
+            #theme-var-select {
+                flex-grow: 1;
+                margin-right: 5px;
+            }
+            .btn {
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .btn-primary {
+                background: #007bff;
+                color: white;
+                border: 1px solid #0056b3;
+            }
+            .btn-secondary {
+                background: #6c757d;
+                color: white;
+                border: 1px solid #5a6268;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    addKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault();
+                this.toggleInspector();
+            }
+            
+            if (e.key === 'Escape' && this.isInspectorActive) {
+                this.toggleInspector();
+            }
+        });
+    }
+    
+    addFloatingButton() {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = 'Theme';
+        toggleBtn.id = 'theme-inspector-toggle';
+        toggleBtn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        toggleBtn.onclick = () => this.toggleInspector();
+        document.body.appendChild(toggleBtn);
     }
     
     loadThemeVariables() {
@@ -225,6 +520,425 @@ class ThemeEditor {
                 }
             });
         }
+        
+        // Note: Inspector event listeners are added/removed dynamically via toggleInspector
+        
+        // Add event listener for creating new theme variables
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'create-var') {
+                this.createNewThemeVar();
+            }
+        });
+    }
+    
+    toggleInspector() {
+        if (this.isInspectorActive) {
+            this.closeInspector();
+        } else {
+            this.openInspector();
+        }
+    }
+    
+    closeInspector() {
+        console.log('closeInspector called, container exists:', !!this.inspectorContainer);
+        if (!this.inspectorContainer) return;
+        
+        this.isInspectorActive = false;
+        this.inspectorContainer.style.display = 'none';
+        console.log('Inspector display set to none');
+        if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
+        document.body.style.cursor = '';
+        
+        // Remove highlights
+        if (this.highlightedElement) {
+            this.highlightedElement.classList.remove('highlighted');
+            this.highlightedElement = null;
+        }
+        // Remove event listeners for inspector functionality
+        this.removeInspectorEventListeners();
+        console.log('Inspector closed successfully');
+    }
+    
+    forceCloseInspector() {
+        console.log('Force closing inspector');
+        const inspector = document.getElementById('theme-inspector');
+        if (inspector) {
+            inspector.style.display = 'none';
+            inspector.style.visibility = 'hidden';
+        }
+        
+        this.isInspectorActive = false;
+        document.body.style.cursor = '';
+        
+        // Remove all highlights
+        document.querySelectorAll('.highlighted').forEach(el => {
+            el.classList.remove('highlighted');
+        });
+        this.highlightedElement = null;
+        
+        // Clean up event listeners
+        try {
+            this.removeInspectorEventListeners();
+        } catch (e) {
+            console.log('Error removing event listeners:', e);
+        }
+        
+        console.log('Inspector force closed');
+    }
+    
+    openInspector() {
+        if (!this.inspectorContainer) return;
+        
+        this.isInspectorActive = true;
+        this.inspectorContainer.style.display = 'flex';
+        if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
+        document.body.style.cursor = 'crosshair';
+        
+        // Update theme variables in the dropdown
+        if (typeof this.updateThemeVarSelect === 'function') {
+            this.updateThemeVarSelect();
+        }
+        // Add event listeners for inspector functionality
+        this.addInspectorEventListeners();
+    }
+    
+    addInspectorEventListeners() {
+        this.mouseOverHandler = this.handleMouseOver.bind(this);
+        this.clickHandler = this.handleElementClick.bind(this);
+        
+        document.addEventListener('mouseover', this.mouseOverHandler);
+        document.addEventListener('click', this.clickHandler, true);
+    }
+    
+    removeInspectorEventListeners() {
+        if (this.mouseOverHandler) {
+            document.removeEventListener('mouseover', this.mouseOverHandler);
+        }
+        if (this.clickHandler) {
+            document.removeEventListener('click', this.clickHandler, true);
+        }
+    }
+    
+    handleMouseOver(e) {
+        if (!this.isInspectorActive) return;
+        
+        const element = e.target;
+        if (element === this.inspectorContainer || this.inspectorContainer.contains(element)) return;
+        
+        // Remove highlight from previous element
+        if (this.highlightedElement) {
+            this.highlightedElement.classList.remove('highlighted');
+        }
+        
+        // Add highlight to current element
+        element.classList.add('highlighted');
+        element.dataset.cssSelector = this.getCssSelector(element);
+        this.highlightedElement = element;
+    }
+    
+    handleElementClick(e) {
+        if (!this.isInspectorActive) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const element = e.target;
+        if (element === this.inspectorContainer || this.inspectorContainer.contains(element)) {
+            return;
+        }
+        
+        this.selectElement(element);
+        return false;
+    }
+    
+    selectElement(element) {
+        this.activeElement = element;
+        
+        // Update element info
+        document.getElementById('selected-element').textContent = element.tagName.toLowerCase();
+        document.getElementById('element-id').textContent = element.id || '-';
+        document.getElementById('element-classes').textContent = element.className || '-';
+        
+        // Display styles
+        this.displayElementStyles(element);
+        
+        // Update theme variable selection
+        this.updateThemeVarSelect();
+    }
+    
+    displayElementStyles(element) {
+        const styles = window.getComputedStyle(element);
+        const styleProperties = document.getElementById('style-properties');
+        styleProperties.innerHTML = '';
+        
+        // Common CSS properties to display
+        const commonProperties = [
+            'color', 'background-color', 'font-size', 'font-family',
+            'width', 'height', 'margin', 'padding', 'border', 'display',
+            'position', 'top', 'right', 'bottom', 'left', 'flex', 'flex-direction',
+            'justify-content', 'align-items', 'gap', 'text-align'
+        ];
+        
+        commonProperties.forEach(prop => {
+            const value = styles.getPropertyValue(prop);
+            if (!value) return;
+            
+            const propDiv = document.createElement('div');
+            propDiv.className = 'style-property';
+            
+            const label = document.createElement('label');
+            label.textContent = prop;
+            
+            let input;
+            
+            if (prop.includes('color') || prop.includes('background')) {
+                input = document.createElement('input');
+                input.type = 'color';
+                input.value = this.rgbToHex(value) || '#000000';
+                input.onchange = (e) => this.updateStyle(prop, e.target.value);
+            } else if (prop === 'font-family' || prop === 'text-align' || 
+                      prop === 'display' || prop === 'flex-direction' ||
+                      prop === 'justify-content' || prop === 'align-items') {
+                input = document.createElement('select');
+                const options = this.getOptionsForProperty(prop);
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.label;
+                    option.selected = opt.value === value.trim();
+                    input.appendChild(option);
+                });
+                input.onchange = (e) => this.updateStyle(prop, e.target.value);
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+                input.value = value;
+                input.onchange = (e) => this.updateStyle(prop, e.target.value);
+            }
+            
+            propDiv.appendChild(label);
+            propDiv.appendChild(input);
+            
+            styleProperties.appendChild(propDiv);
+        });
+    }
+    
+    getOptionsForProperty(property) {
+        const options = {
+            'font-family': [
+                { value: 'Arial, sans-serif', label: 'Arial' },
+                { value: '"Times New Roman", serif', label: 'Times New Roman' },
+                { value: '"Courier New", monospace', label: 'Courier New' },
+                { value: 'Georgia, serif', label: 'Georgia' },
+                { value: 'Verdana, sans-serif', label: 'Verdana' }
+            ],
+            'text-align': [
+                { value: 'left', label: 'Left' },
+                { value: 'center', label: 'Center' },
+                { value: 'right', label: 'Right' },
+                { value: 'justify', label: 'Justify' }
+            ],
+            'display': [
+                { value: 'block', label: 'Block' },
+                { value: 'inline', label: 'Inline' },
+                { value: 'inline-block', label: 'Inline Block' },
+                { value: 'flex', label: 'Flex' },
+                { value: 'grid', label: 'Grid' },
+                { value: 'none', label: 'None' }
+            ],
+            'flex-direction': [
+                { value: 'row', label: 'Row' },
+                { value: 'row-reverse', label: 'Row Reverse' },
+                { value: 'column', label: 'Column' },
+                { value: 'column-reverse', label: 'Column Reverse' }
+            ],
+            'justify-content': [
+                { value: 'flex-start', label: 'Flex Start' },
+                { value: 'flex-end', label: 'Flex End' },
+                { value: 'center', label: 'Center' },
+                { value: 'space-between', label: 'Space Between' },
+                { value: 'space-around', label: 'Space Around' },
+                { value: 'space-evenly', label: 'Space Evenly' }
+            ],
+            'align-items': [
+                { value: 'stretch', label: 'Stretch' },
+                { value: 'flex-start', label: 'Flex Start' },
+                { value: 'flex-end', label: 'Flex End' },
+                { value: 'center', label: 'Center' },
+                { value: 'baseline', label: 'Baseline' }
+            ]
+        };
+        
+        return options[property] || [];
+    }
+    
+    updateStyle(property, value) {
+        if (!this.activeElement) return;
+        
+        // Store original style if not already stored
+        if (!this.originalStyles.has(this.activeElement)) {
+            this.originalStyles.set(this.activeElement, {});
+        }
+        
+        const elementStyles = this.originalStyles.get(this.activeElement);
+        
+        // If this is the first time modifying this property, store the original value
+        if (!elementStyles[property]) {
+            const originalValue = window.getComputedStyle(this.activeElement).getPropertyValue(property);
+            elementStyles[property] = originalValue;
+        }
+        
+        // Apply the new style
+        this.activeElement.style.setProperty(property, value);
+    }
+    
+    resetStyles() {
+        if (!this.activeElement || !this.originalStyles.has(this.activeElement)) return;
+        
+        const elementStyles = this.originalStyles.get(this.activeElement);
+        
+        for (const [property, value] of Object.entries(elementStyles)) {
+            this.activeElement.style.setProperty(property, value);
+        }
+        
+        // Clear the stored styles
+        this.originalStyles.delete(this.activeElement);
+        
+        // Refresh the display
+        this.displayElementStyles(this.activeElement);
+    }
+    
+    saveToTheme() {
+        if (!this.activeElement) {
+            alert('Please select an element first');
+            return;
+        }
+        
+        const varName = document.getElementById('theme-var-select').value;
+        if (!varName) {
+            alert('Please select or create a theme variable first');
+            return;
+        }
+        
+        // Get all modified styles for the active element
+        if (!this.originalStyles.has(this.activeElement)) {
+            alert('No styles have been modified for this element');
+            return;
+        }
+        
+        const elementStyles = this.originalStyles.get(this.activeElement);
+        const selector = this.getCssSelector(this.activeElement);
+        
+        // In a real implementation, this would save to your theme system
+        console.log(`Saving styles for ${selector} to theme variable ${varName}:`, elementStyles);
+        
+        // Add to theme variables
+        this.themeVariables[varName] = elementStyles;
+        
+        // Update the theme variable dropdown
+        this.updateThemeVarSelect();
+        
+        alert(`Styles saved to theme variable: ${varName}`);
+    }
+    
+    createNewThemeVar() {
+        const varName = prompt('Enter a name for the new theme variable (e.g., primary-button, card-bg):');
+        if (!varName) return;
+        
+        // Add to theme variables
+        if (!this.themeVariables[varName]) {
+            this.themeVariables[varName] = {};
+            this.updateThemeVarSelect(varName);
+        } else {
+            alert('A variable with this name already exists');
+        }
+    }
+    
+    updateThemeVarSelect(selectedVar = '') {
+        const select = document.getElementById('theme-var-select');
+        if (!select) return;
+        
+        // Save current selection
+        const currentValue = selectedVar || select.value;
+        
+        // Clear and rebuild options
+        select.innerHTML = '<option value="">-- Select or create --</option>';
+        
+        // Add theme variables
+        Object.keys(this.themeVariables).sort().forEach(varName => {
+            const option = document.createElement('option');
+            option.value = varName;
+            option.textContent = varName;
+            if (varName === currentValue) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+    
+    // Helper function to convert RGB/RGBA to hex
+    rgbToHex(rgb) {
+        if (!rgb) return null;
+        
+        // Handle rgb/rgba values
+        const rgbMatch = rgb.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+\s*)?\)/i);
+        
+        if (rgbMatch) {
+            const r = parseInt(rgbMatch[1], 10);
+            const g = parseInt(rgbMatch[2], 10);
+            const b = parseInt(rgbMatch[3], 10);
+            
+            return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        }
+        
+        // Return as-is if it's already in hex format or named color
+        return rgb;
+    }
+    
+    // Helper function to generate CSS selector for an element
+    getCssSelector(element) {
+        if (!element) return '';
+        
+        const parts = [];
+        
+        while (element && element.nodeType === Node.ELEMENT_NODE) {
+            let selector = element.nodeName.toLowerCase();
+            
+            if (element.id) {
+                selector += '#' + element.id;
+                parts.unshift(selector);
+                break;
+            } else {
+                let sibling = element;
+                let siblingCount = 0;
+                let siblingIndex = 0;
+                
+                while (sibling) {
+                    if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName.toLowerCase() === selector) {
+                        siblingCount++;
+                        if (sibling === element) {
+                            siblingIndex = siblingCount;
+                        }
+                    }
+                    sibling = sibling.previousSibling;
+                }
+                
+                if (siblingCount > 1) {
+                    selector += ':nth-of-type(' + siblingIndex + ')';
+                }
+                
+                parts.unshift(selector);
+                
+                if (element.className && typeof element.className === 'string') {
+                    const classSelector = '.' + element.className.trim().replace(/\s+/g, '.');
+                    parts[0] += classSelector;
+                }
+            }
+            
+            element = element.parentNode;
+        }
+        
+        return parts.join(' > ');
     }
     
     initModal() {

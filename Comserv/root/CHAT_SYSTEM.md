@@ -1,25 +1,25 @@
-# Chat System Documentation
+# AI Chat System Documentation
 
 ## Overview
 
-The Comserv Chat System provides a real-time communication channel between users and administrators. It allows users to send messages to administrators, who can then respond through an admin interface.
+The Comserv AI Chat System provides an intelligent chat interface powered by AI. Users can ask questions and receive instant responses from an AI assistant, providing immediate help and support without waiting for human administrators.
 
 ## Features
 
-- Theme-integrated chat widget on all pages
-- Persistent message storage in the database
-- Admin interface for responding to user messages
-- Notification system for new messages
-- Mobile-friendly design
+- Theme-integrated AI chat widget on all pages
+- Real-time AI responses powered by Ollama LLM
+- No waiting time - instant responses
+- Mobile-friendly responsive design
+- Seamless integration with existing theme system
 
 ## Technical Implementation
 
-The chat system consists of the following components:
+The AI chat system consists of the following components:
 
-1. **Frontend Widget**: A JavaScript-based chat widget that appears on all pages
-2. **Backend API**: Perl-based API endpoints for sending and receiving messages
-3. **Database Storage**: SQLite table for storing chat messages
-4. **Admin Interface**: Web interface for administrators to view and respond to messages
+1. **Frontend Widget**: A JavaScript-based AI chat widget that appears on all pages
+2. **Backend API**: AI Controller endpoints (`/ai/generate`) for processing AI queries
+3. **AI Engine**: Ollama LLM integration for generating intelligent responses
+4. **Real-time Interface**: Instant query processing without polling or delays
 
 ## Theme Integration
 
@@ -50,34 +50,34 @@ perl Comserv/script/create_chat_table.pl
 
 ### For Users
 
-1. Click on the chat button in the bottom-right corner of any page
-2. Type your message in the text box
+1. Click on the "Chat with AI" button (🤖) in the bottom-right corner of any page
+2. Type your question or message in the text box
 3. Press Enter or click Send
-4. Wait for an administrator to respond
+4. Receive an instant AI-generated response
+5. Continue the conversation as needed
 
 ### For Administrators
 
-1. Log in with an administrator account
-2. Navigate to `/chat/admin`
-3. View all messages from users
-4. Click "Respond" next to a message to reply
-5. Type your response and click "Send Response"
+The AI chat system operates autonomously and doesn't require administrator intervention. However, administrators can:
+- Monitor system performance through logs
+- Manage AI models and configuration through `/ai/models`
+- Access the full AI interface at `/ai/` for advanced interactions
 
 ## API Endpoints
 
-The chat system provides the following API endpoints:
+The AI chat system uses the following API endpoints:
 
-- `/chat/send_message` - POST endpoint for sending a message
-- `/chat/get_messages` - GET endpoint for retrieving messages
-- `/chat/respond` - POST endpoint for admin responses
+- `/ai/generate` - POST endpoint for sending queries to AI and receiving responses
+- `/ai/` - Main AI interface page
+- `/ai/models` - AI model management interface
 
 ## Multi-Domain Support
 
-The chat system works across all domains hosted by the application:
+The AI chat system works seamlessly across all domains hosted by the application:
 
-- Messages are associated with the domain they were sent from
-- Administrators can see which domain a message came from
-- Responses are routed back to the appropriate domain
+- AI responses are consistent across all domains
+- Theme integration adapts to each domain's styling automatically
+- No domain-specific configuration required
 
 ## Customization
 

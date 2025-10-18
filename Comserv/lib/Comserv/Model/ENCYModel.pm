@@ -2,6 +2,7 @@ package Comserv::Model::ENCYModel;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+     use Try::Tiny;
 extends 'Catalyst::Model';
 
 has 'ency_schema' => (
@@ -33,6 +34,13 @@ sub add_herb {
 
     # Log the herb data being added
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Adding new herb: " . join(", ", map { "$_: $herb_data->{$_}" } keys %$herb_data));
+# Method to add a new herb to the forager database
+sub add_herb {
+    my ($self, $herb_data) = @_;
+    # Logic to save the herb data to the database
+    $self->forager_schema->resultset('Herb')->create($herb_data);
+}
+
 
     # Logic to save the herb data to the database
     eval {
