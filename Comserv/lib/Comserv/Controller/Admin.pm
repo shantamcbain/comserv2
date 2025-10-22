@@ -162,6 +162,76 @@ sub db_status :Chained('base') :PathPart('db-status') :Args(0) {
         "Completed Admin db_status action");
 }
 
+# Schema comparison redirect - redirects to dedicated SchemaComparison controller
+sub compare_schema :Chained('base') :PathPart('compare_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_schema', 
+        "Redirecting to dedicated schema comparison controller");
+    
+    # Redirect to the dedicated schema comparison controller
+    $c->response->redirect($c->uri_for('/admin/schema-comparison'));
+}
+
+# Legacy AJAX endpoint redirects for schema comparison functionality
+# These maintain backward compatibility with existing template URLs
+
+sub get_table_schema :Chained('base') :PathPart('get_table_schema') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/get-field-comparison');
+}
+
+sub get_field_comparison :Chained('base') :PathPart('get_field_comparison') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/get-field-comparison');
+}
+
+sub sync_fields :Chained('base') :PathPart('sync_fields') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/sync-fields');
+}
+
+sub batch_sync_table :Chained('base') :PathPart('batch_sync_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/batch-sync-table');
+}
+
+sub create_table_from_result :Chained('base') :PathPart('create_table_from_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/create-table-from-result');
+}
+
+sub create_result_from_table :Chained('base') :PathPart('create_result_from_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/create-result-from-table');
+}
+
+sub sync_table_to_result :Chained('base') :PathPart('sync_table_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/sync-table-to-result');
+}
+
+sub sync_result_to_table :Chained('base') :PathPart('sync_result_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Forward to the dedicated schema comparison controller
+    $c->forward('/admin/schema-comparison/sync-result-to-table');
+}
+
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
@@ -1495,6 +1565,83 @@ sub check_system_requirements {
     };
     
     return $check;
+}
+
+# Schema Manager action - manage database schema and create AI conversation tables
+sub schema_manager : Chained('admin_check') : PathPart('schema_manager') : Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', 
+        "Schema manager page accessed");
+    
+    # Handle POST requests for table creation
+    if ($c->request->method eq 'POST') {
+        my $action = $c->request->params->{action} || '';
+        
+        if ($action eq 'create_ai_tables') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', 
+                "Creating AI conversation tables");
+            
+            try {
+                my $schema_manager = $c->model('DBSchemaManager');
+                
+                # Path to our AI conversation SQL file
+                my $sql_file_path = $c->path_to('Comserv', 'sql', 'ai_conversation_tables.sql');
+                
+                # Create tables using the DBSchemaManager
+                my $result = $schema_manager->create_table_from_sql($c, 'ENCY', $sql_file_path->stringify);
+                
+                $c->stash->{message} = "AI conversation tables created successfully! " .
+                                      "Executed $result->{executed_count} statements.";
+                $c->stash->{message_type} = 'success';
+                
+                # Check if tables were created successfully
+                my $ai_conv_exists = $schema_manager->table_exists($c, 'ENCY', 'ai_conversations');
+                my $ai_msg_exists = $schema_manager->table_exists($c, 'ENCY', 'ai_messages');
+                
+                $c->stash->{ai_tables_status} = {
+                    ai_conversations => $ai_conv_exists,
+                    ai_messages => $ai_msg_exists
+                };
+                
+            } catch {
+                my $error = $_;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'schema_manager', 
+                    "Error creating AI tables: $error");
+                    
+                $c->stash->{message} = "Error creating AI conversation tables: $error";
+                $c->stash->{message_type} = 'error';
+            };
+        }
+    } else {
+        # GET request - show schema information
+        try {
+            my $schema_manager = $c->model('DBSchemaManager');
+            
+            # Check current table status
+            my $ai_conv_exists = $schema_manager->table_exists($c, 'ENCY', 'ai_conversations');
+            my $ai_msg_exists = $schema_manager->table_exists($c, 'ENCY', 'ai_messages');
+            
+            $c->stash->{ai_tables_status} = {
+                ai_conversations => $ai_conv_exists,
+                ai_messages => $ai_msg_exists
+            };
+            
+            # Get list of existing tables
+            my $tables = $schema_manager->list_tables($c, 'ENCY');
+            $c->stash->{existing_tables} = $tables;
+            
+        } catch {
+            my $error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'schema_manager', 
+                "Error getting schema information: $error");
+                
+            $c->stash->{message} = "Error retrieving schema information: $error";
+            $c->stash->{message_type} = 'error';
+        };
+    }
+    
+    $c->stash->{template} = 'admin/schema_manager.md';
 }
 
 =head1 AUTHOR

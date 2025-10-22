@@ -369,5 +369,245 @@ sub table_exists {
     return $exists;
 }
 
+# Create table from field definitions (used by SchemaComparison controller)
+sub create_table_from_fields {
+    my ($self, $table_name, $fields, $schema_model) = @_;
+    
+    my $result = {
+        success => 0,
+        error => ''
+    };
+    
+    try {
+        # Get database configuration
+        my $db_config;
+        if ($schema_model eq 'DBEncy') {
+            $db_config = $config->{shanta_ency};
+        } elsif ($schema_model eq 'DBForager') {
+            $db_config = $config->{shanta_forager};
+        } else {
+            $result->{error} = "Unknown schema model: $schema_model";
+            return $result;
+        }
+        
+        # Connect to database
+        my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
+        my $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
+            RaiseError => 1,
+            AutoCommit => 1,
+            mysql_enable_utf8 => 1
+        }) or die "Cannot connect to database: $DBI::errstr";
+        
+        # Build CREATE TABLE statement
+        my $sql = "CREATE TABLE `$table_name` (\n";
+        my @field_definitions = ();
+        my @primary_keys = ();
+        
+        foreach my $field (@$fields) {
+            my $field_def = "`$field->{name}` ";
+            
+            # Convert DBIx::Class types to MySQL types
+            my $mysql_type = $self->convert_dbic_to_mysql_type($field->{type});
+            $field_def .= $mysql_type;
+            
+            # Add size if specified
+            if ($field->{size}) {
+                $field_def .= "($field->{size})";
+            }
+            
+            # Add NOT NULL if specified
+            unless ($field->{nullable}) {
+                $field_def .= " NOT NULL";
+            }
+            
+            # Add default value if specified
+            if (defined $field->{default}) {
+                $field_def .= " DEFAULT '$field->{default}'";
+            }
+            
+            # Add auto_increment if specified
+            if ($field->{is_auto_increment}) {
+                $field_def .= " AUTO_INCREMENT";
+                push @primary_keys, $field->{name};
+            }
+            
+            push @field_definitions, $field_def;
+        }
+        
+        $sql .= join(",\n", @field_definitions);
+        
+        # Add primary key constraint if we have primary keys
+        if (@primary_keys) {
+            $sql .= ",\nPRIMARY KEY (`" . join('`, `', @primary_keys) . "`)";
+        }
+        
+        $sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        
+        # Execute the CREATE TABLE statement
+        $dbh->do($sql);
+        $dbh->disconnect();
+        
+        $result->{success} = 1;
+        $result->{message} = "Table $table_name created successfully";
+        
+    } catch {
+        $result->{error} = "Failed to create table: $_";
+    };
+    
+    return $result;
+}
+
+# Synchronize table with result file fields (used by SchemaComparison controller)
+sub sync_table_with_result_fields {
+    my ($self, $table_name, $result_fields, $schema_model) = @_;
+    
+    my $result = {
+        success => 0,
+        error => '',
+        changes => []
+    };
+    
+    try {
+        # Get database configuration
+        my $db_config;
+        if ($schema_model eq 'DBEncy') {
+            $db_config = $config->{shanta_ency};
+        } elsif ($schema_model eq 'DBForager') {
+            $db_config = $config->{shanta_forager};
+        } else {
+            $result->{error} = "Unknown schema model: $schema_model";
+            return $result;
+        }
+        
+        # Connect to database
+        my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
+        my $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
+            RaiseError => 1,
+            AutoCommit => 1,
+            mysql_enable_utf8 => 1
+        }) or die "Cannot connect to database: $DBI::errstr";
+        
+        # Get current table structure
+        my $sth = $dbh->prepare("DESCRIBE `$table_name`");
+        $sth->execute();
+        
+        my %current_fields = ();
+        while (my $row = $sth->fetchrow_hashref()) {
+            $current_fields{lc($row->{Field})} = {
+                name => $row->{Field},
+                type => $row->{Type},
+                null => $row->{Null},
+                key => $row->{Key} || '',
+                default => $row->{Default},
+                extra => $row->{Extra} || ''
+            };
+        }
+        
+        # Create mapping of result fields
+        my %result_field_map = map { lc($_->{name}) => $_ } @$result_fields;
+        
+        # Find fields to add (in result file but not in table)
+        foreach my $field_name (keys %result_field_map) {
+            unless (exists $current_fields{$field_name}) {
+                my $field = $result_field_map{$field_name};
+                my $mysql_type = $self->convert_dbic_to_mysql_type($field->{type});
+                
+                my $add_sql = "ALTER TABLE `$table_name` ADD COLUMN `$field->{name}` $mysql_type";
+                
+                if ($field->{size}) {
+                    $add_sql .= "($field->{size})";
+                }
+                
+                unless ($field->{nullable}) {
+                    $add_sql .= " NOT NULL";
+                }
+                
+                if (defined $field->{default}) {
+                    $add_sql .= " DEFAULT '$field->{default}'";
+                }
+                
+                $dbh->do($add_sql);
+                push @{$result->{changes}}, "Added field: $field->{name}";
+            }
+        }
+        
+        # Find fields to modify (type differences)
+        foreach my $field_name (keys %result_field_map) {
+            if (exists $current_fields{$field_name}) {
+                my $result_field = $result_field_map{$field_name};
+                my $current_field = $current_fields{$field_name};
+                
+                # Simple type comparison - could be enhanced
+                my $mysql_type = $self->convert_dbic_to_mysql_type($result_field->{type});
+                
+                # Check if types are different (basic check)
+                unless (lc($current_field->{type}) =~ /^\Q$mysql_type\E/i) {
+                    my $modify_sql = "ALTER TABLE `$table_name` MODIFY COLUMN `$result_field->{name}` $mysql_type";
+                    
+                    if ($result_field->{size}) {
+                        $modify_sql .= "($result_field->{size})";
+                    }
+                    
+                    unless ($result_field->{nullable}) {
+                        $modify_sql .= " NOT NULL";
+                    }
+                    
+                    if (defined $result_field->{default}) {
+                        $modify_sql .= " DEFAULT '$result_field->{default}'";
+                    }
+                    
+                    $dbh->do($modify_sql);
+                    push @{$result->{changes}}, "Modified field: $result_field->{name}";
+                }
+            }
+        }
+        
+        $dbh->disconnect();
+        
+        $result->{success} = 1;
+        $result->{message} = "Table synchronized with " . scalar(@{$result->{changes}}) . " changes";
+        
+    } catch {
+        $result->{error} = "Failed to sync table: $_";
+    };
+    
+    return $result;
+}
+
+# Convert DBIx::Class data types to MySQL data types
+sub convert_dbic_to_mysql_type {
+    my ($self, $dbic_type) = @_;
+    
+    my %type_mapping = (
+        'integer' => 'INT',
+        'int' => 'INT',
+        'bigint' => 'BIGINT',
+        'smallint' => 'SMALLINT',
+        'tinyint' => 'TINYINT',
+        'decimal' => 'DECIMAL',
+        'float' => 'FLOAT',
+        'double' => 'DOUBLE',
+        'varchar' => 'VARCHAR',
+        'char' => 'CHAR',
+        'text' => 'TEXT',
+        'longtext' => 'LONGTEXT',
+        'mediumtext' => 'MEDIUMTEXT',
+        'tinytext' => 'TINYTEXT',
+        'date' => 'DATE',
+        'datetime' => 'DATETIME',
+        'timestamp' => 'TIMESTAMP',
+        'time' => 'TIME',
+        'year' => 'YEAR',
+        'blob' => 'BLOB',
+        'longblob' => 'LONGBLOB',
+        'mediumblob' => 'MEDIUMBLOB',
+        'tinyblob' => 'TINYBLOB',
+        'enum' => 'ENUM',
+        'set' => 'SET'
+    );
+    
+    return $type_mapping{lc($dbic_type)} || 'VARCHAR';
+}
+
 __PACKAGE__->meta->make_immutable;  # Make the package immutable for performance
 1;

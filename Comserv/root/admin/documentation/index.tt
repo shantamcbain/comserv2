@@ -1,7 +1,7 @@
 [%# Admin Documentation Index Template %]
 [% META title = 'Admin Documentation Index' %]
 [% META description = 'Complete list of all documentation files for administrators' %]
-[% PageVersion = 'admin/documentation/index.tt,v 1.08 2025/01/18 08:45:00 system Exp system ' %]
+[% PageVersion = 'admin/documentation/index.tt,v 1.09 2025/10/19 08:04:27 shanta Exp shanta - Added search functionality with role-based filtering' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -231,6 +231,141 @@
             font-style: italic;
         }
         
+        /* Search Form Styles */
+        .search-container {
+            margin: 20px 0;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .search-form {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .search-input-group {
+            display: flex;
+            gap: 10px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .search-input {
+            flex: 2;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-category {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .search-category:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .search-button {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .search-button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+        
+        /* Search Results Styles */
+        .search-results {
+            margin: 20px 0;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .search-results-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e1e5e9;
+        }
+        
+        .search-results-header h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+        
+        .search-results-header p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .search-results-grid {
+            margin-top: 0;
+        }
+        
+        .search-result-card {
+            border-left: 4px solid #667eea;
+        }
+        
+        .search-result-card .file-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .match-score {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .search-excerpt {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #555;
+            border-left: 3px solid #667eea;
+        }
+        
+        .search-excerpt strong {
+            background: #ffeb3b;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+
         @media (max-width: 768px) {
             .files-grid {
                 grid-template-columns: 1fr;
@@ -238,6 +373,15 @@
             
             .container-header h2 {
                 font-size: 1.2em;
+            }
+            
+            .search-input-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .search-input, .search-category, .search-button {
+                width: 100%;
             }
         }
     </style>
@@ -253,6 +397,88 @@
             <span class="context-item"><strong>Files Available:</strong> [% page_count || 0 %]</span>
         </div>
     </header>
+
+    <!-- Search Form -->
+    <div class="search-container">
+        <form method="GET" action="[% c.uri_for('/documentation/search') %]" class="search-form">
+            <div class="search-input-group">
+                <input type="text" 
+                       name="q" 
+                       value="[% c.req.param('q') | html %]" 
+                       placeholder="Search documentation..." 
+                       class="search-input"
+                       minlength="2"
+                       required>
+                <select name="category" class="search-category">
+                    <option value="">All Categories</option>
+                    [% FOREACH category_key IN sorted_categories %]
+                        [% category = categories.$category_key %]
+                        <option value="[% category_key %]" 
+                                [% IF c.req.param('category') == category_key %]selected[% END %]>
+                            [% category.title || category_key | ucfirst %]
+                        </option>
+                    [% END %]
+                </select>
+                <button type="submit" class="search-button">Search</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Search Results (if search was performed) -->
+    [% IF c.req.param('q') %]
+        <div class="search-results">
+            [% IF search_results && search_results.size > 0 %]
+                <div class="search-results-header">
+                    <h3>Search Results</h3>
+                    <p>Found [% search_results.size %] result[% IF search_results.size != 1 %]s[% END %] 
+                       for "[% c.req.param('q') | html %]"
+                       [% IF c.req.param('category') %] in [% categories.${c.req.param('category')}.title %][% END %]</p>
+                </div>
+                
+                <div class="files-grid search-results-grid">
+                    [% FOREACH result IN search_results %]
+                        <div class="file-card search-result-card">
+                            <div class="file-title">
+                                <a href="[% result.url %]">[% result.title || result.page_name %]</a>
+                                <span class="match-score">Score: [% result.score %]</span>
+                            </div>
+                            <div class="file-meta">
+                                <strong>Path:</strong> [% result.path %]<br>
+                                <strong>Category:</strong> [% result.category || 'General' %]<br>
+                                <strong>Site:</strong> [% result.site || 'all' %]
+                            </div>
+                            [% IF result.excerpt %]
+                                <div class="search-excerpt">
+                                    [% result.excerpt %]
+                                </div>
+                            [% END %]
+                            <div class="file-roles">
+                                [% IF result.roles %]
+                                    [% FOREACH role IN result.roles %]
+                                        <span class="role-badge [% role %]">[% role | ucfirst %]</span>
+                                    [% END %]
+                                [% ELSE %]
+                                    <span class="role-badge">All Users</span>
+                                [% END %]
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            [% ELSIF c.req.param('q').length >= 2 %]
+                <div class="search-results-header">
+                    <h3>No Results Found</h3>
+                    <p>No documentation found matching "[% c.req.param('q') | html %]"
+                       [% IF c.req.param('category') %] in [% categories.${c.req.param('category')}.title %][% END %]</p>
+                    <p>Try a different search term or check a different category.</p>
+                </div>
+            [% ELSE %]
+                <div class="search-results-header">
+                    <h3>Search Query Too Short</h3>
+                    <p>Please enter at least 2 characters to search.</p>
+                </div>
+            [% END %]
+        </div>
+    [% END %]
 
     <!-- All Files Container (Global Theme Compatible) -->
     <div class="theme-container">

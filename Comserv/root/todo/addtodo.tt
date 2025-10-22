@@ -1,4 +1,4 @@
-[% PageVersion = 'addtodo.tt,v 0.04 2024/11/23 shanta Exp shanta ' %]
+[% PageVersion = 'addtodo.tt,v 0.05 2025/01/19 AI_Assistant - Fixed date field display width' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
@@ -16,10 +16,18 @@
     }
 
     input[type="text"],
-    input[type="date"],
     input[type="number"],
     select {
         width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    input[type="date"] {
+        width: 200px;
+        max-width: 100%;
         padding: 8px;
         border: 1px solid #ccc;
         border-radius: 4px;
@@ -38,6 +46,36 @@
 
     input[type="submit"]:hover {
         background-color: #45a049;
+    }
+
+    /* Textarea styling */
+    textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        min-height: 60px;
+        resize: vertical;
+    }
+
+    /* Form container */
+    form {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Responsive design for smaller screens */
+    @media (max-width: 768px) {
+        input[type="date"] {
+            width: 100%;
+        }
+        
+        form {
+            max-width: 100%;
+            margin: 0;
+            padding: 0 10px;
+        }
     }
 </style>
 

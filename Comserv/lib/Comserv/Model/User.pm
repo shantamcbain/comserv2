@@ -46,12 +46,6 @@ package Comserv::Model::User;
                          ", type: " . (defined $roles ? (ref $roles || "string") : "undefined") . 
                          ", username: " . $self->_user->username;
                     
-                    # TEMPORARY FIX: Ensure Shanta has admin role
-                    if ($self->_user->username eq 'Shanta') {
-                        warn "DEBUG: Ensuring admin role for user Shanta";
-                        return ['admin', 'user'];
-                    }
-                    
                     # Handle different role formats
                     if (!defined $roles) {
                         warn "DEBUG: No roles defined, returning default ['user']";
