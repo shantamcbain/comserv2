@@ -918,6 +918,154 @@ sub pull_model {
     return $result;
 }
 
+=head2 remove_model
+
+Remove (delete) an installed Ollama model from the server.
+
+    my $result = $ollama->remove_model(
+        model => 'llama3.1'
+    );
+
+Parameters:
+    - model: Required - Name of the model to remove
+
+Returns a hashref with:
+    - success: 1 on success, 0 on failure
+    - message: Status message
+    - error: Error message (if failed)
+
+=cut
+
+sub remove_model {
+    my ($self, %args) = @_;
+    
+    # Log all received arguments for debugging
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+        "remove_model called with args: " . join(", ", map { "$_ => " . ($args{$_} // 'undef') } keys %args));
+    
+    my $model_name = $args{model} or do {
+        $self->last_error("No model name provided");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            "No model name provided - args received: " . join(", ", keys %args));
+        return {
+            success => 0,
+            error => "No model name provided"
+        };
+    };
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'remove_model',
+        "Model name extracted: '$model_name'");
+    
+    # Validate model name (basic sanitization)
+    unless ($model_name =~ /^[a-zA-Z0-9._:-]+$/) {
+        $self->last_error("Invalid model name format");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            "Invalid model name format: $model_name");
+        return {
+            success => 0,
+            error => "Invalid model name format"
+        };
+    }
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'remove_model',
+        "Removing model: $model_name");
+    
+    # Build the delete endpoint
+    my $endpoint = $self->endpoint;
+    $endpoint =~ s/\/api\/generate$/\/api\/delete/;
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+        "Delete endpoint: $endpoint");
+    
+    # Build the request payload
+    my $payload = {
+        name => $model_name,
+    };
+    
+    # Encode the payload
+    my $json_payload;
+    try {
+        $json_payload = encode_json($payload);
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+            "Request payload: $json_payload");
+    } catch {
+        $self->last_error("Failed to encode JSON payload: $_");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            "Failed to encode JSON payload: $_");
+        return {
+            success => 0,
+            error => "Failed to encode JSON payload: $_"
+        };
+    };
+    
+    # Create the HTTP request
+    my $req = HTTP::Request->new(DELETE => $endpoint);
+    $req->header('Content-Type' => 'application/json');
+    $req->content($json_payload);
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+        "Sending DELETE request to Ollama API...");
+    
+    # Send the request
+    my $response;
+    try {
+        $response = $self->ua->request($req);
+    } catch {
+        $self->last_error("HTTP request failed: $_");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            "HTTP request failed: $_");
+        return {
+            success => 0,
+            error => "HTTP request failed: $_"
+        };
+    };
+    
+    # Log response status
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+        "Response status: " . $response->status_line);
+    
+    # Check response status
+    unless ($response->is_success) {
+        my $error = "HTTP request failed: " . $response->status_line;
+        my $content = $response->content || 'No content';
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            "$error - Response content: $content");
+        return {
+            success => 0,
+            error => $error
+        };
+    }
+    
+    # Log response content for debugging
+    my $content = $response->content || '';
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'remove_model',
+        "Response content: $content");
+    
+    # The Ollama delete API typically returns an empty response on success
+    # Check if we have any error content
+    if ($content && $content =~ /error/i) {
+        my $error = "Model removal failed: $content";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'remove_model',
+            $error);
+        return {
+            success => 0,
+            error => $error
+        };
+    }
+    
+    my $result = {
+        success => 1,
+        message => "Model '$model_name' removed successfully"
+    };
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'remove_model',
+        "Successfully removed model: $model_name");
+    
+    return $result;
+}
+
 =head2 list_available_models
 
 Get a list of available models from the Ollama library (not installed locally).

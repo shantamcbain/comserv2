@@ -1,0 +1,31 @@
+from jinja2 import Template
+import json
+
+# Load database servers from dbi_config.json file
+with open('/config/dbi_config.json') as f:
+    dbi_config = json.load(f)
+
+container_template = Template('''
+    {{ container_name }}
+    <div class="database-container">
+        <h1>{{ server_name }}</h1>
+        <!-- Server content -->
+    </div>
+''')
+
+def get_container_name(server):
+    # Return a unique name for each database server
+    return f'database-{server["name"]}'
+
+def render_database_containers():
+    containers = []
+    for server in dbi_config['servers']:
+        container_name = get_container_name(server)
+        template_vars = {
+            'container_name': container_name,
+            'server_name': server['name']
+        }
+        rendered_template = container_template.render(**template_vars)
+        # Add additional server content here
+        containers.append(rendered_template)
+    return containers

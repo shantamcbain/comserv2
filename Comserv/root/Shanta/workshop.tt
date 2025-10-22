@@ -1,0 +1,157 @@
+[% META
+    title = 'Shanta\'s Workshop'
+    description = 'Personal workshop and development area for Shanta'
+    roles = ['user', 'admin', 'developer']
+    category = 'personal'
+    page_version = 'v1.00'
+    last_updated = '2025-01-19'
+    site_specific = 'yes'
+%]
+
+[% ViewVersion = 'v 1.00 2025/01/19 Shanta/workshop.tt' %]
+
+[% IF c.session.debug_mode == 1 %]
+    [% ViewVersion %]
+[% END %]
+
+[% embed('ErrorDisplayView') %]
+
+<div class="workshop-container">
+    <table cellpadding="0" cellspacing="0" border="0" align="left" width="100%">
+        <tr align="left">
+            <td align="left">
+                
+                <h1>Shanta's Workshop</h1>
+                
+                [% IF username == 'Shanta' %]
+                
+                    <div class="workshop-navigation">
+                        <h2>Workshop Tools & Resources</h2>
+                        <ul>
+                            <li><a href="/Shanta">← Back to Dashboard</a></li>
+                            <li><a href="/todo">Todo Management</a></li>
+                            <li><a href="/project">Project Management</a></li>
+                            <li><a href="/admin">System Administration</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="workshop-content">
+                        <h3>Development Environment</h3>
+                        <p>Welcome to your personal development workspace, Shanta!</p>
+                        
+                        <div class="workshop-sections">
+                            <div class="section">
+                                <h4>Current Projects</h4>
+                                <p>Access your active development projects and tasks.</p>
+                                <!-- Project list can be dynamically loaded here -->
+                            </div>
+                            
+                            <div class="section">
+                                <h4>Quick Access Links</h4>
+                                <ul>
+                                    <li><a href="https://github.com" target="_blank">GitHub</a></li>
+                                    <li><a href="/documentation">Documentation</a></li>
+                                    <li><a href="/admin/logs">System Logs</a></li>
+                                </ul>
+                            </div>
+                            
+                            <div class="section">
+                                <h4>Workshop Notes</h4>
+                                <p>Personal workspace for development notes and ideas.</p>
+                                <!-- Notes area can be enhanced with a simple text editor -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                [% ELSE %]
+                
+                    <div class="access-denied">
+                        <h2>Access Restricted</h2>
+                        <p>This workshop area is restricted to Shanta only.</p>
+                        <p><a href="/Shanta">← Return to Shanta's Homepage</a></p>
+                    </div>
+                    
+                [% END %]
+                
+            </td>
+        </tr>
+    </table>
+</div>
+
+<style>
+.workshop-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.workshop-navigation ul {
+    list-style-type: none;
+    padding: 0;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+.workshop-navigation li {
+    margin: 5px 0;
+}
+
+.workshop-navigation a {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.workshop-navigation a:hover {
+    text-decoration: underline;
+}
+
+.workshop-sections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.workshop-sections .section {
+    flex: 1;
+    min-width: 300px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+.workshop-sections .section h4 {
+    color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+}
+
+.access-denied {
+    text-align: center;
+    color: #cc0000;
+    background-color: #ffeeee;
+    border: 1px solid #cc0000;
+    border-radius: 5px;
+    padding: 20px;
+    margin: 20px;
+}
+
+.access-denied h2 {
+    margin-top: 0;
+}
+
+.access-denied a {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.access-denied a:hover {
+    text-decoration: underline;
+}
+</style>
+
+[% embed('CSCCopyRight') %]

@@ -1029,6 +1029,170 @@ sub _determine_page_category {
     return 'documentation';
 }
 
+# Search documentation with role-based filtering
+sub search :Path('/documentation/search') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log the search action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search', 
+        "Documentation search initiated");
+    
+    # Get search parameters
+    my $query = $c->req->params->{q} || '';
+    my $category = $c->req->params->{category} || '';
+    
+    # Trim whitespace
+    $query =~ s/^\s+|\s+$//g;
+    
+    # Ensure documentation has been scanned
+    $self->_ensure_scanned($c);
+    
+    # Get user role (same logic as index method)
+    my $user_role = 'normal';
+    my $is_admin = 0;
+    
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
+        if (grep { lc($_) eq 'admin' } @{$c->session->{roles}}) {
+            $user_role = 'admin';
+            $is_admin = 1;
+        } else {
+            $user_role = $c->session->{roles}->[0];
+        }
+    } elsif ($c->controller('Root')->user_exists($c)) {
+        $user_role = $c->session->{roles} || 'normal';
+        $is_admin = 1 if lc($user_role) eq 'admin';
+    }
+    
+    # Special case for CSC site
+    if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
+        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+            $user_role = 'admin';
+            $is_admin = 1;
+        }
+    }
+    
+    my $site_name = $c->stash->{SiteName} || 'default';
+    
+    # Perform search only if query is provided
+    my @search_results;
+    if ($query && length($query) >= 2) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search',
+            "Performing search for: '$query' in category: '$category'");
+        
+        # Get all documentation pages
+        my $pages = $self->documentation_pages;
+        
+        foreach my $page_name (keys %$pages) {
+            my $metadata = $pages->{$page_name};
+            
+            # Apply same role and site filtering as index method
+            if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name) {
+                next unless $is_admin;
+            }
+            
+            # Check role access
+            my $has_role = $is_admin;
+            unless ($has_role) {
+                foreach my $role (@{$metadata->{roles}}) {
+                    if ($role eq $user_role) {
+                        $has_role = 1;
+                        last;
+                    } elsif ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+                        if (grep { $_ eq $role } @{$c->session->{roles}}) {
+                            $has_role = 1;
+                            last;
+                        }
+                    } elsif ($role eq 'normal' && $user_role) {
+                        $has_role = 1;
+                        last;
+                    }
+                }
+            }
+            next unless $has_role;
+            
+            # Determine category for filtering
+            my $page_category = $self->_determine_page_category($page_name, $metadata->{path});
+            
+            # Skip if specific category is requested and this page doesn't match
+            if ($category && $category ne $page_category) {
+                next;
+            }
+            
+            # Check if query matches page name or content
+            my $title = $self->_format_title($page_name);
+            my $matches_title = ($title =~ /\Q$query\E/i);
+            my $matches_content = 0;
+            my $excerpt = '';
+            
+            # Try to read file content for search
+            if (-f $metadata->{path}) {
+                eval {
+                    open my $fh, '<', $metadata->{path} or die "Cannot open file: $!";
+                    my $content = do { local $/; <$fh> };
+                    close $fh;
+                    
+                    if ($content =~ /\Q$query\E/i) {
+                        $matches_content = 1;
+                        
+                        # Create excerpt around the match
+                        my $match_pos = index(lc($content), lc($query));
+                        if ($match_pos >= 0) {
+                            my $start = $match_pos > 100 ? $match_pos - 100 : 0;
+                            my $end = $match_pos + length($query) + 100;
+                            $end = length($content) if $end > length($content);
+                            
+                            $excerpt = substr($content, $start, $end - $start);
+                            $excerpt =~ s/^\S*\s*//; # Remove partial word at start
+                            $excerpt =~ s/\s*\S*$//; # Remove partial word at end
+                            $excerpt = '...' . $excerpt . '...' if $start > 0 || $end < length($content);
+                            
+                            # Remove Template Toolkit syntax for cleaner display
+                            $excerpt =~ s/\[%.*?%\]//g;
+                            $excerpt =~ s/<[^>]*>//g; # Remove HTML tags
+                            $excerpt =~ s/\s+/ /g; # Normalize whitespace
+                            $excerpt = substr($excerpt, 0, 300) . '...' if length($excerpt) > 300;
+                        }
+                    }
+                };
+                
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'search',
+                        "Error reading file for search: $@");
+                }
+            }
+            
+            # Add to results if match found
+            if ($matches_title || $matches_content) {
+                push @search_results, {
+                    title => $title,
+                    url => $c->uri_for($self->action_for('view'), [$page_name]),
+                    category => $page_category,
+                    site => $metadata->{site},
+                    roles => $metadata->{roles},
+                    excerpt => $excerpt,
+                    relevance => $matches_title ? 10 : 5, # Title matches rank higher
+                };
+            }
+        }
+        
+        # Sort results by relevance
+        @search_results = sort { $b->{relevance} <=> $a->{relevance} || $a->{title} cmp $b->{title} } @search_results;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search',
+            "Search completed. Found " . scalar(@search_results) . " results");
+    }
+    
+    # Forward to index with search results
+    $c->forward('index');
+    
+    # Add search-specific stash variables
+    $c->stash(
+        search_query => $query,
+        search_category => $category,
+        search_results => \@search_results,
+    );
+}
+
 # Helper method to clean data structure for JSON encoding
 # Converts blessed objects and references to simple values
 sub _clean_for_json {

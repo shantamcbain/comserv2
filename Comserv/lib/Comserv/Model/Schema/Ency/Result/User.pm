@@ -35,6 +35,13 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
 
+# Relationships
+__PACKAGE__->has_many(
+    'ai_conversations' => 'Comserv::Model::Schema::Ency::Result::AiConversation',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
 # Add method to check password (needed for authentication)
 sub check_password {
     my ($self, $password) = @_;

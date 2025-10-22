@@ -925,6 +925,163 @@ sub test_model :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 remove_model
+
+Remove (delete) an installed Ollama model from a specific server.
+
+=cut
+
+sub remove_model :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Set response content type
+    $c->response->content_type('application/json');
+    
+    # Check authentication
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'remove_model', "Unauthorized access attempt to AI remove model");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(401);
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    # Check user permissions for model management
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_manage_models = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_manage_models = grep { $_ =~ /^(admin|developer)$/i } @$user_roles;
+    }
+    
+    unless ($can_manage_models) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'remove_model', "Unauthorized model removal attempt by user: $username");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Insufficient permissions to remove models'
+        });
+        $c->response->body($error_response);
+        $c->response->status(403);
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'remove_model', "Processing AI remove model request");
+    
+    # Get JSON payload
+    my $json_data;
+    try {
+        my $body = $c->request->body_data;
+        if ($body && ref($body) eq 'HASH') {
+            $json_data = $body;
+        } else {
+            # Try to parse raw body as JSON
+            my $raw_body = $c->request->body;
+            $json_data = decode_json($raw_body) if $raw_body;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'remove_model', "Failed to parse JSON request body: $_");
+    };
+    
+    unless ($json_data) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'remove_model', "No JSON data received in remove model request");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'JSON data is required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(400);
+        return;
+    }
+    
+    # Extract parameters
+    my $model_name = $json_data->{model} || '';
+    my $server_host = $json_data->{host} || 'localhost';
+    my $server_port = $json_data->{port} || 11434;
+    
+    # Validate model name
+    unless ($model_name && length($model_name) > 0) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'remove_model', "Empty model name provided by user: $username");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Model name is required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(400);
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'remove_model', "Remove model request from user '$username': $model_name on $server_host:$server_port");
+    
+    my $response_data;
+    
+    try {
+        # Get Ollama model
+        my $ollama = $c->model('Ollama');
+        unless ($ollama) {
+            die "Failed to load Ollama model";
+        }
+        
+        # Configure for specific server
+        $ollama->host($server_host);
+        $ollama->port($server_port);
+        $ollama->clear_endpoint;  # Force rebuild of endpoint URL
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'remove_model', "Ollama model configured for $server_host:$server_port, removing model...");
+        
+        # Remove the model
+        my $result = $ollama->remove_model(model => $model_name);
+        
+        unless ($result && $result->{success}) {
+            my $error = $result->{error} || $ollama->last_error || 'Unknown error';
+            die "Model removal failed: $error";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'remove_model', "Model removal successful for user '$username': $model_name on $server_host:$server_port");
+        
+        # Build JSON response
+        $response_data = {
+            success => JSON::true,
+            message => $result->{message} || "Model '$model_name' removed successfully",
+            model => $model_name,
+            server => "$server_host:$server_port"
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'remove_model', "Model removal failed for user '$username': $error");
+        
+        $response_data = {
+            success => JSON::false,
+            error => 'Failed to remove model: ' . $error
+        };
+        $c->response->status(500);
+    };
+    
+    my $json_response = encode_json($response_data);
+    $c->response->body($json_response);
+}
+
 =head2 check_status
 
 Check Ollama service connectivity. Returns JSON status.

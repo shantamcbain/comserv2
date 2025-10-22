@@ -201,15 +201,6 @@ sub do_login :Local {
             "Raw roles from database for user '$username': " . (defined $roles ? "'$roles'" : 'undefined')
         );
         
-        # TEMPORARY FIX: Ensure Shanta has admin role
-        if ($username eq 'Shanta') {
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'do_login',
-                "Applying temporary admin role fix for user Shanta"
-            );
-            $roles = 'admin,user';
-        }
-        
         if (defined $roles && !ref $roles) {
             # If roles is a string, split by comma and clean up whitespace
             if ($roles =~ /,/) {

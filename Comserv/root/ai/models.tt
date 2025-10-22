@@ -1,4 +1,4 @@
-[% PageVersion = 'models.tt,v 0.5 2025/10/09 14:45 ai_assistant Exp ai_assistant' %]
+[% PageVersion = 'models.tt,v 0.6 2025/10/21 07:36 ai_assistant Exp ai_assistant' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -136,11 +136,21 @@
                                             
                                             <div class="model-actions">
                                                 [% IF is_installed %]
-                                                    <button type="button" 
-                                                            class="test-model-button" 
-                                                            onclick="testModel('[% model.name %]', '[% server.host %]', '[% server.port %]')">
-                                                        <i class="icon-test"></i> Test Model
-                                                    </button>
+                                                    <div class="action-buttons">
+                                                        <button type="button" 
+                                                                class="test-model-button" 
+                                                                onclick="testModel('[% model.name %]', '[% server.host %]', '[% server.port %]')">
+                                                            <i class="icon-test"></i> Test Model
+                                                        </button>
+                                                        <button type="button" 
+                                                                class="remove-model-button" 
+                                                                data-model-name="[% model.name %]"
+                                                                data-server-host="[% server.host %]"
+                                                                data-server-port="[% server.port %]"
+                                                                onclick="removeModel('[% model.name %]', '[% server.host %]', '[% server.port %]')">
+                                                            <i class="icon-trash"></i> Remove
+                                                        </button>
+                                                    </div>
                                                 [% ELSE %]
                                                     <button type="button" 
                                                             class="pull-model-button" 
@@ -346,21 +356,52 @@
     margin-top: 15px;
 }
 
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
 .pull-model-button,
-.test-model-button {
-    background: #28a745;
-    color: white;
+.test-model-button,
+.remove-model-button {
     border: none;
     padding: 10px 15px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 0.9em;
     transition: background 0.3s ease;
-    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    justify-content: center;
+    min-width: 0;
+    flex: 1;
 }
 
-.pull-model-button:hover {
+.pull-model-button,
+.test-model-button {
+    background: #28a745;
+    color: white;
+}
+
+.pull-model-button:hover,
+.test-model-button:hover {
     background: #218838;
+}
+
+.remove-model-button {
+    background: #dc3545;
+    color: white;
+}
+
+.remove-model-button:hover {
+    background: #c82333;
+}
+
+/* For models without installations, keep full width */
+.pull-model-button {
+    width: 100%;
 }
 
 .pull-model-button:disabled {
@@ -560,6 +601,60 @@ function testModel(modelName, serverHost, serverPort) {
     .catch(error => {
         console.error('Error testing model:', error);
         showStatusMessage('error', `Failed to test model ${modelName} on ${serverHost}: ${error.message}`);
+    });
+}
+
+// Remove model function with server support and confirmation
+function removeModel(modelName, serverHost, serverPort) {
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to remove model "${modelName}" from ${serverHost}?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+    
+    const button = document.querySelector(`button[data-model-name="${modelName}"][data-server-host="${serverHost}"].remove-model-button`);
+    
+    // Disable button and show progress
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="icon-spinner"></i> Removing...';
+    }
+    
+    showStatusMessage('info', `Removing model ${modelName} from ${serverHost}...`);
+    
+    // Make AJAX request to remove model
+    fetch('/ai/remove_model', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            model: modelName,
+            host: serverHost,
+            port: serverPort
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showStatusMessage('success', `Model ${modelName} removed successfully from ${serverHost}!`);
+            
+            // Reload page after 2 seconds to show updated model list
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            throw new Error(data.error || 'Failed to remove model');
+        }
+    })
+    .catch(error => {
+        console.error('Error removing model:', error);
+        showStatusMessage('error', `Failed to remove model ${modelName} from ${serverHost}: ${error.message}`);
+        
+        // Re-enable button
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="icon-trash"></i> Remove';
+        }
     });
 }
 

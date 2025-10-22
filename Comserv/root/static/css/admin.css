@@ -81,3 +81,139 @@
 .debug-footer li {
     margin-bottom: 5px;
 }
+
+/* Schema Comparison Server/Database Structure Styles */
+.server-section {
+    margin-bottom: 15px;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+}
+
+.server-toggle {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.server-toggle:hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+    box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+}
+
+.server-content {
+    display: none;
+    padding: 10px;
+    background: #f8f9ff;
+}
+
+.server-content.expanded {
+    display: block;
+}
+
+.database-section {
+    margin: 8px 0;
+    border: 1px solid #6f42c1;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #f8f5ff 0%, #ffffff 100%);
+}
+
+.database-section.disconnected {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+}
+
+.database-toggle {
+    width: 100%;
+    padding: 12px 15px;
+    background: linear-gradient(135deg, #6f42c1 0%, #5a2a9b 100%);
+    color: white;
+    border: none;
+    border-radius: 5px 5px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.database-toggle:hover {
+    background: linear-gradient(135deg, #5a2a9b 0%, #4e237a 100%);
+    box-shadow: 0 2px 6px rgba(111,66,193,0.3);
+}
+
+.database-header {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    border-radius: 5px 5px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.database-content {
+    display: none;
+    padding: 10px;
+    background: #f8f5ff;
+}
+
+.database-content.expanded {
+    display: block;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.connected {
+    background: #28a745;
+    color: white;
+}
+
+.status-badge.disconnected {
+    background: #dc3545;
+    color: white;
+}
+
+.connection-type {
+    padding: 2px 6px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: normal;
+}
+
+.host-info {
+    font-size: 12px;
+    opacity: 0.9;
+    font-weight: normal;
+}
+
+.table-count {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.error-info {
+    color: #ffecb3;
+    font-size: 11px;
+    font-weight: normal;
+}
