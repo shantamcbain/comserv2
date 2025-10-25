@@ -610,9 +610,7 @@ sub get_active_database_connections {
                     if ($dbh) {
                         # Get tables using the same pattern as DBEncy list_tables method
                         if ($config->{db_type} eq 'sqlite') {
-                            my $sth = $dbh->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-                            $sth->execute();
-                            $tables = $dbh->selectcol_arrayref($sth);
+                            $tables = $dbh->selectcol_arrayref("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
                         } else {
                             $tables = $dbh->selectcol_arrayref("SHOW TABLES");
                         }
@@ -667,28 +665,29 @@ sub get_active_database_connections {
             if ($tables && @$tables) {
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_active_database_connections', 
                     "Step 4f: Processing " . scalar(@$tables) . " tables for $config_key");
-                    
+                
+                # Build Result class name mappings for this database
+                my $result_class_mappings = $self->_build_result_class_mappings($database_name);
+                
                 foreach my $table_name (@$tables) {
+                    # Check if this table has a corresponding Result class file
+                    my $has_result_file = exists $result_class_mappings->{lc($table_name)} ? 1 : 0;
+                    
                     my $table_info = {
                         name => $table_name,
                         database => $config_key,
-                        has_result_file => 0,
-                        sync_status => 'unknown'
+                        has_result_file => $has_result_file,
+                        sync_status => $has_result_file ? 'unknown' : 'missing_result'
                     };
                     
-                    # Check for result file
-                    my $result_file_path = "/home/shanta/PycharmProjects/comserv2/Comserv/root/admin/comparison_results/${table_name}_comparison.json";
-                    if (-f $result_file_path) {
-                        $table_info->{has_result_file} = 1;
-                        # For now, assume synchronized if result file exists
-                        # Later this could be enhanced to actually compare content
-                        $table_info->{sync_status} = 'synchronized';
-                    } else {
-                        $table_info->{sync_status} = 'needs_sync';
-                    }
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_active_database_connections', 
+                        "Table $table_name: has_result_file=$has_result_file");
                     
                     push @{$connection_data->{tables}}, $table_info;
                 }
+                
+                # Store table_comparisons for later use
+                $connection_data->{table_comparisons} = $connection_data->{tables};
             }
             
             $connections->{$config_key} = $connection_data;
@@ -1864,7 +1863,7 @@ sub _generate_database_containers {
     my ($self, $c, $comparison_data) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_generate_database_containers',
-        "Starting database containers generation");
+        "Starting database containers generation - FIXED to use servers structure");
     
     my $containers = {
         container1 => {  # Tables with Result files showing field differences
@@ -1887,77 +1886,83 @@ sub _generate_database_containers {
         }
     };
     
-    # Process each database to populate containers
-    my $databases = $comparison_data->{databases} || {};
-    foreach my $db_key (keys %$databases) {
-        my $db_info = $databases->{$db_key};
-        next unless $db_info && ref($db_info) eq 'HASH';
+    # CRITICAL FIX: Iterate through servers structure (hierarchical) instead of flat databases
+    # The flat databases structure doesn't have the needed fields, but servers.databases.table_comparisons does
+    my $servers = $comparison_data->{servers} || {};
+    
+    foreach my $server_key (keys %$servers) {
+        my $server = $servers->{$server_key};
+        next unless $server && ref($server) eq 'HASH';
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_generate_database_containers',
-            "Processing database: $db_key");
-        
-        # Get all Result files for this database
-        my $result_files = $self->_collect_result_files($c, $db_key);
-        
-        # Get all tables for this database
-        my $tables = $db_info->{tables} || [];
-        
-        # Process tables with Result files (Container 1)
-        my $tables_with_results = $db_info->{tables_with_results} || {};
-        foreach my $table_name (keys %$tables_with_results) {
-            my $result_info = $tables_with_results->{$table_name};
+        foreach my $db_key (keys %{$server->{databases} || {}}) {
+            my $db = $server->{databases}->{$db_key};
+            next unless $db && ref($db) eq 'HASH';
             
-            # Get detailed field comparison
-            my $field_comparison = $self->_compare_table_result_fields($c, $db_key, $table_name, $result_info);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_generate_database_containers',
+                "Processing database: $db_key from server: $server_key");
             
-            push @{$containers->{container1}->{items}}, {
-                database => $db_key,
-                table_name => $table_name,
-                result_file => $result_info->{result_file},
-                field_comparison => $field_comparison,
-                has_differences => $field_comparison->{has_differences} || 0,
-                differences_count => $field_comparison->{differences_count} || 0
-            };
-        }
-        
-        # Process Result files without tables (Container 2)
-        foreach my $result_file (@$result_files) {
-            my $table_name = lc($result_file);
-            $table_name =~ s/\.result$//i;
+            # Get all Result files for this database
+            my $result_files = $self->_collect_result_files($c, $db_key);
             
-            # Check if this Result file has a corresponding table
-            my $has_table = grep { lc($_) eq $table_name } @$tables;
+            # Get all tables for this database - from table_comparisons which has the actual data
+            my $table_comparisons = $db->{table_comparisons} || [];
+            my @table_names = map { $_->{name} } @$table_comparisons;
             
-            unless ($has_table) {
-                my $result_fields = $self->_extract_result_file_fields($c, $db_key, $result_file);
+            # Process tables with Result files (Container 1)
+            foreach my $table_comp (@$table_comparisons) {
+                my $table_name = $table_comp->{name};
                 
-                push @{$containers->{container2}->{items}}, {
-                    database => $db_key,
-                    result_file => $result_file,
-                    expected_table_name => $table_name,
-                    result_fields => $result_fields,
-                    field_count => scalar(keys %$result_fields)
-                };
+                if ($table_comp->{has_result_file}) {
+                    # This table HAS a result file
+                    my $result_file_name = $table_name . '.Result';
+                    
+                    push @{$containers->{container1}->{items}}, {
+                        database => $db_key,
+                        server => $server_key,
+                        table_name => $table_name,
+                        result_file => $result_file_name,
+                        sync_status => $table_comp->{sync_status} || 'unknown',
+                        has_differences => $table_comp->{has_differences} || 0,
+                        differences_count => $table_comp->{differences_count} || 0
+                    };
+                }
             }
-        }
-        
-        # Process tables without Result files (Container 3)
-        foreach my $table_name (@$tables) {
-            # Check if this table has a corresponding Result file
-            my $result_file_name = $table_name . '.Result';
-            my $has_result_file = grep { lc($_) eq lc($result_file_name) } @$result_files;
             
-            unless ($has_result_file) {
-                # Get table fields from database
-                my $table_fields = $self->_get_table_fields($c, $db_key, $table_name);
+            # Process Result files without tables (Container 2)
+            foreach my $result_file (@$result_files) {
+                my $expected_table_name = lc($result_file);
+                $expected_table_name =~ s/\.result$//i;
                 
-                push @{$containers->{container3}->{items}}, {
-                    database => $db_key,
-                    table_name => $table_name,
-                    expected_result_file => $result_file_name,
-                    table_fields => $table_fields,
-                    field_count => scalar(keys %$table_fields)
-                };
+                # Check if this Result file has a corresponding table in table_comparisons
+                my $has_table = grep { lc($_->{name}) eq $expected_table_name } @$table_comparisons;
+                
+                unless ($has_table) {
+                    push @{$containers->{container2}->{items}}, {
+                        database => $db_key,
+                        server => $server_key,
+                        result_file => $result_file,
+                        expected_table_name => $expected_table_name,
+                        field_count => 0  # Could be enhanced to read actual fields
+                    };
+                }
+            }
+            
+            # Process tables without Result files (Container 3)
+            foreach my $table_comp (@$table_comparisons) {
+                my $table_name = $table_comp->{name};
+                
+                if (!$table_comp->{has_result_file}) {
+                    # This table does NOT have a result file
+                    my $result_file_name = $table_name . '.Result';
+                    
+                    push @{$containers->{container3}->{items}}, {
+                        database => $db_key,
+                        server => $server_key,
+                        table_name => $table_name,
+                        expected_result_file => $result_file_name,
+                        field_count => 0  # Could be enhanced to count actual fields
+                    };
+                }
             }
         }
     }
@@ -1968,7 +1973,7 @@ sub _generate_database_containers {
     $containers->{container3}->{count} = scalar(@{$containers->{container3}->{items}});
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_generate_database_containers',
-        sprintf("Generated containers: C1=%d, C2=%d, C3=%d", 
+        sprintf("Generated containers: C1=%d items (tables with results), C2=%d items (results without tables), C3=%d items (tables without results)", 
                $containers->{container1}->{count},
                $containers->{container2}->{count}, 
                $containers->{container3}->{count}));
@@ -1983,15 +1988,16 @@ sub _collect_result_files {
     my $result_files = [];
     
     # Determine schema directory based on database key
+    # FIXED: Corrected paths to actual DBIx::Class Result file locations
     my $schema_dir;
     if ($database_key =~ /ency/i) {
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/ency';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result';
     } elsif ($database_key =~ /forager/i) {
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/forager';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Forager/Result';
     } else {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_collect_result_files',
             "Unknown database type for $database_key, using ency schema");
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/ency';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result';
     }
     
     if (-d $schema_dir) {
@@ -2003,11 +2009,18 @@ sub _collect_result_files {
         
         while (my $file = readdir($dh)) {
             next if $file =~ /^\.\.?$/;  # Skip . and ..
-            next unless $file =~ /\.Result$/i;  # Only Result files
+            next unless $file =~ /\.pm$/i;  # Look for .pm files (DBIx::Class Result classes)
             
-            push @$result_files, $file;
+            # Extract the Result class name (filename without .pm extension)
+            my $result_name = $file;
+            $result_name =~ s/\.pm$//i;
+            
+            push @$result_files, $result_name;
         }
         closedir($dh);
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_collect_result_files',
+            "Schema directory does not exist: $schema_dir");
     }
     
     return $result_files;
@@ -2020,16 +2033,19 @@ sub _extract_result_file_fields {
     my $fields = {};
     
     # Determine schema directory
+    # FIXED: Corrected paths to actual DBIx::Class Result file locations
     my $schema_dir;
     if ($database_key =~ /ency/i) {
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/ency';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result';
     } elsif ($database_key =~ /forager/i) {
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/forager';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Forager/Result';
     } else {
-        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/schema/ency';
+        $schema_dir = '/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/Ency/Result';
     }
     
-    my $file_path = "$schema_dir/$result_file";
+    # Add .pm extension if not already present
+    my $file_suffix = $result_file =~ /\.pm$/ ? $result_file : "$result_file.pm";
+    my $file_path = "$schema_dir/$file_suffix";
     
     if (-f $file_path) {
         eval {
@@ -2056,6 +2072,9 @@ sub _extract_result_file_fields {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_extract_result_file_fields',
                 "Error parsing Result file $file_path: $@");
         }
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_extract_result_file_fields',
+            "Result file not found: $file_path");
     }
     
     return $fields;
@@ -2261,6 +2280,63 @@ sub _integrate_container_data_into_databases {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_integrate_container_data_into_databases',
         "Container data integration completed");
+}
+
+# Helper method: Build Result class name mappings for a specific database
+sub _build_result_class_mappings {
+    my ($self, $database_name) = @_;
+    
+    # Determine which database directory to check
+    my $db_dir;
+    if (lc($database_name) eq 'ency') {
+        $db_dir = 'Ency';
+    } elsif (lc($database_name) eq 'shanta_forager') {
+        $db_dir = 'Forager';
+    } else {
+        # Default fallback
+        $db_dir = 'Ency';
+    }
+    
+    my $result_dir = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/$db_dir/Result/";
+    
+    my %table_mappings = ();
+    
+    # Check if result directory exists
+    unless (-d $result_dir) {
+        return \%table_mappings;
+    }
+    
+    # Get all .pm files in the result directory
+    opendir(my $dh, $result_dir) or return \%table_mappings;
+    my @result_files = grep { /\.pm$/ && -f "$result_dir$_" } readdir($dh);
+    closedir($dh);
+    
+    # Create mappings from Result class names to possible table names
+    foreach my $file (@result_files) {
+        my $class_name = $file;
+        $class_name =~ s/\.pm$//;
+        
+        # Direct lowercase match
+        $table_mappings{lc($class_name)} = 1;
+        
+        # Convert PascalCase to snake_case
+        my $snake_case = $class_name;
+        $snake_case =~ s/([A-Z])/_$1/g;
+        $snake_case =~ s/^_//;
+        $snake_case = lc($snake_case);
+        $table_mappings{$snake_case} = 1;
+        
+        # Try pluralized versions (e.g. Category -> categories)
+        my $plural = lc($class_name) . 's';
+        $table_mappings{$plural} = 1;
+        
+        # Try singular version (e.g. Files -> file)  
+        my $singular = lc($class_name);
+        $singular =~ s/s$// if $singular =~ /[^s]s$/;
+        $table_mappings{$singular} = 1;
+    }
+    
+    return \%table_mappings;
 }
 
 __PACKAGE__->meta->make_immutable;

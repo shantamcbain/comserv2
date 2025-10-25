@@ -4,11 +4,11 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "system"
-   page_version = "1.01"
-   last_updated = "2025-01-11"
+   page_version = "1.02"
+   last_updated = "2025-10-25"
    site_specific = "false"
 %]
-[% PageVersion = 'system/server_update_procedure.tt,v 1.01 2025/01/11 admin Exp admin - Global Themes Compliance Update' %]
+[% PageVersion = 'system/server_update_procedure.tt,v 1.02 2025/10/25 admin Exp admin - Consolidated Admin and System Versions' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -17,10 +17,11 @@
     <h1 style="color: var(--text-color); font-family: var(--header-font);">Server Update Procedure - Step-by-Step Guide</h1>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-        Last Updated: 2025-01-11 | 
-        Version: 1.01 | 
+        Last Updated: 2025-10-25 | 
+        Version: 1.02 | 
         Author: Admin | 
-        Status: Production
+        Status: Production | 
+        Note: Consolidated from admin/server_update_procedure
     </div>
 
     <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">

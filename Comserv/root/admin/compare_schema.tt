@@ -280,7 +280,7 @@
                                     [% END %]
                                     
                                     <!-- Sub-Container 1: Tables with Result Files -->
-                                    [% INCLUDE admin/tables_with_result.md 
+                                    [% INCLUDE admin/tables_with_result.tt 
                                         tables_with_results = tables_with_results
                                         database_name = database_name
                                         database_key = database_key
@@ -290,7 +290,7 @@
                                     %]
                                 
                                 <!-- Sub-Container 2: Tables without Result Files -->
-                                [% INCLUDE admin/tables_without_result.md 
+                                [% INCLUDE admin/tables_without_result.tt 
                                     tables_without_results = tables_without_results
                                     database_name = database_name
                                     database_key = database_key
@@ -299,7 +299,7 @@
                                 %]
                                 
                                 <!-- Sub-Container 3: Result Files without Tables -->
-                                [% INCLUDE admin/result_without_tables.md 
+                                [% INCLUDE admin/result_without_tables.tt 
                                     results_without_tables = results_without_tables
                                     database_name = database_name
                                     database_key = database_key

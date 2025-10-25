@@ -1,0 +1,400 @@
+[% META
+   title = "Security Monitoring System"
+   description = "Comprehensive security monitoring, threat detection, and compliance tracking for Comserv applications"
+   roles = "admin,developer,security"
+   TemplateType = "Application"
+   category = "Security"
+   page_version = "0.01"
+   last_updated = "Thu Oct 25 2025 Initial_Implementation"
+%]
+[% PageVersion = 'Documentation/system/security_monitoring.tt,v 0.01 2025/10/25 AI_Assistant Initial_Security_Monitoring_System' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Security Monitoring System</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-10-25 |
+        Version: 0.01 |
+        Status: Active | 
+        Maintained By: Security Team
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                The Security Monitoring System is a comprehensive security infrastructure designed to detect threats, monitor vulnerabilities, track compliance metrics, and provide real-time security alerts for Comserv applications. This system integrates with your application deployment to protect against unauthorized access, data breaches, and security vulnerabilities.
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Administrator or security team access</li>
+                <li>Comserv application v5.0 or higher</li>
+                <li>Database access for audit logging</li>
+                <li>System-level access for log monitoring</li>
+                <li>Email service for security alerts</li>
+                <li>Knowledge of security concepts (CVSS, threat models)</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Core Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Real-Time Threat Detection</strong>: Monitors for suspicious activities</li>
+                <li><strong>Vulnerability Scanning</strong>: Automated security scans and assessments</li>
+                <li><strong>Compliance Tracking</strong>: OWASP, NIST, and custom compliance rules</li>
+                <li><strong>Audit Logging</strong>: Complete audit trail of all security events</li>
+                <li><strong>Security Alerts</strong>: Configurable notifications for security incidents</li>
+                <li><strong>Credential Management</strong>: Secure password and secret handling</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Security Monitoring Architecture</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">System Components</h3>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Component</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Purpose</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Status Indicators</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Event Logger</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Records all security events and audit trails</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Log file size, write errors</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Threat Detector</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Identifies suspicious patterns and potential attacks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Alert count, detection accuracy</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Vulnerability Scanner</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Scans code and configurations for security weaknesses</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Last scan time, vulnerability count</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Compliance Manager</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Tracks compliance with security standards (OWASP, NIST)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Compliance score, failures</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>SecureConfig Module</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Manages secure credential storage and retrieval</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Config validation, credential freshness</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Alert Manager</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Routes and escalates security alerts to administrators</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Alert queue, delivery status</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Getting Started with Security Monitoring</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Initial Security Assessment</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Before deploying the security monitoring system, conduct a baseline security assessment of your application and infrastructure. This identifies the current security posture and establishes priorities.
+            </p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Run security baseline assessment
+cd /opt/catalyst/Comserv
+perl script/security_assessment.pl --mode=baseline --output=/tmp/baseline.json
+
+# Review assessment results
+cat /tmp/baseline.json | jq .
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Configure Secure Credential Management</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Move database credentials from plaintext JSON files to environment variables or Kubernetes Secrets. This is the foundation of secure operations.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Create environment-specific credential files (never commit to Git)</li>
+                <li>Load credentials via SecureConfig module at application startup</li>
+                <li>Validate all required credentials are present before application runs</li>
+                <li>Implement automatic credential rotation policies</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Enable Comprehensive Audit Logging</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Configure audit logging to capture all security-relevant events for investigation and compliance purposes.
+            </p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Configure audit logging
+cat > /etc/comserv/audit_config.json <<EOF
+{
+  "audit_log_path": "/var/log/comserv/audit.log",
+  "log_level": "INFO",
+  "events_to_log": [
+    "authentication",
+    "authorization",
+    "data_modification",
+    "admin_actions",
+    "security_events",
+    "configuration_changes"
+  ],
+  "retention_days": 365
+}
+EOF
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Configure Security Alerts</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Set up real-time notifications for critical security events so your team responds immediately to incidents.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Configure alert thresholds (failed login attempts, permission changes)</li>
+                <li>Set notification channels (email, Slack, webhooks)</li>
+                <li>Define escalation procedures for critical alerts</li>
+                <li>Test alert delivery before going to production</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 5: Validate Deployment</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                After deployment, validate that all security monitoring components are functioning correctly.
+            </p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Run security validation tests
+perl -Ilib script/security_validation.pl --check=all
+
+# Verify monitoring system health
+curl http://localhost:3000/admin/security/health
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Advanced Security Monitoring</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Threat Detection Patterns</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                The system monitors for common attack patterns and suspicious behavior:
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Brute Force Attacks</strong>: Multiple failed login attempts from same IP</li>
+                <li><strong>SQL Injection</strong>: Suspicious SQL patterns in user input</li>
+                <li><strong>Cross-Site Scripting (XSS)</strong>: Script tags and encoded payloads in parameters</li>
+                <li><strong>Privilege Escalation</strong>: Unauthorized permission changes</li>
+                <li><strong>Data Exfiltration</strong>: Unusual database query patterns and large data transfers</li>
+                <li><strong>Configuration Tampering</strong>: Unauthorized changes to security settings</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Vulnerability Scanning</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Automated scans identify security weaknesses in your application and infrastructure:
+            </p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Run comprehensive vulnerability scan
+perl script/vulnerability_scan.pl \
+  --scan-type=comprehensive \
+  --output=/tmp/vuln_report.json \
+  --severity-threshold=HIGH
+
+# Generate detailed report
+perl script/generate_vulnerability_report.pl \
+  --input=/tmp/vuln_report.json \
+  --format=html \
+  --output=/tmp/vuln_report.html
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Compliance Monitoring</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Track compliance with security standards and generate compliance reports for audits.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>OWASP Top 10</strong>: Protection against most common web vulnerabilities</li>
+                <li><strong>NIST Cybersecurity Framework</strong>: Comprehensive security controls</li>
+                <li><strong>CIS Benchmarks</strong>: Industry-standard security baselines</li>
+                <li><strong>Custom Policies</strong>: Organization-specific security requirements</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Kubernetes Security Integration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                When deployed to Kubernetes, security monitoring integrates with K8s security features:
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Pod Security Policies enforce container security standards</li>
+                <li>Network Policies restrict traffic between pods</li>
+                <li>RBAC (Role-Based Access Control) limits pod permissions</li>
+                <li>Secrets encryption protects sensitive data in etcd</li>
+                <li>Audit logging tracks all API server requests</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Credentials Not Loading</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Application fails to connect to databases, "Database credentials not found" errors in logs</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify environment variables are set: <code>echo $DATABASE_HOST</code></li>
+                    <li>Check K8s Secret is mounted: <code>kubectl get secret comserv-db-credentials</code></li>
+                    <li>Validate SecureConfig module can read variables</li>
+                    <li>Check file permissions on credential files (should be readable by app user only)</li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Audit Logs Growing Too Large</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Disk space usage increasing, audit log file exceeds expected size</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Enable log rotation in audit configuration</li>
+                    <li>Archive logs older than retention period</li>
+                    <li>Review logging level (reduce verbosity if appropriate)</li>
+                    <li>Archive to external storage: <code>tar -czf audit_logs_2025_Q1.tar.gz /var/log/comserv/audit.log.*</code></li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: False Positive Alerts</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Receiving alerts for normal application behavior</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Review alert thresholds and adjust for legitimate use patterns</li>
+                    <li>Add IP addresses or users to whitelist if appropriate</li>
+                    <li>Tune threat detection rules based on your environment</li>
+                    <li>Document exceptions in security policy</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Security Configuration Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Setting</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">COMSERV_SECURITY_ENABLED</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">true</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Enable/disable security monitoring system</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">SECURITY_ALERT_EMAIL</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">string</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">security@example.com</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Email address for security alerts</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AUDIT_LOG_RETENTION_DAYS</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">integer</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">365</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Number of days to retain audit logs</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">THREAT_DETECTION_ENABLED</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">true</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Enable real-time threat detection</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">FAILED_LOGIN_THRESHOLD</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">integer</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">5</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Failed attempts before account lockout</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">SESSION_TIMEOUT_MINUTES</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">integer</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">30</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Session inactivity timeout in minutes</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">Related Documentation</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/system/database_configuration" style="color: var(--link-color);">Database Configuration Guide</a></li>
+                    <li><a href="/Documentation/AI_Guidelines" style="color: var(--link-color);">Security Development Guidelines</a></li>
+                    <li><a href="/admin/compare_schema" style="color: var(--link-color);">Database Schema Comparison Tool</a></li>
+                    <li><a href="/admin/security" style="color: var(--link-color);">Security Administration Panel</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For questions about security monitoring or to report security incidents, contact the security team immediately.</p>
+                <p><em>This documentation is part of the Comserv system. All security-related information should be treated as sensitive and not shared outside authorized personnel.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 
+THEME COMPLIANCE NOTES FOR DEVELOPERS:
+
+This security monitoring documentation template maintains complete theme compliance:
+
+1. **CSS Variables Used**: All styling uses Comserv theme system CSS variables:
+   - Color variables (--text-color, --warning-color, --info-color, --success-color)
+   - Typography variables (--header-font, --body-font, --font-size-large)
+   - Spacing variables (--spacing-small, --spacing-medium, --spacing-large)
+   - Table styling (--table-header-bg, --border-color)
+
+2. **Layout System**: Uses responsive grid layout:
+   - .container for main content wrapper
+   - .row and .col-100 for full-width sections
+   - Automatic responsive adaptation
+
+3. **Color-Coded Content Blocks**:
+   - Red/Warning blocks for problems and issues
+   - Blue/Info blocks for informational problems
+   - Green/Success blocks for references and related links
+
+4. **Cross-Theme Compatibility**: Works seamlessly with all Comserv themes:
+   - Default theme
+   - CSC theme
+   - USBM theme
+   - APIS theme
+   - Future custom themes
+
+Usage: This file serves as documentation for the Security Monitoring System and can be accessed
+via the Documentation interface. Maintain the META block and CSS variable structure when updating.
+-->
