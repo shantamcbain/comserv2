@@ -17,6 +17,7 @@ requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
 requires 'DBD::mysql';
+requires 'Object::Signature';
 #json
 requires 'JSON';
 requires 'Config::JSON';
