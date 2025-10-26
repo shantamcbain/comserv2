@@ -92,14 +92,16 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]
         [% INCLUDE 'Navigation/TopDropListIT.tt' %]
         [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
+        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
 
         [% IF is_admin %]
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
-         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
-       </ul>
+        </ul>
     </nav>
+
+
 </header>
 [% IF error_msg %]
 <p class="error">Error: [% error_msg %]</p>
@@ -108,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
 [% END %]
-    [% IF c.stash.debug_msg %]
+    [% IF is_admin && c.stash.debug_msg %]
         [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
         [% END %]
