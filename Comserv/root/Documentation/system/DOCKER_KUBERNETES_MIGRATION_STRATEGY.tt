@@ -1,0 +1,417 @@
+[% META
+        title = "Docker & Kubernetes Migration Strategy"
+   description = "Strategic roadmap for Docker and Kubernetes adoption across development, testing, and production environments"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment"
+   page_version = "1.00"
+   last_updated = "Thu Jan 16 11:23:04 AM PDT 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt,v 1.00 2025/01/16 shanta Exp - Docker/Kubernetes Migration Strategic Plan' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker & Kubernetes Migration Strategy for Comserv</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-01-16 | 
+        Status: Strategic Planning Phase (Phase 0) | 
+        Maintained By: Development Team
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This document serves as a living blueprint for transitioning Comserv from manual server deployments to a fully containerized, Kubernetes-based infrastructure. The strategy spans 7 implementation phases over 4-6 months, with clear deliverables, pros/cons analysis, and decision points at each phase.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Deployment Model</strong>: Manual SSH + git pull + restart starman on production server. <strong>Target Model</strong>: Zero-downtime, auto-scaling Kubernetes cluster with CI/CD automation.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Current State Analysis</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Existing Deployment Workflow</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Developer Machines (Multiple)
+    ↓ [git clone + local changes]
+GitHub Repository
+    ↓ [git push from developer machine]
+Production Server (On-Premises)
+    ↓ [Manual: git pull + comserv_server.pl + restart starman]
+Live Application
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Current Pain Points</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Manual updates</strong>: Each deployment requires SSH access and manual steps</li>
+                <li><strong>Environment inconsistency</strong>: Developer machine ≠ production server setup</li>
+                <li><strong>No rollback mechanism</strong>: Failed updates require manual recovery</li>
+                <li><strong>Scaling limitation</strong>: Adding servers means duplicating manual setup</li>
+                <li><strong>Update downtime</strong>: Application down during comserv_server.pl execution</li>
+                <li><strong>Port mapping issues</strong>: As discovered with Docker testing (port 5000/3000 confusion)</li>
+                <li><strong>Database management</strong>: Manual synchronization across environments</li>
+                <li><strong>Developer onboarding</strong>: New developers must set up entire Perl/MySQL stack locally</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Current Infrastructure</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Deployment Target</strong>: On-premises Proxmox with potential for additional physical servers</li>
+                <li><strong>Application Runtime</strong>: Catalyst Perl framework via Starman server</li>
+                <li><strong>Database</strong>: MySQL/PostgreSQL with future SQLite offline mode option</li>
+                <li><strong>Version Control</strong>: Local git clone, manual push/pull workflow (only one developer currently)</li>
+                <li><strong>CI/CD</strong>: None (manual everything)</li>
+                <li><strong>Container Status</strong>: Docker container exists but not yet integrated with production workflow</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Target State Vision</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">End Goal: Production-Ready Kubernetes</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Developer Machines → Standardized Docker Dev Environment
+    ↓
+GitHub Repository → Automated via CI/CD
+    ↓
+CI/CD Pipeline (GitHub Actions) → Build, Test, Push to Registry
+    ↓
+Kubernetes Cluster (Multi-node on Proxmox)
+    ├─ App Containers (Replicated, Auto-scaled)
+    ├─ Database Service (Persistent)
+    └─ Monitoring/Logging
+    ↓
+Live Application (Zero-Downtime Deployments)
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Key Benefits When Achieved</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ <strong>Zero-downtime updates</strong> - Blue-green or rolling updates</li>
+                <li>✅ <strong>Automatic scaling</strong> - Handle load spikes automatically</li>
+                <li>✅ <strong>Consistency</strong> - Same environment from dev → prod</li>
+                <li>✅ <strong>Rollback capability</strong> - Revert to previous version instantly</li>
+                <li>✅ <strong>Multi-developer friendly</strong> - Standardized local environment</li>
+                <li>✅ <strong>Future cloud migration</strong> - K8s on Proxmox → Cloud K8s seamlessly</li>
+                <li>✅ <strong>Self-healing infrastructure</strong> - Failed containers restart automatically</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Migration Phases Overview</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Phase</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Name</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Duration</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Environment(s)</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>0</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Strategic Planning & Documentation</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Current</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Reference only</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>1</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Docker Local Development</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Developer Workstations</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>2</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">All Components Containerized</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3-4 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Developer Workstations</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>3</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">CI/CD Pipeline Setup (GitHub Actions)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GitHub + Registry</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>4</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Testing Environment Deployment</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Test VM</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>5</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production Docker Deployment</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production Server</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>6</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Single-Node Kubernetes Setup</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3-4 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production Server</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>7</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Multi-Node Kubernetes Cluster</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">4-6 weeks</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Multiple Servers</td>
+                </tr>
+            </table>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Total Estimated Timeline</strong>: 4-6 months for Phases 1-7 (depends on testing cycles and issue resolution)</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Decisions - TEAM CONSENSUS RECORDED</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--success-color); font-family: var(--header-font);">Container Registry</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Decision</strong>: GitHub Container Registry (GCR)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Rationale</strong>: Already integrated with GitHub, free tier available, simplest implementation path</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--success-color); font-family: var(--header-font);">CI/CD Platform</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Decision</strong>: GitHub Actions</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Rationale</strong>: Already using GitHub for source control, minimal setup, cost-effective</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font);">Developer/Git Workflow Notes</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Status</strong>: Single developer, no feature branches, all work to main branch</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Plan for Multiple Developers</strong>: Once additional developers join, will implement Git Flow with feature branches and pull request reviews</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Workflow</strong>: Straightforward - clone, edit, git push to main, CI/CD handles the rest</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font);">Database Strategy</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Setup</strong>: Separate database server (already deployed, production-ready)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>For Containerization</strong>: Use separate database server (not containerized with app) for better performance and data persistence</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Backup Plan</strong>: TBD - need to document current backup procedures and adapt for containerized environment</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Phase Details & Deliverables</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 1: Docker Local Development (Weeks 1-3)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Objective</strong>: Get Docker working on developer machines; fix the port mapping issue (dev 3000, prod 5000)</p>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Deliverables</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Dockerfile for Comserv application</li>
+                <li>docker-compose.yml for local development</li>
+                <li>Setup guide for developers (copy-paste ready)</li>
+                <li>Fix for port mapping issue (5000 production, 3000 development)</li>
+                <li>Documentation of what changed vs current setup</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Why This Phase</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Fixes immediate pain point (port mapping issue from Docker testing)</li>
+                <li>Creates consistent development environment for all developers</li>
+                <li>Validates that application runs in Docker container</li>
+                <li>Allows offline development (each dev has full stack)</li>
+                <li>Low risk: doesn't touch production yet</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Pros</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Eliminates "works on my machine" problems</li>
+                <li>✅ New developers can start contributing in hours instead of days</li>
+                <li>✅ Database consistency (everyone uses same MySQL version)</li>
+                <li>✅ Isolated environments (dev changes don't affect system Perl)</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Cons</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>❌ Docker learning curve (mitigated by documentation)</li>
+                <li>❌ Requires Docker installation on all developer machines</li>
+                <li>❌ Initial setup time (~30 min per developer)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 3: CI/CD Pipeline Setup (Weeks 8-10)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Objective</strong>: Automate build, test, and container image push via GitHub Actions</p>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Deliverables</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>GitHub Actions workflow file (.github/workflows/deploy.yml)</li>
+                <li>Container registry setup (GitHub Container Registry)</li>
+                <li>Automated tests that run in CI</li>
+                <li>Security scanning (image vulnerability scanning)</li>
+                <li>Container image tagging strategy</li>
+            </ul>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">CI/CD Workflow</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Developer pushes to GitHub (main branch)
+    ↓
+GitHub Actions triggered
+    ↓
+Build: docker build (creates new image)
+    ↓
+Test: Run automated tests inside container
+    ↓
+Push: Image pushed to registry with tags
+    ↓
+Ready for deployment (manual approval for production)
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Pros</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ Automation reduces human error</li>
+                <li>✅ Immediate feedback on code quality</li>
+                <li>✅ Faster deployment process</li>
+                <li>✅ Foundation for blue-green/canary deployments</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Developer Workflow Evolution</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Current Workflow (Manual, Phase 0)</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>1. git clone
+2. Set up Perl, MySQL locally (manual or script)
+3. Edit files in IDE
+4. Test locally
+5. git push origin main
+6. SSH to production
+7. cd /app && git pull && perl Makefile.PL && restart starman
+8. Hope it works!
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 1-2 Workflow (Docker Compose Local)</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>1. git clone
+2. docker-compose up          # ALL setup automatic!
+3. Edit files in IDE (same as before)
+4. Test locally at http://localhost:3000
+5. git push origin main
+6. GitHub Actions automatically builds & tests container
+7. Monitor logs from web UI
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 3-5 Workflow (CI/CD + Docker)</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>1. git clone
+2. docker-compose up
+3. Edit files in IDE
+4. git push origin main
+5. GitHub Actions:
+   ├─ Builds container image
+   ├─ Runs automated tests
+   ├─ Pushes image to registry
+   └─ Notifies team
+6. Click "Deploy to Production" in GitHub (manual approval)
+7. Automated deployment
+   ├─ Blue-green switch
+   ├─ Health checks
+   └─ Automatic rollback if issues
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Success Metrics & Timeline</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 1-2 Success Criteria</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ All developers running local docker-compose setup</li>
+                <li>☐ New developer onboarding takes &lt;1 hour (previously 2-4 hours)</li>
+                <li>☐ Port mapping issue resolved (5000 prod, 3000 dev)</li>
+                <li>☐ Automated tests run in CI for every commit</li>
+                <li>☐ Team comfortable with basic Docker commands</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 3-5 Success Criteria</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ Automated deployments to test environment</li>
+                <li>☐ Production deployments via CI/CD with manual approval</li>
+                <li>☐ Deployment time reduced to &lt;5 minutes</li>
+                <li>☐ Rollback procedure tested and working</li>
+                <li>☐ Zero failed deployments due to inconsistency</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Overall Timeline</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Phase 0 (Current)</strong>: Documentation & decisions (this session)</li>
+                <li><strong>Phases 1-2</strong>: Docker local setup (2-3 weeks)</li>
+                <li><strong>Phase 3</strong>: CI/CD automation (2-3 weeks)</li>
+                <li><strong>Phases 4-5</strong>: Testing & production deployment (4-6 weeks)</li>
+                <li><strong>Phases 6-7</strong>: Kubernetes implementation (7-10 weeks)</li>
+                <li><strong>Total</strong>: 4-6 months for full migration to K8s</li>
+            </ul>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Overall Impact</strong>: Deployment time reduced from 20+ minutes to &lt;1 minute; zero-downtime updates; automatic scaling capability; infrastructure future-proofed for cloud migration</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Next Steps</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Immediate Actions</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Review this document</strong> with team</li>
+                <li><strong>Finalize open decisions</strong>:
+                    <ul>
+                        <li>Kubernetes distribution (MicroK8s vs Rancher vs other)</li>
+                        <li>Storage solution for persistent data</li>
+                        <li>Deployment strategy (blue-green vs rolling updates)</li>
+                        <li>Testing approach (what tests run in CI)</li>
+                    </ul>
+                </li>
+                <li><strong>When ready for Phase 1</strong>: I'll create Dockerfile, docker-compose.yml, and setup guide</li>
+            </ol>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--info-color); font-family: var(--header-font);">Recommendation for Next Session</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">When ready to proceed, start with <strong>Phase 1: Docker Local Development</strong>. This will fix the port mapping issue immediately and establish the foundation for all subsequent phases. All work in Phase 1 is reversible, making it a safe, low-risk entry point.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">Document Status</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status</strong>: Strategic Planning Phase (Phase 0) Complete</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Review Status</strong>: Team consensus recorded on: Container Registry (GitHub), CI/CD Platform (GitHub Actions), Database Strategy (Separate Server), Developer Workflow (Simple, no branches currently)</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Editing</strong>: This document is maintained in .tt format (official documentation). Update via version control workflow. Increment page_version and last_updated on changes.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Document Purpose</strong>: Living strategic blueprint for Docker & Kubernetes adoption. Update this document as phases complete and decisions are made.</p>
+                <p><strong>For Future Sessions</strong>: This document contains the complete roadmap. Refer to the relevant phase section to understand context and deliverables.</p>
+                <p><em>This documentation is part of the Comserv system's infrastructure planning.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
