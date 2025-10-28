@@ -1,0 +1,79 @@
+# Git files
+.git
+.gitignore
+.gitmodules
+.github
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+.codebuddy
+
+# Docker files (don't include in context)
+docker-compose.yml
+docker-compose.override.yml
+Dockerfile
+.dockerignore
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+
+# Test files
+t/
+*.test
+*.t
+
+# Build artifacts
+build/
+dist/
+.build/
+
+# Development files
+.env
+.env.local
+.env.*.local
+.cache
+
+# Node modules (if any frontend build)
+node_modules/
+npm-debug.log
+
+# Database dumps
+*.sql
+*.sql.gz
+backups/
+
+# Temporary files
+.qodo/
+temp_files/
+*.tmp
+*.log
+
+# Python files (if not needed)
+*.pyc
+__pycache__/
+*.egg-info/
+.python-version
+
+# Large files that don't need to be in image
+Comserv/backups/*
+Comserv/local/.cpan/*
+Comserv/local/man/*
+.docker/
+
+# Session/cache files
+Comserv/root/session/*
+Comserv/root/log/*
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
