@@ -1,0 +1,314 @@
+[% META
+        title = "Node.js Setup Guide"
+   description = "Comprehensive guide for installing and configuring Node.js 20 LTS for Comserv development, PyCharm integration, and Docker deployment"
+   roles = "developer,admin"
+   TemplateType = "Documentation"
+   category = "deployment"
+   page_version = "1.0"
+   last_updated = "Wed Oct 29 07:57:10 AM PDT 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/deployment/nodejs_setup_guide.tt,v 1.0 07:57:10 2025/10/29 zencoder Exp - Node.js Setup Guide' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Node.js Setup Guide for Comserv</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-10-29 | 
+        Version: 1.0 | 
+        Author: Zencoder | 
+        Status: Active
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This guide provides comprehensive instructions for installing and configuring Node.js 20 LTS for Comserv development. Node.js enables Zencoder agents to run in the project environment, supporting both local development and Docker containerized deployments.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Linux/Unix system (Ubuntu 20.04+)</li>
+                <li>sudo access for package installation</li>
+                <li>PyCharm IDE (2025.2 or later)</li>
+                <li>Docker and Docker Compose (for container deployment)</li>
+                <li>Internet connectivity for package downloads</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Consistent Environment</strong>: All developers use Node.js v20 LTS</li>
+                <li><strong>Local Development</strong>: Full IDE integration with PyCharm</li>
+                <li><strong>Docker Support</strong>: Same versions in containerized deployments</li>
+                <li><strong>Agent Runtime</strong>: Zencoder agents can execute Node.js code</li>
+                <li><strong>npm Integration</strong>: Package management with version locking</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Quick Start (5 Minutes)</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Option A: Automated Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The fastest way to get Node.js running on your system:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+bash /home/shanta/PycharmProjects/comserv2/scripts/setup-nodejs.sh
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">This script automatically:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Detects your system configuration</li>
+                <li>Installs Node.js v20 LTS if needed</li>
+                <li>Installs npm v10+</li>
+                <li>Verifies installation</li>
+                <li>Provides PyCharm configuration instructions</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Option B: Manual Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Follow these steps for manual installation:</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Local Development Setup</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Install Node.js via NodeSource</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This is the recommended approach for team consistency:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Install NodeSource repository
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+# Install Node.js
+sudo apt-get install -y nodejs
+
+# Verify installation
+node --version    # Should show v20.x.x
+npm --version     # Should show 10.x.x
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Install Project Dependencies</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Install npm packages for the Comserv project:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+cd /home/shanta/PycharmProjects/comserv2
+npm install
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Configure PyCharm IDE</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Configure PyCharm to recognize the Node.js interpreter:</p>
+            
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Open PyCharm and go to <strong>File > Settings</strong></li>
+                <li>Navigate to <strong>Languages &amp; Frameworks > Node.js and NPM</strong></li>
+                <li>Click the folder icon next to "Node interpreter:"</li>
+                <li>Select "Add" → "Add Local"</li>
+                <li>Browse to <strong>/usr/bin/node</strong></li>
+                <li>Set npm to <strong>/usr/bin/npm</strong></li>
+                <li>Click "OK" and restart PyCharm</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Verify Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Test that everything is working:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# From PyCharm Terminal, test Node.js
+node --version
+npm --version
+npm list
+
+# Should display installed packages without errors
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Docker Integration</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Update Dockerfile</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Add Node.js to the Comserv Dockerfile for consistency across all containers:</p>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">Edit <strong>/home/shanta/PycharmProjects/comserv2/Comserv/Dockerfile</strong>:</p>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>After line 22 (builder stage):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Install Node.js LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest && \
+    rm -rf /var/lib/apt/lists/*
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>After line 49 (runtime stage):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Install Node.js LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest && \
+    rm -rf /var/lib/apt/lists/*
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Rebuild Docker Images</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">After updating the Dockerfile, rebuild the containers:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+docker-compose build --no-cache
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Verify Docker Node.js</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Test that Node.js is available in the container:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+docker-compose exec web-dev node --version
+docker-compose exec web-dev npm --version
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Project Configuration</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Create package.json</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">If not already present, create a package.json in the project root:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+{
+  "name": "comserv-zencoder-agents",
+  "version": "1.0.0",
+  "description": "Zencoder agent environment for Comserv",
+  "type": "module",
+  "scripts": {
+    "start": "node agents/index.js",
+    "dev": "NODE_ENV=development node agents/index.js",
+    "install-agents": "npm install",
+    "list-agents": "ls -la .qodo/agents/"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0"
+  },
+  "engines": {
+    "node": "&gt;=20.0.0",
+    "npm": "&gt;=10.0.0"
+  }
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Create .env.agents File</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create environment configuration for agent execution:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+NODE_ENV=development
+AGENT_DEBUG=1
+AGENT_PORT=4000
+COMSERV_API_URL=http://localhost:3000
+AGENT_TIMEOUT=30000
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Node.js Not Found in PyCharm</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">If PyCharm doesn't recognize Node.js:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Clear PyCharm cache
+rm -rf ~/.cache/JetBrains/PyCharm2025.2
+
+# Restart PyCharm
+# Reconfigure Node interpreter in Settings
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">npm Permissions Error</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">If you encounter permission issues with npm:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+export PATH=~/.npm-global/bin:$PATH
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Build Fails</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">If Docker build encounters issues:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+docker system prune -a
+docker-compose build --no-cache
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Verification Checklist</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ Node.js v20 LTS installed locally (<code>node --version</code>)</li>
+                <li>☐ npm v10+ installed (<code>npm --version</code>)</li>
+                <li>☐ PyCharm Node interpreter configured</li>
+                <li>☐ <code>package.json</code> created in project root</li>
+                <li>☐ Dependencies installed (<code>npm install</code>)</li>
+                <li>☐ <code>.env.agents</code> file created</li>
+                <li>☐ Dockerfile updated with Node.js installation</li>
+                <li>☐ Docker images rebuilt successfully</li>
+                <li>☐ Node.js available in Docker container</li>
+                <li>☐ All team members have completed local setup</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Environment Standards</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">All Comserv development environments use standardized versions:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Node.js</strong>: v20 LTS (Long Term Support)</li>
+                <li><strong>npm</strong>: v10+</li>
+                <li><strong>Dependency Management</strong>: package-lock.json committed to git</li>
+                <li><strong>CI/CD</strong>: Uses npm ci for locked dependencies</li>
+                <li><strong>Development</strong>: Uses npm install for flexibility</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
