@@ -1,309 +1,79 @@
-# ===================================================================
-# Comserv Docker Management Makefile
-# ===================================================================
-# Usage: make -f Makefile.docker <target>
-# Or copy to Makefile: cp Makefile.docker Makefile
-#
-# Common targets:
-#   make help              - Show all available targets
-#   make dev               - Start development environment
-#   make prod              - Start production environment
-#   make down              - Stop all services
-#   make logs              - View application logs
-#   make shell             - Access application container shell
+.PHONY: help dev prod up down logs shell db-shell cache-clear test health
 
-.PHONY: help dev prod staging down logs shell clean rebuild \
-        db-backup db-restore db-shell cache-clear test lint \
-        security-scan status health monitoring
-
-# Default target
-DEFAULT_ENV ?= .env.development
 COMPOSE := docker-compose
 
-# ===================================================================
-# Display Help
-# ===================================================================
 help:
 	@echo "Comserv Docker Management"
 	@echo "=========================="
 	@echo ""
+	@echo "Usage: make <target>"
+	@echo ""
 	@echo "Environment Targets:"
 	@echo "  make dev              - Start development environment"
 	@echo "  make prod             - Start production environment"
-	@echo "  make staging          - Start staging environment"
 	@echo ""
 	@echo "Service Management:"
 	@echo "  make up               - Start all services"
 	@echo "  make down             - Stop all services"
-	@echo "  make down-v           - Stop services and remove volumes"
-	@echo "  make restart          - Restart all services"
+	@echo "  make restart          - Restart services"
 	@echo "  make build            - Build Docker images"
-	@echo "  make rebuild          - Rebuild Docker images (no cache)"
-	@echo "  make status           - Show service status"
-	@echo "  make logs             - View application logs (tail -f)"
+	@echo "  make logs             - View application logs"
 	@echo ""
 	@echo "Database Operations:"
-	@echo "  make db-shell         - Connect to MySQL shell"
-	@echo "  make db-backup        - Create database backup"
-	@echo "  make db-restore       - Restore from backup (specify FILE=path/to/backup.sql)"
-	@echo "  make db-init          - Initialize database"
-	@echo ""
-	@echo "Cache Management:"
-	@echo "  make cache-clear      - Clear Redis cache"
-	@echo "  make cache-stats      - Show Redis statistics"
+	@echo "  make db-shell         - Connect to MySQL"
+	@echo "  make db-backup        - Backup database"
 	@echo ""
 	@echo "Container Access:"
 	@echo "  make shell            - Access application shell"
-	@echo "  make shell-db         - Access database container"
-	@echo "  make shell-redis      - Access Redis container"
-	@echo ""
-	@echo "Development:"
-	@echo "  make test             - Run test suite"
-	@echo "  make lint             - Check code style"
-	@echo "  make clean            - Clean build artifacts"
 	@echo ""
 	@echo "Monitoring:"
 	@echo "  make health           - Run health checks"
-	@echo "  make monitoring       - Show resource monitoring"
-	@echo "  make security-scan    - Run security scan"
-	@echo ""
+	@echo "  make monitoring       - Show resource usage"
 
-# ===================================================================
-# Environment Presets
-# ===================================================================
 dev:
 	$(COMPOSE) --env-file .env.development up -d
 	@echo "✓ Development environment started"
-	@echo "  Web: http://localhost:3000"
-	@echo "  Database: localhost:3306"
-	@echo "  Redis: localhost:6379"
 
 prod:
 	$(COMPOSE) --env-file .env.production up -d
 	@echo "✓ Production environment started"
-	@echo "  Access via: http://comserv.example.com"
 
-staging:
-	$(COMPOSE) --env-file .env.staging up -d 2>/dev/null || \
-	$(COMPOSE) --env-file .env.example up -d
-	@echo "✓ Staging environment started"
-
-# ===================================================================
-# Service Management
-# ===================================================================
 up:
 	$(COMPOSE) up -d
-	@echo "✓ All services started"
 
 down:
 	$(COMPOSE) down
-	@echo "✓ All services stopped"
-
-down-v:
-	$(COMPOSE) down -v
-	@echo "✓ All services stopped and volumes removed"
 
 restart:
 	$(COMPOSE) restart
-	@echo "✓ All services restarted"
 
 build:
 	$(COMPOSE) build
-	@echo "✓ Docker images built"
-
-rebuild:
-	$(COMPOSE) build --no-cache
-	@echo "✓ Docker images rebuilt (no cache)"
-
-status:
-	$(COMPOSE) ps
-	@echo ""
-	@echo "Service Status Legend:"
-	@echo "  healthy   - Service is running and healthy"
-	@echo "  starting  - Service is initializing"
-	@echo "  exited    - Service has stopped"
 
 logs:
 	$(COMPOSE) logs -f --tail=100
 
-logs-web:
-	$(COMPOSE) logs -f --tail=100 web
-
-logs-db:
-	$(COMPOSE) logs -f --tail=100 database
-
-logs-redis:
-	$(COMPOSE) logs -f --tail=100 redis
-
-logs-nginx:
-	$(COMPOSE) logs -f --tail=100 nginx
-
-# ===================================================================
-# Database Operations
-# ===================================================================
 db-shell:
 	$(COMPOSE) exec database mysql -u comserv -p
 
 db-backup:
 	@mkdir -p ./.docker/backups
-	$(COMPOSE) exec database mysqldump -u comserv -pcomserv_pass \
-		--all-databases --single-transaction > \
-		./.docker/backups/backup-$$(date +%Y%m%d-%H%M%S).sql
-	@echo "✓ Database backed up to ./.docker/backups/"
+	$(COMPOSE) exec database mysqldump -u comserv -pcomserv_pass --all-databases > ./.docker/backups/backup-$$(date +%Y%m%d-%H%M%S).sql
 
-db-restore:
-	@if [ -z "$(FILE)" ]; then \
-		echo "Error: Please specify FILE=path/to/backup.sql"; \
-		exit 1; \
-	fi
-	@echo "Restoring from $(FILE)..."
-	$(COMPOSE) exec -T database mysql -u comserv -pcomserv_pass < $(FILE)
-	@echo "✓ Database restored"
-
-db-init:
-	$(COMPOSE) exec database mysql -u comserv -pcomserv_pass comserv \
-		< Comserv/sql/schema.sql 2>/dev/null || \
-	echo "Note: Schema may already exist or be auto-initialized"
-	@echo "✓ Database initialization attempted"
-
-# ===================================================================
-# Cache Management
-# ===================================================================
 cache-clear:
 	$(COMPOSE) exec redis redis-cli -a redispass FLUSHALL
-	@echo "✓ Redis cache cleared"
 
-cache-stats:
-	$(COMPOSE) exec redis redis-cli -a redispass INFO stats
-	@echo ""
-	@echo "✓ Redis statistics displayed"
-
-# ===================================================================
-# Container Access
-# ===================================================================
 shell:
 	$(COMPOSE) exec web bash
 
-shell-db:
-	$(COMPOSE) exec database bash
-
-shell-redis:
-	$(COMPOSE) exec redis sh
-
-# ===================================================================
-# Development & Testing
-# ===================================================================
-test:
-	@echo "Running test suite..."
-	$(COMPOSE) exec web perl -Ilib t/01app.t
-	@echo "✓ Tests completed"
-
-test-all:
-	@echo "Running all tests..."
-	$(COMPOSE) exec web perl -Ilib -e \
-		'use Test::Harness; runtests(glob("t/*.t"))'
-	@echo "✓ All tests completed"
-
-lint:
-	@echo "Checking code style..."
-	$(COMPOSE) exec web perl -c Comserv/lib/Comserv.pm
-	@echo "✓ Perl syntax check passed"
-
-clean:
-	@echo "Cleaning build artifacts..."
-	find . -name "*.o" -delete
-	find . -name "*.so" -delete
-	find . -name ".DS_Store" -delete
-	@echo "✓ Cleanup complete"
-
-# ===================================================================
-# Monitoring & Health
-# ===================================================================
 health:
 	@echo "Running health checks..."
-	@echo ""
-	@echo "Web service:"
-	@curl -s -f http://localhost:3000/ > /dev/null && \
-		echo "  ✓ Web service responding" || \
-		echo "  ✗ Web service NOT responding"
-	@echo ""
-	@echo "Database:"
-	@$(COMPOSE) exec database mysqladmin -u comserv -pcomserv_pass ping > /dev/null 2>&1 && \
-		echo "  ✓ Database is responsive" || \
-		echo "  ✗ Database NOT responding"
-	@echo ""
-	@echo "Redis:"
-	@$(COMPOSE) exec redis redis-cli -a redispass ping > /dev/null 2>&1 && \
-		echo "  ✓ Redis is responsive" || \
-		echo "  ✗ Redis NOT responding"
+	@curl -s http://localhost:3000/ && echo "✓ Web service OK" || echo "✗ Web service down"
+	@$(COMPOSE) exec database mysqladmin -u comserv -pcomserv_pass ping && echo "✓ Database OK" || echo "✗ Database down"
+	@$(COMPOSE) exec redis redis-cli -a redispass ping && echo "✓ Redis OK" || echo "✗ Redis down"
 
 monitoring:
-	@echo "Container Resource Usage:"
-	@echo "================================"
 	docker stats --no-stream
 
-# ===================================================================
-# Security
-# ===================================================================
-security-scan:
-	@echo "Running security scan..."
-	@echo "Checking for exposed credentials..."
-	@grep -r "password\s*=" Comserv/ --include="*.pm" --include="*.pl" | \
-		grep -v "^\s*//" | grep -v "^\s*#" || echo "  ✓ No hardcoded passwords found"
-	@echo ""
-	@echo "Checking for security issues..."
-	@$(COMPOSE) exec web perl -c Comserv/lib/Comserv.pm
-	@echo "  ✓ Syntax check passed"
-
-# ===================================================================
-# Docker Image Management
-# ===================================================================
-images:
-	docker images | grep comserv
-
-prune:
-	@echo "Pruning unused Docker resources..."
-	docker image prune -f
-	docker volume prune -f
-	docker network prune -f
-	@echo "✓ Pruning complete"
-
-# ===================================================================
-# Push to Registry (optional)
-# ===================================================================
-push:
-	@if [ -z "$(REGISTRY)" ]; then \
-		echo "Error: Please specify REGISTRY=your.registry.com"; \
-		exit 1; \
-	fi
-	docker tag comserv:latest $(REGISTRY)/comserv:latest
-	docker push $(REGISTRY)/comserv:latest
-	@echo "✓ Image pushed to $(REGISTRY)"
-
-pull:
-	@if [ -z "$(REGISTRY)" ]; then \
-		echo "Error: Please specify REGISTRY=your.registry.com"; \
-		exit 1; \
-	fi
-	docker pull $(REGISTRY)/comserv:latest
-	docker tag $(REGISTRY)/comserv:latest comserv:latest
-	@echo "✓ Image pulled from $(REGISTRY)"
-
-# ===================================================================
-# Useful Utilities
-# ===================================================================
-psql:
-	$(COMPOSE) exec database psql -U postgres
-
-redis-cli:
-	$(COMPOSE) exec redis redis-cli -a redispass
-
-version:
-	@echo "Version Information:"
-	@docker --version
-	@docker-compose --version
-	@$(COMPOSE) exec web perl -v 2>/dev/null | head -5
-
-# Default to help if no target specified
-%:
-	@$(MAKE) -f Makefile.docker help
+test:
+	$(COMPOSE) exec web perl -Ilib t/01app.t

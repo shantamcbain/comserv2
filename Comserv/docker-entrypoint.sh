@@ -12,6 +12,30 @@ rm -f /var/run/supervisor.sock /var/run/supervisord.pid
 mkdir -p ${CATALYST_HOME}/root/log /var/log/supervisor
 chmod 755 ${CATALYST_HOME}/root/log /var/log/supervisor
 
+# Create base supervisord.conf if missing or empty
+if [ ! -s /etc/supervisor/supervisord.conf ]; then
+    mkdir -p /etc/supervisor/conf.d
+    cat > /etc/supervisor/supervisord.conf << 'EOFBASE'
+[unix_http_server]
+file=/var/run/supervisor.sock
+
+[supervisorctl]
+serverurl=unix:///var/run/supervisor.sock
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisord]
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord.pid
+nodaemon=true
+user=root
+
+[include]
+files=/etc/supervisor/conf.d/*.conf
+EOFBASE
+fi
+
 # Generate supervisor config with dynamic port
 bash ${CATALYST_HOME}/create-supervisor-config.sh
 

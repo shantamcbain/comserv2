@@ -7,36 +7,21 @@ FROM ${BASE_IMAGE} as builder
 
 # Install system dependencies for building and running Comserv
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Build tools
-    build-essential \
-    curl \
-    git \
-    wget \
-    # Database and network tools
-    mysql-client \
-    libmysqlclient-dev \
-    libssl-dev \
-    libmariadb-dev \
-    # Required libraries
-    libexpat-dev \
-    zlib1g-dev \
-    libjson-c-dev \
-    libxml2-dev \
-    # Utilities
-    locales \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential curl git wget pkg-config mariadb-client libmariadb-dev \
+    libssl-dev libexpat-dev zlib1g-dev libjson-c-dev \
+    libxml2-dev locales ca-certificates \
+    libc-dev libgdbm-dev libbz2-dev libdb-dev \
+    perl-doc cpanplus && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set locale
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-# Install cpanm (CPAN client)
+# Install cpanm
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
 
-# Create application directory structure
+# Create application directory
 WORKDIR /opt/comserv
 ENV PERL_LOCAL_LIB_ROOT=/opt/comserv/local
 ENV PERL5LIB=/opt/comserv/local/lib/perl5:$PERL5LIB
@@ -45,128 +30,80 @@ ENV PATH=/opt/comserv/local/bin:$PATH
 # Copy application files
 COPY . .
 
-# Create local lib directory for local installations
+# Create local lib directory
 RUN mkdir -p /opt/comserv/local/lib/perl5
 
-# Install all CPAN dependencies from cpanfile
-RUN cpanm --local-lib=/opt/comserv/local --installdeps . && \
-    cpanm --local-lib=/opt/comserv/local --reinstall --force YAML::XS JSON::XS
+# Install CPAN dependencies
+RUN cpanm --local-lib=/opt/comserv/local --notest --installdeps . && \
+    cpanm --local-lib=/opt/comserv/local --reinstall --force --notest YAML::XS JSON::XS
 
-# Verify critical modules are installed
-RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded successfully\n"'
+# Verify critical modules
+RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded\n"'
 
 # ===================================================================
-# Stage 2: Runtime image (minimal size)
+# Stage 2: Runtime image
 FROM ${BASE_IMAGE}
 
-# Install only runtime dependencies (minimal)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Runtime essentials
-    mysql-client \
-    libmysqlclient21 \
-    libssl3 \
-    libxml2 \
-    # Utilities
-    curl \
-    locales \
-    ca-certificates \
-    # Process management
-    supervisor \
-    && rm -rf /var/lib/apt/lists/*
+    bash mariadb-client libmariadb3 libssl3 libxml2 curl locales \
+    ca-certificates supervisor && rm -rf /var/lib/apt/lists/*
 
-# Set locale
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
-    locale-gen en_US.UTF-8
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-# Create application user (security best practice)
-RUN useradd -m -s /bin/bash comserv && \
-    mkdir -p /opt/comserv && \
+# Create application user
+RUN useradd -m -s /bin/bash comserv && mkdir -p /opt/comserv && \
     chown -R comserv:comserv /opt/comserv
 
-# Set working directory
 WORKDIR /opt/comserv
 
-# Copy pre-built application and local lib from builder stage
+# Copy from builder
 COPY --from=builder --chown=comserv:comserv /opt/comserv /opt/comserv
 
-# Set environment variables
+# Set environment
 ENV PERL_LOCAL_LIB_ROOT=/opt/comserv/local
 ENV PERL5LIB=/opt/comserv/local/lib/perl5:$PERL5LIB
 ENV PATH=/opt/comserv/local/bin:/opt/comserv/script:$PATH
-ENV CATALYST_ENV=production
-ENV CATALYST_DEBUG=0
+ENV CATALYST_ENV=production CATALYST_DEBUG=0
+ENV CPANM_HOME=/opt/comserv/.cpanm
 
-# Create necessary directories with proper permissions
-RUN mkdir -p /opt/comserv/root/log && \
-    mkdir -p /opt/comserv/root/session && \
-    mkdir -p /opt/comserv/backups && \
+# Create directories
+RUN mkdir -p /opt/comserv/root/log /opt/comserv/root/session \
+    /opt/comserv/backups /opt/comserv/.cpanm && \
     chown -R comserv:comserv /opt/comserv
 
-# Create supervisor configuration directory
+# Create marker file to prevent runtime module re-installation
+# (all modules are pre-installed in build stage)
+RUN touch /opt/comserv/local/.modules_installed && \
+    chmod 666 /opt/comserv/local/.modules_installed
+
+# Create supervisor base configuration
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Add supervisor configuration for Starman
-COPY <<'EOF' /etc/supervisor/conf.d/comserv.conf
-[program:comserv-starman]
-command=/opt/comserv/local/bin/starman --workers=4 --port=3000 --app /opt/comserv/script/comserv_server.pl
-directory=/opt/comserv
-user=comserv
-environment=CATALYST_ENV=production,PERL5LIB=/opt/comserv/local/lib/perl5
-autostart=true
-autorestart=true
-startsecs=10
-stopasgroup=true
-stdout_logfile=/opt/comserv/root/log/starman.log
-stderr_logfile=/opt/comserv/root/log/starman_error.log
-EOF
+# Copy supervisor base config (heredoc doesn't work reliably in Docker)
+COPY supervisord.conf /etc/supervisor/supervisord.conf
+RUN chmod 644 /etc/supervisor/supervisord.conf
 
-# Health check script
+# Copy startup script that generates supervisor config with dynamic port
+COPY create-supervisor-config.sh /opt/comserv/create-supervisor-config.sh
+RUN chmod +x /opt/comserv/create-supervisor-config.sh && \
+    chown comserv:comserv /opt/comserv/create-supervisor-config.sh
+
+# Health check - will check dynamic port
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+    CMD PORT=${WEB_PORT:-3000} && curl -f http://localhost:$PORT/ || exit 1
 
-# Expose port
-EXPOSE 3000
+EXPOSE 3000 5000
 
-# Create startup script
-RUN cat > /opt/comserv/docker-entrypoint.sh << 'EOF'
-#!/bin/bash
-set -e
+# Copy entrypoint script from host (with proper permissions)
+COPY docker-entrypoint.sh /opt/comserv/docker-entrypoint.sh
+RUN chmod +x /opt/comserv/docker-entrypoint.sh && chown comserv:comserv /opt/comserv/docker-entrypoint.sh
 
-# Verify database connection
-if [ -n "$DB_HOST" ]; then
-    echo "Waiting for database at $DB_HOST:${DB_PORT:-3306}..."
-    until nc -z "$DB_HOST" "${DB_PORT:-3306}"; do
-        echo "Database is unavailable - sleeping..."
-        sleep 1
-    done
-    echo "Database is available!"
-fi
-
-# Initialize database if needed
-if [ ! -f "/opt/comserv/.db_initialized" ]; then
-    echo "Initializing database..."
-    cd /opt/comserv
-    perl script/initialize_db.pl 2>&1 || echo "Database may already be initialized"
-    touch /opt/comserv/.db_initialized
-fi
-
-# Start supervisor
-exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
-EOF
-
-RUN chmod +x /opt/comserv/docker-entrypoint.sh && \
-    chown comserv:comserv /opt/comserv/docker-entrypoint.sh
-
-# Switch to non-root user
-USER comserv
-
-# Use entrypoint script
+# Don't switch to comserv user - entrypoint runs as root to configure supervisor,
+# then supervisord handles dropping privileges for app processes
 ENTRYPOINT ["/opt/comserv/docker-entrypoint.sh"]
 CMD []
 
-# Labels for metadata
 LABEL maintainer="Comserv Development Team"
 LABEL description="Comserv Catalyst Web Application - Production Container"
 LABEL version="1.0"
