@@ -110,6 +110,8 @@ Comserv/script/test_load.pl
 
 # Working copies and implementation summaries (Zencoder convenience files)
 *.md
+!.github/*.md
+!.github/workflows/
 AI_CONTROLLER_IMPLEMENTATION_SUMMARY.md
 *.md.new
 

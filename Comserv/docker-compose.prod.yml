@@ -1,0 +1,94 @@
+version: '3.9'
+
+services:
+  web-prod:
+    image: ghcr.io/${{ secrets.IMAGE_REGISTRY }}/comserv:latest
+    container_name: comserv-web-prod
+    restart: always
+    environment:
+      CATALYST_ENV: production
+      CATALYST_DEBUG: 0
+      WEB_PORT: 5000
+      TZ: UTC
+      # Production database configuration
+      DB_HOST: ${DB_HOST_PROD:-db-prod.example.com}
+      DB_PORT: ${DB_PORT_PROD:-3306}
+      DB_NAME: ${DB_NAME_PROD:-comserv_production}
+      DB_USER: ${DB_USER_PROD:-comserv}
+      DB_PASS: ${DB_PASS_PROD}
+      # Production features
+      ENABLE_MONITORING: 1
+      ENABLE_LOGGING: 1
+    ports:
+      - "5000:5000"
+    volumes:
+      # Code is read-only in production
+      - ./lib:/opt/comserv/lib:ro
+      - ./script:/opt/comserv/script:ro
+      - ./root:/opt/comserv/root:ro
+      - ./config:/opt/comserv/config:ro
+      - ./t:/opt/comserv/t:ro
+      # Config (read-only)
+      - ./db_config.json:/opt/comserv/db_config.json:ro
+      # Persistent volumes for critical data
+      - comserv-prod-logs:/opt/comserv/root/log
+      - comserv-prod-sessions:/opt/comserv/root/session
+      - comserv-prod-backups:/opt/comserv/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    # Production resource allocation
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    # Extra hosts for multi-server setup (if needed)
+    extra_hosts:
+      - "db-prod.example.com:${DB_HOST_PROD_IP}"
+
+  # Optional: Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: comserv-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - web-prod
+    networks:
+      - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  comserv-prod-logs:
+    driver: local
+  comserv-prod-sessions:
+    driver: local
+  comserv-prod-backups:
+    driver: local
+
+networks:
+  comserv-network:
+    driver: bridge
