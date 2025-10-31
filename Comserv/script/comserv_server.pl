@@ -89,10 +89,19 @@ unless (-d "$FindBin::Bin/../local") {
     mkdir "$FindBin::Bin/../local" or die "Could not create local directory: $!";
 }
 
-# Automatically install dependencies locally
-print "Installing dependencies from cpanfile...\n";
+# Check if we've already installed modules (to prevent infinite loops and unnecessary reinstalls)
+my $install_marker = "$FindBin::Bin/../local/.modules_installed";
+my $already_installed = -e $install_marker;
+
+if ($already_installed) {
+    print "Modules already installed (marker file found). Skipping installation.\n";
+} else {
+    # Automatically install dependencies locally
+    print "Installing dependencies from cpanfile...\n";
+}
+
 my $cpanfile_path = "$FindBin::Bin/../cpanfile";
-if (-e $cpanfile_path) {
+if (-e $cpanfile_path && !$already_installed) {
     print "Found cpanfile at: $cpanfile_path\n";
 
     # Check if cpanm is installed
@@ -223,7 +232,7 @@ if (-e $cpanfile_path) {
 
 # Specifically install Catalyst::ScriptRunner if not already installed
 eval { require Catalyst::ScriptRunner; };
-if ($@) {
+if ($@ && !$already_installed) {
     print "Installing Catalyst::ScriptRunner...\n";
     my $result = system("cpanm --local-lib=$FindBin::Bin/../local Catalyst::ScriptRunner");
 
@@ -271,9 +280,8 @@ my $need_restart = 0;
 # Ensure local lib paths are in @INC before checking modules (already done in BEGIN block)
 # Architecture-specific paths are also already added in BEGIN block
 
-# Check if we've already tried installing modules (to prevent infinite loops)
-my $install_marker = "$FindBin::Bin/../local/.modules_installed";
-my $already_tried_install = -e $install_marker;
+# Use $already_installed defined earlier to prevent trying to install modules if already done
+my $already_tried_install = $already_installed;
 
 # Special handling for YAML modules with fallback options
 my $yaml_module_loaded = 0;

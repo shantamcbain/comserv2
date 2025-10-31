@@ -10,7 +10,7 @@ services:
     environment:
       CATALYST_ENV: development
       CATALYST_DEBUG: 1
-      CATALYST_HOME: /opt/comserv
+      CATALYST_HOME: ${CATALYST_HOME}
       WEB_PORT: 3000
       TZ: ${TZ:-UTC}
     ports:
@@ -42,7 +42,7 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
-      CATALYST_HOME: /opt/comserv
+      CATALYST_HOME: ${CATALYST_HOME}
       WEB_PORT: 5000
       TZ: ${TZ:-UTC}
     ports:

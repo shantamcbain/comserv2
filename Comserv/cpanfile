@@ -16,7 +16,7 @@ requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-requires 'DBD::mysql';
+requires 'DBD::MariaDB';
 requires 'Object::Signature';
 #json
 requires 'JSON';
