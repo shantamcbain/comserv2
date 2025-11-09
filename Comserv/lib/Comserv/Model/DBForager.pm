@@ -41,11 +41,25 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('shanta_forager');
     };
 
+    # Fallback to SQLite if primary connections fail
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
             "DBForager: Failed to get connection from RemoteDB: $error");
-        die "DBForager: Failed to establish database connection: $error";
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager: Falling back to SQLite offline mode");
+        
+        # Create a fallback SQLite connection
+        $connection_info = {
+            connection_name => 'sqlite_forager_fallback',
+            config => {
+                db_type => 'sqlite',
+                database_path => 'data/forager_offline.db',
+                description => 'SQLite Fallback - Forager Database (offline mode)',
+                priority => 999
+            },
+            database_name => 'shanta_forager'
+        };
     }
 
     # Extract connection details from RemoteDB
@@ -105,12 +119,28 @@ sub COMPONENT {
             quote_char => '`',
         };
     } else {
+        # Use the appropriate driver (mysql or mariadb)
+        my $driver = $db_type eq 'mariadb' ? 'MariaDB' : 'mysql';
         $connect_info = {
-            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
             password => $conn->{password},
             mysql_enable_utf8 => 1,
-            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+            # CRITICAL: Add timeouts to prevent workers from hanging indefinitely
+            mysql_connect_timeout => 10,     # Connection timeout: 10 seconds
+            mysql_read_timeout => 30,        # Query read timeout: 30 seconds
+            mysql_write_timeout => 30,       # Query write timeout: 30 seconds
+            # Error handling
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+            on_connect_do => [
+                "SET NAMES 'utf8'",
+                "SET CHARACTER SET 'utf8'",
+                "SET SESSION max_execution_time=60000",  # 60 second max query time (milliseconds)
+                "SET SESSION net_read_timeout=30",
+                "SET SESSION net_write_timeout=30",
+            ],
             quote_char => '`',
         };
     }

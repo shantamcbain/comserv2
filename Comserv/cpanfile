@@ -20,6 +20,7 @@ requires 'DBD::MariaDB';
 requires 'Object::Signature';
 #json
 requires 'JSON';
+requires 'JSON::XS';
 requires 'Config::JSON';
 
 # Template Toolkit and plugins
@@ -80,9 +81,7 @@ requires 'LWP::UserAgent';
 requires 'HTTP::Request';
 requires 'Try::Tiny';
 requires 'Text::Markdown';
-requires 'YAML::XS';
 requires 'YAML::Tiny';
-requires 'YAML::Syck';
 
 # Development and testing
 requires 'Term::ReadPassword';

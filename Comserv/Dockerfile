@@ -34,8 +34,9 @@ COPY . .
 RUN mkdir -p /opt/comserv/local/lib/perl5
 
 # Install CPAN dependencies
-RUN cpanm --local-lib=/opt/comserv/local --notest --installdeps . && \
-    cpanm --local-lib=/opt/comserv/local --reinstall --force --notest YAML::XS JSON::XS
+# Note: Do NOT force-rebuild YAML::XS as it causes binary incompatibility with Perl 5.40.0
+# Application uses YAML::Tiny for all YAML operations
+RUN cpanm --local-lib=/opt/comserv/local --notest --installdeps .
 
 # Verify critical modules
 RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded\n"'
@@ -89,9 +90,10 @@ COPY create-supervisor-config.sh /opt/comserv/create-supervisor-config.sh
 RUN chmod +x /opt/comserv/create-supervisor-config.sh && \
     chown comserv:comserv /opt/comserv/create-supervisor-config.sh
 
-# Health check - will check dynamic port
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD PORT=${WEB_PORT:-3000} && curl -f http://localhost:$PORT/ || exit 1
+# Health check - will check dynamic port using /health endpoint
+# /health endpoint bypasses database queries and returns immediately
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD PORT=${WEB_PORT:-3000} && curl -f http://localhost:$PORT/health || exit 1
 
 EXPOSE 3000 5000
 

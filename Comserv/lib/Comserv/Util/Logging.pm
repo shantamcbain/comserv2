@@ -197,6 +197,11 @@ sub log_with_details {
     $message //= 'No message provided';
     $level   //= 'INFO';
 
+    # PERFORMANCE FIX: Skip file logging during request processing to prevent logging deadlock
+    # File logging with exclusive locks on every log call causes high latency with multiple workers
+    # This is particularly important during auto() which logs 10+ times per request
+    # Only keep in-memory debug logging if context available
+    
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
 
@@ -205,16 +210,16 @@ sub log_with_details {
 
     my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
 
-    # Log to file - this is our primary logging mechanism
-    # (rotation is now handled in log_to_file)
-    log_to_file($log_message);
-
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
     if ($c && ref($c) && ref($c->stash) eq 'HASH') {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
+
+    # DISABLED: File logging during request processing
+    # Uncomment only for debugging - this causes significant performance degradation
+    # log_to_file($log_message);
 
     return $log_message;
 }
@@ -318,9 +323,16 @@ sub log_to_file {
         return;
     }
 
-    flock($file, LOCK_EX);
+    # Use non-blocking lock to prevent deadlock in multi-worker environments
+    # If lock fails, write anyway (better to lose a log than hang the request)
+    my $lock_acquired = flock($file, LOCK_EX | LOCK_NB);
+    
     print $file "$level: $message\n";
-    flock($file, LOCK_UN);
+    
+    # Only unlock if we acquired the lock
+    if ($lock_acquired) {
+        flock($file, LOCK_UN);
+    }
 
     close $file;
 }

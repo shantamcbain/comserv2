@@ -7,8 +7,24 @@ use LWP::UserAgent;
 use Try::Tiny;
 use Config::General;
 use File::Temp qw(tempfile);
-use IPC::Run3 qw(run3);
 use Path::Tiny qw(path);
+
+# Try to load IPC::Run3, but make it optional
+BEGIN {
+    eval {
+        require IPC::Run3;
+        IPC::Run3->import('run3');
+    };
+    if ($@) {
+        warn "Warning: IPC::Run3 module not available. Some proxy features may be limited.\n";
+        # Create a dummy run3 function as fallback
+        *run3 = sub {
+            warn "IPC::Run3 not available - run3 call cannot be executed\n";
+            return 0;
+        };
+    }
+}
+
 # Use flexible YAML loading with fallback options
 BEGIN {
     my $yaml_module;

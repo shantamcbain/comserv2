@@ -166,6 +166,17 @@ sub get_site_domain {
         # Try both SiteDomain and sitedomain table names (case sensitivity issue)
         my $site_domain;
 
+        # CRITICAL: Use alarm to prevent indefinite hangs (fallback to DB timeouts)
+        # Set 15 second timeout for entire operation
+        local $SIG{ALRM} = sub {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'get_site_domain',
+                "Query timeout after 15 seconds for domain: $domain"
+            );
+            die "Query timeout for domain lookup: $domain\n";
+        };
+        alarm(15);
+
         # First try with the original table name
         eval {
             $site_domain = $self->schema->resultset('SiteDomain')->find({ domain => $domain });
@@ -197,6 +208,9 @@ sub get_site_domain {
             }
         }
 
+        # Cancel the alarm since query completed
+        alarm(0);
+
         # If we found a domain, return it
         return $site_domain if $site_domain;
 
@@ -208,6 +222,7 @@ sub get_site_domain {
         return;
     } catch {
         my $error = $_;
+        alarm(0);  # Cancel alarm on error
         $self->logging->log_with_details(
             $c, 'error', __FILE__, __LINE__, 'get_site_domain',
             "Error looking up domain: $error"

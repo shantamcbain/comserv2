@@ -84,15 +84,28 @@ sub load_config {
 
         # Store pages
         $self->{pages} = $config->{pages} || [];
+        
+        # Ensure pages is an array
+        unless (ref $self->{pages} eq 'ARRAY') {
+            Comserv::Util::Logging::log_to_file(
+                "Warning: pages field is not an array, converting to empty array",
+                undef, 'WARN'
+            );
+            $self->{pages} = [];
+        }
 
         # Index pages by ID
         foreach my $page (@{$self->{pages}}) {
+            next unless ref $page eq 'HASH' && $page->{id};
+            
             $self->{pages_by_id}->{$page->{id}} = $page;
 
-            # Index pages by category
-            foreach my $category (@{$page->{categories}}) {
-                $self->{pages_by_category}->{$category} ||= [];
-                push @{$self->{pages_by_category}->{$category}}, $page;
+            # Index pages by category (safely)
+            if (ref $page->{categories} eq 'ARRAY') {
+                foreach my $category (@{$page->{categories}}) {
+                    $self->{pages_by_category}->{$category} ||= [];
+                    push @{$self->{pages_by_category}->{$category}}, $page;
+                }
             }
 
             # Index pages by site

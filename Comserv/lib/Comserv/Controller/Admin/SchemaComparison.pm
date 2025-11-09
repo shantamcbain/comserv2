@@ -601,7 +601,7 @@ sub get_active_database_connections {
                         $dsn = "dbi:SQLite:dbname=" . $config->{database_path};
                         $dbh = DBI->connect($dsn, "", "", { RaiseError => 0, PrintError => 0 });
                     } else {
-                        $dsn = "dbi:mysql:database=" . $config->{database} . 
+                        $dsn = "dbi:MariaDB:database=" . $config->{database} . 
                                ";host=" . $config->{host} . ";port=" . $config->{port};
                         $dbh = DBI->connect($dsn, $config->{username}, $config->{password}, 
                                           { RaiseError => 0, PrintError => 0 });
@@ -1687,7 +1687,7 @@ __PACKAGE__->add_columns(
 };
         
         # Add size if applicable
-        if ($field->{type} =~ /\((\d+)\)/) {
+        if ($field->{type} =~ /\((\d+)\)/s) {
             $content .= qq{        size => $1,
 };
         }

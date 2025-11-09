@@ -1135,7 +1135,7 @@ sub search :Path('/documentation/search') :Args(0) {
                         $matches_content = 1;
                         
                         # Create excerpt around the match
-                        my $match_pos = index(lc($content), lc($query));
+                        my $match_pos = CORE::index(lc($content), lc($query));
                         if ($match_pos >= 0) {
                             my $start = $match_pos > 100 ? $match_pos - 100 : 0;
                             my $end = $match_pos + length($query) + 100;

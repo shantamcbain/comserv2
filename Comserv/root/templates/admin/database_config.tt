@@ -1,0 +1,369 @@
+[% META
+        title = "Database Configuration Management"
+   description = "Admin interface for managing environment-specific database connections"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "admin"
+   page_version = "1.0"
+   last_updated = "Tue Nov 04 02:15:00 PM PST 2025"
+   site_specific = "true"
+%]
+[% PageVersion = 'templates/admin/database_config.tt,v 1.0 14:15:00 2025/11/04 shanta Exp shanta - Database Configuration Admin Interface' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Database Configuration Management</h1>
+            <p class="text-muted">Manage database connection profiles for different deployment environments</p>
+        </div>
+    </div>
+
+    [% IF message %]
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="alert alert-[% message_type == 'success' ? 'success' : 'danger' %] alert-dismissible fade show">
+                [% message %]
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+            </div>
+        </div>
+    </div>
+    [% END %]
+
+    <!-- Deployment Environment Guidance -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Environment Guidance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Production Server</h6>
+                            <p><small>Configure ONLY production connection profiles. Database is isolated from development/testing.</small></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Development Workstation</h6>
+                            <p><small>Configure production connection for testing plus local databases for isolation.</small></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Testing Server</h6>
+                            <p><small>Configure production connection for regression testing plus test-specific databases.</small></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Backup Server</h6>
+                            <p><small>Configure ONLY backup/archive connections - no production or development access.</small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Configuration Form -->
+    <form method="POST" action="[% c.uri_for('/admin/database-config') %]" class="mt-4">
+        
+        <!-- Production Connections -->
+        [% IF connection_profiles.production.size > 0 %]
+        <div class="card mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-server"></i> Production Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    [% FOREACH profile_name, profile_config IN connection_profiles.production %]
+                    <div class="col-md-6 mb-3">
+                        <fieldset class="border p-3 rounded">
+                            <legend class="w-auto px-2">
+                                <strong>[% profile_config.description %]</strong>
+                                <br><small class="text-muted">[% profile_config.notes %]</small>
+                            </legend>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_host">Host</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_host" 
+                                       name="db_[% profile_name %]_host" 
+                                       placeholder="[% profile_config.host %]"
+                                       [% IF profile_config.enabled %]required[% END %]>
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_port">Port</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_port" 
+                                       name="db_[% profile_name %]_port" 
+                                       value="[% profile_config.port || 3306 %]"
+                                       placeholder="[% profile_config.port || 3306 %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_database">Database</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_database" 
+                                       name="db_[% profile_name %]_database" 
+                                       placeholder="[% profile_config.database %]"
+                                       [% IF profile_config.enabled %]required[% END %]>
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_username">Username</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_username" 
+                                       name="db_[% profile_name %]_username" 
+                                       placeholder="[% profile_config.username %]"
+                                       [% IF profile_config.enabled %]required[% END %]>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="db_[% profile_name %]_password">Password</label>
+                                <input type="password" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_password" 
+                                       name="db_[% profile_name %]_password" 
+                                       placeholder="(Leave blank if not changed)"
+                                       [% IF profile_config.enabled %]required[% END %]>
+                            </div>
+                        </fieldset>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Workstation Connections -->
+        [% IF connection_profiles.workstation.size > 0 %]
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-laptop"></i> Workstation Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    [% FOREACH profile_name, profile_config IN connection_profiles.workstation %]
+                    <div class="col-md-6 mb-3">
+                        <fieldset class="border p-3 rounded">
+                            <legend class="w-auto px-2">
+                                <strong>[% profile_config.description %]</strong>
+                                <br><small class="text-muted">[% profile_config.notes %]</small>
+                            </legend>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_host">Host</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_host" 
+                                       name="db_[% profile_name %]_host" 
+                                       placeholder="[% profile_config.host %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_port">Port</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_port" 
+                                       name="db_[% profile_name %]_port" 
+                                       value="[% profile_config.port || 3306 %]"
+                                       placeholder="[% profile_config.port || 3306 %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_database">Database</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_database" 
+                                       name="db_[% profile_name %]_database" 
+                                       placeholder="[% profile_config.database %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_username">Username</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_username" 
+                                       name="db_[% profile_name %]_username" 
+                                       placeholder="[% profile_config.username %]">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="db_[% profile_name %]_password">Password</label>
+                                <input type="password" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_password" 
+                                       name="db_[% profile_name %]_password" 
+                                       placeholder="(Leave blank if not changed)">
+                            </div>
+                        </fieldset>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Testing Server Connections -->
+        [% IF connection_profiles.testing.size > 0 %]
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-flask"></i> Testing Server Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    [% FOREACH profile_name, profile_config IN connection_profiles.testing %]
+                    <div class="col-md-6 mb-3">
+                        <fieldset class="border p-3 rounded">
+                            <legend class="w-auto px-2">
+                                <strong>[% profile_config.description %]</strong>
+                                <br><small class="text-muted">[% profile_config.notes %]</small>
+                            </legend>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_host">Host</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_host" 
+                                       name="db_[% profile_name %]_host" 
+                                       placeholder="[% profile_config.host %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_port">Port</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_port" 
+                                       name="db_[% profile_name %]_port" 
+                                       value="[% profile_config.port || 3306 %]"
+                                       placeholder="[% profile_config.port || 3306 %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_database">Database</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_database" 
+                                       name="db_[% profile_name %]_database" 
+                                       placeholder="[% profile_config.database %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_username">Username</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_username" 
+                                       name="db_[% profile_name %]_username" 
+                                       placeholder="[% profile_config.username %]">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="db_[% profile_name %]_password">Password</label>
+                                <input type="password" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_password" 
+                                       name="db_[% profile_name %]_password" 
+                                       placeholder="(Leave blank if not changed)">
+                            </div>
+                        </fieldset>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Backup Server Connections -->
+        [% IF connection_profiles.backup.size > 0 %]
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-database"></i> Backup Server Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    [% FOREACH profile_name, profile_config IN connection_profiles.backup %]
+                    <div class="col-md-6 mb-3">
+                        <fieldset class="border p-3 rounded">
+                            <legend class="w-auto px-2">
+                                <strong>[% profile_config.description %]</strong>
+                                <br><small class="text-muted">[% profile_config.notes %]</small>
+                            </legend>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_host">Host</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_host" 
+                                       name="db_[% profile_name %]_host" 
+                                       placeholder="[% profile_config.host %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_port">Port</label>
+                                <input type="number" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_port" 
+                                       name="db_[% profile_name %]_port" 
+                                       value="[% profile_config.port || 3306 %]"
+                                       placeholder="[% profile_config.port || 3306 %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_database">Database</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_database" 
+                                       name="db_[% profile_name %]_database" 
+                                       placeholder="[% profile_config.database %]">
+                            </div>
+                            
+                            <div class="form-group mb-2">
+                                <label for="db_[% profile_name %]_username">Username</label>
+                                <input type="text" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_username" 
+                                       name="db_[% profile_name %]_username" 
+                                       placeholder="[% profile_config.username %]">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="db_[% profile_name %]_password">Password</label>
+                                <input type="password" class="form-control form-control-sm" 
+                                       id="db_[% profile_name %]_password" 
+                                       name="db_[% profile_name %]_password" 
+                                       placeholder="(Leave blank if not changed)">
+                            </div>
+                        </fieldset>
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+        </div>
+        [% END %]
+
+        <!-- Form Actions -->
+        <div class="row mt-4 mb-4">
+            <div class="col-md-12">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Implementation Notes -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Implementation Notes</h5>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Empty Fields:</strong> Leave fields empty to use defaults or skip configuration</li>
+                        <li><strong>Placeholder Values:</strong> Fields containing "YOUR_*" are automatically skipped and stored as placeholders</li>
+                        <li><strong>Password Security:</strong> Credentials are stored in /tmp/comserv_db_env.conf with restricted permissions (600)</li>
+                        <li><strong>Connection Timeout:</strong> 5-second timeout applied to MySQL/MariaDB connections to prevent indefinite hanging</li>
+                        <li><strong>Failover:</strong> If primary connection fails, RemoteDB.pm automatically tries next priority connection</li>
+                        <li><strong>Environment Variables:</strong> Form data is converted to COMSERV_DB_[PROFILE]_[FIELD] environment variables</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+[% END %]

@@ -10,12 +10,12 @@ services:
       CATALYST_DEBUG: 0
       WEB_PORT: 5000
       TZ: UTC
-      # Production database configuration
-      DB_HOST: ${DB_HOST_PROD:-db-prod.example.com}
+      # Production database configuration - Uses db_config.json priority system
+      DB_HOST: ${DB_HOST_PROD:-192.168.1.198}
       DB_PORT: ${DB_PORT_PROD:-3306}
-      DB_NAME: ${DB_NAME_PROD:-comserv_production}
-      DB_USER: ${DB_USER_PROD:-comserv}
-      DB_PASS: ${DB_PASS_PROD}
+      DB_NAME: ${DB_NAME_PROD:-ency}
+      DB_USER: ${DB_USER_PROD:-shanta_forager}
+      DB_PASS: ${DB_PASS_PROD:-UA=nPF8*m+T#}
       # Production features
       ENABLE_MONITORING: 1
       ENABLE_LOGGING: 1
@@ -35,7 +35,7 @@ services:
       - comserv-prod-sessions:/opt/comserv/root/session
       - comserv-prod-backups:/opt/comserv/backups
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 5

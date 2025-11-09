@@ -1,5 +1,10 @@
 package Comserv::Util::SystemInfo;
 
+# CRITICAL: Debug Bar System Information Module - DO NOT REMOVE
+# This module provides hostname, IP, and system info used by the debug bar
+# to display server diagnostics to admins and debug mode users.
+# Removing this breaks Root.pm debug bar rendering and admin page visibility.
+
 use strict;
 use warnings;
 use Socket;
@@ -40,19 +45,42 @@ sub get_server_ip {
     
     # Try multiple methods to get the server IP
     
-    # Method 1: Use Socket to get IP from hostname
+    # Method 1: Check for Docker environment and get container IP
     eval {
-        my $hostname = hostname();
-        $ip = inet_ntoa(scalar gethostbyname($hostname || 'localhost'));
-        
-        # Skip localhost addresses
-        if ($ip eq '127.0.0.1' || $ip eq '::1') {
-            $ip = undef;
+        # In Docker, check the primary network interface (usually eth0 or similar)
+        # We can identify Docker by checking for /.dockerenv file
+        if (-f '/.dockerenv') {
+            # We're in Docker - try to get the container's IP
+            my $output = `ip addr show 2>/dev/null`;
+            if ($output) {
+                # Look for the first non-loopback IPv4 address
+                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+)\/\d+/g) {
+                    my $found_ip = $1;
+                    # Skip localhost addresses
+                    if ($found_ip ne '127.0.0.1') {
+                        $ip = $found_ip;
+                        last;
+                    }
+                }
+            }
         }
     };
     
+    # Method 2: Use Socket to get IP from hostname
+    if (!$ip) {
+        eval {
+            my $hostname = hostname();
+            $ip = inet_ntoa(scalar gethostbyname($hostname || 'localhost'));
+            
+            # Skip localhost addresses
+            if ($ip eq '127.0.0.1' || $ip eq '::1') {
+                $ip = undef;
+            }
+        };
+    }
+    
     if ($@ || !$ip) {
-        # Method 2: Parse ifconfig/ip addr output
+        # Method 3: Parse ifconfig/ip addr output
         eval {
             my $cmd = -x '/sbin/ifconfig' ? '/sbin/ifconfig' : 
                      (-x '/bin/ifconfig' ? '/bin/ifconfig' : 
@@ -61,7 +89,7 @@ sub get_server_ip {
             if ($cmd) {
                 my $output = `$cmd`;
                 # Look for non-loopback IPv4 addresses
-                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+).*?(?:netmask|Mask)/g) {
+                while ($output =~ /inet (?:addr:)?(\d+\.\d+\.\d+\.\d+).*?(?:netmask|Mask|\/)/g) {
                     my $found_ip = $1;
                     # Skip localhost addresses
                     if ($found_ip ne '127.0.0.1') {
@@ -82,7 +110,7 @@ sub get_server_ip {
         };
     }
     
-    # Method 3: Try to get IP by connecting to a public server
+    # Method 4: Try to get IP by connecting to a public server
     if ($@ || !$ip) {
         eval {
             # Create a UDP socket
