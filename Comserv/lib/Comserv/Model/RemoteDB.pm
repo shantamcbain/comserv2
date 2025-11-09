@@ -51,16 +51,39 @@ sub _load_config {
     try {
         use File::Basename;
         
-        # Use fixed path to database config - we know where it is
-        my $config_file = "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json";
-        # Read and decode the JSON config
+        # Detect config file location based on runtime environment
+        my $config_file;
         
+        # Priority 1: Docker/Kubernetes container path
+        if (-f '/opt/comserv/db_config.json') {
+            $config_file = '/opt/comserv/db_config.json';
+        }
+        # Priority 2: Environment variable override (for Kubernetes Secrets, etc)
+        elsif ($ENV{COMSERV_DB_CONFIG}) {
+            $config_file = $ENV{COMSERV_DB_CONFIG};
+        }
+        # Priority 3: Relative path from FindBin (local development on host)
+        else {
+            my $relative_path = File::Spec->catfile($FindBin::Bin, '../db_config.json');
+            if (-f $relative_path) {
+                $config_file = $relative_path;
+            }
+        }
+        
+        die "Could not locate db_config.json in any known location" unless $config_file;
+        die "db_config.json not readable: $config_file" unless -r $config_file;
+        
+        # Read and decode the JSON config
         local $/;
         open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
         close $fh;
         $config = decode_json($json_text);
 
+        # Apply environment variable overrides (for Docker/Kubernetes environments)
+        # This allows credentials and hostnames to be set via environment without changing db_config.json
+        $config = $self->_apply_env_overrides($config);
+        
         # Store the raw config and expose a normalized contract via get_all_connections
         $self->config($config);
 
@@ -73,6 +96,38 @@ sub _load_config {
             "Failed to load database configuration: $_");
         die "RemoteDB: Cannot continue without database configuration";
     };
+}
+
+# Apply environment variable overrides to configuration
+# Supports Docker/Kubernetes deployments where credentials/hosts come from environment
+sub _apply_env_overrides {
+    my ($self, $config) = @_;
+    return $config unless $config;
+    
+    # Environment variable pattern: COMSERV_DB_<CONNECTION_NAME>_<FIELD>
+    # Example: COMSERV_DB_PRODUCTION_SERVER_HOST=mydbhost
+    #          COMSERV_DB_PRODUCTION_SERVER_PORT=3307
+    #          COMSERV_DB_PRODUCTION_SERVER_USERNAME=appuser
+    
+    foreach my $conn_name (keys %$config) {
+        next if $conn_name =~ /^_/;
+        next unless ref $config->{$conn_name} eq 'HASH';
+        
+        my $conn = $config->{$conn_name};
+        my $env_prefix = 'COMSERV_DB_' . uc($conn_name);
+        
+        # Check for field overrides
+        foreach my $field (qw(host port username password database)) {
+            my $env_var = $env_prefix . '_' . uc($field);
+            if (defined $ENV{$env_var}) {
+                $conn->{$field} = $ENV{$env_var};
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_apply_env_overrides',
+                    "Override $env_var for connection '$conn_name'");
+            }
+        }
+    }
+    
+    return $config;
 }
 
 # Public API: return all configured connections in a stable contract
@@ -148,7 +203,7 @@ sub test_connection {
         my $dsn;
         my $dbh;
         
-        if ($connection_config->{db_type} eq 'sqlite') {
+        if (defined $connection_config->{db_type} && $connection_config->{db_type} eq 'sqlite') {
             # SQLite connection
             $dsn = "dbi:SQLite:dbname=" . $connection_config->{database_path};
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
@@ -159,17 +214,25 @@ sub test_connection {
                 sqlite_timeout => 5000,
             });
         } else {
-            # MySQL connection
-            $dsn = "dbi:mysql:database=" . $connection_config->{database} . 
+            # MySQL/MariaDB connection
+            my $driver = 'mysql';
+            $dsn = "dbi:$driver:database=" . $connection_config->{database} . 
                    ";host=" . $connection_config->{host} . 
                    ";port=" . $connection_config->{port};
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-                "MySQL DSN: $dsn with user: " . $connection_config->{username});
-            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, {
+                "DB DSN ($driver): $dsn with user: " . $connection_config->{username});
+            
+            # Use driver-appropriate attributes
+            my $connect_attrs = {
                 RaiseError => 0,
                 PrintError => 0,
-                mysql_connect_timeout => 5,
-            });
+            };
+            # Only add mysql_connect_timeout for mysql driver
+            if ($driver eq 'mysql' || $driver eq 'MariaDB') {
+                $connect_attrs->{mysql_connect_timeout} = 5;
+            }
+            
+            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, $connect_attrs);
         }
         
         if ($dbh) {
@@ -205,7 +268,7 @@ sub select_connection {
         my $conn = $config->{$_};
         $conn && ref $conn eq 'HASH' &&
         (($conn->{database} && $conn->{database} eq $database_name) ||
-         ($conn->{db_type} eq 'sqlite' && $_ =~ /\Q$database_name\E/))
+         ((defined $conn->{db_type} && $conn->{db_type} eq 'sqlite') && $_ =~ /\Q$database_name\E/))
     } keys %$config;
 
     # Sort by priority
@@ -226,13 +289,24 @@ sub select_connection {
     # Try connections in priority order
     foreach my $conn_name (@matching_connections) {
         my $conn = $config->{$conn_name};
+        my $host = $conn->{host} || 'N/A';
+        my $port = $conn->{port} || 'N/A';
 
         # Skip if required fields are missing, empty, or contain placeholders
         my $skip = 0;
         
+        # Check localhost_override flag - skip localhost connections unless explicitly enabled
+        if ($conn->{localhost_override}) {
+            unless ($ENV{COMSERV_ALLOW_LOCALHOST_OVERRIDE}) {
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                    "SKIPPED $conn_name ($host:$port): localhost_override=true and COMSERV_ALLOW_LOCALHOST_OVERRIDE not set");
+                next;
+            }
+        }
+        
         # Different required fields for different database types
         my @required_fields;
-        if ($conn->{db_type} eq 'sqlite') {
+        if (defined $conn->{db_type} && $conn->{db_type} eq 'sqlite') {
             @required_fields = qw/database_path/;
         } else {
             @required_fields = qw/host port username database/;
@@ -242,12 +316,14 @@ sub select_connection {
             if (!exists $conn->{$field} ||
                 !defined $conn->{$field} ||
                 $conn->{$field} =~ /^\s*$/) {
-                warn "Skipping $conn_name: Missing required field '$field'";
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                    "SKIPPED $conn_name ($host:$port): Missing required field '$field'");
                 $skip = 1;
                 last;
             }
             if ($conn->{$field} =~ /YOUR_|PLACEHOLDER/i) {
-                warn "Skipping $conn_name: Field '$field' contains placeholder value";
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                    "SKIPPED $conn_name ($host:$port): Field '$field' contains placeholder value");
                 $skip = 1;
                 last;
             }
@@ -255,26 +331,44 @@ sub select_connection {
         next if $skip;
 
         # Try the connection
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+            "ATTEMPTING connection $conn_name at $host:$port for database '$database_name'");
+        
         if ($self->test_connection($conn)) {
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                "RemoteDB: Selected connection $conn_name for database '$database_name' (" . 
+                "✓ SUCCESS: Connected to $conn_name ($host:$port) - Database: '$database_name' (" . 
                 ($conn->{description} || 'no description') . ")");
 
             # Store the selected connection info
             my $connection_info = {
                 connection_name => $conn_name,
                 config => $conn,
-                database_name => $database_name
+                database_name => $database_name,
+                host => $host,
+                port => $port
             };
             $self->selected_connection->{$database_name} = $connection_info;
             
             return $connection_info;
+        } else {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                "✗ FAILED: Could not connect to $conn_name at $host:$port - will try next priority");
         }
     }
 
     # If we get here, no connection worked
-    die "RemoteDB: No working database connection found for '$database_name' database after trying " .
-        scalar(@matching_connections) . " connections";
+    my $error_msg = "RemoteDB: No working database connection found for '$database_name' database after trying " .
+        scalar(@matching_connections) . " connections:\n";
+    foreach my $conn_name (@matching_connections) {
+        my $conn = $config->{$conn_name};
+        my $host = $conn->{host} || 'N/A';
+        my $port = $conn->{port} || 'N/A';
+        my $desc = $conn->{description} || 'no description';
+        $error_msg .= "  - $conn_name ($host:$port): $desc\n";
+    }
+    
+    $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
+    die $error_msg;
 }
 
 # Get connection info for a database (select if not already selected)
@@ -454,39 +548,74 @@ sub add_connection {
 sub get_connection {
     my ($self, $c, $conn_name) = @_;
     
+    my $start_time = time();
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_connection', 
+        "[TIMING] get_connection START for '$conn_name' at " . scalar(localtime($start_time)));
+    
     # Check if the connection exists
     unless (exists $self->connections->{$conn_name}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection', 
-            "Remote connection '$conn_name' does not exist");
+            "Remote connection '$conn_name' does not exist. Available connections: " . join(', ', keys %{$self->connections}));
         return;
     }
     
     my $conn = $self->connections->{$conn_name};
     
-    # If we already have an active connection, return it
-    if ($conn->{dbh} && $conn->{dbh}->ping) {
-        return $conn->{dbh};
+    # Check existing connection status
+    if ($conn->{dbh}) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_connection', 
+            "[PING] Testing existing connection for '$conn_name'");
+        
+        my $ping_result;
+        eval {
+            $ping_result = $conn->{dbh}->ping;
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_connection', 
+                "[PING_ERROR] Ping failed for '$conn_name': $@");
+        } elsif ($ping_result) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_connection', 
+                "[PING_OK] Connection '$conn_name' is active, returning existing handle");
+            return $conn->{dbh};
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_connection', 
+                "[PING_FAILED] Connection '$conn_name' failed ping, will reconnect");
+        }
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_connection', 
+            "[NEW_CONN] No existing connection for '$conn_name', will create new");
     }
     
-    # Otherwise, create a new connection
+    # Create a new connection
     my $config = $conn->{config};
-    # Fixed DSN format for MySQL - most common format
-    my $dsn = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
+    my $db_type = 'mysql';
+    my $dsn = "dbi:$db_type:database=$config->{database};host=$config->{host};port=$config->{port}";
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection', 
+        "[CONNECT] Attempting to connect to DSN: dbi:$db_type:database=$config->{database};host=$config->{host};port=$config->{port} as user '$config->{username}'");
     
     try {
+        my $connect_start = time();
         $conn->{dbh} = DBI->connect($dsn, $config->{username}, $config->{password}, {
             RaiseError => 1,
             AutoCommit => 1,
             PrintError => 0,
         });
+        my $connect_time = time() - $connect_start;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection', 
-            "Successfully connected to remote database '$conn_name'");
+            "[CONNECT_OK] Successfully connected to remote database '$conn_name' in ${connect_time}s");
+        
+        my $total_time = time() - $start_time;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_connection', 
+            "[TIMING] get_connection COMPLETE for '$conn_name' in ${total_time}s");
         
         return $conn->{dbh};
     } catch {
+        my $total_time = time() - $start_time;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection', 
-            "Failed to connect to remote database '$conn_name': $_");
+            "[CONNECT_FAILED] Failed to connect to remote database '$conn_name' after ${total_time}s: $_");
         return;
     };
 }
@@ -889,7 +1018,8 @@ sub _connect_to_database {
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=$database";
     } else {
-        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
+        my $driver = 'mysql';
+        $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
     }
     
     try {

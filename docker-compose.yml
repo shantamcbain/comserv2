@@ -1,6 +1,32 @@
 version: '3.9'
 
+# Simplified Docker Compose for Comserv Development
+# Database: External MySQL on 192.168.1.198 (NOT local)
+# Dev Port: 3000 (with code mounting for debugging via comserv_server.pl)
+# Prod Port: 5000 (Starman workers via Supervisor)
+
 services:
+  # Redis Cache Service
+  redis:
+    image: redis:7-alpine
+    container_name: comserv-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redispass_dev} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass_dev}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - comserv-network
+
+  # Development Web Service - Port 3000
+  # Code is mounted for live development with comserv_server.pl debugging
   web-dev:
     build:
       context: ./Comserv
@@ -12,27 +38,40 @@ services:
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
+      # External Database Configuration (192.168.1.198)
+      COMSERV_DB_LOCAL_ENCY_HOST: ${DB_HOST:-192.168.1.198}
+      COMSERV_DB_LOCAL_ENCY_PORT: ${DB_PORT:-3306}
+      COMSERV_DB_LOCAL_ENCY_USERNAME: ${DB_USER:-shanta_forager}
+      COMSERV_DB_LOCAL_ENCY_PASSWORD: ${DB_PASSWORD:-UA=nPF8*m+T#}
+      COMSERV_DB_LOCAL_ENCY_DATABASE: ${DB_NAME:-ency}
     ports:
       - "3000:3000"
     volumes:
-      # Mount source code directories only (not Docker-built artifacts)
+      # Mount source code for development (allows live reload and debugging)
       - ${APP_MOUNT:-.}/Comserv/lib:/opt/comserv/lib:delegated
       - ${APP_MOUNT:-.}/Comserv/script:/opt/comserv/script:delegated
       - ${APP_MOUNT:-.}/Comserv/root:/opt/comserv/root:delegated
       - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
-      # Mount configuration as read-only
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
-      # Preserve Docker-built artifacts: local (Starman, Perl modules), backups
-      # These are created during build and NOT overridden by host mounts
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - comserv-network
 
+  # Production Web Service - Port 5000
+  # Starman workers via Supervisor (production-grade setup)
   web-prod:
     build:
       context: ./Comserv
@@ -44,23 +83,47 @@ services:
       CATALYST_DEBUG: 0
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
+      # External Database Configuration (192.168.1.198)
+      COMSERV_DB_LOCAL_ENCY_HOST: ${DB_HOST:-192.168.1.198}
+      COMSERV_DB_LOCAL_ENCY_PORT: ${DB_PORT:-3306}
+      COMSERV_DB_LOCAL_ENCY_USERNAME: ${DB_USER:-shanta_forager}
+      COMSERV_DB_LOCAL_ENCY_PASSWORD: ${DB_PASSWORD:-UA=nPF8*m+T#}
+      COMSERV_DB_LOCAL_ENCY_DATABASE: ${DB_NAME:-ency}
     ports:
       - "5000:5000"
     volumes:
-      # Mount source code directories only (not Docker-built artifacts)
+      # Mount source code for production debugging
       - ${APP_MOUNT:-.}/Comserv/lib:/opt/comserv/lib:delegated
       - ${APP_MOUNT:-.}/Comserv/script:/opt/comserv/script:delegated
       - ${APP_MOUNT:-.}/Comserv/root:/opt/comserv/root:delegated
       - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
-      # Mount configuration as read-only
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
-      # Preserve Docker-built artifacts: local (Starman, Perl modules), backups
-      # These are created during build and NOT overridden by host mounts
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - comserv-network
+
+# Volumes for persistent data
+volumes:
+  redis_data:
+    driver: local
+
+# Network for inter-service communication
+networks:
+  comserv-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

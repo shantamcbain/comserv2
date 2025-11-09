@@ -1,184 +1,105 @@
 {
-   "pages" : {
-      "Pages" : {
-         "last_updated" : "Fri Oct 17 09:26:45 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "Documentation" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Sat Oct 18 05:46:15 2025"
-      },
-      "AI" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Thu Oct 16 10:12:37 2025"
-      },
-      "admintopmenu_guide" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Thu Oct 16 10:14:38 2025"
-      },
-      "DBIDocument" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Sat Oct 18 05:45:29 2025"
-      },
-      "BMasterController" : {
-         "last_updated" : "Thu Oct 16 10:15:13 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "Api" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Fri Oct 17 09:14:19 2025"
-      },
-      "Admin" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Fri Oct 17 09:13:54 2025"
-      },
-      "controller_routing_guidelines" : {
-         "last_updated" : "Fri Oct 17 09:40:03 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "proxmox_api" : {
-         "last_updated" : "Fri Oct 17 09:39:12 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "admin_guides" : {
-         "last_updated" : "Fri Oct 17 09:28:15 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "admin" : {
-         "last_updated" : "Sun Oct 19 07:51:19 2025",
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ]
-      },
-      "opnsense_vm_proxmox_k83_setup" : {
-         "last_updated" : "Fri Oct 17 09:37:37 2025",
-         "roles" : [
-            "admin",
-            "developer"
-         ]
-      },
-      "ContentManagement" : {
-         "roles" : [
-            "editor",
-            "admin",
-            "developer"
-         ],
-         "last_updated" : "Thu Oct 16 11:26:26 2025"
-      }
-   },
    "categories" : {
       "admin_guides" : {
-         "title" : "Administrator Guides",
-         "site_filter" : "all",
          "description" : "Documentation for system administrators",
          "roles" : [
             "admin",
             "developer"
-         ]
-      },
-      "user_guides" : {
-         "title" : "User Guides",
+         ],
          "site_filter" : "all",
+         "title" : "Administrator Guides"
+      },
+      "changelog" : {
+         "description" : "System changes and updates",
          "roles" : [
-            "normal",
-            "editor",
             "admin",
             "developer"
          ],
-         "description" : "Documentation for end users of the system"
+         "site_filter" : "all",
+         "title" : "Changelog"
+      },
+      "controllers" : {
+         "description" : "Documentation for system controllers",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all",
+         "title" : "Controller Documentation"
       },
       "developer_guides" : {
-         "title" : "Developer Documentation",
-         "site_filter" : "all",
          "description" : "Documentation for developers",
          "roles" : [
             "developer",
             "admin"
-         ]
+         ],
+         "site_filter" : "all",
+         "title" : "Developer Documentation"
       },
-      "mail_system" : {
+      "documentation" : {
+         "description" : "Documentation about the documentation system itself",
          "roles" : [
             "admin",
             "developer"
          ],
+         "site_filter" : "all",
+         "title" : "Documentation System"
+      },
+      "mail_system" : {
          "description" : "Documentation for the mail system",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
          "site_filter" : "all",
          "title" : "Mail System"
       },
+      "models" : {
+         "description" : "Documentation for system models",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all",
+         "title" : "Model Documentation"
+      },
+      "modules" : {
+         "description" : "Documentation for specific system modules",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all",
+         "title" : "Module Documentation"
+      },
+      "proxmox" : {
+         "description" : "Documentation for Proxmox virtualization environment",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_filter" : "all",
+         "title" : "Proxmox Documentation"
+      },
       "site_specific" : {
+         "description" : "Documentation specific to this site",
          "roles" : [
             "normal",
             "editor",
             "admin",
             "developer"
          ],
-         "description" : "Documentation specific to this site",
          "site_filter" : "site_specific",
          "title" : "Site-Specific Documentation"
       },
-      "proxmox" : {
-         "title" : "Proxmox Documentation",
-         "site_filter" : "all",
+      "templates" : {
+         "description" : "Documentation for system templates",
          "roles" : [
             "admin",
             "developer"
          ],
-         "description" : "Documentation for Proxmox virtualization environment"
-      },
-      "controllers" : {
          "site_filter" : "all",
-         "roles" : [
-            "admin",
-            "developer"
-         ],
-         "description" : "Documentation for system controllers",
-         "title" : "Controller Documentation"
+         "title" : "Template Documentation"
       },
       "tutorials" : {
          "description" : "Step-by-step guides for common tasks",
@@ -192,58 +113,151 @@
          "title" : "Tutorials"
       },
       "ui_features" : {
-         "title" : "UI Features",
-         "site_filter" : "all",
+         "description" : "Documentation for UI features and components",
          "roles" : [
             "admin",
             "developer"
          ],
-         "description" : "Documentation for UI features and components"
-      },
-      "changelog" : {
          "site_filter" : "all",
-         "description" : "System changes and updates",
+         "title" : "UI Features"
+      },
+      "user_guides" : {
+         "description" : "Documentation for end users of the system",
          "roles" : [
+            "normal",
+            "editor",
             "admin",
             "developer"
          ],
-         "title" : "Changelog"
-      },
-      "modules" : {
-         "title" : "Module Documentation",
          "site_filter" : "all",
-         "description" : "Documentation for specific system modules",
+         "title" : "User Guides"
+      }
+   },
+   "pages" : [
+      {
+         "id" : "Documentation",
+         "last_updated" : "Sat Oct 18 05:46:15 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "Pages",
+         "last_updated" : "Fri Oct 17 09:26:45 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "admintopmenu_guide",
+         "last_updated" : "Thu Oct 16 10:14:38 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "DBIDocument",
+         "last_updated" : "Sat Oct 18 05:45:29 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "AI",
+         "last_updated" : "Thu Oct 16 10:12:37 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "ContentManagement",
+         "last_updated" : "Thu Oct 16 11:26:26 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "controller_routing_guidelines",
+         "last_updated" : "Fri Oct 17 09:40:03 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "Admin",
+         "last_updated" : "Fri Oct 17 09:13:54 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "opnsense_vm_proxmox_k83_setup",
+         "last_updated" : "Fri Oct 17 09:37:37 2025",
          "roles" : [
             "admin",
             "developer"
          ]
       },
-      "templates" : {
-         "title" : "Template Documentation",
-         "site_filter" : "all",
-         "description" : "Documentation for system templates",
+      {
+         "id" : "proxmox_api",
+         "last_updated" : "Fri Oct 17 09:39:12 2025",
          "roles" : [
+            "editor",
             "admin",
             "developer"
          ]
       },
-      "documentation" : {
-         "title" : "Documentation System",
-         "site_filter" : "all",
+      {
+         "id" : "admin",
+         "last_updated" : "Sun Oct 19 07:51:19 2025",
          "roles" : [
+            "editor",
             "admin",
             "developer"
-         ],
-         "description" : "Documentation about the documentation system itself"
+         ]
       },
-      "models" : {
-         "title" : "Model Documentation",
-         "site_filter" : "all",
-         "description" : "Documentation for system models",
+      {
+         "id" : "admin_guides",
+         "last_updated" : "Fri Oct 17 09:28:15 2025",
          "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "BMasterController",
+         "last_updated" : "Thu Oct 16 10:15:13 2025",
+         "roles" : [
+            "editor",
+            "admin",
+            "developer"
+         ]
+      },
+      {
+         "id" : "Api",
+         "last_updated" : "Fri Oct 17 09:14:19 2025",
+         "roles" : [
+            "editor",
             "admin",
             "developer"
          ]
       }
-   }
+   ]
 }

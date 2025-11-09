@@ -10,12 +10,12 @@ services:
       CATALYST_DEBUG: 1
       WEB_PORT: 3000
       TZ: UTC
-      # Database (shared across environments - consider per-env in future)
-      DB_HOST: ${DB_HOST:-db.example.com}
+      # Database - Uses db_config.json priority system (production server is Priority 1)
+      DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
-      DB_NAME: ${DB_NAME:-comserv_dev}
-      DB_USER: ${DB_USER:-comserv}
-      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME:-ency}
+      DB_USER: ${DB_USER:-shanta_forager}
+      DB_PASS: ${DB_PASS:-UA=nPF8*m+T#}
     ports:
       - "3000:3000"
     volumes:
@@ -28,9 +28,9 @@ services:
       # Config (read-only)
       - ./db_config.json:/opt/comserv/db_config.json:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 30s
     networks:

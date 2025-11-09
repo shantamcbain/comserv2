@@ -1644,6 +1644,97 @@ sub schema_manager : Chained('admin_check') : PathPart('schema_manager') : Args(
     $c->stash->{template} = 'admin/schema_manager.md';
 }
 
+# Database configuration management
+sub database_config :Chained('base') :PathPart('database-config') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_config', 
+        "Starting database configuration action - Method: " . $c->req->method);
+    
+    if ($c->req->method eq 'POST') {
+        # Save database configuration
+        try {
+            # Create environment configuration file
+            my $env_file = '/tmp/comserv_db_env.conf';
+            my @config_lines;
+            
+            # Get form parameters for each connection profile
+            my $params = $c->req->params;
+            
+            # Build configuration from form data
+            foreach my $key (sort keys %$params) {
+                if ($key =~ /^db_(\w+)_(.+)$/) {
+                    my $profile = $1;
+                    my $field = $2;
+                    my $value = $params->{$key};
+                    
+                    # Skip empty values
+                    next unless defined $value && $value ne '';
+                    
+                    # Skip placeholder values
+                    next if $value =~ /^YOUR_/i;
+                    
+                    # Export as environment variable
+                    my $env_var = 'COMSERV_DB_' . uc($profile) . '_' . uc($field);
+                    $env_var =~ s/[\s-]/_/g;  # Replace spaces and dashes with underscores
+                    push @config_lines, "$env_var=\"$value\"";
+                }
+            }
+            
+            # Write configuration file with restricted permissions
+            write_file($env_file, join("\n", @config_lines) . "\n");
+            chmod(0600, $env_file);  # Only owner can read
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_config', 
+                "Database configuration saved to $env_file - " . scalar(@config_lines) . " settings");
+            
+            # Set success message
+            $c->stash->{message} = "Database configuration saved successfully. " . 
+                                   "(" . scalar(@config_lines) . " connection settings stored)";
+            $c->stash->{message_type} = 'success';
+            
+        } catch {
+            my $error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'database_config', 
+                "Error saving database configuration: $error");
+            
+            $c->stash->{message} = "Error saving configuration: $error";
+            $c->stash->{message_type} = 'error';
+        };
+    }
+    
+    # Load template configuration for display
+    eval {
+        my $db_config_file = $c->config->{home} . '/db_config.template.json';
+        
+        if (-f $db_config_file) {
+            my $config_content = read_file($db_config_file);
+            my $config_data = JSON->new->utf8->decode($config_content);
+            
+            $c->stash->{db_config} = $config_data;
+            $c->stash->{connection_profiles} = {
+                production => $config_data->{production_connections} || {},
+                workstation => $config_data->{workstation_connections} || {},
+                testing => $config_data->{testing_server_connections} || {},
+                backup => $config_data->{backup_server_connections} || {}
+            };
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'database_config', 
+                "Database config template not found at: $db_config_file");
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'database_config', 
+            "Error loading database config: $@");
+    }
+    
+    # Set template
+    $c->stash->{template} = 'admin/database_config.tt';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_config', 
+        "Completed database configuration action");
+}
+
 =head1 AUTHOR
 
 Shanta McBain

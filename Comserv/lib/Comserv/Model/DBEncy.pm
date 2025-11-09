@@ -41,11 +41,25 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('ency');
     };
 
+    # Fallback to SQLite if primary connections fail
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
-        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
             "DBEncy: Failed to get connection from RemoteDB: $error");
-        die "DBEncy: Failed to establish database connection: $error";
+        $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+            "DBEncy: Falling back to SQLite offline mode");
+        
+        # Create a fallback SQLite connection
+        $connection_info = {
+            connection_name => 'sqlite_ency_fallback',
+            config => {
+                db_type => 'sqlite',
+                database_path => 'data/ency_offline.db',
+                description => 'SQLite Fallback - ENCY Database (offline mode)',
+                priority => 999
+            },
+            database_name => 'ency'
+        };
     }
 
     # Extract connection details from RemoteDB
@@ -104,12 +118,22 @@ sub COMPONENT {
             on_connect_do => ["PRAGMA foreign_keys = ON"],
         };
     } else {
+        # Use the MariaDB driver (compatible with both MySQL and MariaDB databases)
+        my $driver = 'MariaDB';
         $connect_info = {
-            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
             password => $conn->{password},
-            mysql_enable_utf8 => 1,
-            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+            # Error handling
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+            on_connect_do => [
+                "SET NAMES 'utf8'",
+                "SET CHARACTER SET 'utf8'",
+                "SET SESSION net_read_timeout=30",
+                "SET SESSION net_write_timeout=30",
+            ],
         };
     }
 
@@ -144,9 +168,18 @@ sub get_startup_connection_info {
 sub list_tables {
     my $self = shift;
 
-    return $self->schema->storage->dbh->selectcol_arrayref(
-        "SHOW TABLES"  # Adjust if the database uses a different query for metadata
-    );
+    my $dbh = $self->schema->storage->dbh;
+    my $driver = $dbh->{Driver}->{Name};
+    
+    if ($driver eq 'SQLite') {
+        return $dbh->selectcol_arrayref(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        );
+    } else {
+        return $dbh->selectcol_arrayref(
+            "SHOW TABLES"
+        );
+    }
 }
 
 sub get_active_projects {

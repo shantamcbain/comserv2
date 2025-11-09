@@ -1,37 +1,35 @@
 # perl
-                package Comserv;
-                use Moose;
-                use namespace::autoclean;
-                use Config::JSON;
-                use FindBin '$Bin';
-                use Comserv::Util::Logging;
 
-                # Initialize the logging system
-                BEGIN {
-                    Comserv::Util::Logging->init();
-                }
+package Comserv;
+use Moose;
+use namespace::autoclean;
+use Config::JSON;
+use FindBin '$Bin';
+use Comserv::Util::Logging;
 
-                use Catalyst::Runtime 5.80;
-                use Catalyst qw/
-                    ConfigLoader
-                    Static::Simple
-                    StackTrace
-                    Session
-                    Session::State::Cookie
-                    Session::Store::File
-                    Authentication
-                /;
+# Initialize the logging system
+BEGIN {
+    Comserv::Util::Logging->init();
+}
+
+use Catalyst::Runtime 5.80;
+use Catalyst qw/
+    ConfigLoader
+    Static::Simple
+    Session
+    Session::State::Cookie
+    Session::Store::File
+    Authentication
+/;
 
 extends 'Catalyst';
 
 our $VERSION = '0.01';
 
-__PACKAGE__->log(Catalyst::Log->new(output => sub {
-    my ($self, $level, $message) = @_;
-    $level = 'debug' unless defined $level;
-    $message = '' unless defined $message;
-    $self->dispatchers->[0]->log(level => $level, message => $message);
-}));
+# REMOVED: Custom log setup that was causing segfaults
+# The problematic code tried to access $self->dispatchers->[0] which doesn't exist
+# during early request handling. Using Plugin::Log::Dispatch config instead.
+# This was the root cause of the "Empty reply from server" / segmentation fault issues.
 
 __PACKAGE__->config(
     name => 'Comserv',
@@ -86,11 +84,13 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        storage => '/tmp/session_data',
         expires => 3600,
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
+    },
+    'Plugin::Session::Store::File' => {
+        dir => '/tmp/session_data',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
@@ -119,52 +119,92 @@ sub psgi_app {
     return sub {
         my $env = shift;
 
-                        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
-                        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
+        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-                        return $app->($env);
-                    };
-                }
+        return $app->($env);
+    };
+}
 
+# Auto-fix for missing modules - attempt to load modules with fallbacks
+# This ensures the application works even if modules are missing
 
-                # Auto-fix for missing modules - attempt to load modules with fallbacks
-                # This ensures the application works even if modules are missing
-                
-                # First, try to load email modules
-                my $email_modules_loaded = 0;
-                # Temporarily disabled email modules to fix startup issues
-                # eval {
-                #     require Comserv::View::Email;
-                #     require Comserv::View::Email::Template;
-                # };
-                # if ($@) {
-                    warn "Warning: Email modules disabled for testing\n";
-                    warn "Email functionality may not work correctly.\n";
-                    # $email_modules_loaded = 0;
-                    
-                    # Try to auto-install the modules if we're in development mode
-                    # if ($ENV{CATALYST_DEBUG}) {
-                    #     warn "Attempting to auto-install email modules...\n";
-                    #     eval {
-                    #         require App::cpanminus;
-                    #         my $local_lib = __PACKAGE__->path_to('local');
-                    #         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
-                    #         
-                    #         # Try loading again after installation
-                    #         require Comserv::View::Email;
-                    #         require Comserv::View::Email::Template;
-                    #         $email_modules_loaded = 1;
-                    #     };
-                    #     if ($@) {
-                    #         warn "Auto-installation failed: $@\n";
-                    #         warn "Email functionality will be limited.\n";
-                    #     }
-                    # }
-                # }
-                
-                # Session store is now properly configured in the plugin list above
+# First, try to load email modules
+my $email_modules_loaded = 0;
+# Temporarily disabled email modules to fix startup issues
+# eval {
+#     require Comserv::View::Email;
+#     require Comserv::View::Email::Template;
+# };
+# if ($@) {
+warn "Warning: Email modules disabled for testing\n";
+warn "Email functionality may not work correctly.\n";
+# $email_modules_loaded = 0;
 
-                
-                __PACKAGE__->setup();
+# Try to auto-install the modules if we're in development mode
+# if ($ENV{CATALYST_DEBUG}) {
+#     warn "Attempting to auto-install email modules...\n";
+#     eval {
+#         require App::cpanminus;
+#         my $local_lib = __PACKAGE__->path_to('local');
+#         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
+#         
+#         # Try loading again after installation
+#         require Comserv::View::Email;
+#         require Comserv::View::Email::Template;
+#         $email_modules_loaded = 1;
+#     };
+#     if ($@) {
+#         warn "Auto-installation failed: $@\n";
+#         warn "Email functionality will be limited.\n";
+#     }
+# }
+# }
 
-                1;
+# Session store is now properly configured in the plugin list above
+
+# LAYER 3: Global Application Error Handler
+# Catches exceptions that escape individual controller error handling
+around 'finalize_error' => sub {
+    my ($orig, $self, $c) = @_;
+    
+    # Log all unhandled errors with context
+    if (my $error = $c->error->[0]) {
+        my $error_msg = ref $error ? $error->message : $error;
+        my $logger = Comserv::Util::Logging->instance;
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
+            "[GLOBAL ERROR] Unhandled exception: $error_msg");
+    }
+    
+    # If error.tt hasn't been rendered yet, render it now
+    unless ($c->response->body) {
+        $c->response->status(500) unless $c->response->status;
+        
+        # Set up error template stash if not already set
+        $c->stash->{error_title} ||= 'Application Error';
+        $c->stash->{error_msg} ||= 'An unexpected error occurred.';
+        $c->stash->{technical_details} ||= join(', ', @{$c->error});
+        $c->stash->{template} = 'error.tt';
+        
+        # Try to render error page
+        eval {
+            my $view = $c->view('TT');
+            $view->process($c);
+        };
+        
+        # If that fails, send a plain text error response
+        if ($@) {
+            $c->response->content_type('text/plain; charset=utf-8');
+            $c->response->body("Internal Server Error\n\n" . 
+                               "An error occurred and we were unable to render the error page.\n" .
+                               "Please contact the system administrator.");
+        }
+    }
+    
+    # Call the original finalize_error to complete response processing
+    $self->$orig($c);
+};
+
+__PACKAGE__->setup();
+
+1;

@@ -4,9 +4,13 @@
 [% SET roles = c.session.roles || [] %]
 [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
 
+<!-- CRITICAL: Debug Bar UI - DO NOT REMOVE (lines 7-22)
+     This debug bar section displays server info (hostname, IP, database connections)
+     to admins and users in debug mode. Removing this breaks diagnostic visibility
+     and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
 [% IF is_admin || c.session.debug_mode == 1 %]
 <div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; color: #495057;">
-    [% IF is_admin %]
+    [% IF is_admin || c.session.debug_mode == 1 %]
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
@@ -14,12 +18,19 @@
         Server IP: <strong>[% server_ip %]</strong>[% IF db_connections && db_connections.size > 0 %] | 
         Databases: [% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% END %]
         [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %] |
+        [% IF is_admin %]
         <button id="css-edit-toggle" style="background: #4a90e2; color: white; border: none; border-radius: 3px; padding: 2px 10px; margin-left: 10px; cursor: pointer; font-size: 12px;">
             <i class="fas fa-paint-brush"></i> Toggle CSS Edit
         </button>
+        [% END %]
     </div>
 </div>
 [% END %]
+[% END %]
+
+<!-- Include Debug Template - shows session/stash when debug_mode=1 -->
+[% IF c.session.debug_mode == 1 %]
+[% INCLUDE 'debug.tt' %]
 [% END %]
 
 <!-- Add Font Awesome for the paint brush icon -->

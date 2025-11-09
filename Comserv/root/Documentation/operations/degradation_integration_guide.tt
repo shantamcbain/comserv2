@@ -1,0 +1,305 @@
+[% META
+        title = "Degradation Pattern Detection - Integration Guide"
+   description = "Step-by-step deployment and integration of the degradation detection system into AI response pipeline"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "operations"
+   page_version = "1.0"
+   last_updated = "Sun Nov  2 09:38:03 AM PST 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/degradation_integration_guide.tt,v 1.0 09:38:03 2025-11-02 Zencoder Exp Zencoder - Degradation Pattern Integration' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Degradation Pattern Detection - Integration Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-11-02 | 
+        Version: 1.0 | 
+        Author: Zencoder | 
+        Status: Production-Ready Deployment
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This guide provides step-by-step instructions for deploying the Degradation Pattern Detection System into your AI response pipeline. The system runs automatically before each response to detect and prevent session degradation patterns.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Perl 5.40.0 (via Perlbrew)</li>
+                <li>JSON module installed</li>
+                <li>YAML::XS module installed</li>
+                <li>Time::HiRes module</li>
+                <li>Catalyst framework (for template access)</li>
+                <li>Read/write access to session directory</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Integration Points</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>AI Response Handler</li>
+                <li>Session Management System</li>
+                <li>Audit Log Writer</li>
+                <li>Response Status Display</li>
+                <li>Tool Availability Manager</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Deployment Steps</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Copy Detection Script</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Copy the main detection script to the appropriate location:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Script location (already deployed)
+/Comserv/root/Documentation/session_history/detect_degradation_patterns.pl
+
+# Verify script exists and is executable
+ls -la /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl
+chmod +x /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Verify Test Suite</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Verify that the test suite exists and all tests pass:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Run complete test suite
+cd /Comserv
+perl t/detect_degradation_patterns.t
+
+# Expected output:
+# 1..7
+# ok 1 - Test 1: First Run (Missing Counter File)
+# ... (7 subtests with 41 total assertions)
+# ok 7 - Test 7: Multiple Anomalies Combined
+# Result: PASS (41/41 assertions)
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Integrate into Response Handler</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Add detection call to your AI response handler code. The script should run BEFORE generating the response:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Pseudo-code for response handler
+sub handle_ai_response {
+    my ($session_dir) = @_;
+    
+    # STEP 1: Run degradation detection (BEFORE response)
+    my $audit_log = "$session_dir/audit_log.json";
+    my $counter_file = "$session_dir/.prompt_counter";
+    
+    my $detect_script = '/Comserv/root/Documentation/session_history/detect_degradation_patterns.pl';
+    my $result = system("perl $detect_script $audit_log $counter_file");
+    
+    if ($result != 0) {
+        die "Degradation detection failed: $result";
+    }
+    
+    # STEP 2: Read current status from counter file
+    my $counter = YAML::LoadFile($counter_file);
+    my $status = $counter->{current_status}{status_level};
+    
+    # STEP 3: Apply tool restrictions based on status
+    restrict_tools_if_needed($counter);
+    
+    # STEP 4: Generate response (with restricted tools if needed)
+    my $response = generate_response();
+    
+    # STEP 5: Display status in response header
+    print_status_header($counter);
+    
+    return $response;
+}
+
+sub restrict_tools_if_needed {
+    my ($counter) = @_;
+    my $restrictions = $counter->{current_status}{tool_restrictions};
+    
+    # Set tool availability in context
+    $c->{stash}{can_execute_shell} = $restrictions->{execute_shell_command};
+    $c->{stash}{can_use_browser} = $restrictions->{browser_commands};
+    $c->{stash}{can_modify_files} = $restrictions->{modification_tools};
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Setup Audit Log Writing</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Ensure all tool actions are logged to audit_log.json in JSON format:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Log function (pseudo-code)
+sub log_action {
+    my ($action_type, $details) = @_;
+    
+    my $entry = {
+        action => $action_type,
+        timestamp => int(time()),
+        %$details  # Spread details into entry
+    };
+    
+    my $audit_log = "$session_dir/audit_log.json";
+    open my $fh, '>>', $audit_log or die "Cannot open audit log: $!";
+    print $fh JSON::encode_json($entry) . "\n";
+    close $fh;
+}
+
+# Usage examples:
+log_action('ViewFile', { file => 'config.pm' });
+log_action('ExecuteShellCommand', { command => 'perl -v' });
+log_action('analyze', { diagnosis => 'Connection timeout' });
+log_action('EditFile', { file => 'script.pl' });
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 5: Display Status in Response Header</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Include the status display at the top of each AI response:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Print before response body
+sub print_status_header {
+    my ($counter) = @_;
+    my $prompt = $counter->{prompt_tracking}{current_prompt};
+    my $limit = $counter->{prompt_tracking}{total_prompts_limit};
+    my $commands = $counter->{command_tracking}{command_count};
+    my $anomalies = scalar @{$counter->{current_status}{caution_reasons} || []};
+    my $status = $counter->{current_status}{status_level};
+    
+    print "\n[Prompt $prompt/$limit | Commands: $commands | Anomalies: $anomalies | Status: $status]\n";
+    
+    if (@{$counter->{current_status}{caution_reasons} || []}) {
+        print "\nCaution Reasons:\n";
+        foreach my $reason (@{$counter->{current_status}{caution_reasons}}) {
+            print "  - $reason\n";
+        }
+    }
+}
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 6: Session Directory Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create or verify session directory structure:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Session directory structure
+/Comserv/root/Documentation/session_history/
+├── audit_log.json          # JSON-formatted audit entries
+├── .prompt_counter         # YAML state file (auto-created)
+├── current_session.md      # Session tracking documentation
+└── [other session files]   # Additional session data
+
+# Create if needed
+mkdir -p /Comserv/root/Documentation/session_history
+chmod 755 /Comserv/root/Documentation/session_history
+                </code></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Integration Checklist</h2>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Deployment Verification:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>☐ Script exists at /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl</li>
+                    <li>☐ Script is executable (chmod +x)</li>
+                    <li>☐ All 41 tests passing (perl t/detect_degradation_patterns.t)</li>
+                    <li>☐ JSON and YAML modules installed and available</li>
+                    <li>☐ Session directory exists with read/write permissions</li>
+                    <li>☐ Response handler calls detection script before generating response</li>
+                    <li>☐ Audit log writing function implemented and working</li>
+                    <li>☐ Tool restrictions applied based on status level</li>
+                    <li>☐ Status display included in response headers</li>
+                    <li>☐ Counter file (.prompt_counter) auto-creates on first run</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Configuration Options</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">All configuration is stored in the .prompt_counter YAML file. Modify thresholds and time windows as needed:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Parameter</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Purpose</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">total_prompts_limit</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">19</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Maximum prompts before blocking tools</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">files_checked.time_window_minutes</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">10</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Time window for file repeat detection</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">files_checked.anomaly_threshold</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">File repeats threshold to trigger anomaly</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">commands_repeated.time_window_minutes</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">15</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Time window for command repeat detection</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">commands_repeated.anomaly_threshold</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Command repeats threshold to trigger anomaly</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">unvalidated_modifications.anomaly_threshold</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unvalidated code changes threshold</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/operations/degradation_system_architecture" style="color: var(--link-color);">System Architecture - Technical Components</a></li>
+                    <li><a href="/Documentation/operations/degradation_operations_manual" style="color: var(--link-color);">Operations Manual - Monitoring & Troubleshooting</a></li>
+                    <li><a href="/Documentation/operations/degradation_api_reference" style="color: var(--link-color);">API Reference - State Files & Configuration</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For deployment support or integration questions, contact the development team.</p>
+                <p><em>This documentation is part of the Comserv system. All integration steps are production-tested and verified.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -6,6 +6,7 @@ use Data::Dumper;
 use DateTime;
 use JSON;
 use URI;
+use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
 
@@ -166,183 +167,339 @@ __PACKAGE__->config(namespace => '');
 sub auto :Private {
     my ($self, $c) = @_;
     
-    # Set up site name
-    $self->fetch_and_set($c, 'SiteName');
-    
-    # Set up theme using canonical ThemeConfig model
-    my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
-    $c->stash->{theme_name} = $theme_name;
-    
-    # Set up user information for templates
-    # Check both Catalyst auth system and session-based auth
-    my $user_logged_in = 0;
-    my $username = '';
-    my $user_id = '';
-    my $user_roles = [];
-    my $is_admin = 0;
-    
-    if ($c->user_exists) {
-        # Using Catalyst authentication system
-        my $user = $c->user;
-        $user_logged_in = 1;
-        $username = $user->username if $user->can('username');
-        $user_id = $user->id if $user->can('id');
-        $user_roles = $user->roles if $user->can('roles');
-        
-        # Also check session for backward compatibility
-        $c->session->{username} = $username if $username;
-        $c->session->{user_id} = $user_id if $user_id;
-        $c->session->{roles} = $user_roles if $user_roles;
-        
-    } elsif ($self->user_exists($c)) {
-        # Using session-based authentication (backward compatibility)
-        $user_logged_in = 1;
-        $username = $c->session->{username};
-        $user_id = $c->session->{user_id};
-        $user_roles = $c->session->{roles};
-    }
-    
-    # Check admin status
-    if ($user_logged_in) {
-        $is_admin = $self->check_user_roles($c, 'admin');
-    }
-    
-    # Set stash variables
-    $c->stash->{username} = $username;
-    $c->stash->{user_id} = $user_id;
-    $c->stash->{user_roles} = $user_roles;
-    $c->stash->{is_admin} = $is_admin;
-    $c->stash->{user_logged_in} = $user_logged_in;
-    
-    # Set up navigation data
-    my $site_name = $c->stash->{SiteName} || 'All';
-    my $nav_controller = $c->controller('Navigation');
-    
-    if ($nav_controller) {
-        # Ensure navigation tables exist and populate navigation data
-        $nav_controller->populate_navigation($c);
-        
-        # Get main menu items
-        $c->stash->{main_pages} = $nav_controller->get_pages($c, 'Main', $site_name);
-        $c->stash->{member_pages} = $nav_controller->get_pages($c, 'Member', $site_name);
-        $c->stash->{coop_pages} = $nav_controller->get_pages($c, 'Coop', $site_name);
-        $c->stash->{it_pages} = $nav_controller->get_pages($c, 'IT', $site_name);
-        $c->stash->{helpdesk_pages} = $nav_controller->get_pages($c, 'HelpDesk', $site_name);
-        $c->stash->{hosted_pages} = $nav_controller->get_pages($c, 'Hosted', $site_name);
-        
-        # Get internal links
-        $c->stash->{main_links} = $nav_controller->get_internal_links($c, 'Main_links', $site_name);
-        $c->stash->{member_links} = $nav_controller->get_internal_links($c, 'Member_links', $site_name);
-        $c->stash->{coop_links} = $nav_controller->get_internal_links($c, 'Coop_links', $site_name);
-        $c->stash->{it_links} = $nav_controller->get_internal_links($c, 'IT_links', $site_name);
-        $c->stash->{helpdesk_links} = $nav_controller->get_internal_links($c, 'HelpDesk_links', $site_name);
-        $c->stash->{hosted_links} = $nav_controller->get_internal_links($c, 'Hosted_links', $site_name);
-        
-        # Get admin data if user is admin
-        if ($c->stash->{is_admin}) {
-            $c->stash->{admin_pages} = $nav_controller->get_admin_pages($c, $site_name);
-            $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
+    # LAYER 1: Auto Method Protection - wrap entire method in error handling
+    eval {
+        # Skip database queries for health checks and monitoring endpoints
+        if ($c->req->path =~ m{^/health(?:/|$)}) {
+            return 1; # Allow /health to proceed without database setup
         }
         
-        # Get private links for logged in users
-        if ($c->stash->{user_logged_in}) {
-            $c->stash->{private_links} = $nav_controller->get_private_links($c, $c->session->{username}, $site_name);
+        # CRITICAL: Capture debug parameter from URL query string
+        # URL format: http://host/path?debug=1 activates debug mode
+        my $debug_param = $c->req->params->{debug};
+        if (defined $debug_param && $debug_param eq '1') {
+            $c->session->{debug_mode} = 1;
+            $c->stash->{debug} = 1;
+        } else {
+            # Ensure debug mode is off if not explicitly enabled
+            $c->session->{debug_mode} = 0 unless defined $c->session->{debug_mode};
+            $c->stash->{debug} = 0;
         }
         
-        # Get navigation items from the new navigation system (showing private items only to logged-in users)
-        # Temporarily commented out to restore login functionality
-        # eval {
-        #     my $user_logged_in = $c->stash->{user_logged_in} || 0;
-        #     if ($nav_controller->can('get_navigation_tree')) {
-        #         $c->stash->{navigation_main} = $nav_controller->get_navigation_tree($c, 'Main', $user_logged_in);
-        #         $c->stash->{navigation_member} = $nav_controller->get_navigation_tree($c, 'Member', $user_logged_in);
-        #         $c->stash->{navigation_coop} = $nav_controller->get_navigation_tree($c, 'Coop', $user_logged_in);
-        #         $c->stash->{navigation_it} = $nav_controller->get_navigation_tree($c, 'IT', $user_logged_in);
-        #         $c->stash->{navigation_helpdesk} = $nav_controller->get_navigation_tree($c, 'HelpDesk', $user_logged_in);
-        #         $c->stash->{navigation_hosted} = $nav_controller->get_navigation_tree($c, 'Hosted', $user_logged_in);
-        #         
-        #         # Get admin navigation if user is admin
-        #         if ($c->stash->{is_admin}) {
-        #             $c->stash->{navigation_admin} = $nav_controller->get_navigation_tree($c, 'Admin', $user_logged_in);
-        #         }
-        #     }
-        # };
-        # if ($@) {
-        #     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-        #         "Error loading new navigation system: $@");
-        # }
+        # Set up site name with timeout protection
+        eval {
+            local $SIG{ALRM} = sub { die "Site name fetch timeout\n"; };
+            alarm(3);  # 3 second timeout for site name fetch
+            $self->fetch_and_set($c, 'SiteName');
+            alarm(0);
+        };
+        alarm(0);  # Make sure alarm is cancelled
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Site name fetch timed out or failed: $@. Using default site name.");
+            $c->stash->{SiteName} = 'default';
+        }
         
-        # Debug logging for menu data
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
-            "Menu data loaded for site '$site_name': " .
-            "main_pages=" . (@{$c->stash->{main_pages} || []} . " items, ") .
-            "main_links=" . (@{$c->stash->{main_links} || []} . " items, ") .
-            "user_logged_in=" . ($c->stash->{user_logged_in} ? 'yes' : 'no') . ", " .
-            "is_admin=" . ($c->stash->{is_admin} ? 'yes' : 'no')
-        );
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-            "Navigation controller not found - menus will be empty");
+        # Set up theme using canonical ThemeConfig model with timeout protection
+        my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+        eval {
+            local $SIG{ALRM} = sub { die "Theme fetch timeout\n"; };
+            alarm(3);  # 3 second timeout for theme fetch
+            my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
+            $c->stash->{theme_name} = $theme_name;
+            alarm(0);
+        };
+        alarm(0);  # Make sure alarm is cancelled
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Theme fetch timed out or failed: $@. Using default theme.");
+            $c->stash->{theme_name} = 'default';
+        }
+        
+        # Set up user information for templates
+        # Check both Catalyst auth system and session-based auth
+        my $user_logged_in = 0;
+        my $username = '';
+        my $user_id = '';
+        my $user_roles = [];
+        my $is_admin = 0;
+        
+        if ($c->user_exists) {
+            # Using Catalyst authentication system
+            my $user = $c->user;
+            $user_logged_in = 1;
+            $username = $user->username if $user->can('username');
+            $user_id = $user->id if $user->can('id');
+            $user_roles = $user->roles if $user->can('roles');
+            
+            # Also check session for backward compatibility
+            $c->session->{username} = $username if $username;
+            $c->session->{user_id} = $user_id if $user_id;
+            $c->session->{roles} = $user_roles if $user_roles;
+            
+        } elsif ($self->user_exists($c)) {
+            # Using session-based authentication (backward compatibility)
+            $user_logged_in = 1;
+            $username = $c->session->{username};
+            $user_id = $c->session->{user_id};
+            $user_roles = $c->session->{roles};
+        }
+        
+        # Check admin status
+        if ($user_logged_in) {
+            $is_admin = $self->check_user_roles($c, 'admin');
+        }
+        
+        # Set stash variables
+        $c->stash->{username} = $username;
+        $c->stash->{user_id} = $user_id;
+        $c->stash->{user_roles} = $user_roles;
+        $c->stash->{is_admin} = $is_admin;
+        $c->stash->{user_logged_in} = $user_logged_in;
+        
+        # Initialize navigation variables with defaults to prevent template crashes
+        $c->stash->{main_pages} = [];
+        $c->stash->{member_pages} = [];
+        $c->stash->{coop_pages} = [];
+        $c->stash->{it_pages} = [];
+        $c->stash->{helpdesk_pages} = [];
+        $c->stash->{hosted_pages} = [];
+        $c->stash->{main_links} = [];
+        $c->stash->{member_links} = [];
+        $c->stash->{coop_links} = [];
+        $c->stash->{it_links} = [];
+        $c->stash->{helpdesk_links} = [];
+        $c->stash->{hosted_links} = [];
+        $c->stash->{admin_pages} = [];
+        $c->stash->{admin_links} = [];
+        $c->stash->{private_links} = [];
+        $c->stash->{navigation_error} = '';
+        
+        # Set up navigation data
+        my $site_name = $c->stash->{SiteName} || 'All';
+        my $nav_controller = $c->controller('Navigation');
+        
+        if ($nav_controller) {
+            # Wrap navigation setup with timeout to prevent hanging if database is unreachable
+            eval {
+                local $SIG{ALRM} = sub { die "Navigation setup timeout\n"; };
+                alarm(5);  # 5 second timeout for navigation setup
+                
+                # Ensure navigation tables exist and populate navigation data
+                $nav_controller->populate_navigation($c);
+                
+                alarm(0);  # Cancel alarm on success
+            };
+            alarm(0);  # Make sure alarm is cancelled
+            
+            if ($@) {
+                if ($@ =~ /timeout/i) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                        "Navigation setup timed out (database connectivity issue). Continuing without navigation data.");
+                    # Set empty navigation data to allow page to render
+                    $c->stash->{main_pages} = [];
+                    $c->stash->{member_pages} = [];
+                    $c->stash->{coop_pages} = [];
+                    $c->stash->{it_pages} = [];
+                    $c->stash->{helpdesk_pages} = [];
+                    $c->stash->{hosted_pages} = [];
+                    $c->stash->{main_links} = [];
+                    $c->stash->{member_links} = [];
+                    $c->stash->{coop_links} = [];
+                    $c->stash->{it_links} = [];
+                    $c->stash->{helpdesk_links} = [];
+                    $c->stash->{hosted_links} = [];
+                    $c->stash->{navigation_error} = "Database connection failed. Navigation unavailable.";
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "Navigation setup error: $@");
+                }
+            }
+            
+            # Only get menu items if navigation setup succeeded (no timeout)
+            unless ($@) {
+                # Get main menu items
+                $c->stash->{main_pages} = $nav_controller->get_pages($c, 'Main', $site_name);
+                $c->stash->{member_pages} = $nav_controller->get_pages($c, 'Member', $site_name);
+                $c->stash->{coop_pages} = $nav_controller->get_pages($c, 'Coop', $site_name);
+                $c->stash->{it_pages} = $nav_controller->get_pages($c, 'IT', $site_name);
+                $c->stash->{helpdesk_pages} = $nav_controller->get_pages($c, 'HelpDesk', $site_name);
+                $c->stash->{hosted_pages} = $nav_controller->get_pages($c, 'Hosted', $site_name);
+                
+                # Get internal links
+                $c->stash->{main_links} = $nav_controller->get_internal_links($c, 'Main_links', $site_name);
+                $c->stash->{member_links} = $nav_controller->get_internal_links($c, 'Member_links', $site_name);
+                $c->stash->{coop_links} = $nav_controller->get_internal_links($c, 'Coop_links', $site_name);
+                $c->stash->{it_links} = $nav_controller->get_internal_links($c, 'IT_links', $site_name);
+                $c->stash->{helpdesk_links} = $nav_controller->get_internal_links($c, 'HelpDesk_links', $site_name);
+                $c->stash->{hosted_links} = $nav_controller->get_internal_links($c, 'Hosted_links', $site_name);
+                
+                # Get admin data if user is admin
+                if ($c->stash->{is_admin}) {
+                    $c->stash->{admin_pages} = $nav_controller->get_admin_pages($c, $site_name);
+                    $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
+                }
+                
+                # Get private links for logged in users
+                if ($c->stash->{user_logged_in}) {
+                    $c->stash->{private_links} = $nav_controller->get_private_links($c, $c->session->{username}, $site_name);
+                }
+            }
+            
+            # Get navigation items from the new navigation system (showing private items only to logged-in users)
+            # Temporarily commented out to restore login functionality
+            # eval {
+            #     my $user_logged_in = $c->stash->{user_logged_in} || 0;
+            #     if ($nav_controller->can('get_navigation_tree')) {
+            #         $c->stash->{navigation_main} = $nav_controller->get_navigation_tree($c, 'Main', $user_logged_in);
+            #         $c->stash->{navigation_member} = $nav_controller->get_navigation_tree($c, 'Member', $user_logged_in);
+            #         $c->stash->{navigation_coop} = $nav_controller->get_navigation_tree($c, 'Coop', $user_logged_in);
+            #         $c->stash->{navigation_it} = $nav_controller->get_navigation_tree($c, 'IT', $user_logged_in);
+            #         $c->stash->{navigation_helpdesk} = $nav_controller->get_navigation_tree($c, 'HelpDesk', $user_logged_in);
+            #         $c->stash->{navigation_hosted} = $nav_controller->get_navigation_tree($c, 'Hosted', $user_logged_in);
+            #         
+            #         # Get admin navigation if user is admin
+            #         if ($c->stash->{is_admin}) {
+            #             $c->stash->{navigation_admin} = $nav_controller->get_navigation_tree($c, 'Admin', $user_logged_in);
+            #         }
+            #     }
+            # };
+            # if ($@) {
+            #     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            #         "Error loading new navigation system: $@");
+            # }
+            
+            # Debug logging for menu data
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+                "Menu data loaded for site '$site_name': " .
+                "main_pages=" . (@{$c->stash->{main_pages} || []} . " items, ") .
+                "main_links=" . (@{$c->stash->{main_links} || []} . " items, ") .
+                "user_logged_in=" . ($c->stash->{user_logged_in} ? 'yes' : 'no') . ", " .
+                "is_admin=" . ($c->stash->{is_admin} ? 'yes' : 'no')
+            );
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                "Navigation controller not found - menus will be empty");
+        }
+        
+        return 1; # Continue processing
+    };
+    
+    # Error handling for auto() method
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
+            "Exception in auto() method: $error");
+        
+        # Set HTTP 500 status
+        $c->response->status(500);
+        
+        # Prepare error stash variables for error.tt template
+        $c->stash->{error_title} = 'Application Initialization Error';
+        $c->stash->{error_msg} = 'An error occurred while initializing the application.';
+        $c->stash->{technical_details} = $error;
+        $c->stash->{template} = 'error.tt';
+        
+        # Use detach() to cleanly exit and let default view rendering handle it
+        # DO NOT use forward() as it can cause infinite loops with view processing
+        $c->detach( $c->view('TT') );
+        
+        # Return 0 to halt further action processing after error
+        return 0;
     }
     
-    return 1; # Continue processing
+    return 1;
+}
+
+sub health :Path('/health') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Simple health check endpoint - returns 200 OK without database queries
+    # Used by Docker health checks and monitoring systems
+    $c->response->content_type('application/json');
+    $c->response->body('{"status":"ok","timestamp":"' . time() . '"}');
+    return;
 }
 
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
-    $c->stash->{forwarder} = '/'; # Set a default forward path
+    # LAYER 2: Index Action Protection - wrap entire action in error handling
+    eval {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
+        $c->stash->{forwarder} = '/'; # Set a default forward path
 
-    # Log if there's a view parameter, but don't handle specific views here
-    if ($c->req->param('view')) {
-        my $view = $c->req->param('view');
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
-    }
-
-    # Get ControllerName from the session
-    my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
-
-    if ($ControllerName && $ControllerName ne 'Root') {
-        # Check if the controller exists before attempting to detach
-        my $controller_exists = 0;
-        eval {
-            # Try to get the controller object
-            my $controller = $c->controller($ControllerName);
-            $controller_exists = 1 if $controller;
-        };
-
-        if ($controller_exists) {
-            # Forward to the controller's index action
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
-
-            # Use a standard redirect to the controller's path
-            # This is a more reliable approach that works for all controllers
-            $c->response->redirect("/$ControllerName");
-            $c->detach();
-        } else {
-            # Log the error and fall back to Root's index template
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "Controller '$ControllerName' not found or not loaded. Falling back to Root's index template.");
-
-            # Set a flash message for debugging
-            $c->flash->{error_msg} = "Controller '$ControllerName' not found. Please try again or contact the administrator.";
-
-            # Default to Root's index template
-            $c->stash(template => 'index.tt');
-            $c->forward($c->view('TT'));
+        # Log if there's a view parameter, but don't handle specific views here
+        if ($c->req->param('view')) {
+            my $view = $c->req->param('view');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
-    } else {
-        # Default to Root's index template
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
-        $c->stash(template => 'index.tt');
-        $c->forward($c->view('TT'));
-    }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Completed index action");
-    return 1; # Allow the request to proceed
+        # Get ControllerName from the session
+        my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
+
+        if ($ControllerName && $ControllerName ne 'Root') {
+            # Check if the controller exists before attempting to detach
+            my $controller_exists = 0;
+            eval {
+                # Try to get the controller object
+                my $controller = $c->controller($ControllerName);
+                $controller_exists = 1 if $controller;
+            };
+
+            if ($controller_exists) {
+                # Forward to the controller's index action
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
+
+                # Use a standard redirect to the controller's path
+                # This is a more reliable approach that works for all controllers
+                $c->response->redirect("/$ControllerName");
+                $c->detach();
+            } else {
+                # Log the error and fall back to Root's index template
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                    "Controller '$ControllerName' not found or not loaded. Falling back to Root's index template.");
+
+                # Set a flash message for debugging
+                $c->flash->{error_msg} = "Controller '$ControllerName' not found. Please try again or contact the administrator.";
+
+                # Default to Root's index template - let default view rendering handle it
+                $c->stash(template => 'index.tt');
+                return 1;
+            }
+        } else {
+            # Default to Root's index template - let default view rendering handle it
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
+            $c->stash(template => 'index.tt');
+            return 1;
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Completed index action");
+        return 1; # Allow the request to proceed
+    };
+    
+    # Error handling for index() method
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
+            "Exception in index() action: $error");
+        
+        # Set HTTP 500 status
+        $c->response->status(500);
+        
+        # Prepare error stash variables for error.tt template
+        $c->stash->{error_title} = 'Home Page Error';
+        $c->stash->{error_msg} = 'An error occurred while loading the home page.';
+        $c->stash->{technical_details} = $error;
+        $c->stash->{template} = 'error.tt';
+        
+        # Use detach() to cleanly exit and let default view rendering handle it
+        # DO NOT use forward() as it can cause infinite loops with view processing
+        $c->detach( $c->view('TT') );
+        
+        return 0; # Halt further processing
+    }
 }
 
 
@@ -569,10 +726,6 @@ sub track_application_start {
     } else {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "JSON file $json_file does not exist");
     }
-}
-
-sub auto :Private {
-    my ($self, $c) = @_;
     
     # Temporarily add back the uri_no_port function to prevent template errors
     # This will be removed once all templates are updated
@@ -619,15 +772,67 @@ sub auto :Private {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
 
-    # Get server information
+    # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
+    # This section (lines 775-827) provides server information for the debug bar UI
+    # which displays hostname, IP, and database connection info to admins/debug mode.
+    # Removing this breaks admin diagnostic capability and page rendering visibility.
+    
+    # Get server information - extract from database connection if available
+    my $db_host = 'Unknown';
     my $system_info = Comserv::Util::SystemInfo::get_system_info();
-    $c->stash->{server_hostname} = $system_info->{hostname};
+    
+    # Populate database connections information for debug display
+    my @db_connections;
+    eval {
+        # Try to get database connection info from active models
+        if ($c->model('DBEncy')) {
+            my $conn_info = $c->model('DBEncy')->get_connection_info();
+            my $dsn = $conn_info->{current_dsn};
+            
+            # Extract host from DSN: DBI:mysql:database=xyz;host=192.168.1.198;port=3306
+            my $host = 'Unknown';
+            if ($dsn && $dsn =~ /host=([^;]+)/) {
+                $host = $1;
+                $db_host = $host if $db_host eq 'Unknown';  # Use first available host
+            }
+            
+            push @db_connections, {
+                type => 'DBEncy',
+                name => 'Ency',
+                ip => $host
+            };
+        }
+        if ($c->model('DBForager')) {
+            my $conn_info = $c->model('DBForager')->get_connection_info();
+            my $dsn = $conn_info->{current_dsn};
+            
+            # Extract host from DSN
+            my $host = 'Unknown';
+            if ($dsn && $dsn =~ /host=([^;]+)/) {
+                $host = $1;
+                $db_host = $host if $db_host eq 'Unknown';  # Use first available host
+            }
+            
+            push @db_connections, {
+                type => 'DBForager',
+                name => 'Forager',
+                ip => $host
+            };
+        }
+    };
+    $c->stash->{db_connections} = \@db_connections;
+    
+    # Set server_hostname to the actual database host (primary server)
+    $c->stash->{server_hostname} = $db_host ne 'Unknown' ? $db_host : $system_info->{hostname};
+    
+    # Set server_ip to the actual server's network IP
     $c->stash->{server_ip} = $system_info->{ip};
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
-        "Server info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
+        "Server info - DB Host: $db_host, Hostname: " . $system_info->{hostname} . ", IP: " . $system_info->{ip});
 
-    # Perform general setup tasks
-    $self->setup_debug_mode($c);
+    # Debug mode already set in initial auto method - no additional setup needed
+    # (setup_debug_mode method is deprecated; use direct session flag setting)
     
     # Test database connections if in debug mode
     if ($c->session->{debug_mode}) {
@@ -976,9 +1181,8 @@ sub setup_site {
             $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
             push @{$c->stash->{debug_msg}}, "Domain Error ($error_type): $technical_details";
 
-            # Forward to the error template and stop processing
-            $c->forward($c->view('TT'));
-            $c->detach(); # Ensure we stop processing here and show the error page
+            # Detach to the error template and stop processing
+            $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         } else {
             # Generic error case (should not happen with our improved error handling)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
@@ -1042,9 +1246,8 @@ sub setup_site {
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: This domain ($domain) is not properly configured in the system.";
 
-            # Forward to the error template and stop processing
-            $c->forward($c->view('TT'));
-            $c->detach(); # Ensure we stop processing here and show the error page
+            # Detach to the error template and stop processing
+            $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         }
     }
 
@@ -1229,8 +1432,41 @@ sub reset_session :Global {
     $c->response->redirect($c->uri_for('/'));
 }
 
+# Request lifecycle: Begin - log request start
+sub begin : Private {
+    my ($self, $c) = @_;
+    
+    # Store request start time for timing analysis
+    $c->stash->{_request_start_time} = time();
+    $c->stash->{_request_start_hires} = [gettimeofday()];
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "[REQUEST_START] Method: " . $c->req->method . 
+        " Path: " . $c->req->path . 
+        " at " . scalar(localtime($c->stash->{_request_start_time})));
+}
 
-sub end : ActionClass('RenderView') {}
+sub end : ActionClass('RenderView') {
+    my ($self, $c) = @_;
+    
+    # Calculate request duration
+    if ($c->stash->{_request_start_time}) {
+        my $duration = time() - $c->stash->{_request_start_time};
+        my $status = $c->response->status || 'unknown';
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'end', 
+            "[REQUEST_END] Method: " . $c->req->method . 
+            " Path: " . $c->req->path . 
+            " Status: " . $status . 
+            " Duration: ${duration}s");
+        
+        # Warn if request took too long
+        if ($duration > 5) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'end', 
+                "[SLOW_REQUEST] Request took ${duration}s - may indicate database hang or processing issue");
+        }
+    }
+}
 
 # Default action for handling 404 errors
 sub default :Path {
