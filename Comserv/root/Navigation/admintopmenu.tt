@@ -9,7 +9,7 @@
 %]
 [% PageVersion = 'admintopmenu.tt,v 0.5 2025/10/06 ai_assistant Exp ai_assistant ' %]
 [% IF debug == 1 %]
-    [% PageVersion %]
+    [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
 [% END %]
 <li class="horizontal-dropdown">

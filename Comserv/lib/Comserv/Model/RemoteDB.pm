@@ -215,7 +215,11 @@ sub test_connection {
             });
         } else {
             # MySQL/MariaDB connection
-            my $driver = 'mysql';
+            # Use the driver from config (mariadb, mysql) or default to mysql
+            my $driver = $connection_config->{db_type} || 'mysql';
+            # Normalize driver names: 'mariadb' -> 'MariaDB', 'mysql' -> 'mysql'
+            $driver = 'MariaDB' if $driver eq 'mariadb';
+            
             $dsn = "dbi:$driver:database=" . $connection_config->{database} . 
                    ";host=" . $connection_config->{host} . 
                    ";port=" . $connection_config->{port};
