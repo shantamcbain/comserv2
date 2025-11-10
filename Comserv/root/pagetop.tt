@@ -1,6 +1,9 @@
 
 
 [% PageVersion = 'root/pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 [% SET roles = c.session.roles || [] %]
 [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
 
@@ -14,10 +17,10 @@
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
-        Server: <strong>[% server_hostname %]</strong> | 
-        Server IP: <strong>[% server_ip %]</strong>[% IF db_connections && db_connections.size > 0 %] | 
-        Databases: [% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% END %]
-        [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %] |
+        Catalyst Server: <strong>[% server_hostname || 'Unknown' %]</strong> |
+        Server IP: <strong>[% server_ip || 'Unknown' %]</strong> |
+        Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %]
+        [% IF c.session.debug_mode == 1 %] | [% END %] |
         [% IF is_admin %]
         <button id="css-edit-toggle" style="background: #4a90e2; color: white; border: none; border-radius: 3px; padding: 2px 10px; margin-left: 10px; cursor: pointer; font-size: 12px;">
             <i class="fas fa-paint-brush"></i> Toggle CSS Edit

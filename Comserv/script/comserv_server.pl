@@ -26,6 +26,26 @@ BEGIN {
 
     # Add the lib directory to @INC
     use FindBin;
+    
+    # CRITICAL FIX (November 2025): Ensure main lib/ takes ABSOLUTE PRIORITY over blib/lib/
+    # Module::Install may add blib/lib to @INC, which shadows current source code.
+    # This affects all three ports (3001 manual, 5000 Docker, 3000 Docker) and the test suite.
+    # Solution: Explicitly unshift main lib paths to BEGINNING of @INC before any other module loading.
+    # Then remove any blib/lib entries that Module::Install may have added.
+    
+    # STEP 1: Remove any blib/lib entries from @INC (Module::Install artifact)
+    @INC = grep { 
+        $_ !~ /blib[\/\\]lib/ && 
+        $_ !~ /\Qblib\E/ 
+    } @INC;
+    
+    # STEP 2: Add main lib path to VERY BEGINNING of @INC via unshift (takes absolute priority)
+    unshift @INC, "$FindBin::Bin/../lib";
+    
+    # STEP 3: Also add project root for relative module loading
+    unshift @INC, "$FindBin::Bin/..";
+    
+    # Traditional use lib statements (for compatibility) - now comes AFTER unshift
     use lib "$FindBin::Bin/../lib";
     use lib "$FindBin::Bin/..";
 
@@ -81,6 +101,19 @@ BEGIN {
         foreach my $path (@arch_paths) {
             print "  $path\n" if -d $path;
         }
+        
+        # CRITICAL DEBUG (November 2025): Verify blib/lib is NOT in @INC
+        print "\nDEBUG: CRITICAL - Checking for blib/ shadowing in \@INC:\n";
+        my $has_blib = grep { /blib/ } @INC;
+        if ($has_blib) {
+            print "  WARNING: blib/ found in \@INC - may cause stale code loading!\n";
+            foreach my $path (@INC) {
+                print "    $path\n" if $path =~ /blib/;
+            }
+        } else {
+            print "  OK: No blib/ entries in \@INC\n";
+        }
+        print "  First lib path in \@INC: $INC[0]\n";
     }
 }
 

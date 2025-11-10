@@ -31,7 +31,12 @@ Returns the hostname of the server
 =cut
 
 sub get_server_hostname {
-    return hostname();
+    my $name = hostname();
+    # CRITICAL: Ensure return value is never empty - must be valid hostname or 'Unknown'
+    if (!$name || $name eq '') {
+        return 'Unknown';
+    }
+    return $name;
 }
 
 =head2 get_server_ip
@@ -136,8 +141,12 @@ sub get_server_ip {
         $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_server_ip', "Error getting server IP: $@");
     }
     
-    # Return the IP or a default message
-    return $ip || 'Unknown';
+    # CRITICAL: Ensure return value is never empty string - must be valid IP or 'Unknown'
+    # Don't return undef or empty values as they display as blank in templates
+    if (!$ip || $ip eq '') {
+        return 'Unknown';
+    }
+    return $ip;
 }
 
 =head2 get_system_info

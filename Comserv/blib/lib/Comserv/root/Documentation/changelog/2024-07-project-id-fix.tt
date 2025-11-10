@@ -1,0 +1,78 @@
+[% META title = 'Project ID Fix in Todo System - July 2024' %]
+[% PageVersion = 'changelog/2024-07-project-id-fix.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+[% WRAPPER 'site/layout.tt' %]
+
+<h1>Project ID Fix in Todo System - July 2024</h1>
+
+<h2>Issue Description</h2>
+
+<p>The Todo system was experiencing an error when creating new todo items. The error message was:</p>
+
+<pre>
+DBIx::Class::Storage::DBI::_dbh_execute(): DBI Exception: DBD::mysql::st execute failed: Column 'project_id' cannot be null [for Statement "INSERT INTO todo (...) VALUES (...)" with ParamValues: ... 15=undef, ...]
+</pre>
+
+<p>This error occurred because the project selection dropdown in the project_list.tt template was using incorrect field names, causing the selected project ID not to be passed to the controller.</p>
+
+<h2>Root Cause</h2>
+
+<p>In the project_list.tt template, the select element was defined with:</p>
+
+<pre>
+&lt;select id="parent_id" name="parent_id"&gt;
+    &lt;option value="" [% IF !selected_project_id %]selected[% END %]&gt;None&lt;/option&gt;
+    [% display_project_options(projects, selected_project_id, 0) %]
+&lt;/select&gt;
+</pre>
+
+<p>However, the Todo controller's create method was expecting a parameter named project_id:</p>
+
+<pre>
+my $project_id = $c-&gt;request-&gt;params-&gt;{project_id};
+</pre>
+
+<p>This mismatch in field names caused the project_id parameter to be null when creating a new todo item.</p>
+
+<h2>Solution</h2>
+
+<p>The fix was to update the select element in the project_list.tt template to use the correct field name:</p>
+
+<pre>
+&lt;select id="project_id" name="project_id"&gt;
+    &lt;option value="" [% IF !selected_project_id %]selected[% END %]&gt;None&lt;/option&gt;
+    [% display_project_options(projects, selected_project_id, 0) %]
+&lt;/select&gt;
+</pre>
+
+<p>This ensures that when the form is submitted, the selected project ID is passed with the parameter name project_id, which is what the controller is expecting.</p>
+
+<h2>Implementation Details</h2>
+
+<ol>
+<li>Identified the issue by examining the error message and tracing it to the relevant code.</li>
+<li>Located the project_list.tt template and found the mismatch in field names.</li>
+<li>Updated the select element to use id="project_id" name="project_id" instead of id="parent_id" name="parent_id".</li>
+<li>Verified that the fix resolved the issue by testing the creation of a new todo item.</li>
+</ol>
+
+<h2>Impact</h2>
+
+<p>This fix ensures that:</p>
+<ul>
+<li>New todo items can be created with the correct project association</li>
+<li>The project_id field is properly populated in the database</li>
+<li>Users can select projects from the dropdown and have them correctly associated with their todo items</li>
+</ul>
+
+<h2>Date Implemented</h2>
+
+<p>July 2024</p>
+
+[% END %]
