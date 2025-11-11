@@ -169,7 +169,8 @@ around 'finalize_error' => sub {
     my ($orig, $self, $c) = @_;
     
     # Log all unhandled errors with context
-    if (my $error = $c->error->[0]) {
+    if ($c->error && @{$c->error}) {
+        my $error = $c->error->[0];
         my $error_msg = ref $error ? $error->message : $error;
         my $logger = Comserv::Util::Logging->instance;
         $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',

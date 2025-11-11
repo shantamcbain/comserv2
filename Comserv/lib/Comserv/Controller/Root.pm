@@ -22,6 +22,7 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+
 # Add user_exists method
 sub user_exists {
     my ($self, $c) = @_;
@@ -162,6 +163,15 @@ has '_theme_css_generated' => (
 BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
+
+sub get_server_ip :Private {
+    my ($self, $c) = @_;
+    
+    my $ip = `ip route get 1.1.1.1 | awk '{print \$7; exit}'`;
+    chomp($ip);
+    
+    return $ip || 'unknown';
+}
 
 # Auto method to set up common stash variables for all requests
 sub auto :Private {
@@ -381,6 +391,243 @@ sub auto :Private {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
                 "Navigation controller not found - menus will be empty");
         }
+        
+        # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
+        # This section provides server information for the debug bar UI
+        # which displays hostname, IP, and database connection info to admins/debug mode.
+        # Removing this breaks admin diagnostic capability and page rendering visibility.
+        
+        # Get server information - extract from database connection if available
+        my $db_host = 'Unknown';
+        my $system_info = Comserv::Util::SystemInfo::get_system_info();
+        
+        # Validate system_info returned valid data, add defaults if needed
+        if (!$system_info || !ref($system_info)) {
+            $system_info = {
+                hostname => 'Unknown',
+                ip => 'Unknown',
+                os => $^O,
+                perl_version => $^V,
+            };
+        }
+        
+        # CRITICAL: Ensure system_info values are never empty strings - treat empty as Unknown
+        $system_info->{hostname} = 'Unknown' if !$system_info->{hostname} || $system_info->{hostname} eq '';
+        $system_info->{ip} = 'Unknown' if !$system_info->{ip} || $system_info->{ip} eq '';
+        
+        # Populate database connections information for debug display
+        my @db_connections;
+        eval {
+            # Try to get database connection info from active models
+            if ($c->model('DBEncy')) {
+                eval {
+                    my $conn_info = $c->model('DBEncy')->get_connection_info();
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                        "DBEncy connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
+                        
+                    if ($conn_info && ref($conn_info) eq 'HASH') {
+                        my $dsn = $conn_info->{current_dsn};
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "DBEncy DSN: $dsn");
+                        
+                        # Extract host from DSN: DBI:mysql:database=xyz;host=192.168.1.198;port=3306
+                        # or dbi:MariaDB:database=ency;host=192.168.1.198;port=3306
+                        my $host = 'Unknown';
+                        if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
+                            if ($dsn =~ /host=([^;]+)/) {
+                                $host = $1;
+                                # Clean up host value
+                                $host =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBEncy host extracted: $host");
+                            } else {
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBEncy DSN has no host= pattern (likely SQLite): $dsn");
+                            }
+                        }
+                        
+                        push @db_connections, {
+                            type => 'DBEncy',
+                            name => 'Ency',
+                            ip => $host
+                        };
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "Added DBEncy to db_connections with host: $host");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                            "DBEncy connection info is not a valid hash ref");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                        "Error extracting DBEncy connection info: $@");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                    "DBEncy model not available");
+            }
+            
+            if ($c->model('DBForager')) {
+                eval {
+                    my $conn_info = $c->model('DBForager')->get_connection_info();
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                        "DBForager connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
+                        
+                    if ($conn_info && ref($conn_info) eq 'HASH') {
+                        my $dsn = $conn_info->{current_dsn};
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "DBForager DSN: $dsn");
+                        
+                        # Extract host from DSN
+                        my $host = 'Unknown';
+                        if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
+                            if ($dsn =~ /host=([^;]+)/) {
+                                $host = $1;
+                                # Clean up host value
+                                $host =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBForager host extracted: $host");
+                            } else {
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBForager DSN has no host= pattern (likely SQLite): $dsn");
+                            }
+                        }
+                        
+                        push @db_connections, {
+                            type => 'DBForager',
+                            name => 'Forager',
+                            ip => $host
+                        };
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "Added DBForager to db_connections with host: $host");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                            "DBForager connection info is not a valid hash ref");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                        "Error extracting DBForager connection info: $@");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                    "DBForager model not available");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                "Error in database connection extraction: $@");
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+            "Database connections collected: " . scalar(@db_connections) . " entries");
+        
+        # CRITICAL FALLBACK: If no database connections were added from models,
+        # add a placeholder entry to ensure debug bar shows database info
+        if (scalar(@db_connections) == 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                "No database connections collected from models - adding fallback entries");
+            
+            # Add placeholder entries so the debug bar displays SOMETHING
+            push @db_connections, {
+                type => 'DBEncy',
+                name => 'Ency (fallback)',
+                ip => 'Not available'
+            };
+            push @db_connections, {
+                type => 'DBForager',
+                name => 'Forager (fallback)',
+                ip => 'Not available'
+            };
+        }
+        
+        # FALLBACK: If no host extracted from models (they may have fallen back to SQLite),
+        # try to read db_config.json directly to get the configured primary database host
+        if ($db_host eq 'Unknown') {
+            eval {
+                require JSON;
+                my $config_paths = [
+                    '/opt/comserv/db_config.json',  # Docker/production path
+                    $ENV{COMSERV_DB_CONFIG},  # Environment variable override
+                    (exists $ENV{CATALYST_ROOT}) ? ($ENV{CATALYST_ROOT} . '/../db_config.json') : (),
+                ];
+                
+                foreach my $config_path (@$config_paths) {
+                    next unless $config_path && -f $config_path;
+                    
+                    eval {
+                        local $/;
+                        open my $fh, '<', $config_path or die "Cannot open $config_path: $!";
+                        my $json_text = <$fh>;
+                        close $fh;
+                        
+                        my $config = JSON::decode_json($json_text);
+                        
+                        # Get the first non-placeholder production connection (highest priority)
+                        foreach my $conn_name (sort {
+                            ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
+                        } keys %$config) {
+                            my $conn = $config->{$conn_name};
+                            next unless ref($conn) eq 'HASH';
+                            next if $conn->{db_type} && $conn->{db_type} eq 'sqlite';  # Skip SQLite
+                            next unless $conn->{host};
+                            next if $conn->{host} =~ /YOUR_|PLACEHOLDER|localhost/i;  # Skip placeholders and localhost
+                            
+                            $db_host = $conn->{host};
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                                "Extracted DB host from config: $db_host (from $conn_name)");
+                            last;
+                        }
+                    };
+                    last if $db_host ne 'Unknown';
+                }
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                "DB config fallback: db_host = $db_host") if $db_host ne 'Unknown';
+        }
+        
+        $c->stash->{db_connections} = \@db_connections;
+        
+        # CRITICAL DIAGNOSTICS: Log actual values before stash assignment
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "DEBUG: system_info->{hostname}='" . (defined $system_info->{hostname} ? $system_info->{hostname} : 'UNDEF') . "', " .
+            "system_info->{ip}='" . (defined $system_info->{ip} ? $system_info->{ip} : 'UNDEF') . "', " .
+            "db_host='$db_host'");
+        
+        # Set server_hostname to the actual database host (primary server)
+        # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
+        my $display_hostname = $db_host ne 'Unknown' ? $db_host : $system_info->{hostname};
+        # Final safety check - ensure it's never empty or undef
+        $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
+        
+        # CRITICAL: Before setting stash, log the exact value being set
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: About to set server_hostname='$display_hostname' into stash");
+        $c->stash->{server_hostname} = $display_hostname;
+        
+        # Verify stash was actually set
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: Verified stash server_hostname='" . $c->stash->{server_hostname} . "'");
+        
+        # Set server_ip to the actual server's network IP (Docker container IP for Catalyst)
+        # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
+        my $display_ip = $system_info->{ip};
+        # Final safety check - ensure it's never empty or undef
+        $display_ip = 'Unknown' if !$display_ip || $display_ip eq '';
+        
+        # CRITICAL: Before setting stash, log the exact value being set
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
+        $c->stash->{server_ip} = $display_ip;
+        
+        # Verify stash was actually set
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: Verified stash server_ip='" . $c->stash->{server_ip} . "'");
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+            "Server info - DB Host: $db_host, Hostname: $display_hostname, IP: $display_ip");
         
         return 1; # Continue processing
     };
@@ -770,274 +1017,6 @@ sub track_application_start {
         }
         $self->_theme_css_generated(1);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
-    }
-
-    # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
-    # This section (lines 775-827) provides server information for the debug bar UI
-    # which displays hostname, IP, and database connection info to admins/debug mode.
-    # Removing this breaks admin diagnostic capability and page rendering visibility.
-    
-    # Get server information - extract from database connection if available
-    my $db_host = 'Unknown';
-    my $system_info = Comserv::Util::SystemInfo::get_system_info();
-    
-    # Validate system_info returned valid data, add defaults if needed
-    if (!$system_info || !ref($system_info)) {
-        $system_info = {
-            hostname => 'Unknown',
-            ip => 'Unknown',
-            os => $^O,
-            perl_version => $^V,
-        };
-    }
-    
-    # CRITICAL: Ensure system_info values are never empty strings - treat empty as Unknown
-    $system_info->{hostname} = 'Unknown' if !$system_info->{hostname} || $system_info->{hostname} eq '';
-    $system_info->{ip} = 'Unknown' if !$system_info->{ip} || $system_info->{ip} eq '';
-    
-    # Populate database connections information for debug display
-    my @db_connections;
-    eval {
-        # Try to get database connection info from active models
-        if ($c->model('DBEncy')) {
-            eval {
-                my $conn_info = $c->model('DBEncy')->get_connection_info();
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                    "DBEncy connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
-                    
-                if ($conn_info && ref($conn_info) eq 'HASH') {
-                    my $dsn = $conn_info->{current_dsn};
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                        "DBEncy DSN: $dsn");
-                    
-                    # Extract host from DSN: DBI:mysql:database=xyz;host=192.168.1.198;port=3306
-                    # or dbi:MariaDB:database=ency;host=192.168.1.198;port=3306
-                    my $host = 'Unknown';
-                    if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
-                        if ($dsn =~ /host=([^;]+)/) {
-                            $host = $1;
-                            # Clean up host value
-                            $host =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
-                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                                "DBEncy host extracted: $host");
-                        } else {
-                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                                "DBEncy DSN has no host= pattern (likely SQLite): $dsn");
-                        }
-                    }
-                    
-                    push @db_connections, {
-                        type => 'DBEncy',
-                        name => 'Ency',
-                        ip => $host
-                    };
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                        "Added DBEncy to db_connections with host: $host");
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                        "DBEncy connection info is not a valid hash ref");
-                }
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                    "Error extracting DBEncy connection info: $@");
-            }
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                "DBEncy model not available");
-        }
-        
-        if ($c->model('DBForager')) {
-            eval {
-                my $conn_info = $c->model('DBForager')->get_connection_info();
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                    "DBForager connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
-                    
-                if ($conn_info && ref($conn_info) eq 'HASH') {
-                    my $dsn = $conn_info->{current_dsn};
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                        "DBForager DSN: $dsn");
-                    
-                    # Extract host from DSN
-                    my $host = 'Unknown';
-                    if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
-                        if ($dsn =~ /host=([^;]+)/) {
-                            $host = $1;
-                            # Clean up host value
-                            $host =~ s/^\s+|\s+$//g;  # Trim whitespace
-                            $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
-                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                                "DBForager host extracted: $host");
-                        } else {
-                            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                                "DBForager DSN has no host= pattern (likely SQLite): $dsn");
-                        }
-                    }
-                    
-                    push @db_connections, {
-                        type => 'DBForager',
-                        name => 'Forager',
-                        ip => $host
-                    };
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
-                        "Added DBForager to db_connections with host: $host");
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                        "DBForager connection info is not a valid hash ref");
-                }
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                    "Error extracting DBForager connection info: $@");
-            }
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-                "DBForager model not available");
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-            "Error in database connection extraction: $@");
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
-        "Database connections collected: " . scalar(@db_connections) . " entries");
-    
-    # CRITICAL FALLBACK: If no database connections were added from models,
-    # add a placeholder entry to ensure debug bar shows database info
-    if (scalar(@db_connections) == 0) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
-            "No database connections collected from models - adding fallback entries");
-        
-        # Add placeholder entries so the debug bar displays SOMETHING
-        push @db_connections, {
-            type => 'DBEncy',
-            name => 'Ency (fallback)',
-            ip => 'Not available'
-        };
-        push @db_connections, {
-            type => 'DBForager',
-            name => 'Forager (fallback)',
-            ip => 'Not available'
-        };
-    }
-    
-    # FALLBACK: If no host extracted from models (they may have fallen back to SQLite),
-    # try to read db_config.json directly to get the configured primary database host
-    if ($db_host eq 'Unknown') {
-        eval {
-            require JSON;
-            my $config_paths = [
-                '/opt/comserv/db_config.json',  # Docker/production path
-                $ENV{COMSERV_DB_CONFIG},  # Environment variable override
-                (exists $ENV{CATALYST_ROOT}) ? ($ENV{CATALYST_ROOT} . '/../db_config.json') : (),
-            ];
-            
-            foreach my $config_path (@$config_paths) {
-                next unless $config_path && -f $config_path;
-                
-                eval {
-                    local $/;
-                    open my $fh, '<', $config_path or die "Cannot open $config_path: $!";
-                    my $json_text = <$fh>;
-                    close $fh;
-                    
-                    my $config = JSON::decode_json($json_text);
-                    
-                    # Get the first non-placeholder production connection (highest priority)
-                    foreach my $conn_name (sort {
-                        ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
-                    } keys %$config) {
-                        my $conn = $config->{$conn_name};
-                        next unless ref($conn) eq 'HASH';
-                        next if $conn->{db_type} && $conn->{db_type} eq 'sqlite';  # Skip SQLite
-                        next unless $conn->{host};
-                        next if $conn->{host} =~ /YOUR_|PLACEHOLDER|localhost/i;  # Skip placeholders and localhost
-                        
-                        $db_host = $conn->{host};
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-                            "Extracted DB host from config: $db_host (from $conn_name)");
-                        last;
-                    }
-                };
-                last if $db_host ne 'Unknown';
-            }
-        };
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-            "DB config fallback: db_host = $db_host") if $db_host ne 'Unknown';
-    }
-    
-    $c->stash->{db_connections} = \@db_connections;
-    
-    # CRITICAL DIAGNOSTICS: Log actual values before stash assignment
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-        "DEBUG: system_info->{hostname}='" . (defined $system_info->{hostname} ? $system_info->{hostname} : 'UNDEF') . "', " .
-        "system_info->{ip}='" . (defined $system_info->{ip} ? $system_info->{ip} : 'UNDEF') . "', " .
-        "db_host='$db_host'");
-    
-    # Set server_hostname to the actual database host (primary server)
-    # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
-    my $display_hostname = $db_host ne 'Unknown' ? $db_host : $system_info->{hostname};
-    # Final safety check - ensure it's never empty or undef
-    $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
-    
-    # CRITICAL: Before setting stash, log the exact value being set
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-        "CRITICAL DEBUG: About to set server_hostname='$display_hostname' into stash");
-    $c->stash->{server_hostname} = $display_hostname;
-    
-    # Verify stash was actually set
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-        "CRITICAL DEBUG: Verified stash server_hostname='" . $c->stash->{server_hostname} . "'");
-    
-    # Set server_ip to the actual server's network IP (Docker container IP for Catalyst)
-    # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
-    my $display_ip = $system_info->{ip};
-    # Final safety check - ensure it's never empty or undef
-    $display_ip = 'Unknown' if !$display_ip || $display_ip eq '';
-    
-    # CRITICAL: Before setting stash, log the exact value being set
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-        "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
-    $c->stash->{server_ip} = $display_ip;
-    
-    # Verify stash was actually set
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-        "CRITICAL DEBUG: Verified stash server_ip='" . $c->stash->{server_ip} . "'");
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
-        "Server info - DB Host: $db_host, Hostname: $display_hostname, IP: $display_ip");
-
-    # Debug mode already set in initial auto method - no additional setup needed
-    # (setup_debug_mode method is deprecated; use direct session flag setting)
-    
-    # Test database connections if in debug mode
-    if ($c->session->{debug_mode}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Testing database connections in debug mode");
-        
-        # Add database connection status to debug messages
-        my $debug_msg = $c->stash->{debug_msg} ||= [];
-        push @$debug_msg, "Database connection check initiated. See logs for details.";
-        
-        # Test connections using the test_connection methods we added
-        eval {
-            if ($c->model('DBEncy')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBEncy connection successful");
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBEncy connection error: $@");
-        }
-        
-        eval {
-            if ($c->model('DBForager')->test_connection($c)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "DBForager connection successful");
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "DBForager connection error: $@");
-        }
     }
     
     $self->setup_site($c);
@@ -1611,7 +1590,7 @@ sub reset_session :Global {
 }
 
 # Request lifecycle: Begin - log request start
-sub begin : Private {
+sub begin :Private {
     my ($self, $c) = @_;
     
     # Store request start time for timing analysis

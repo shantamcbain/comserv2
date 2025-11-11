@@ -73,12 +73,17 @@ sub _load_config {
         die "Could not locate db_config.json in any known location" unless $config_file;
         die "db_config.json not readable: $config_file" unless -r $config_file;
         
+        # DEBUGGING: Output to STDERR so we know config loading is working
+        warn "[RemoteDB] Loading config from: $config_file\n";
+        
         # Read and decode the JSON config
         local $/;
         open my $fh, "<", $config_file or die "Could not open $config_file: $!";
         my $json_text = <$fh>;
         close $fh;
         $config = decode_json($json_text);
+        
+        warn "[RemoteDB] Config loaded successfully, keys: " . join(', ', keys %$config) . "\n";
 
         # Apply environment variable overrides (for Docker/Kubernetes environments)
         # This allows credentials and hostnames to be set via environment without changing db_config.json
@@ -197,11 +202,13 @@ sub test_connection {
         "Testing connection: " . ($connection_config->{description} || 'Unknown'));
     
     my $success = 0;
+    my $error_msg = '';
     
     eval {
         require DBI;
         my $dsn;
         my $dbh;
+        my $driver = '';
         
         if (defined $connection_config->{db_type} && $connection_config->{db_type} eq 'sqlite') {
             # SQLite connection
@@ -215,13 +222,36 @@ sub test_connection {
             });
         } else {
             # MySQL/MariaDB connection
+            # CRITICAL FIX (November 2025): Select available database driver
             # Use the driver from config (mariadb, mysql) or default to mysql
-            my $driver = $connection_config->{db_type} || 'mysql';
+            $driver = $connection_config->{db_type} || 'mysql';
             # Normalize driver names: 'mariadb' -> 'MariaDB', 'mysql' -> 'mysql'
             $driver = 'MariaDB' if $driver eq 'mariadb';
             
+            # Check if the preferred driver is actually available, fall back to mysql if not
+            if ($driver eq 'MariaDB') {
+                my $mariadb_available = 0;
+                eval {
+                    require DBD::MariaDB;
+                    $mariadb_available = 1;
+                };
+                
+                if (!$mariadb_available) {
+                    # Fall back to mysql driver
+                    eval {
+                        require DBD::mysql;
+                        $driver = 'mysql';
+                    };
+                    if ($@) {
+                        $error_msg = "DBD::mysql not available: $@";
+                        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
+                            "Driver availability error: $error_msg");
+                    }
+                }
+            }
+            
             $dsn = "dbi:$driver:database=" . $connection_config->{database} . 
-                   ";host=" . $connection_config->{host} . 
+                   ";host=" . $connection_config->{host} .  
                    ";port=" . $connection_config->{port};
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
                 "DB DSN ($driver): $dsn with user: " . $connection_config->{username});
@@ -233,7 +263,6 @@ sub test_connection {
             };
             # Only add mysql_connect_timeout for mysql driver
             if ($driver eq 'mysql' || $driver eq 'MariaDB') {
-                $connect_attrs->{mysql_connect_timeout} = 5;
             }
             
             $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, $connect_attrs);
@@ -244,18 +273,24 @@ sub test_connection {
                 "Connection SUCCESSFUL for: " . ($connection_config->{description} || 'Unknown'));
             $dbh->disconnect();
             $success = 1;
+            $error_msg = '';
         } else {
+            $error_msg = $DBI::errstr || 'Unknown error';
             $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
-                "Connection FAILED for: " . ($connection_config->{description} || 'Unknown') . " - Error: " . ($DBI::errstr || 'Unknown error'));
+                "Connection FAILED for: " . ($connection_config->{description} || 'Unknown') . " - Error: $error_msg");
         }
     };
     if ($@) {
+        $error_msg = $@;
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
-            "Exception during connection test: $@");
+            "Exception during connection test: $error_msg");
     }
     
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
         "Connection test result for " . ($connection_config->{description} || 'Unknown') . ": " . ($success ? 'SUCCESS' : 'FAILED'));
+    
+    # Store error message for caller (select_connection) to access
+    $self->{last_test_error} = $error_msg if $error_msg;
     
     return $success;
 }
@@ -291,6 +326,8 @@ sub select_connection {
     }
 
     # Try connections in priority order
+    my @failed_attempts;  # Track details of all failures
+    
     foreach my $conn_name (@matching_connections) {
         my $conn = $config->{$conn_name};
         my $host = $conn->{host} || 'N/A';
@@ -298,12 +335,15 @@ sub select_connection {
 
         # Skip if required fields are missing, empty, or contain placeholders
         my $skip = 0;
+        my $skip_reason = '';
         
         # Check localhost_override flag - skip localhost connections unless explicitly enabled
         if ($conn->{localhost_override}) {
             unless ($ENV{COMSERV_ALLOW_LOCALHOST_OVERRIDE}) {
+                $skip_reason = "localhost_override=true and COMSERV_ALLOW_LOCALHOST_OVERRIDE not set";
                 $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                    "SKIPPED $conn_name ($host:$port): localhost_override=true and COMSERV_ALLOW_LOCALHOST_OVERRIDE not set");
+                    "SKIPPED $conn_name ($host:$port): $skip_reason");
+                push @failed_attempts, "$conn_name: $skip_reason";
                 next;
             }
         }
@@ -320,25 +360,31 @@ sub select_connection {
             if (!exists $conn->{$field} ||
                 !defined $conn->{$field} ||
                 $conn->{$field} =~ /^\s*$/) {
+                $skip_reason = "Missing required field '$field'";
                 $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                    "SKIPPED $conn_name ($host:$port): Missing required field '$field'");
+                    "SKIPPED $conn_name ($host:$port): $skip_reason");
+                push @failed_attempts, "$conn_name: $skip_reason";
                 $skip = 1;
                 last;
             }
             if ($conn->{$field} =~ /YOUR_|PLACEHOLDER/i) {
+                $skip_reason = "Field '$field' contains placeholder value";
                 $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                    "SKIPPED $conn_name ($host:$port): Field '$field' contains placeholder value");
+                    "SKIPPED $conn_name ($host:$port): $skip_reason");
+                push @failed_attempts, "$conn_name: $skip_reason";
                 $skip = 1;
                 last;
             }
         }
         next if $skip;
 
-        # Try the connection
+        # Try the connection - CAPTURE ERROR DETAILS
         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
             "ATTEMPTING connection $conn_name at $host:$port for database '$database_name'");
         
-        if ($self->test_connection($conn)) {
+        my $test_result = $self->test_connection($conn);
+        
+        if ($test_result) {
             $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
                 "✓ SUCCESS: Connected to $conn_name ($host:$port) - Database: '$database_name' (" . 
                 ($conn->{description} || 'no description') . ")");
@@ -355,21 +401,39 @@ sub select_connection {
             
             return $connection_info;
         } else {
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                "✗ FAILED: Could not connect to $conn_name at $host:$port - will try next priority");
+            my $fail_msg = "✗ FAILED: Could not connect to $conn_name at $host:$port - Error: $self->{last_test_error}";
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection', $fail_msg);
+            push @failed_attempts, $fail_msg;
         }
     }
 
     # If we get here, no connection worked
     my $error_msg = "RemoteDB: No working database connection found for '$database_name' database after trying " .
-        scalar(@matching_connections) . " connections:\n";
-    foreach my $conn_name (@matching_connections) {
-        my $conn = $config->{$conn_name};
-        my $host = $conn->{host} || 'N/A';
-        my $port = $conn->{port} || 'N/A';
-        my $desc = $conn->{description} || 'no description';
-        $error_msg .= "  - $conn_name ($host:$port): $desc\n";
+        scalar(@matching_connections) . " connections:\n\n";
+    
+    # Include detailed failure information from failed_attempts
+    if (@failed_attempts) {
+        $error_msg .= "DETAILED FAILURE REPORT:\n";
+        foreach my $attempt (@failed_attempts) {
+            $error_msg .= "  $attempt\n";
+        }
+    } else {
+        # Fallback: list the original connections
+        foreach my $conn_name (@matching_connections) {
+            my $conn = $config->{$conn_name};
+            my $host = $conn->{host} || 'N/A';
+            my $port = $conn->{port} || 'N/A';
+            my $desc = $conn->{description} || 'no description';
+            $error_msg .= "  - $conn_name ($host:$port): $desc\n";
+        }
     }
+    
+    # CRITICAL: Write to STDERR for visibility (bypasses logging if broken)
+    warn "\n" . ("="x80) . "\n";
+    warn "REMOTEDB CRITICAL FAILURE\n";
+    warn ("="x80) . "\n";
+    warn $error_msg;
+    warn ("="x80) . "\n\n";
     
     $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
     die $error_msg;
