@@ -197,11 +197,6 @@ sub log_with_details {
     $message //= 'No message provided';
     $level   //= 'INFO';
 
-    # PERFORMANCE FIX: Skip file logging during request processing to prevent logging deadlock
-    # File logging with exclusive locks on every log call causes high latency with multiple workers
-    # This is particularly important during auto() which logs 10+ times per request
-    # Only keep in-memory debug logging if context available
-    
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
 
@@ -217,9 +212,9 @@ sub log_with_details {
         push @$debug_errors, $log_message;
     }
 
-    # DISABLED: File logging during request processing
-    # Uncomment only for debugging - this causes significant performance degradation
-    # log_to_file($log_message);
+    # Restore standard behavior: also write to application log file and STDERR
+    log_to_file($log_message, undef, $level);
+    _print_log($log_message);
 
     return $log_message;
 }

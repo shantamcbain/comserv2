@@ -8,6 +8,11 @@
 [% username = c.session.username %][%# username  %]
 [% css_view_name =  c.session.css_view_name %]
 [% welcome_message =  c.session.welcome_message %]
+[% 
+  c.stash.ScriptDisplayName = c.stash.ScriptDisplayName || c.session.site_display_name || 'Comserv';
+  site_display_name = c.stash.site_display_name || c.session.site_display_name || 'Comserv';
+%]
+
 [% firstname = c.session.fristname %]
 [% lastname =  c.session.lastname %]
 [% group = c.session.group%]
@@ -20,7 +25,7 @@
 
     [% Catalyst.debug(obj) %]
     [% PageSiteName = HostName _ 'Comserv home' %]
-    [% ScriptDisplayName = 'Comserv home' %]
+    [%# ScriptDisplayName = 'Comserv home' %]
 [% http_header_description %]
 [% keywords %]
 [% description %]

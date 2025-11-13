@@ -167,6 +167,15 @@ __PACKAGE__->config(namespace => '');
 sub get_server_ip :Private {
     my ($self, $c) = @_;
     
+    # Check if running in Docker container
+    if (-f '/.dockerenv' || -f '/run/.containerenv') {
+        # Get container's IP address
+        my $ip = `hostname -i | awk '{print \$1}'`;
+        chomp($ip);
+        return $ip || 'unknown';
+    }
+    
+    # Fallback to host IP for non-containerized environments
     my $ip = `ip route get 1.1.1.1 | awk '{print \$7; exit}'`;
     chomp($ip);
     
@@ -1065,6 +1074,8 @@ sub track_application_start {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed auto action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+        "FINAL CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') . "'");
     return 1; # Allow the request to proceed
 }
 
@@ -1414,7 +1425,8 @@ sub setup_site {
 
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName (input): '" . (defined $SiteName ? $SiteName : 'UNDEF') . "'");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', 'MARKER: site_setup instrumentation active v1');
 
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
@@ -1425,17 +1437,21 @@ sub site_setup {
     my $default_hostname = "$protocol://$domain";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
-    
+
+    # Log key context prior to DB lookup
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "Context: Domain='$domain', Session.SiteName='" . ($c->session->{SiteName}//'UNDEF') . "', Stash.SiteName='" . ($c->stash->{SiteName}//'UNDEF') . "'");
+
     # Using Catalyst's built-in proxy configuration for URLs without port
     # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
-    
+
     # Log the configuration for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
-    
+
     # Test the configuration by generating a sample URL
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
-    
+
     # Add to debug_msg for visibility in templates
     # Ensure debug_msg is always an array
     $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
@@ -1443,53 +1459,113 @@ sub site_setup {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
+    # Primary attempt: lookup by SiteName (as provided)
     my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
-    unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
+    if (!defined $site) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+            "No site found by name='" . (defined $SiteName ? $SiteName : 'UNDEF') . "'. Attempting domain-based resolution for '$domain'.");
+        # Fallback: resolve via domain to site_id then fetch details
+        my $site_domain = eval { $c->model('Site')->get_site_domain($c, $domain) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_domain error: $@");
+        }
+        if ($site_domain) {
+            my $site_id = eval { $site_domain->site_id };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Resolved site_id via domain: '" . (defined $site_id ? $site_id : 'UNDEF') . "'");
+            if (defined $site_id) {
+                $site = eval { $c->model('Site')->get_site_details($c, $site_id) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_details error: $@");
+                }
+            }
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup', "Domain-based resolution failed for domain '$domain'");
+        }
+    }
 
-        # Set default values for critical variables
+    unless (defined $site) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
+
+        # Ensure site_display_name is never missing in stash/session, even on failure
+        my $fallback_display = $c->stash->{SiteName} || $c->session->{SiteName} || 'Site';
+        $c->stash->{SiteDisplayName}   = $fallback_display;
+        $c->stash->{site_display_name} = $fallback_display;
+        $c->session->{site_display_name} = $fallback_display;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "STASH_CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+            "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') . "' (fallback)");
+
+        # Set default values for other critical variables
         $c->stash->{ScriptDisplayName} = 'Site';
         $c->stash->{css_view_name} = '/static/css/default.css';
         $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
         $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
 
         # Add debug information
-        push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
-        
+        $c->stash->{debug_errors} //= [];
+        push @{$c->stash->{debug_errors}}, "ERROR: No site found (by name or domain).";
+
         # Ensure debug_msg is always an array
         $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Using default site settings because no site was found for '$SiteName'";
+        push @{$c->stash->{debug_msg}}, "Using default site settings because no site was resolved for '" . ($SiteName//"UNDEF") . "'";
 
         return;
     }
 
-    my $css_view_name = $site->css_view_name || '/static/css/default.css';
-    my $site_display_name = $site->site_display_name || $SiteName;
-    my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
-    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-    my $site_name = $site->name || $SiteName;
+    # Log ALL site values we care about for diagnostics
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "SITE RECORD: id='" . ($site->can('id') ? ($site->id//'UNDEF') : 'NA') .
+        "' name='" . ($site->can('name') ? ($site->name//'UNDEF') : 'NA') .
+        "' site_display_name='" . ($site->can('site_display_name') ? ($site->site_display_name//'UNDEF') : 'NA') .
+        "' css_view_name='" . ($site->can('css_view_name') ? ($site->css_view_name//'UNDEF') : 'NA') .
+        "' mail_to_admin='" . ($site->can('mail_to_admin') ? ($site->mail_to_admin//'UNDEF') : 'NA') .
+        "' mail_replyto='" . ($site->can('mail_replyto') ? ($site->mail_replyto//'UNDEF') : 'NA') .
+        "' document_root_url='" . ($site->can('document_root_url') ? ($site->document_root_url//'UNDEF') : 'NA') .
+        "' home_view='" . ($site->can('home_view') ? ($site->home_view//'UNDEF') : 'NA') . "'");
+
+    my $css_view_name     = $site->can('css_view_name')     ? ($site->css_view_name || '/static/css/default.css') : '/static/css/default.css';
+    my $site_display_name = $site->can('site_display_name') ? $site->site_display_name : undef;
+    my $mail_to_admin     = $site->can('mail_to_admin')     ? ($site->mail_to_admin || 'admin@computersystemconsulting.ca') : 'admin@computersystemconsulting.ca';
+    my $mail_replyto      = $site->can('mail_replyto')      ? ($site->mail_replyto || 'helpdesk.computersystemconsulting.ca') : 'helpdesk.computersystemconsulting.ca';
+    my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);
     }
 
     # Get theme from canonical ThemeConfig
-    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
 
     # Set theme in stash for Header.tt to use
     $c->stash->{theme_name} = $theme_name;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Set theme_name in stash: $theme_name");
 
-    $c->stash->{ScriptDisplayName} = $site_display_name;
-    $c->stash->{css_view_name} = $css_view_name;
-    $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $mail_replyto;
-    $c->stash->{SiteName} = $site_name;
-    $c->session->{SiteName} = $site_name;
+    # Write resolved values to stash/session
+    $c->stash->{SiteDisplayName}   = $site_display_name;
+    $c->stash->{site_display_name} = $site_display_name;
+    $c->stash->{css_view_name}     = $css_view_name;
+    $c->stash->{mail_to_admin}     = $mail_to_admin;
+    $c->stash->{mail_replyto}      = $mail_replyto;
+    $c->stash->{SiteName}          = $site_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "STASH_CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+        "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') . "'");
+
+    $c->session->{site_display_name} = $site_display_name;
+    $c->session->{SiteName}          = $site_name;
+
+    # Log the final values being set for verification
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "STASHED: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+        "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') .
+        "', SiteName='" . ($c->stash->{SiteName}//'UNDEF') .
+        "', css_view_name='" . ($c->stash->{css_view_name}//'UNDEF') . "'");
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Completed site_setup action with HostName: " . $c->stash->{HostName});
@@ -1601,6 +1677,27 @@ sub begin :Private {
         "[REQUEST_START] Method: " . $c->req->method . 
         " Path: " . $c->req->path . 
         " at " . scalar(localtime($c->stash->{_request_start_time})));
+
+    # Ensure SiteName is established as early as possible for all routes
+    eval {
+        my $sn = $c->stash->{SiteName} // $c->session->{SiteName};
+        unless (defined $sn && $sn ne '' && $sn ne 'none') {
+            $self->fetch_and_set($c, 'SiteName');
+            $sn = $c->stash->{SiteName} // $c->session->{SiteName};
+        }
+        # Always perform site_setup at begin to guarantee site_display_name in stash
+        if (defined $sn && $sn ne '') {
+            $self->site_setup($c, $sn);
+        } else {
+            # As absolute fallback, try with 'CSC' (commonly configured)
+            $self->site_setup($c, 'CSC');
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin',
+            "BEGIN INIT: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') . "', SiteName='" . ($c->stash->{SiteName}//'UNDEF') . "'");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
+    }
 }
 
 sub end : ActionClass('RenderView') {

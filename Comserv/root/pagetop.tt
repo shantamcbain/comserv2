@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
  [% c.session.first_name %] [% c.session.last_name %] User
 [% ELSE %]
  Guest
-[% END %] to [% c.stash.ScriptDisplayName %]!
+[% END %] to [% c.stash.site_display_name %]!
     </h1>
 
 
