@@ -1,8 +1,10 @@
-version: '3.9'
+
 
 services:
   web-prod:
-    image: ghcr.io/${{ secrets.IMAGE_REGISTRY }}/comserv:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: comserv-web-prod
     restart: always
     environment:
@@ -81,12 +83,33 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  # Optional: config-db service for dynamic DB connections (used by Phase 4+)
+  config-db:
+    image: mysql:8.0
+    container_name: comserv-config-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_config_dev
+      MYSQL_DATABASE: comserv_config
+      MYSQL_USER: comserv_config
+      MYSQL_PASSWORD: config_dev_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - comserv-config-db-data:/var/lib/mysql
+    networks:
+      - comserv-network
+    restart: unless-stopped
+
 volumes:
   comserv-prod-logs:
     driver: local
   comserv-prod-sessions:
     driver: local
   comserv-prod-backups:
+    driver: local
+
+  # Data volume for config-db
+  comserv-config-db-data:
     driver: local
 
 networks:

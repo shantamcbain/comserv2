@@ -1,8 +1,10 @@
-version: '3.9'
+
 
 services:
   web-dev:
-    image: ghcr.io/${{ secrets.IMAGE_REGISTRY }}/comserv:develop
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: comserv-web-dev
     restart: unless-stopped
     environment:

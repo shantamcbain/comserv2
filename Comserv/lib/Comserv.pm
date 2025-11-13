@@ -6,6 +6,7 @@ use namespace::autoclean;
 use Config::JSON;
 use FindBin '$Bin';
 use Comserv::Util::Logging;
+use Comserv::Util::ConfigDatabaseInit;
 
 # Initialize the logging system
 BEGIN {
@@ -207,5 +208,8 @@ around 'finalize_error' => sub {
 };
 
 __PACKAGE__->setup();
+
+# Initialize configuration database after application setup
+Comserv::Util::ConfigDatabaseInit->initialize();
 
 1;
