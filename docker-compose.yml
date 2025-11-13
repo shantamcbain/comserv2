@@ -6,6 +6,32 @@ version: '3.9'
 # Prod Port: 5000 (Starman workers via Supervisor)
 
 services:
+  # Local MySQL for Configuration Storage
+  # Used for storing database_connections, app config during initialization
+  # NOT for production application data
+  config-db:
+    image: mysql:8.0
+    container_name: comserv-config-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${CONFIG_DB_ROOT_PASSWORD:-root_config_dev}
+      MYSQL_DATABASE: ${CONFIG_DB_NAME:-comserv_config}
+      MYSQL_USER: ${CONFIG_DB_USER:-comserv_config}
+      MYSQL_PASSWORD: ${CONFIG_DB_PASSWORD:-config_dev_password}
+      TZ: ${TZ:-UTC}
+    ports:
+      - "3307:3306"
+    volumes:
+      - config_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - comserv-network
+
   # Redis Cache Service
   redis:
     image: redis:7-alpine
@@ -59,6 +85,8 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
     depends_on:
+      config-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -104,6 +132,8 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
     depends_on:
+      config-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -117,6 +147,8 @@ services:
 
 # Volumes for persistent data
 volumes:
+  config_db_data:
+    driver: local
   redis_data:
     driver: local
 

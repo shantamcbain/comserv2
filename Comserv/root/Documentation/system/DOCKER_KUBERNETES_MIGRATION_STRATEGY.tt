@@ -1,20 +1,38 @@
 [% META
-        title = "Docker & Kubernetes Migration Strategy"
+        title = "Docker & Kubernetes Migration Strategy (Updated)"
    description = "Strategic roadmap for Docker and Kubernetes adoption across development, testing, and production environments"
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "infrastructure,deployment"
-   page_version = "1.00"
-   last_updated = "Thu Jan 16 11:23:04 AM PDT 2025"
+   page_version = "1.11"
+   last_updated = "Thu Nov 13 17:06:30 UTC 2025"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt,v 1.00 2025/01/16 shanta Exp - Docker/Kubernetes Migration Strategic Plan' %]
+[% PageVersion = 'Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt,v 1.11 2025/11/13 shanta Exp - Docker/Kubernetes Migration + Database Connection Management' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <div class="container">
     <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker & Kubernetes Migration Strategy for Comserv</h1>
+
+    <!-- Local navigation for quick access -->
+    <nav style="margin: 10px 0; padding: 10px; background: var(--light-color); border: 1px solid var(--border-color);">
+        <strong>On this page:</strong>
+        <ul style="list-style: none; padding-left: 0; margin: 8px 0; column-count: 2; column-gap: 24px;">
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#current-state">Current State Analysis</a></li>
+            <li><a href="#target-state">Target State Vision</a></li>
+            <li><a href="#phases">Migration Phases Overview</a></li>
+            <li><a href="#decisions">Key Decisions</a></li>
+            <li><a href="#phase-details">Phase Details & Deliverables</a></li>
+            <li><a href="#cicd-checklist">CI/CD-ready Checklist</a></li>
+            <li><a href="#docker-setup">Docker/PyCharm/GitHub Setup Guide</a></li>
+            <li><a href="#workflow">Developer Workflow Evolution</a></li>
+            <li><a href="#metrics">Success Metrics & Timeline</a></li>
+            <li><a href="#next-steps">Next Steps</a></li>
+        </ul>
+    </nav>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
         Last Updated: 2025-01-16 | 
@@ -24,7 +42,7 @@
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">This document serves as a living blueprint for transitioning Comserv from manual server deployments to a fully containerized, Kubernetes-based infrastructure. The strategy spans 7 implementation phases over 4-6 months, with clear deliverables, pros/cons analysis, and decision points at each phase.</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Deployment Model</strong>: Manual SSH + git pull + restart starman on production server. <strong>Target Model</strong>: Zero-downtime, auto-scaling Kubernetes cluster with CI/CD automation.</p>
         </div>
@@ -32,7 +50,7 @@
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Current State Analysis</h2>
+            <h2 id="current-state" style="color: var(--text-color); font-family: var(--header-font);">Current State Analysis</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Existing Deployment Workflow</h3>
             <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
@@ -72,7 +90,7 @@ Live Application
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Target State Vision</h2>
+            <h2 id="target-state" style="color: var(--text-color); font-family: var(--header-font);">Target State Vision</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">End Goal: Production-Ready Kubernetes</h3>
             <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
@@ -106,7 +124,7 @@ Live Application (Zero-Downtime Deployments)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Migration Phases Overview</h2>
+            <h2 id="phases" style="color: var(--text-color); font-family: var(--header-font);">Migration Phases Overview</h2>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
                 <tr>
@@ -171,7 +189,7 @@ Live Application (Zero-Downtime Deployments)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Key Decisions - TEAM CONSENSUS RECORDED</h2>
+            <h2 id="decisions" style="color: var(--text-color); font-family: var(--header-font);">Key Decisions - TEAM CONSENSUS RECORDED</h2>
             
             <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--success-color); font-family: var(--header-font);">Container Registry</h3>
@@ -203,7 +221,7 @@ Live Application (Zero-Downtime Deployments)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Phase Details & Deliverables</h2>
+            <h2 id="phase-details" style="color: var(--text-color); font-family: var(--header-font);">Phase Details & Deliverables</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 1: Docker Local Development (Weeks 1-3)</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Objective</strong>: Get Docker working on developer machines; fix the port mapping issue (dev 3000, prod 5000)</p>
@@ -285,7 +303,417 @@ Ready for deployment (manual approval for production)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Developer Workflow Evolution</h2>
+            <h2 id="docker-setup" style="color: var(--text-color); font-family: var(--header-font);">Docker/PyCharm/GitHub Setup Guide</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>This section provides step-by-step instructions for setting up Docker, PyCharm IDE integration, and GitHub Actions CI for the Comserv application.</strong></p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 1: Initial Docker &amp; PyCharm Setup on Developer Machine</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Install Docker Desktop</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Download and install Docker Desktop:
+                    <ul>
+                        <li><strong>macOS</strong>: https://www.docker.com/products/docker-desktop</li>
+                        <li><strong>Windows</strong>: https://www.docker.com/products/docker-desktop</li>
+                        <li><strong>Linux</strong>: Follow official Docker installation guide</li>
+                    </ul>
+                </li>
+                <li>Verify installation:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker --version
+docker-compose --version</pre>
+                </li>
+                <li>Ensure Docker daemon is running (Docker Desktop should start on boot)</li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 2: Configure PyCharm IDE for Docker</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Open PyCharm Project Settings</strong>:
+                    <ul>
+                        <li>Go to <code>PyCharm → Preferences/Settings → Project → Python Interpreter</code></li>
+                        <li>Click the gear icon ⚙️ and select <code>Add</code></li>
+                    </ul>
+                </li>
+                <li><strong>Select Docker Compose as Interpreter</strong>:
+                    <ul>
+                        <li>Choose <code>Docker Compose</code> from the left sidebar</li>
+                        <li><strong>Configuration Files</strong>: Set to <code>docker-compose.yml</code> (or use dropdown)</li>
+                        <li><strong>Service</strong>: Select <code>app</code> (the main application service)</li>
+                        <li>Click <code>OK</code></li>
+                    </ul>
+                </li>
+                <li><strong>Verify Configuration</strong>:
+                    <ul>
+                        <li>Python interpreter should now show: <code>Docker Compose [comserv]</code></li>
+                        <li>PyCharm will build the Docker image automatically</li>
+                    </ul>
+                </li>
+                <li><strong>Configure Run Configurations</strong> (optional but recommended):
+                    <ul>
+                        <li>Go to <code>Run → Edit Configurations</code></li>
+                        <li>Select or create a run configuration for the application</li>
+                        <li>Set Docker Compose as the interpreter</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Clone Repository &amp; Set Up Local Environment</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Clone the Comserv repository</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">git clone https://github.com/[YOUR_ORG]/comserv.git
+cd comserv</pre>
+                </li>
+                <li><strong>Create .env file for local development</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">cat > .env << 'EOF'
+CATALYST_ENV=development
+CATALYST_DEBUG=1
+WEB_PORT=3000
+DB_HOST=db
+DB_PORT=3306
+DB_USER=comserv
+DB_PASSWORD=comserv_dev_password
+DB_NAME=comserv_dev
+IMAGE_REGISTRY=ghcr.io/[YOUR_ORG]
+TAG=latest
+EOF</pre>
+                </li>
+                <li><strong>Verify docker-compose.yml exists</strong> (in project root):
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">ls -la docker-compose.yml</pre>
+                </li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4: Build and Run Local Docker Environment</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Build Docker images</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose build</pre>
+                </li>
+                <li><strong>Start services</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose up -d</pre>
+                </li>
+                <li><strong>Verify services are running</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose ps</pre>
+                </li>
+                <li><strong>Check application logs</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose logs -f app</pre>
+                </li>
+                <li><strong>Access the application</strong>:
+                    <ul>
+                        <li>Open browser to: <code>http://localhost:3000</code></li>
+                        <li>Should see Comserv application home page</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 2: GitHub Actions CI/CD Setup</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 5: Create GitHub Actions Workflow File</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Create workflow directory</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">mkdir -p .github/workflows</pre>
+                </li>
+                <li><strong>Create CI/CD workflow file</strong> (.github/workflows/ci.yml):
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">name: CI/CD Pipeline
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build Docker image
+        run: docker build -t comserv:test .
+      - name: Run tests
+        run: docker run --rm comserv:test perl -t
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push image to registry
+        run: |
+          docker tag comserv:test ghcr.io/${{ github.repository_owner }}/comserv:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/comserv:${{ github.sha }}</pre>
+                </li>
+                <li><strong>Commit workflow file</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">git add .github/workflows/ci.yml
+git commit -m "Add GitHub Actions CI/CD workflow"
+git push origin main</pre>
+                </li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 6: Configure GitHub Secrets (if needed)</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Go to GitHub Repository</strong>:
+                    <ul>
+                        <li>Navigate to <code>Settings → Secrets and variables → Actions</code></li>
+                    </ul>
+                </li>
+                <li><strong>Add Repository Secrets</strong> (if using private registries or databases):
+                    <ul>
+                        <li><code>REGISTRY_USERNAME</code> - If using private Docker registry</li>
+                        <li><code>REGISTRY_PASSWORD</code> - If using private Docker registry</li>
+                        <li><code>DB_PASSWORD</code> - Database password for CI tests</li>
+                    </ul>
+                </li>
+                <li><strong>Default Secrets Available</strong>:
+                    <ul>
+                        <li><code>GITHUB_TOKEN</code> - Automatically available, use for GitHub Container Registry</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 3: Development Workflow</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Daily Development Steps</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Pull latest changes</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">git pull origin main</pre>
+                </li>
+                <li><strong>Start Docker environment</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose up -d</pre>
+                </li>
+                <li><strong>Make code changes</strong> in PyCharm IDE:
+                    <ul>
+                        <li>Edit files normally (docker-compose will auto-reload in development mode)</li>
+                        <li>No need to rebuild container during development</li>
+                    </ul>
+                </li>
+                <li><strong>Test changes locally</strong>:
+                    <ul>
+                        <li>Access application at <code>http://localhost:3000</code></li>
+                        <li>Check logs: <code>docker-compose logs -f app</code></li>
+                    </ul>
+                </li>
+                <li><strong>Commit and push changes</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">git add .
+git commit -m "Description of changes"
+git push origin main</pre>
+                </li>
+                <li><strong>Monitor CI/CD Pipeline</strong>:
+                    <ul>
+                        <li>Go to GitHub repository <code>Actions</code> tab</li>
+                        <li>Watch the workflow run in real-time</li>
+                        <li>Check for build/test failures</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 4: Database Connection Management (NEW)</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Overview: Dynamic Database Configuration System</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Comserv now includes a dynamic database connection management system that allows admins to configure multiple database connections without restarting the application. This system uses a local MySQL container (separate from production databases) to store configuration.</p>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Architecture Components</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>config-db service</strong>: Local MySQL container running on port 3307 (for configuration storage only, NOT application data)</li>
+                <li><strong>database_connections table</strong>: Stores all configured database connections with credentials</li>
+                <li><strong>ConfigDatabaseInit utility</strong>: Initializes config-db on application startup</li>
+                <li><strong>Admin UI</strong>: Manage connections at /admin/db-connections (admin-only)</li>
+            </ul>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Initialization Workflow</h4>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Application Startup
+    ↓
+Comserv.pm calls ConfigDatabaseInit->initialize()
+    ↓
+ConfigDatabaseInit connects to config-db (localhost:3307)
+    ↓
+Creates database_connections table (if missing)
+    ↓
+Checks for dbi_config.json in known locations:
+  - /opt/comserv/dbi_config.json (Docker container path)
+  - ./dbi_config.json (development)
+  - /opt/comserv/Comserv/dbi_config.json
+    ↓
+If found: Import all connections to database_connections table
+    ↓
+Delete dbi_config.json after successful import
+    ↓
+Startup complete - Admin can now manage connections via UI
+                </code></pre>
+            </div>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Configure Docker Compose Environment (.env)</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The docker-compose.yml now includes a config-db service. Configure it with environment variables:</p>
+            <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">CONFIG_DB_HOST=config-db
+CONFIG_DB_PORT=3306
+CONFIG_DB_USER=comserv_config
+CONFIG_DB_PASSWORD=config_dev_password
+CONFIG_DB_NAME=comserv_config
+CONFIG_DB_ROOT_PASSWORD=root_config_dev</pre>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 2: Prepare dbi_config.json (One-time, per environment)</h4>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Each developer machine or deployment environment should have a <code>dbi_config.json</code> file with database connections unique to that network. This file is:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>.gitignore'd</strong> (not committed to repository)</li>
+                <li><strong>Plain-text</strong> (no encryption, but mounted read-only in Docker)</li>
+                <li><strong>Auto-imported</strong> on first application startup</li>
+                <li><strong>Auto-deleted</strong> after import (one-time use)</li>
+            </ul>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example dbi_config.json:</strong></p>
+            <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">{
+  "local_ency": {
+    "host": "192.168.1.198",
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "your_password_here",
+    "database": "ency"
+  },
+  "local_forager": {
+    "host": "192.168.1.198",
+    "port": 3306,
+    "username": "forager_user",
+    "password": "forager_password",
+    "database": "forager_db"
+  }
+}</pre>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Start Application with Auto-Import</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Start containers</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose up -d</pre>
+                </li>
+                <li><strong>Monitor import process</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker-compose logs -f web-dev | grep ConfigDatabaseInit</pre>
+                    <p style="color: var(--text-color); font-family: var(--body-font);">Watch for messages: "ConfigDatabaseInit: Initialization successful" or "ConfigDatabaseInit: Imported connection '[name]'"</p>
+                </li>
+                <li><strong>Verify import</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">docker exec comserv-config-db mysql -u comserv_config -pconfig_dev_password -D comserv_config -e "SELECT * FROM database_connections;"</pre>
+                </li>
+                <li><strong>Check dbi_config.json deletion</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;">ls -la ./Comserv/dbi_config.json 2>&1
+# Should show: "No such file or directory" if import was successful</pre>
+                </li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4: Manage Connections via Admin UI</h4>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Access admin panel</strong>:
+                    <ul>
+                        <li>Login as admin at <code>http://localhost:3000/user/login</code></li>
+                        <li>Navigate to <code>/admin/db-connections</code> or click "Database Connections" in admin menu</li>
+                    </ul>
+                </li>
+                <li><strong>View existing connections</strong>:
+                    <ul>
+                        <li>All connections imported from dbi_config.json appear in a table</li>
+                        <li>Shows: Connection name, host, port, database, status, created/updated dates</li>
+                    </ul>
+                </li>
+                <li><strong>Edit a connection</strong>:
+                    <ul>
+                        <li>Click "Edit" button next to connection name</li>
+                        <li>Modify host, port, username, password, database name, or status</li>
+                        <li>Click "Save" to persist changes to config-db</li>
+                    </ul>
+                </li>
+                <li><strong>Add a new connection</strong>:
+                    <ul>
+                        <li>Click "Add Connection" button on the connections list page</li>
+                        <li>Fill in connection details for a new database server/instance</li>
+                        <li>Save - immediately available for application use</li>
+                    </ul>
+                </li>
+                <li><strong>Deactivate a connection</strong>:
+                    <ul>
+                        <li>Edit connection and toggle "Active" status to OFF</li>
+                        <li>Deactivated connections are marked as unavailable but retained in history</li>
+                    </ul>
+                </li>
+                <li><strong>Delete a connection</strong>:
+                    <ul>
+                        <li>Click "Delete" button next to connection name (use with caution)</li>
+                        <li>Permanently removes connection record</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Key Features & Benefits</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ <strong>No Docker restart required</strong> - Add/modify connections on-the-fly via admin UI</li>
+                <li>✅ <strong>Network-specific configuration</strong> - Each environment (dev machine, test, prod) has unique dbi_config.json</li>
+                <li>✅ <strong>One-time import</strong> - dbi_config.json auto-imported and deleted on first startup</li>
+                <li>✅ <strong>Persistent storage</strong> - All connections stored in local MySQL config-db</li>
+                <li>✅ <strong>Admin control</strong> - Authorized admins can manage all connections</li>
+                <li>✅ <strong>Multiple databases</strong> - Support unlimited database connections (e.g., Ency, Forager, Production, Backup)</li>
+                <li>✅ <strong>Separation of concerns</strong> - Config storage separate from application data</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 5: Common Commands Reference</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr style="background-color: var(--table-header-bg);">
+                    <th style="color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;"><strong>Command</strong></th>
+                    <th style="color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;"><strong>Purpose</strong></th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker-compose up -d</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Start services in background</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker-compose down</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Stop and remove all services</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker-compose logs -f app</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">View real-time application logs</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker-compose ps</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">List running services</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker-compose rebuild</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Rebuild images without cache</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: monospace; padding: var(--spacing-small); border: 1px solid var(--border-color);">docker exec -it [container] bash</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Open shell in running container</td>
+                </tr>
+            </table>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Part 6: Troubleshooting</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Problem: Application won't start on http://localhost:3000</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Check service status</strong>: <code>docker-compose ps</code></li>
+                <li><strong>View logs</strong>: <code>docker-compose logs app</code></li>
+                <li><strong>Verify port is correct</strong>: Confirm WEB_PORT=3000 in .env file</li>
+                <li><strong>Port already in use</strong>: Change port in .env and rebuild: <code>docker-compose rebuild</code></li>
+                <li><strong>Database connection issues</strong>: Check DB_HOST=db and DB connection string in config</li>
+            </ul>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Problem: GitHub Actions build fails</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Check Actions tab</strong>: GitHub repo → Actions → view failed workflow</li>
+                <li><strong>Read error logs</strong>: Look for specific build or test errors</li>
+                <li><strong>Common issues</strong>:
+                    <ul>
+                        <li>Perl module not installed: Add to Dockerfile or Makefile.PL</li>
+                        <li>Database migration failed: Check schema changes in CI environment</li>
+                        <li>Tests failing: Run locally first with <code>perl -t</code></li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Problem: Docker image won't push to GitHub Container Registry</h4>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Verify GitHub token permissions</strong>: Token must have write:packages scope</li>
+                <li><strong>Check image naming</strong>: Should be <code>ghcr.io/[owner]/comserv:tag</code></li>
+                <li><strong>Manual login test</strong>: <code>docker login ghcr.io -u [username]</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="workflow" style="color: var(--text-color); font-family: var(--header-font);">Developer Workflow Evolution</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Current Workflow (Manual, Phase 0)</h3>
             <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
@@ -335,7 +763,7 @@ Ready for deployment (manual approval for production)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Success Metrics & Timeline</h2>
+            <h2 id="metrics" style="color: var(--text-color); font-family: var(--header-font);">Success Metrics & Timeline</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Phase 1-2 Success Criteria</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -371,7 +799,44 @@ Ready for deployment (manual approval for production)
 
     <div class="row">
         <div class="col-100">
-            <h2 style="color: var(--text-color); font-family: var(--header-font);">Next Steps</h2>
+            <h2 id="cicd-checklist" style="color: var(--text-color); font-family: var(--header-font);">CI/CD-ready Containerization Checklist</h2>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>PSGI entrypoint</strong>: Ensure script/comserv_server.psgi exists and returns Comserv->psgi_app.</li>
+                <li><strong>Unified server</strong>: Run Starman everywhere via supervisor:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap;">starman --env &lt;development|deployment&gt; --listen :$WEB_PORT --host 0.0.0.0 --workers 2 script/comserv_server.psgi</pre>
+                </li>
+                <li><strong>Entrypoint scripts</strong>: docker-entrypoint.sh seeds supervisor; create-supervisor-config.sh uses WEB_PORT and CATALYST_ENV to generate comserv.conf.</li>
+                <li><strong>Dockerfile dependencies</strong>: Install Perl deps in image (e.g., <code>cpanm --notest --installdeps .</code>) and include script/, lib/, root/, config/.</li>
+                <li><strong>Compose uses images</strong>: In dev/prod compose:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap;">image: ghcr.io/${IMAGE_REGISTRY}/comserv:${TAG}</pre>
+                    Provide IMAGE_REGISTRY and TAG via .env or CI. Avoid ${{ … }} in compose files.</li>
+                <li><strong>Environment</strong>:
+                    <ul>
+                        <li>Dev: CATALYST_ENV=development, CATALYST_DEBUG=1, WEB_PORT=3000</li>
+                        <li>Prod: CATALYST_ENV=production, CATALYST_DEBUG=0, WEB_PORT=5000</li>
+                        <li>Optional: COMSERV_LOG_DIR for log path, COMSERV_DB_CONFIG for external DB JSON</li>
+                    </ul>
+                </li>
+                <li><strong>Config and volumes</strong>: Keep db_config.json external (read-only mount) or point COMSERV_DB_CONFIG to a mounted path. In prod, avoid code mounts; use persistent volumes for logs/sessions/backups as needed.</li>
+                <li><strong>Healthchecks</strong>: /health endpoint used for compose/K8s health/readiness. Verify 200 inside container and from host.</li>
+                <li><strong>Networking</strong>: Publish 3000:3000 (dev), 5000:5000 (prod). If fronted by proxy, ensure X-Forwarded-* headers and Catalyst using_frontend_proxy/ignore_frontend_proxy_port are set.</li>
+                <li><strong>CI build/push (GitHub Actions)</strong>:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap;">docker build -t ghcr.io/${{ github.repository_owner }}/comserv:${{ github.sha }} .
+docker push ghcr.io/${{ github.repository_owner }}/comserv:${{ github.sha }}</pre>
+                    Optionally tag latest or release tags.</li>
+                <li><strong>Server deploy</strong>: On server, set IMAGE_REGISTRY and TAG in .env. Then:
+                    <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap;">docker-compose --env-file .env -f docker-compose.prod.yml pull
+docker-compose --env-file .env -f docker-compose.prod.yml up -d</pre>
+                </li>
+                <li><strong>Compose hygiene</strong>: Replace any ${{ … }} with ${VAR}. Guard or remove extra_hosts entries relying on unset variables (e.g., DB_HOST_PROD_IP).</li>
+                <li><strong>Kubernetes readiness</strong>: Same image, Deployment runs Starman cmd; mount secrets/config via K8s; readiness/liveness to /health; Service/Ingress in front.</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="next-steps" style="color: var(--text-color); font-family: var(--header-font);">Next Steps</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Immediate Actions</h3>
             <ol style="color: var(--text-color); font-family: var(--body-font);">

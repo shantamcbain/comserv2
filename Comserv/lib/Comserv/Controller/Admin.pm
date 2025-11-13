@@ -1735,6 +1735,165 @@ sub database_config :Chained('base') :PathPart('database-config') :Args(0) {
         "Completed database configuration action");
 }
 
+sub db_connections :Chained('base') :PathPart('db-connections') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connections', 
+        "Starting database connections management");
+    
+    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $port = $ENV{CONFIG_DB_PORT} || 3306;
+    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
+    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
+    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    
+    my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
+    my @connections;
+    
+    try {
+        my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 });
+        
+        my $sql = q{
+            SELECT id, connection_name, db_host, db_port, db_username, db_database, 
+                   is_default, is_active, created_at, updated_at
+            FROM database_connections
+            ORDER BY is_default DESC, connection_name ASC
+        };
+        
+        my $sth = $dbh->prepare($sql);
+        $sth->execute;
+        
+        while (my $row = $sth->fetchrow_hashref) {
+            push @connections, $row;
+        }
+        
+        $sth->finish;
+        $dbh->disconnect;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'db_connections', 
+            "Error fetching database connections: $_");
+        $c->stash->{message} = "Error loading connections: $_";
+        $c->stash->{message_type} = 'error';
+    };
+    
+    $c->stash->{connections} = \@connections;
+    $c->stash->{template} = 'admin/db_connections.tt';
+}
+
+sub db_connection_edit :Chained('base') :PathPart('db-connection-edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_edit', 
+        "Starting database connection edit for ID: $id");
+    
+    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $port = $ENV{CONFIG_DB_PORT} || 3306;
+    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
+    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
+    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    
+    my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
+    
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->params;
+        
+        try {
+            my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 });
+            
+            my $update_sql = q{
+                UPDATE database_connections 
+                SET connection_name = ?, db_host = ?, db_port = ?, 
+                    db_username = ?, db_password = ?, db_database = ?, is_active = ?
+                WHERE id = ?
+            };
+            
+            my $sth = $dbh->prepare($update_sql);
+            $sth->execute(
+                $params->{connection_name},
+                $params->{db_host},
+                $params->{db_port} || 3306,
+                $params->{db_username},
+                $params->{db_password},
+                $params->{db_database},
+                $params->{is_active} ? 1 : 0,
+                $id
+            );
+            
+            $sth->finish;
+            $dbh->disconnect;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_edit', 
+                "Connection ID $id updated successfully");
+            
+            $c->response->redirect($c->uri_for('/admin/db-connections'));
+            return;
+        }
+        catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'db_connection_edit', 
+                "Error updating connection: $_");
+            $c->stash->{message} = "Error updating connection: $_";
+            $c->stash->{message_type} = 'error';
+        };
+    }
+    
+    my $connection;
+    try {
+        my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 });
+        
+        my $sql = q{
+            SELECT * FROM database_connections WHERE id = ?
+        };
+        
+        my $sth = $dbh->prepare($sql);
+        $sth->execute($id);
+        $connection = $sth->fetchrow_hashref;
+        $sth->finish;
+        $dbh->disconnect;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'db_connection_edit', 
+            "Error fetching connection: $_");
+    };
+    
+    $c->stash->{connection} = $connection;
+    $c->stash->{template} = 'admin/db_connection_edit.tt';
+}
+
+sub db_connection_delete :Chained('base') :PathPart('db-connection-delete') :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_delete', 
+        "Deleting database connection ID: $id");
+    
+    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $port = $ENV{CONFIG_DB_PORT} || 3306;
+    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
+    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
+    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    
+    my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
+    
+    try {
+        my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 });
+        
+        my $delete_sql = q{ DELETE FROM database_connections WHERE id = ? };
+        my $sth = $dbh->prepare($delete_sql);
+        $sth->execute($id);
+        $sth->finish;
+        $dbh->disconnect;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_delete', 
+            "Connection ID $id deleted successfully");
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'db_connection_delete', 
+            "Error deleting connection: $_");
+    };
+    
+    $c->response->redirect($c->uri_for('/admin/db-connections'));
+}
+
 =head1 AUTHOR
 
 Shanta McBain
