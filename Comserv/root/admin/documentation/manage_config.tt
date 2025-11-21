@@ -1,0 +1,455 @@
+[%# Documentation Configuration Management Interface %]
+[% META title = 'Documentation Configuration Management' %]
+
+<style>
+.config-manager {
+    max-width: 1400px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.section {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.pages-table, .categories-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.pages-table th, .categories-table th {
+    background: #667eea;
+    color: white;
+    padding: 10px;
+    text-align: left;
+}
+
+.pages-table td, .categories-table td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.pages-table tr:hover, .categories-table tr:hover {
+    background: #f5f5f5;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 0 5px;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.role-checkbox {
+    margin-right: 15px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.filter-box {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.filter-box input {
+    padding: 8px;
+    width: 300px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+</style>
+
+<div class="config-manager">
+    <h1>Documentation Configuration Management</h1>
+
+    [% IF c.req.param('msg') == 'saved' %]
+        <div style="padding: 15px; background: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 20px;">
+            Configuration saved successfully!
+        </div>
+    [% ELSIF c.req.param('msg') == 'error' %]
+        <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 4px; margin-bottom: 20px;">
+            Error saving configuration!
+        </div>
+    [% END %]
+
+    <!-- Quick Actions -->
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <button class="btn btn-primary" onclick="showAddCategoryModal()">Add New Category</button>
+        <button class="btn btn-success" onclick="window.location.href='[% c.uri_for('/Documentation') %]'">View Documentation</button>
+        <button class="btn btn-primary" onclick="window.location.href='[% c.uri_for('/Documentation/rescan') %]'">Rescan Files</button>
+    </div>
+
+    <!-- Categories Section -->
+    <div class="section">
+        <h2>Categories ([% config.categories.keys.size %])</h2>
+        <table class="categories-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Roles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH cat_key IN categories %]
+                    [% cat = config.categories.$cat_key %]
+                    <tr>
+                        <td><strong>[% cat_key %]</strong></td>
+                        <td>[% cat.title %]</td>
+                        <td>[% cat.description %]</td>
+                        <td>[% cat.roles.join(', ') %]</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editCategory('[% cat_key %]')">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteCategory('[% cat_key %]')">Delete</button>
+                        </td>
+                    </tr>
+                [% END %]
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pages Section -->
+    <div class="section">
+        <h2>Documentation Pages ([% config.pages.keys.size %])</h2>
+
+        <div class="filter-box">
+            <input type="text" id="pageFilter" placeholder="Filter pages..." onkeyup="filterPages()">
+        </div>
+
+        <table class="pages-table" id="pagesTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Title</th>
+                    <th>Path</th>
+                    <th>Category</th>
+                    <th>Roles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH page_name IN config.pages.keys.sort %]
+                    [% page = config.pages.$page_name %]
+                    <tr>
+                        <td><strong>[% page_name %]</strong></td>
+                        <td>[% page.title || page_name %]</td>
+                        <td>[% page.path %]</td>
+                        <td>[% page.category || 'N/A' %]</td>
+                        <td>[% page.roles.join(', ') %]</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editPage('[% page_name %]')">Edit</button>
+                            <button class="btn btn-danger" onclick="deletePage('[% page_name %]')">Delete</button>
+                        </td>
+                    </tr>
+                [% END %]
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Page Modal -->
+<div id="editPageModal" class="modal">
+    <div class="modal-content">
+        <h2>Edit Page</h2>
+        <form id="editPageForm" method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="update_page">
+            <input type="hidden" name="page_name" id="edit_page_name">
+
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="title" id="edit_title">
+            </div>
+
+            <div class="form-group">
+                <label>Category:</label>
+                <select name="category" id="edit_category">
+                    <option value="">None</option>
+                    [% FOREACH cat_key IN categories %]
+                        <option value="[% cat_key %]">[% config.categories.$cat_key.title %]</option>
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="roles" value="[% role %]" class="edit_role_checkbox">
+                        [% role | ucfirst %]
+                    </label>
+                [% END %]
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn" onclick="closeModal('editPageModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Category Modal -->
+<div id="addCategoryModal" class="modal">
+    <div class="modal-content">
+        <h2>Add New Category</h2>
+        <form method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="add_category">
+
+            <div class="form-group">
+                <label>Category Key:</label>
+                <input type="text" name="category_key" required>
+            </div>
+
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="category_title" required>
+            </div>
+
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea name="category_description" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="category_roles" value="[% role %]">
+                        [% role | ucfirst %]
+                    </label>
+                [% END %]
+            </div>
+
+            <button type="submit" class="btn btn-success">Add Category</button>
+            <button type="button" class="btn" onclick="closeModal('addCategoryModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div id="editCategoryModal" class="modal">
+    <div class="modal-content">
+        <h2>Edit Category</h2>
+        <form method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="update_category">
+            <input type="hidden" name="category_key" id="edit_cat_key">
+
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="category_title" id="edit_cat_title" required>
+            </div>
+
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea name="category_description" id="edit_cat_description" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="category_roles" value="[% role %]" class="edit_cat_role_checkbox">
+                        [% role | ucfirst %]
+                    </label>
+                [% END %]
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn" onclick="closeModal('editCategoryModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+var configData = [% config.json %];
+
+function editPage(pageName) {
+    var page = configData.pages[pageName];
+    document.getElementById('edit_page_name').value = pageName;
+    document.getElementById('edit_title').value = page.title || '';
+    document.getElementById('edit_category').value = page.category || '';
+
+    // Set role checkboxes
+    var checkboxes = document.getElementsByClassName('edit_role_checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = page.roles && page.roles.includes(checkboxes[i].value);
+    }
+
+    showModal('editPageModal');
+}
+
+function deletePage(pageName) {
+    if (confirm('Are you sure you want to delete ' + pageName + '?')) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '[% c.uri_for('/Documentation/save_config') %]';
+
+        var actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete_page';
+        form.appendChild(actionInput);
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = 'page_name';
+        nameInput.value = pageName;
+        form.appendChild(nameInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function editCategory(catKey) {
+    var cat = configData.categories[catKey];
+    document.getElementById('edit_cat_key').value = catKey;
+    document.getElementById('edit_cat_title').value = cat.title || '';
+    document.getElementById('edit_cat_description').value = cat.description || '';
+
+    // Set role checkboxes
+    var checkboxes = document.getElementsByClassName('edit_cat_role_checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = cat.roles && cat.roles.includes(checkboxes[i].value);
+    }
+
+    showModal('editCategoryModal');
+}
+
+function deleteCategory(catKey) {
+    if (confirm('Are you sure you want to delete category ' + catKey + '?')) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '[% c.uri_for('/Documentation/save_config') %]';
+
+        var actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'delete_category';
+        form.appendChild(actionInput);
+
+        var keyInput = document.createElement('input');
+        keyInput.type = 'hidden';
+        keyInput.name = 'category_key';
+        keyInput.value = catKey;
+        form.appendChild(keyInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function showAddCategoryModal() {
+    showModal('addCategoryModal');
+}
+
+function showModal(modalId) {
+    document.getElementById(modalId).classList.add('active');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+}
+
+function filterPages() {
+    var input = document.getElementById('pageFilter');
+    var filter = input.value.toUpperCase();
+    var table = document.getElementById('pagesTable');
+    var tr = table.getElementsByTagName('tr');
+
+    for (var i = 1; i < tr.length; i++) {
+        var td = tr[i].getElementsByTagName('td');
+        var found = false;
+
+        for (var j = 0; j < td.length; j++) {
+            if (td[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                found = true;
+                break;
+            }
+        }
+
+        tr[i].style.display = found ? '' : 'none';
+    }
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.classList.remove('active');
+    }
+}
+</script>
