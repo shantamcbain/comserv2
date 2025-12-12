@@ -64,7 +64,7 @@ sub _load_config {
         }
         # Priority 3: Relative path from FindBin (local development on host)
         else {
-            my $relative_path = File::Spec->catfile($FindBin::Bin, 'db_config.json');
+            my $relative_path = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
             if (-f $relative_path) {
                 $config_file = $relative_path;
             }
