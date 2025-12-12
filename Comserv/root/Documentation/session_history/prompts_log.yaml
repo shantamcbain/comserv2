@@ -1,0 +1,25 @@
+# Comserv AI Prompt Recording System - YAML Log
+# ==============================================================================
+# Purpose: Central YAML-based prompt tracking for all AI agent activity
+# Format: YAML blocks appended chronologically (newest entries at top)
+# Lifecycle: Active - agents append prompt entries after each /updateprompt execution
+# Transition Note: Concurrent with current_session.md until verified; will replace it
+# ==============================================================================
+
+---
+timestamp: "2025-12-11T19:43:00Z"
+ai_assistant: "Zencoder"
+agent_name: "Cleanup Agent"
+session_id: "2025-12-11_19-43-00"
+chat: 22
+prompt: 1
+action: "Create prompts_log.yaml file"
+description: "Initialize YAML prompt logging system with proper structure and documentation"
+files_involved: ["prompts_log.yaml"]
+code_changed: null
+tools_used: ["Write"]
+success: true
+hostname: "null"
+diagnostics: {}
+problems: null
+notes: "Chat 22 Priority 3: Created prompts_log.yaml file with YAML structure per repo.md specification. System transitioning from current_session.md to YAML-based logging while maintaining backward compatibility."
