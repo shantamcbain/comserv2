@@ -22,63 +22,64 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+has 'db_config' => (
+    is      => 'rw',
+    isa     => 'HashRef',
+    lazy    => 1,
+    builder => '_build_db_config',
+);
+
 # Initialize logger
 Log::Log4perl->easy_init($DEBUG);
 
-# Load the database configuration from db_config.json
-my $config_file;
-my $json_text;
-
-# Try to load the config file using Catalyst::Utils if the application is initialized
-eval {
-    $config_file = Catalyst::Utils::path_to('db_config.json');
-};
-
-# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
-if ($@ || !defined $config_file) {
+sub _build_db_config {
+    my ($self) = @_;
+    
     use File::Basename;
     
-    # Get the application root directory (one level up from script or lib)
-    my $bin_dir = $FindBin::Bin;
-    my $app_root;
+    my $config_file;
+    my $json_text;
     
-    # If we're in a script directory, go up one level to find app root
-    if ($bin_dir =~ /\/script$/) {
-        $app_root = dirname($bin_dir);
-    }
-    # If we're somewhere else, try to find the app root
-    else {
-        # Check if we're already in the app root
-        if (-f "$bin_dir/db_config.json") {
-            $app_root = $bin_dir;
+    try {
+        eval {
+            $config_file = Catalyst::Utils::path_to('db_config.json');
+        };
+        
+        if ($@ || !defined $config_file || ! -f $config_file) {
+            my $bin_dir = $FindBin::Bin;
+            my $app_root;
+            
+            if ($bin_dir =~ /\/script$/) {
+                $app_root = dirname($bin_dir);
+            } else {
+                if (-f "$bin_dir/Comserv/db_config.json") {
+                    $app_root = "$bin_dir/Comserv";
+                } elsif (-f "$bin_dir/db_config.json") {
+                    $app_root = $bin_dir;
+                } elsif (-f dirname($bin_dir) . "/Comserv/db_config.json") {
+                    $app_root = dirname($bin_dir) . "/Comserv";
+                } elsif (-f dirname($bin_dir) . "/db_config.json") {
+                    $app_root = dirname($bin_dir);
+                } else {
+                    $app_root = $bin_dir;
+                }
+            }
+            
+            $config_file = "$app_root/db_config.json";
         }
-        # Otherwise, try one level up
-        elsif (-f dirname($bin_dir) . "/db_config.json") {
-            $app_root = dirname($bin_dir);
-        }
-        # If all else fails, assume we're in lib and need to go up one level
-        else {
-            $app_root = dirname($bin_dir);
-        }
-    }
-    
-    $config_file = "$app_root/db_config.json";
-    warn "Using FindBin fallback for config file: $config_file";
+        
+        local $/;
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+        $json_text = <$fh>;
+        close $fh;
+        
+        my $config = decode_json($json_text);
+        return $config;
+    } catch {
+        warn "Warning: Could not load db_config.json at initialization: $_";
+        return {};
+    };
 }
-
-# Load the configuration file
-eval {
-    local $/;    # Enable 'slurp' mode
-    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-    $json_text = <$fh>;
-    close $fh;
-};
-
-if ($@) {
-    die "Error loading config file $config_file: $@";
-}
-
-my $config = decode_json($json_text);
 
 # List tables in the appropriate database
 sub list_tables {
@@ -230,9 +231,9 @@ sub create_table_from_sql {
     # Get database configuration
     my $db_config;
     if ($database eq 'ENCY') {
-        $db_config = $config->{shanta_ency};
+        $db_config = $self->db_config->{shanta_ency};
     } elsif ($database eq 'FORAGER') {
-        $db_config = $config->{shanta_forager};
+        $db_config = $self->db_config->{shanta_forager};
     } else {
         die "Unknown database: $database";
     }
@@ -345,9 +346,9 @@ sub table_exists {
     # Get database configuration
     my $db_config;
     if ($database eq 'ENCY') {
-        $db_config = $config->{shanta_ency};
+        $db_config = $self->db_config->{shanta_ency};
     } elsif ($database eq 'FORAGER') {
-        $db_config = $config->{shanta_forager};
+        $db_config = $self->db_config->{shanta_forager};
     } else {
         die "Unknown database: $database";
     }
@@ -382,9 +383,9 @@ sub create_table_from_fields {
         # Get database configuration
         my $db_config;
         if ($schema_model eq 'DBEncy') {
-            $db_config = $config->{shanta_ency};
+            $db_config = $self->db_config->{shanta_ency};
         } elsif ($schema_model eq 'DBForager') {
-            $db_config = $config->{shanta_forager};
+            $db_config = $self->db_config->{shanta_forager};
         } else {
             $result->{error} = "Unknown schema model: $schema_model";
             return $result;
@@ -471,9 +472,9 @@ sub sync_table_with_result_fields {
         # Get database configuration
         my $db_config;
         if ($schema_model eq 'DBEncy') {
-            $db_config = $config->{shanta_ency};
+            $db_config = $self->db_config->{shanta_ency};
         } elsif ($schema_model eq 'DBForager') {
-            $db_config = $config->{shanta_forager};
+            $db_config = $self->db_config->{shanta_forager};
         } else {
             $result->{error} = "Unknown schema model: $schema_model";
             return $result;
