@@ -1,0 +1,654 @@
+[% PageVersion = 'Documentation/SYSTEM_DOCUMENTATION_TEMPLATE.tt,v 1.0 [DATE] Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="system_top"><a href="#system_top">[SYSTEM_NAME] Module - [SYSTEM_DESCRIPTION]</a></h1>
+
+<h3>Quick Navigation</h3>
+<p>
+    <a href="#overview">Overview</a> | 
+    <a href="#controller_section">Controllers</a> | 
+    <a href="#model_section">Models</a> | 
+    <a href="#utils_section">Utilities</a> | 
+    <a href="#files_section">System Files</a> | 
+    <a href="#guidelines_section">Guidelines</a> | 
+    <a href="#admin_docs">Admin Documentation</a> | 
+    <a href="#user_docs">User Documentation</a> | 
+    <a href="#developer_docs">Developer Documentation</a> | 
+    <a href="#database_structure">Database Structure</a> | 
+    <a href="#api_endpoints">API Endpoints</a> | 
+    <a href="#implementation_plan">Implementation Plan</a>
+</p>
+
+<div class="container info" id="overview">
+    <div class="container-header">System Overview</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>[SYSTEM_DESCRIPTION_DETAILED] - Comprehensive description of what this system does, its purpose, scope, and key features.</p>
+            
+            <p>This system provides [CORE_FUNCTIONALITY] and manages [DATA_TYPES]. It includes features for [KEY_FEATURES_LIST] and integrates with [EXTERNAL_SYSTEMS].</p>
+            
+            <div class="system-info-grid">
+                <div class="info-card">
+                    <h4>Primary Purpose</h4>
+                    <p>[PRIMARY_PURPOSE_DESCRIPTION]</p>
+                </div>
+                <div class="info-card">
+                    <h4>Key Features</h4>
+                    <ul>
+                        <li>[FEATURE_1]</li>
+                        <li>[FEATURE_2]</li>
+                        <li>[FEATURE_3]</li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <h4>Data Scope</h4>
+                    <p>[DATA_SCOPE_DESCRIPTION]</p>
+                </div>
+                <div class="info-card">
+                    <h4>System Dependencies</h4>
+                    <ul>
+                        <li>[DEPENDENCY_1]</li>
+                        <li>[DEPENDENCY_2]</li>
+                        <li>[DEPENDENCY_3]</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONTROLLERS SECTION -->
+<div class="container primary">
+    <div class="container-header" id="controller_section">[SYSTEM_NAME] Controller Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/controllers/[SYSTEM_NAME]Controller.tt' %]
+        </div>
+    </div>
+</div>
+
+<!-- MODELS SECTION -->
+<div class="container primary">
+    <div class="container-header" id="model_section">[SYSTEM_NAME] Model Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/models/[SYSTEM_NAME]Model.tt' %]
+        </div>
+    </div>
+</div>
+
+<!-- UTILITIES SECTION -->
+<div class="container primary">
+    <div class="container-header" id="utils_section">[SYSTEM_NAME] Utilities Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/utils/[SYSTEM_NAME]Utils.tt' %]
+        </div>
+    </div>
+</div>
+
+<!-- SYSTEM FILES SECTION -->
+<div class="container secondary">
+    <div class="container-header" id="files_section">System Files Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Perl Modules (.pm)</h3>
+            <div class="file-grid">
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME].pm</h4>
+                    <p>Main module file containing core system logic</p>
+                    [% INCLUDE 'Documentation/scripts/[SYSTEM_NAME].pm.tt' %]
+                </div>
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME]Utils.pm</h4>
+                    <p>Utility functions and helper methods</p>
+                    [% INCLUDE 'Documentation/scripts/[SYSTEM_NAME]Utils.pm.tt' %]
+                </div>
+            </div>
+            
+            <h3>Template Files (.tt)</h3>
+            <div class="file-grid">
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME]Index.tt</h4>
+                    <p>Main index template for system display</p>
+                    [% INCLUDE 'Documentation/templates/[SYSTEM_NAME]Index.tt.tt' %]
+                </div>
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME]Form.tt</h4>
+                    <p>Form templates for data entry and editing</p>
+                    [% INCLUDE 'Documentation/templates/[SYSTEM_NAME]Form.tt.tt' %]
+                </div>
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME]Display.tt</h4>
+                    <p>Display templates for data presentation</p>
+                    [% INCLUDE 'Documentation/templates/[SYSTEM_NAME]Display.tt.tt' %]
+                </div>
+            </div>
+            
+            <h3>Configuration Files</h3>
+            <div class="file-grid">
+                <div class="file-card">
+                    <h4>[SYSTEM_NAME]_config.json</h4>
+                    <p>System configuration settings</p>
+                    [% INCLUDE 'Documentation/config/[SYSTEM_NAME]_config.json.tt' %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GUIDELINES SECTION -->
+<div class="container info">
+    <div class="container-header" id="guidelines_section">[SYSTEM_NAME] Guidelines Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            [% INCLUDE 'Documentation/guidelines/[SYSTEM_NAME]_guidelines.tt' %]
+        </div>
+    </div>
+</div>
+
+<!-- ADMIN DOCUMENTATION SECTION -->
+<div class="container warning">
+    <div class="container-header" id="admin_docs">Administrator Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="admin-docs-grid">
+                <div class="doc-card">
+                    <h4>Installation & Setup</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_installation.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Configuration Management</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_configuration.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Maintenance Procedures</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_maintenance.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Troubleshooting Guide</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_troubleshooting.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Backup & Recovery</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_backup.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Security Configuration</h4>
+                    [% INCLUDE 'Documentation/admin/[SYSTEM_NAME]_security.tt' %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- USER DOCUMENTATION SECTION -->
+<div class="container success">
+    <div class="container-header" id="user_docs">User Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="user-docs-grid">
+                <div class="doc-card">
+                    <h4>Getting Started Guide</h4>
+                    [% INCLUDE 'Documentation/roles/normal/[SYSTEM_NAME]_getting_started.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>User Interface Guide</h4>
+                    [% INCLUDE 'Documentation/roles/normal/[SYSTEM_NAME]_ui_guide.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Feature Tutorials</h4>
+                    [% INCLUDE 'Documentation/tutorials/[SYSTEM_NAME]_tutorials.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>FAQ & Common Issues</h4>
+                    [% INCLUDE 'Documentation/roles/normal/[SYSTEM_NAME]_faq.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Best Practices</h4>
+                    [% INCLUDE 'Documentation/roles/normal/[SYSTEM_NAME]_best_practices.tt' %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DEVELOPER DOCUMENTATION SECTION -->
+<div class="container primary">
+    <div class="container-header" id="developer_docs">Developer Documentation</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="developer-docs-grid">
+                <div class="doc-card">
+                    <h4>Development Setup</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_development_setup.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Code Architecture</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_architecture.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>API Documentation</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_api.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Testing Guidelines</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_testing.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Extension Development</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_extensions.tt' %]
+                </div>
+                <div class="doc-card">
+                    <h4>Deployment Process</h4>
+                    [% INCLUDE 'Documentation/roles/developer/[SYSTEM_NAME]_deployment.tt' %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DATABASE STRUCTURE SECTION -->
+<div class="container info">
+    <div class="container-header" id="database_structure">Database Structure</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>Comprehensive database structure for the [SYSTEM_NAME] system:</p>
+            
+            <div class="database-structure">
+                <div class="table-category">
+                    <h3>1. Core System Tables</h3>
+                    
+                    <div class="table-group">
+                        <div class="table-card">
+                            <h4>[PRIMARY_TABLE_NAME]</h4>
+                            <p class="table-description">Main table for [PRIMARY_DATA_TYPE] storage.</p>
+                            <div class="schema-display">
+                                <div class="field">[primary_id] <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">[field_1]</div>
+                                <div class="field">[field_2]</div>
+                                <div class="field">[field_3]</div>
+                                <div class="field">description</div>
+                                <div class="field">status</div>
+                                <div class="field">created_by</div>
+                                <div class="field">created_date</div>
+                                <div class="field">modified_by</div>
+                                <div class="field">modified_date</div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-card">
+                            <h4>[LOOKUP_TABLE_NAME]</h4>
+                            <p class="table-description">Lookup table for [LOOKUP_DATA_TYPE].</p>
+                            <div class="schema-display">
+                                <div class="field">[lookup_id] <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">name</div>
+                                <div class="field">description</div>
+                                <div class="field">sort_order</div>
+                                <div class="field">active_flag</div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-card">
+                            <h4>[RELATIONSHIP_TABLE_NAME]</h4>
+                            <p class="table-description">Many-to-many relationship table.</p>
+                            <div class="schema-display">
+                                <div class="field">[primary_id] <span class="key-type">(Foreign Key to [PRIMARY_TABLE_NAME])</span></div>
+                                <div class="field">[lookup_id] <span class="key-type">(Foreign Key to [LOOKUP_TABLE_NAME])</span></div>
+                                <div class="field">relationship_type</div>
+                                <div class="field">created_date</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-category">
+                    <h3>2. Supporting Tables</h3>
+                    
+                    <div class="table-group">
+                        <div class="table-card">
+                            <h4>[AUDIT_TABLE_NAME]</h4>
+                            <p class="table-description">Audit trail for system changes.</p>
+                            <div class="schema-display">
+                                <div class="field">audit_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">table_name</div>
+                                <div class="field">record_id</div>
+                                <div class="field">action_type</div>
+                                <div class="field">old_values</div>
+                                <div class="field">new_values</div>
+                                <div class="field">changed_by</div>
+                                <div class="field">change_date</div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-card">
+                            <h4>[CONFIG_TABLE_NAME]</h4>
+                            <p class="table-description">System configuration settings.</p>
+                            <div class="schema-display">
+                                <div class="field">config_id <span class="key-type">(Primary Key)</span></div>
+                                <div class="field">config_key</div>
+                                <div class="field">config_value</div>
+                                <div class="field">config_type</div>
+                                <div class="field">description</div>
+                                <div class="field">modified_by</div>
+                                <div class="field">modified_date</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="database-relationships">
+                <h3>Table Relationships</h3>
+                <div class="relationship-diagram">
+                    <p><strong>Primary Relationships:</strong></p>
+                    <ul>
+                        <li>[PRIMARY_TABLE_NAME] → [RELATIONSHIP_TABLE_NAME] (One-to-Many)</li>
+                        <li>[LOOKUP_TABLE_NAME] → [RELATIONSHIP_TABLE_NAME] (One-to-Many)</li>
+                        <li>[PRIMARY_TABLE_NAME] → [AUDIT_TABLE_NAME] (One-to-Many)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API ENDPOINTS SECTION -->
+<div class="container secondary">
+    <div class="container-header" id="api_endpoints">API Endpoints</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="api-section">
+                <h3>REST API Endpoints</h3>
+                
+                <div class="endpoint-group">
+                    <h4>[PRIMARY_DATA_TYPE] Management</h4>
+                    <div class="endpoint-list">
+                        <div class="endpoint-card">
+                            <h5>GET /api/[system_name]/[data_type]</h5>
+                            <p>Retrieve all [data_type] records</p>
+                            <div class="endpoint-details">
+                                <strong>Parameters:</strong> page, limit, sort, filter<br>
+                                <strong>Returns:</strong> JSON array of [data_type] objects
+                            </div>
+                        </div>
+                        
+                        <div class="endpoint-card">
+                            <h5>GET /api/[system_name]/[data_type]/{id}</h5>
+                            <p>Retrieve specific [data_type] record</p>
+                            <div class="endpoint-details">
+                                <strong>Parameters:</strong> id (required)<br>
+                                <strong>Returns:</strong> JSON [data_type] object
+                            </div>
+                        </div>
+                        
+                        <div class="endpoint-card">
+                            <h5>POST /api/[system_name]/[data_type]</h5>
+                            <p>Create new [data_type] record</p>
+                            <div class="endpoint-details">
+                                <strong>Body:</strong> JSON [data_type] object<br>
+                                <strong>Returns:</strong> Created [data_type] object with ID
+                            </div>
+                        </div>
+                        
+                        <div class="endpoint-card">
+                            <h5>PUT /api/[system_name]/[data_type]/{id}</h5>
+                            <p>Update existing [data_type] record</p>
+                            <div class="endpoint-details">
+                                <strong>Parameters:</strong> id (required)<br>
+                                <strong>Body:</strong> JSON [data_type] object<br>
+                                <strong>Returns:</strong> Updated [data_type] object
+                            </div>
+                        </div>
+                        
+                        <div class="endpoint-card">
+                            <h5>DELETE /api/[system_name]/[data_type]/{id}</h5>
+                            <p>Delete [data_type] record</p>
+                            <div class="endpoint-details">
+                                <strong>Parameters:</strong> id (required)<br>
+                                <strong>Returns:</strong> Success/failure status
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="endpoint-group">
+                    <h4>Search & Filter Endpoints</h4>
+                    <div class="endpoint-list">
+                        <div class="endpoint-card">
+                            <h5>GET /api/[system_name]/search</h5>
+                            <p>Search across all [system_name] data</p>
+                            <div class="endpoint-details">
+                                <strong>Parameters:</strong> query, fields, limit, offset<br>
+                                <strong>Returns:</strong> JSON search results
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- IMPLEMENTATION PLAN SECTION -->
+<div class="container warning">
+    <div class="container-header" id="implementation_plan">Implementation Plan</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="alert alert-warning">
+                <h3>⚠️ CRITICAL: Phased Implementation Approach Required</h3>
+                <p><strong>This system requires careful implementation planning:</strong></p>
+            </div>
+            
+            <div class="implementation-phases">
+                <div class="phase-container">
+                    <h4>Phase 1: Foundation (0-3 months)</h4>
+                    <ul class="phase-list">
+                        <li><strong>Database Design:</strong> Create core database structure</li>
+                        <li><strong>Basic Models:</strong> Implement primary data models</li>
+                        <li><strong>Core Controllers:</strong> Basic CRUD operations</li>
+                        <li><strong>Authentication:</strong> User access control implementation</li>
+                    </ul>
+                </div>
+                
+                <div class="phase-container">
+                    <h4>Phase 2: Core Features (3-6 months)</h4>
+                    <ul class="phase-list">
+                        <li><strong>User Interface:</strong> Primary system interface development</li>
+                        <li><strong>Search Functionality:</strong> Basic search and filter capabilities</li>
+                        <li><strong>Data Validation:</strong> Input validation and error handling</li>
+                        <li><strong>API Development:</strong> RESTful API endpoints</li>
+                    </ul>
+                </div>
+                
+                <div class="phase-container">
+                    <h4>Phase 3: Advanced Features (6-9 months)</h4>
+                    <ul class="phase-list">
+                        <li><strong>Advanced Search:</strong> Complex queries and filtering</li>
+                        <li><strong>Reporting System:</strong> Data analysis and reporting tools</li>
+                        <li><strong>Integration APIs:</strong> External system integration</li>
+                        <li><strong>Performance Optimization:</strong> Database and query optimization</li>
+                    </ul>
+                </div>
+                
+                <div class="phase-container">
+                    <h4>Phase 4: Enhancement & Maintenance (9+ months)</h4>
+                    <ul class="phase-list">
+                        <li><strong>User Feedback Integration:</strong> Feature refinements</li>
+                        <li><strong>Advanced Analytics:</strong> Data insights and analytics</li>
+                        <li><strong>Mobile Optimization:</strong> Mobile-responsive enhancements</li>
+                        <li><strong>System Monitoring:</strong> Performance monitoring and alerting</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="implementation-requirements">
+                <h3>Technical Requirements</h3>
+                <div class="requirements-grid">
+                    <div class="requirement-card">
+                        <h4>Infrastructure</h4>
+                        <ul>
+                            <li>[DATABASE_REQUIREMENTS]</li>
+                            <li>[SERVER_REQUIREMENTS]</li>
+                            <li>[STORAGE_REQUIREMENTS]</li>
+                        </ul>
+                    </div>
+                    <div class="requirement-card">
+                        <h4>Dependencies</h4>
+                        <ul>
+                            <li>[PERL_VERSION]</li>
+                            <li>[FRAMEWORK_REQUIREMENTS]</li>
+                            <li>[EXTERNAL_LIBRARIES]</li>
+                        </ul>
+                    </div>
+                    <div class="requirement-card">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li>[DEVELOPMENT_TEAM_SIZE]</li>
+                            <li>[ESTIMATED_TIMELINE]</li>
+                            <li>[BUDGET_CONSIDERATIONS]</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FILE LISTING SECTION -->
+<div class="container info">
+    <div class="container-header" id="file_listing">Complete File Listing</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <div class="file-structure">
+                <h3>System File Organization</h3>
+                
+                <div class="file-category">
+                    <h4>📁 Controllers</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]Controller.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]AdminController.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]APIController.pm</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Models</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]Model.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]DataModel.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]ValidationModel.pm</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Utilities</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]Utils.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]DataUtils.pm</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]ValidationUtils.pm</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Templates (.tt)</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]Index.tt</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]Form.tt</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]Display.tt</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]Admin.tt</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]Report.tt</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Configuration</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]_config.json</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_database.conf</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_routes.conf</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Documentation</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME].md (this file)</div>
+                        <div class="file-item">📁 controllers/[SYSTEM_NAME]Controller.md</div>
+                        <div class="file-item">📁 models/[SYSTEM_NAME]Model.md</div>
+                        <div class="file-item">📁 utils/[SYSTEM_NAME]Utils.md</div>
+                        <div class="file-item">📁 admin/[SYSTEM_NAME]_installation.md</div>
+                        <div class="file-item">📁 admin/[SYSTEM_NAME]_configuration.md</div>
+                        <div class="file-item">📁 admin/[SYSTEM_NAME]_maintenance.md</div>
+                        <div class="file-item">📁 roles/normal/[SYSTEM_NAME]_user_guide.md</div>
+                        <div class="file-item">📁 roles/developer/[SYSTEM_NAME]_api.md</div>
+                        <div class="file-item">📁 guidelines/[SYSTEM_NAME]_guidelines.md</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Tests</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]_unit_tests.t</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_integration_tests.t</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_api_tests.t</div>
+                    </div>
+                </div>
+                
+                <div class="file-category">
+                    <h4>📁 Scripts</h4>
+                    <div class="file-list">
+                        <div class="file-item">📄 [SYSTEM_NAME]_setup.pl</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_migration.pl</div>
+                        <div class="file-item">📄 [SYSTEM_NAME]_backup.pl</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container success">
+    <div class="container-header">Template Usage Instructions</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>How to Use This Template</h3>
+            <div class="instruction-grid">
+                <div class="instruction-card">
+                    <h4>1. Replace Placeholders</h4>
+                    <p>Replace all [PLACEHOLDER] values with system-specific information:</p>
+                    <ul>
+                        <li>[SYSTEM_NAME] - Name of your system</li>
+                        <li>[SYSTEM_DESCRIPTION] - Brief description</li>
+                        <li>[PRIMARY_TABLE_NAME] - Main database table</li>
+                        <li>[DATA_TYPE] - Primary data type managed</li>
+                    </ul>
+                </div>
+                <div class="instruction-card">
+                    <h4>2. Create Sub-Documents</h4>
+                    <p>Create the referenced .tt files in appropriate directories:</p>
+                    <ul>
+                        <li>Documentation/controllers/</li>
+                        <li>Documentation/models/</li>
+                        <li>Documentation/admin/</li>
+                        <li>Documentation/roles/</li>
+                    </ul>
+                </div>
+                <div class="instruction-card">
+                    <h4>3. Update Navigation</h4>
+                    <p>Customize the Quick Navigation section to match your system's specific sections and anchor links.</p>
+                </div>
+                <div class="instruction-card">
+                    <h4>4. Version Control</h4>
+                    <p>Update the PageVersion at the top with your system's file path and version information.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="back-to-top">
+    <p id="return_top"><a href="#system_top">Return to Top</a></p>
+</div>

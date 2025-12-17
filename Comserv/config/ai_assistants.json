@@ -1,0 +1,15 @@
+{
+  "customCommands": [
+    {
+      "name": "CleanupAgent",
+      "description": "Scan audit file and apply guideline cleanups",
+      "prompt": "Read AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md. Parse the list of files/tools. For each: Identify outdated workarounds (e.g., verbose hacks for old models). Suggest removals/rearrangements to coding-standards.yaml. Ensure no conflicts. Output as a step-by-step change plan."
+    }
+  ],
+  "models": [
+    {
+      "title": "Grok",
+      "provider": "xai"
+    }
+  ]
+}

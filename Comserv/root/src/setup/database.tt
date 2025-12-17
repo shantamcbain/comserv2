@@ -1,0 +1,126 @@
+<div class="container" style="max-width: 600px; margin: 50px auto;">
+    <div style="background: var(--light-color); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <h1 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Database Configuration Setup</h1>
+        
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 20px;">
+            The application needs database connection information to operate. 
+            Please provide your database credentials below.
+        </p>
+        
+        [% IF error_msg %]
+            <div style="background-color: #ffebee; color: #c62828; padding: 15px; border-radius: 4px; margin-bottom: 20px; border-left: 4px solid #d32f2f;">
+                <strong>Error:</strong> [% error_msg %]
+            </div>
+        [% END %]
+        
+        <form method="POST" style="display: grid; gap: 15px;">
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Database Type
+                </label>
+                <select name="db_type" required style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px;">
+                    <option value="mariadb">MariaDB / MySQL</option>
+                    <option value="Pg">PostgreSQL</option>
+                </select>
+            </div>
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Host
+                </label>
+                <input 
+                    type="text" 
+                    name="host" 
+                    placeholder="e.g., 192.168.1.198 or localhost" 
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Port
+                </label>
+                <input 
+                    type="number" 
+                    name="port" 
+                    placeholder="3306"
+                    value="3306"
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Username
+                </label>
+                <input 
+                    type="text" 
+                    name="username" 
+                    placeholder="Database user"
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Password
+                </label>
+                <input 
+                    type="password" 
+                    name="password"
+                    placeholder="Database password"
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div>
+                <label style="display: block; color: var(--text-color); font-weight: bold; margin-bottom: 5px;">
+                    Database Name
+                </label>
+                <input 
+                    type="text" 
+                    name="database"
+                    placeholder="e.g., ency or forager"
+                    required
+                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box;"
+                />
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <button 
+                    type="submit" 
+                    style="padding: 10px; background-color: var(--primary-color); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px;"
+                >
+                    Test & Save
+                </button>
+                <button 
+                    type="button" 
+                    onclick="window.location='[% c.uri_for('/') %]'"
+                    style="padding: 10px; background-color: var(--border-color); color: var(--text-color); border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 14px;"
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
+        
+        <hr style="margin-top: 30px; border: 1px solid var(--border-color);" />
+        
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; margin-top: 20px;">
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Alternative: Environment Variables</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-size: 12px;">
+                Instead of using this form, you can set environment variables before starting the application:
+            </p>
+            <pre style="background: #fff; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; overflow-x: auto; font-size: 12px;">
+export COMSERV_DB_HOST=192.168.1.198
+export COMSERV_DB_PORT=3306
+export COMSERV_DB_USER=your_username
+export COMSERV_DB_PASS=your_password
+export COMSERV_DB_NAME=ency</pre>
+        </div>
+    </div>
+</div>
