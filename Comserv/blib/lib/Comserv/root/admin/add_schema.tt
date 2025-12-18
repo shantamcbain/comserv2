@@ -1,0 +1,29 @@
+[% PageVersion = 'Admin/add_schema.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Schema Management.</h1>
+
+<p>Welcome to the Add Schema page. Here you can manage schema changes for the site.</p>
+
+
+<form method="post" action="[% c.uri_for('/admin/add_schema') %]">
+    <label for="schema_name">Schema Name:</label><br>
+    <input type="text" id="schema_name" name="schema_name"><br>
+    <label for="schema_description">Schema Description:</label><br>
+    <textarea id="schema_description" name="schema_description"></textarea><br>
+    <input type="submit" value="Create Migration">
+</form>
+
+[% IF error_msg %]
+    <p style="color: red;">[% error_msg %]</p>
+[% END %]
+
+<p>After creating the migration, you can apply it to the database by clicking the 'Migrate Schema' button.</p>
+
+<form method="post" action="[% c.uri_for('/admin/migrate_schema') %]">
+    <input type="submit" value="Migrate Schema">
+</form>
+
+<p>For more information or assistance, please contact us.</p>

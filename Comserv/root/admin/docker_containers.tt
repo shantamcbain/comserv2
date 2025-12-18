@@ -1,0 +1,538 @@
+[% META
+   title = 'Docker Container Management'
+   version = '1.0'
+   author = 'AI Assistant'
+   date = '2025-12-14'
+   last_modified = '2025-12-14'
+   category = 'admin'
+   tags = 'docker, containers, infrastructure'
+%]
+[% PageVersion = 'docker_containers.tt,v 1.0 2025/12/14 ai_assistant Exp ai_assistant ' %]
+
+<div class="container" style="margin: 20px auto; max-width: 1200px;">
+    <div class="row">
+        <div class="col-md-12">
+            <h1><i class="icon-docker"></i> Docker Container Management</h1>
+            <hr>
+        </div>
+    </div>
+
+    [% IF !docker_available %]
+    <div class="alert alert-warning" role="alert">
+        <strong>Notice:</strong> Docker container management is not available from within a Docker container. 
+        This feature must be accessed from the host system.
+    </div>
+    [% ELSE %]
+    
+    <div class="row" style="margin-bottom: 30px;">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                    <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                        <span>
+                            <i class="icon-list" style="margin-right: 10px;"></i>
+                            Container Status Overview
+                        </span>
+                        <button onclick="refreshContainers()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            <i class="icon-refresh"></i> Refresh
+                        </button>
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                    <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <p style="color: #666; text-align: center;">Loading container information...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="margin-bottom: 30px;">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                    <h3 style="margin: 0; display: flex; align-items: center;">
+                        <i class="icon-tools" style="margin-right: 10px;"></i>
+                        Container Controls
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                        <div>
+                            <label for="service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Select Service:
+                            </label>
+                            <select id="service-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">-- Select a service --</option>
+                                <option value="all">All Services</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Actions:
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="restart-btn" onclick="restartContainer()" 
+                                    style="padding: 8px 16px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <i class="icon-refresh"></i> Restart
+                                </button>
+                                <button id="status-btn" onclick="checkStatus()" 
+                                    style="padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <i class="icon-status"></i> Check Status
+                                </button>
+                                <button id="logs-btn" onclick="viewLogs()" 
+                                    style="padding: 8px 16px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <i class="icon-log"></i> View Logs
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="force-restart" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="force-restart" style="width: 18px; height: 18px;">
+                                <span>Force restart (down/up cycle)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header" style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                    <h3 style="margin: 0; display: flex; align-items: center;">
+                        <i class="icon-log" style="margin-right: 10px;"></i>
+                        Output/Logs
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 20px;">
+                    <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
+                        font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                        Ready for commands...
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button onclick="clearOutput()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Clear Output
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    [% END %]
+</div>
+
+<script>
+    const outputBox = document.getElementById('output-box');
+    const containersList = document.getElementById('containers-list');
+    let containersData = [];
+
+    function appendOutput(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        outputBox.textContent += `[${timestamp}] ${message}\n`;
+        outputBox.scrollTop = outputBox.scrollHeight;
+    }
+
+    function clearOutput() {
+        outputBox.textContent = 'Ready for commands...\n';
+    }
+
+    function getSelectedService() {
+        const select = document.getElementById('service-select');
+        const service = select.value;
+        if (!service) {
+            alert('Please select a service');
+            return null;
+        }
+        return service;
+    }
+
+    function getStateColor(state) {
+        const stateColors = {
+            'running': '#28a745',
+            'up': '#28a745',
+            'exited': '#dc3545',
+            'exit': '#dc3545',
+            'restarting': '#ffc107',
+            'paused': '#6c757d',
+            'created': '#17a2b8',
+            'not_created': '#6c757d',
+            'unknown': '#6c757d'
+        };
+        return stateColors[state.toLowerCase()] || '#6c757d';
+    }
+
+    function getStateIcon(state) {
+        const stateIcons = {
+            'running': '▶',
+            'up': '▶',
+            'exited': '■',
+            'exit': '■',
+            'restarting': '↻',
+            'paused': '❚❚',
+            'created': '○',
+            'not_created': '○',
+            'unknown': '?'
+        };
+        return stateIcons[state.toLowerCase()] || '?';
+    }
+
+    function refreshContainers() {
+        containersList.innerHTML = '<p style="color: #666; text-align: center;">Loading container information...</p>';
+
+        fetch('/admin/docker-list')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                containersData = data.containers;
+                displayContainers(data.containers);
+                updateServiceDropdown(data.containers);
+            })
+            .catch(error => {
+                containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
+            });
+    }
+
+    function displayContainers(containers) {
+        if (!containers || containers.length === 0) {
+            containersList.innerHTML = '<p style="color: #666; text-align: center;">No containers found</p>';
+            return;
+        }
+
+        let html = '';
+        containers.forEach(container => {
+            const stateColor = getStateColor(container.state);
+            const stateIcon = getStateIcon(container.state);
+            const isRunning = ['running', 'up'].includes(container.state.toLowerCase());
+
+            html += `
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: #fff;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 5px 0; color: #333;">
+                                <span style="color: ${stateColor}; margin-right: 8px;">${stateIcon}</span>
+                                ${container.service}
+                            </h4>
+                            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                <strong>Container:</strong> ${container.name}
+                            </div>
+                            ${container.description ? `
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                    <strong>Description:</strong> ${container.description}
+                                </div>
+                            ` : ''}
+                            ${container.image ? `
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                    <strong>Image:</strong> ${container.image}
+                                </div>
+                            ` : ''}
+                            ${container.ports && container.ports.length > 0 ? `
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                    <strong>Ports:</strong> ${container.ports.join(', ')}
+                                </div>
+                            ` : ''}
+                            <div style="font-size: 12px;">
+                                <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
+                                    ${container.state.toUpperCase()}
+                                </span>
+                                <span style="color: #666; margin-left: 10px;">${container.status}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                            ${container.state === 'not_created' ? `
+                                <button onclick="createContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🚀 Create & Start
+                                </button>
+                            ` : isRunning ? `
+                                <button onclick="stopContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ■ Stop
+                                </button>
+                                <button onclick="restartContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ↻ Restart
+                                </button>
+                                <button onclick="viewLogsDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    📋 Logs
+                                </button>
+                            ` : `
+                                <button onclick="startContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▶ Start
+                                </button>
+                                <button onclick="restartContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ↻ Restart
+                                </button>
+                                <button onclick="viewLogsDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    📋 Logs
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        containersList.innerHTML = html;
+    }
+
+    function updateServiceDropdown(containers) {
+        const select = document.getElementById('service-select');
+        // Clear existing options except the first two
+        while (select.options.length > 2) {
+            select.remove(2);
+        }
+
+        containers.forEach(container => {
+            const option = document.createElement('option');
+            option.value = container.service;
+            option.textContent = container.service;
+            select.appendChild(option);
+        });
+    }
+
+    function createContainerDirect(service) {
+        appendOutput(`Creating and starting ${service}...`);
+
+        fetch(`/admin/docker-up/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ ${service} created and started successfully!\n` + (data.stdout || ''));
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    appendOutput(`✗ Failed to create ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function startContainerDirect(service) {
+        appendOutput(`Starting ${service}...`);
+
+        fetch(`/admin/docker-start/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ ${service} started successfully!\n` + (data.stdout || ''));
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    appendOutput(`✗ Failed to start ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function stopContainerDirect(service) {
+        if (!confirm(`Are you sure you want to stop ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Stopping ${service}...`);
+
+        fetch(`/admin/docker-stop/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ ${service} stopped successfully!\n` + (data.stdout || ''));
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    appendOutput(`✗ Failed to stop ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function restartContainerDirect(service) {
+        if (!confirm(`Are you sure you want to restart ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Restarting ${service}...`);
+
+        fetch(`/admin/docker-restart/${service}?force=0`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ ${service} restarted successfully!\n` + (data.stdout || ''));
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    appendOutput(`✗ Failed to restart ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function viewLogsDirect(service) {
+        const lines = prompt('How many lines of logs to display? (default: 50)', '50');
+        if (lines === null) return;
+
+        appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+
+        fetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.output || data.error === '') {
+                    appendOutput(`Logs for ${service}:\n` + (data.output || 'No logs available'));
+                } else if (data.error) {
+                    appendOutput(`Error getting logs:\n` + data.error);
+                } else {
+                    appendOutput('Unable to retrieve logs');
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function checkStatus() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        appendOutput(`Checking status for: ${service}`);
+
+        const url = service === 'all' ? '/admin/docker-status/all' : `/admin/docker-status/${service}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    appendOutput('Status output:\n' + (data.output || data.stdout || 'No output'));
+                } else {
+                    appendOutput('Error: ' + (data.error || data.stderr || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+            });
+    }
+
+    function restartContainer() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        const force = document.getElementById('force-restart').checked;
+
+        if (!confirm(`Are you sure you want to restart ${service}?`)) {
+            return;
+        }
+
+        appendOutput(`Restarting ${service}${force ? ' (force mode)' : ''}...`);
+
+        const url = `/admin/docker-restart/${service}?force=${force ? 1 : 0}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput('✓ Restart successful!\n' + (data.stdout || data.output || ''));
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    appendOutput('✗ Restart failed:\n' + (data.stderr || data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+            });
+    }
+
+    function viewLogs() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        const lines = prompt('How many lines of logs to display? (default: 50)', '50');
+        if (lines === null) return;
+
+        appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+
+        const url = `/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.output || data.error === '') {
+                    appendOutput('Logs:\n' + (data.output || 'No logs available'));
+                } else if (data.error) {
+                    appendOutput('Error getting logs:\n' + data.error);
+                } else {
+                    appendOutput('Unable to retrieve logs');
+                }
+            })
+            .catch(error => {
+                appendOutput('Error: ' + error.message);
+            });
+    }
+
+    // Initialize - load containers on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshContainers();
+    });
+</script>
+
+<style>
+    .card {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .card-header {
+        border-radius: 4px 4px 0 0;
+    }
+
+    .card-body {
+        background-color: #fff;
+    }
+
+    .alert {
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+
+    .alert-warning {
+        color: #856404;
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+    }
+
+    button:hover {
+        opacity: 0.9;
+    }
+
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 20px;
+    }
+
+    h3 {
+        color: #333;
+    }
+</style>
