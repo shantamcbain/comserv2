@@ -111,12 +111,12 @@ sub direct_install_docker :Path('/proxymanager/install_docker') :Args(0) {
     # Prepare installation instructions based on OS
     my $installation_instructions = {
         general => "Docker installation instructions vary by operating system. Please follow the official Docker documentation for your specific OS.",
-        ubuntu => "sudo apt-get update && sudo apt-get install -y docker.io docker-compose",
-        debian => "sudo apt-get update && sudo apt-get install -y docker.io docker-compose",
-        centos => "sudo yum install -y docker docker-compose",
-        fedora => "sudo dnf install -y docker docker-compose",
-        rhel => "sudo yum install -y docker docker-compose",
-        arch => "sudo pacman -S docker docker-compose",
+        ubuntu => "sudo apt-get update && sudo apt-get install -y docker.io docker compose",
+        debian => "sudo apt-get update && sudo apt-get install -y docker.io docker compose",
+        centos => "sudo yum install -y docker docker compose",
+        fedora => "sudo dnf install -y docker docker compose",
+        rhel => "sudo yum install -y docker docker compose",
+        arch => "sudo pacman -S docker docker compose",
     };
     
     # Determine which instructions to show based on OS
@@ -420,12 +420,12 @@ sub install_docker :Chained('base') :PathPart('install_docker') :Args(0) {
     # Prepare installation instructions based on OS
     my $installation_instructions = {
         general => "Docker installation instructions vary by operating system. Please follow the official Docker documentation for your specific OS.",
-        ubuntu => "sudo apt-get update && sudo apt-get install -y docker.io docker-compose",
-        debian => "sudo apt-get update && sudo apt-get install -y docker.io docker-compose",
-        centos => "sudo yum install -y docker docker-compose",
-        fedora => "sudo dnf install -y docker docker-compose",
-        rhel => "sudo yum install -y docker docker-compose",
-        arch => "sudo pacman -S docker docker-compose",
+        ubuntu => "sudo apt-get update && sudo apt-get install -y docker.io docker compose",
+        debian => "sudo apt-get update && sudo apt-get install -y docker.io docker compose",
+        centos => "sudo yum install -y docker docker compose",
+        fedora => "sudo dnf install -y docker docker compose",
+        rhel => "sudo yum install -y docker docker compose",
+        arch => "sudo pacman -S docker docker compose",
     };
     
     # Determine which instructions to show based on OS
@@ -1634,25 +1634,33 @@ sub check_infrastructure_status {
     
     # Check NPM installation
     eval {
-        # Check if NPM is running in Docker
-        my $npm_container = `docker ps --filter "name=nginx-proxy-manager" --format "{{.Names}}" 2>/dev/null`;
+        # Check if NPM is running in Docker (all containers, not just running ones)
+        my $npm_container = `docker ps -a --filter "name=nginx-proxy-manager" --format "{{.Names}}" 2>/dev/null`;
         chomp($npm_container);
         
         if ($npm_container) {
             $status->{npm}->{installed} = 1;
-            $status->{npm}->{status} = 'Running in Docker';
             
-            # Try to get NPM version from container
-            my $npm_version = `docker exec $npm_container cat /app/package.json 2>/dev/null | grep version`;
-            if ($npm_version =~ /"version":\s*"([^"]+)"/) {
-                $status->{npm}->{version} = $1;
+            # Check if container is actually running
+            my $npm_status = `docker ps --filter "name=nginx-proxy-manager" --format "{{.Names}}" 2>/dev/null`;
+            chomp($npm_status);
+            
+            if ($npm_status) {
+                $status->{npm}->{status} = 'Running in Docker';
+                # Try to get NPM version from container
+                my $npm_version = `docker exec $npm_container cat /app/package.json 2>/dev/null | grep version`;
+                if ($npm_version =~ /"version":\s*"([^"]+)"/) {
+                    $status->{npm}->{version} = $1;
+                }
+            } else {
+                $status->{npm}->{status} = 'Stopped (Container exists)';
             }
         } else {
-            # Check if NPM docker-compose file exists
+            # Check if NPM docker compose file exists
             my $npm_compose_file = Catalyst::Utils::home('Comserv') . "/config/npm-docker-compose.yml";
             if (-e $npm_compose_file) {
                 $status->{npm}->{installed} = 1;
-                $status->{npm}->{status} = 'Configured but not running';
+                $status->{npm}->{status} = 'Configured but no container';
             }
         }
         

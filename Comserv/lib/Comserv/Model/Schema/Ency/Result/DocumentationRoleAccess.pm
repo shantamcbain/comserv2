@@ -33,20 +33,6 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['role', 'doc_section_pattern']);
 
-eval {
-    __PACKAGE__->add_index(['role']);
-};
-if ($@) {
-    warn "[DocumentationRoleAccess] Could not add index on role: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['doc_section_pattern']);
-};
-if ($@) {
-    warn "[DocumentationRoleAccess] Could not add index on doc_section_pattern: $@\n";
-}
-
 # Helper methods
 sub matches_doc_path {
     my ($self, $doc_path) = @_;

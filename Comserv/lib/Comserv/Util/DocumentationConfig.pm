@@ -68,7 +68,7 @@ sub instance {
 sub load_config {
     my ($self) = @_;
 
-    my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'documentation_config.json');
+    my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'DocumentationConfig.json');
 
     try {
         # Read the JSON file

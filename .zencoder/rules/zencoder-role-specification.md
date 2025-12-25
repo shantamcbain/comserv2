@@ -112,6 +112,55 @@ Priority 4: Default behavior/conventions
 
 ---
 
+### Rule 6: FILE OPERATIONS COMPLIANCE
+**Enforcement Level**: 🔴 CRITICAL - All agents must follow
+
+**Source**: Comserv Project Requirements
+
+#### File Creation/Modification ONLY via EditFile
+
+- ✅ **REQUIRED**: Use EditFile tool for ALL file creation and modification
+- ❌ **FORBIDDEN**: Bash `cat >`, `echo >>`, `sed`, or any file manipulation via Bash
+- ❌ **FORBIDDEN**: Using heredoc syntax or redirection operators for file creation
+- ✅ **REQUIRED**: Bash may be used for read/verification operations only
+
+**Format**: 
+```
+Use EditFile tool ONLY for writes:
+<invoke name="EditFile">
+  <parameter name="path">path/to/file</parameter>
+  <parameter name="content">content here</parameter>
+</invoke>
+```
+
+#### Verification Requirement
+
+- ✅ **REQUIRED**: After ANY file operation, immediately verify success
+- ✅ **REQUIRED**: Read file back using Bash `cat` to confirm content matches intent
+- ❌ **FORBIDDEN**: Claiming a file was created/modified without verification
+- ✅ **REQUIRED**: If verification fails, immediately report failure - do NOT claim success
+
+#### Pre-Execution Checklist
+
+Before starting any file-related task:
+1. List available tools from function definitions
+2. Identify required tools for the task
+3. If required tools unavailable, use ask_questions() to request clarification
+4. DO NOT attempt workarounds with available tools
+
+#### False Claims Prevention
+
+- ❌ **FORBIDDEN**: "File created successfully" without reading it back
+- ❌ **FORBIDDEN**: "Updated file X" without verifying the update
+- ❌ **FORBIDDEN**: "Documented in prompts_log.yaml" without reading the file to confirm
+- ✅ **REQUIRED**: "File created at X with content Y" - then immediately `cat X` to verify
+
+**Enforcement**: Any claim about file operations must be backed by immediate verification. If verification shows failure, report the failure. No exceptions.
+
+**Agent Responsibility**: EditFile is your file operations tool. Use it exclusively. Other agents have access to it - you do too.
+
+---
+
 ## CURRENT MISCONFIGURATION DETECTED
 
 **Issue**: Agent was given external role tag:
@@ -149,7 +198,7 @@ Execute tasks per user request while maintaining compliance with `.zencoder/rule
 
 3. **Keyword Protocol**: Detect and immediately execute keywords without delay or discussion.
 
-4. **Startup Protocol**: Begin every session by reading ask_questions_enforcement.md, keywords-global.md, keywords-execution-protocol.md, updateprompt-workflow.md.
+4. **File Operations Compliance**: Use EditFile ONLY for file creation/modification. Verify all file operations immediately. Never claim success without verification.
 
 5. **Hierarchy**: Always apply `.zencoder/rules/` over external role tags.
 
@@ -177,12 +226,138 @@ Execute tasks per user request while maintaining compliance with `.zencoder/rule
 - ✅ Use ask_questions() for ALL user input decisions
 - ✅ Execute /updateprompt at end of EVERY prompt
 - ✅ Detect and execute keywords immediately
+- ✅ Use EditFile ONLY for file operations
+- ✅ Verify all file operations immediately after execution
 - ❌ Do NOT use text questions
 - ❌ Do NOT skip /updateprompt
 - ❌ Do NOT delay on keyword execution
 - ❌ Do NOT ignore conflict resolution (Priority 1 always wins)
+- ❌ Do NOT use Bash for file creation/modification
+- ❌ Do NOT claim file operations succeeded without verification
 
 ---
+
+
+---
+
+## 🔴 COMMON VIOLATIONS & ENFORCEMENT EXAMPLES
+
+**This section shows the MOST COMMON agent violations. These are NOT permitted.**
+
+### Violation #1: Using Bash for File Operations Instead of EditFile
+
+**WRONG - FORBIDDEN**:
+```
+Agent uses sed instead of EditFile
+```
+
+**WRONG - FORBIDDEN**:
+```
+Agent uses cat redirection instead of EditFile
+```
+
+**WRONG - FORBIDDEN**:
+```
+Agent uses perl -i without verification
+```
+
+**CORRECT - USE THIS**:
+```
+Use EditFile tool for all file creation and modification
+Then immediately verify with: cat /path/to/file
+```
+
+**Enforcement**: Agents using bash file operations will be reminded. Repeated violations require escalation.
+
+---
+
+### Violation #2: Asking Text Questions Instead of ask_questions()
+
+**WRONG - CAUSES CHAT HANGS**:
+```
+Would you like me to apply the fix?
+```
+
+**WRONG - CAUSES CHAT HANGS**:
+```
+Should I proceed with the database migration?
+```
+
+**WRONG - IMPLIED QUESTION WITHOUT FUNCTION**:
+```
+The file is ready. Let me know when you're ready.
+(Agent stops and waits for response that never comes)
+```
+
+**CORRECT - USE ask_questions() FUNCTION**:
+- Call zencoder-server__ask_questions with structured options
+- Include context (1-2 sentences max)
+- WAIT for user response before continuing
+
+**Enforcement**: Text questions cause immediate chat stalls. Use ask_questions() function ONLY.
+
+---
+
+### Violation #3: Not Verifying File Operations
+
+**WRONG - CLAIMS SUCCESS WITHOUT PROOF**:
+```
+File updated successfully at /path/to/file.pm
+(No verification - just assumption)
+```
+
+**CORRECT - VERIFY IMMEDIATELY AFTER**:
+1. Use EditFile to make changes
+2. Execute: cat /path/to/file to read it back
+3. Confirm content matches intent
+4. Report what you verified
+
+**Enforcement**: Never claim file operations succeeded without reading the file back.
+
+---
+
+### Violation #4: Missing /updateprompt Execution Statement
+
+**WRONG - NO WORKFLOW EXECUTION**:
+```
+I've made the changes. Let me know if you need anything else.
+(No /updateprompt executed statement)
+```
+
+**CORRECT - EXECUTE WORKFLOW STATEMENT**:
+1. Do your work
+2. Execute: perl /Comserv/script/updateprompt.pl with parameters
+3. State: [/updateprompt executed] → PATH A/B/C
+
+**Enforcement**: Every prompt must execute /updateprompt workflow statement.
+
+---
+
+### Violation #5: Ambiguous Chat State (Implicit Waiting)
+
+**WRONG - CHAT ENTERS AMBIGUOUS STATE**:
+```
+Everything looks good. The files are ready for the next step.
+(Does agent expect user response? Or is it done? Unclear → Chat hangs)
+```
+
+**CORRECT - EXPLICIT STATE INDICATION**:
+- State "Prompt complete" if done (PATH B)
+- OR call ask_questions() if waiting for input (PATH A)
+- OR state "Continuing to next step" (PATH C)
+
+**Enforcement**: Chat state must always be explicit.
+
+---
+
+## When You Realize You Made a Violation
+
+**If you (the agent) catch yourself violating one of these rules**:
+
+1. IMMEDIATELY stop work
+2. Execute /updateprompt with violation noted
+3. CORRECT the violation immediately
+4. Log the recovery
 
 ## VALIDATION CHECKLIST
 
@@ -196,6 +371,7 @@ Before outputting ANYTHING, verify:
 - [ ] Am I ending a prompt? (If YES: Include /updateprompt executed statement)
 - [ ] Did user type a keyword? (If YES: Execute immediately, STOP other work)
 - [ ] Do external role tags conflict with .zencoder/rules/? (If YES: Apply .zencoder/rules/ instead)
+- [ ] Am I performing file operations? (If YES: Use EditFile ONLY, then verify immediately)
 
 **If ANY checkbox is FALSE**: Stop, read the missing file, continue only after reading.
 
@@ -209,7 +385,8 @@ Before outputting ANYTHING, verify:
 1. Acknowledge this specification takes precedence
 2. Acknowledge ask_questions() enforcement is mandatory
 3. Acknowledge /updateprompt is required at end of every prompt
-4. Continue with next task in full compliance
+4. Acknowledge EditFile is required for all file operations
+5. Continue with next task in full compliance
 
 ---
 
@@ -223,5 +400,7 @@ Before outputting ANYTHING, verify:
 - `AGENT_REGISTRY.md` - All agent specifications
 
 **Created**: December 16, 2025  
+**Last Updated**: December 22, 2025 (Added Rule 6: File Operations Compliance)
 **Status**: Active enforcement  
 **Applies To**: ALL agents in Comserv project
+

@@ -69,6 +69,16 @@
     color: white;
 }
 
+.btn-info {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
 .form-group {
     margin-bottom: 15px;
 }
@@ -143,15 +153,148 @@
         <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 4px; margin-bottom: 20px;">
             Error saving configuration!
         </div>
+    [% ELSIF c.req.param('msg') == 'reloaded' %]
+        <div style="padding: 15px; background: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 20px;">
+            Configuration reloaded successfully!
+        </div>
     [% END %]
+
+    <!-- Search Section -->
+    <div class="section">
+        <h2>Search Configuration</h2>
+        <form method="GET" action="[% c.uri_for('/Documentation/manage_config') %]" style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" name="search_query" value="[% search_query %]" placeholder="Search for words in config..." style="flex: 1; min-width: 200px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <label style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" name="search_docs" value="1" [% IF search_docs %]checked[% END %]>
+                    Search Documentation files
+                </label>
+                <button type="submit" class="btn btn-primary">Search</button>
+                [% IF search_query %]
+                <a href="[% c.uri_for('/Documentation/manage_config') %]" class="btn">Clear</a>
+                [% END %]
+            </div>
+        </form>
+
+        [% IF search_results.size %]
+        <div style="margin-top: 20px;">
+            <h3>Search Results ([% search_results.size %])</h3>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                [% FOREACH result IN search_results %]
+                <div style="padding: 10px; border-bottom: 1px solid #eee; [% IF loop.first %]background: #f8f9fa;[% END %]">
+                    <div style="font-weight: bold; color: #333;">
+                        [% result.title %]
+                        <span style="font-size: 12px; color: #666; margin-left: 10px;">
+                            ([% result.type %], relevance: [% result.relevance %])
+                        </span>
+                    </div>
+                    [% IF result.content %]
+                    <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                        [% result.content %]
+                    </div>
+                    [% END %]
+                    <div style="margin-top: 5px;">
+                        [% IF result.type == 'page' %]
+                        <a href="[% c.uri_for('/Documentation/manage_config') %]/[% result.url | uri %]" class="btn btn-sm btn-primary">Edit Page</a>
+                        [% ELSIF result.type == 'category' %]
+                        <a href="#category-[% result.key %]" class="btn btn-sm btn-success">View Category</a>
+                        [% ELSIF result.type == 'registered_file' %]
+                        <a href="[% c.uri_for('/Documentation') %]/[% result.url | uri %]" class="btn btn-sm btn-info">View Documentation</a>
+                        [% ELSIF result.type == 'unregistered_file' %]
+                        <button class="btn btn-sm btn-warning" onclick="addUnregisteredFile('[% result.key %]', '[% result.title.replace('Unregistered File: ', '') %]')">Add to Config</button>
+                        <a href="[% c.uri_for('/Documentation') %]/[% result.key.replace('Documentation/', '').replace('.tt', '').replace('.md', '') | uri %]" class="btn btn-sm btn-info" target="_blank">View File</a>
+                        [% END %]
+                    </div>
+                </div>
+                [% END %]
+            </div>
+        </div>
+        [% ELSIF search_query %]
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+            No results found for "[% search_query %]".
+        </div>
+        [% END %]
+    </div>
 
     <!-- Quick Actions -->
     <div class="section">
         <h2>Quick Actions</h2>
-        <button class="btn btn-primary" onclick="showAddCategoryModal()">Add New Category</button>
+        <a href="[% c.uri_for('/Documentation/add_category') %]" class="btn btn-primary">Add New Category</a>
         <button class="btn btn-success" onclick="window.location.href='[% c.uri_for('/Documentation') %]'">View Documentation</button>
         <button class="btn btn-primary" onclick="window.location.href='[% c.uri_for('/Documentation/rescan') %]'">Rescan Files</button>
     </div>
+
+    <!-- Page Detail View -->
+    [% IF selected_page %]
+    <div class="section">
+        <h2>Edit Page Configuration: [% selected_page %]</h2>
+        <form method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="update_page">
+            <input type="hidden" name="original_page_name" value="[% selected_page %]">
+
+            <div class="form-group">
+                <label for="edit_page_name">Page Name:</label>
+                <input type="text" id="edit_page_name" name="page_name" value="[% selected_page %]" required>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_title">Title:</label>
+                <input type="text" id="edit_title" name="title" value="[% config.pages.$selected_page.title %]" required>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_category">Categories:</label>
+                <select id="edit_category" name="categories" multiple size="4">
+                    [% FOREACH cat_key IN categories %]
+                    <option value="[% cat_key %]" [%
+                        # Handle both single category (old format) and multiple categories (new format)
+                        IF config.pages.$selected_page.categories AND config.pages.$selected_page.categories.grep(cat_key).size;
+                            'selected';
+                        ELSIF config.pages.$selected_page.category == cat_key;
+                            'selected';
+                        END;
+                    %]>[% config.categories.$cat_key.title %]</option>
+                    [% END %]
+                </select>
+                <small class="form-help">Hold Ctrl (Cmd on Mac) to select multiple categories</small>
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                <div>
+                    [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="roles" value="[% role %]" class="edit_role_checkbox"
+                               [% IF config.pages.$selected_page.roles AND config.pages.$selected_page.roles.grep(role).size %]checked[% END %]>
+                        [% role %]
+                    </label>
+                    [% END %]
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_path">Path:</label>
+                <input type="text" id="edit_path" name="path" value="[% config.pages.$selected_page.path %]">
+            </div>
+
+            <div class="form-group">
+                <label for="edit_format">Format:</label>
+                <select id="edit_format" name="format">
+                    <option value="template" [% IF config.pages.$selected_page.format == 'template' %]selected[% END %]>Template (.tt)</option>
+                    <option value="markdown" [% IF config.pages.$selected_page.format == 'markdown' %]selected[% END %]>Markdown (.md)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="edit_site">Site:</label>
+                <input type="text" id="edit_site" name="site" value="[% config.pages.$selected_page.site %]">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="[% c.uri_for('/Documentation/manage_config') %]" class="btn">Cancel</a>
+        </form>
+    </div>
+    [% ELSE %]
 
     <!-- Categories Section -->
     <div class="section">
@@ -214,6 +357,7 @@
                         <td>[% page.roles.join(', ') %]</td>
                         <td>
                             <button class="btn btn-primary" onclick="editPage('[% page_name %]')">Edit</button>
+                            <a href="[% c.uri_for('/Documentation/manage_config') %]/[% page_name | uri %]" class="btn btn-success" style="text-decoration: none; display: inline-block;">View Details</a>
                             <button class="btn btn-danger" onclick="deletePage('[% page_name %]')">Delete</button>
                         </td>
                     </tr>
@@ -221,6 +365,7 @@
             </tbody>
         </table>
     </div>
+    [% END %]
 </div>
 
 <!-- Edit Page Modal -->
@@ -282,6 +427,11 @@
             <div class="form-group">
                 <label>Description:</label>
                 <textarea name="category_description" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Icon:</label>
+                <input type="text" name="category_icon" value="fas fa-file-alt">
             </div>
 
             <div class="form-group">
@@ -443,6 +593,38 @@ function filterPages() {
         }
 
         tr[i].style.display = found ? '' : 'none';
+    }
+}
+
+function addUnregisteredFile(filePath, displayName) {
+    // Extract page name from file path (remove Documentation/ prefix and extension)
+    var pageName = filePath.replace('Documentation/', '').replace('.tt', '').replace('.md', '');
+
+    if (confirm('Add "' + displayName + '" to documentation config?')) {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '[% c.uri_for('/Documentation/save_config') %]';
+
+        var actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'add_page';
+        form.appendChild(actionInput);
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = 'page_name';
+        nameInput.value = pageName;
+        form.appendChild(nameInput);
+
+        var pathInput = document.createElement('input');
+        pathInput.type = 'hidden';
+        pathInput.name = 'file_path';
+        pathInput.value = filePath;
+        form.appendChild(pathInput);
+
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 

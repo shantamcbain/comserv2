@@ -11,8 +11,6 @@ use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
 
-# Don't extend Catalyst::Model - make this a standalone utility class
-
 has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -40,79 +38,224 @@ has 'selected_connection' => (
 use FindBin;
 use File::Spec;
 
-# Load configuration lazily when first needed
 sub _load_config {
     my ($self) = @_;
     
-    return if keys %{$self->config}; # Already loaded
+    return if keys %{$self->config};
     
-    # Load the database configuration
     my $config;
     try {
-        use File::Basename;
-        
-        # Detect config file location based on runtime environment
-        my $config_file;
-        
-        # Priority 1: Docker/Kubernetes container path
-        if (-f '/opt/comserv/db_config.json') {
-            $config_file = '/opt/comserv/db_config.json';
+        $config = $self->_load_from_k8s_secrets();
+        if ($config && keys %$config) {
+            warn "[RemoteDB] Successfully loaded configuration from K8s Secrets\n";
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Configuration loaded from K8s Secrets mount point");
+            $self->config($config);
+            return;
         }
-        # Priority 2: Environment variable override (for Kubernetes Secrets, etc)
-        elsif ($ENV{COMSERV_DB_CONFIG}) {
-            $config_file = $ENV{COMSERV_DB_CONFIG};
+        
+        $config = $self->_load_from_env_variables();
+        if ($config && keys %$config) {
+            warn "[RemoteDB] Successfully loaded configuration from environment variables\n";
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Configuration loaded from environment variables (COMSERV_DB_*)");
+            $self->config($config);
+            return;
         }
-        # Priority 3: Relative path from FindBin (local development on host)
-        else {
-            my $relative_path = File::Spec->catfile($FindBin::Bin, '..', 'db_config.json');
-            if (-f $relative_path) {
-                $config_file = $relative_path;
+        
+        my $config_file = $self->_find_db_config_file();
+        if ($config_file) {
+            warn "[RemoteDB] Loading config from db_config.json (DEPRECATED - migrate to K8s Secrets)\n";
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Using db_config.json fallback - MIGRATE TO K8S SECRETS for production security");
+
+            local $/;
+            open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+            my $json_text = <$fh>;
+            close $fh;
+            $config = decode_json($json_text);
+
+            $self->config($config);
+
+            # NEW: Track that we're using fallback configuration (not K8s Secrets)
+            if (!$self->{k8s_secrets_found}) {
+                $self->{configuration_status} = 'FALLBACK';
+                $self->{configuration_error} = 'Using db_config.json fallback - K8s Secrets not found. Please migrate to K8s Secrets for production security.';
+                $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                    "Configuration status set to FALLBACK - K8s Secrets not found, using db_config.json");
             }
+
+            return;
         }
         
-        die "Could not locate db_config.json in any known location" unless $config_file;
-        die "db_config.json not readable: $config_file" unless -r $config_file;
+        warn "[RemoteDB] CONFIGURATION NOT FOUND - Admin setup required\n";
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+            "No configuration found in K8s Secrets, environment variables, or db_config.json");
         
-        # DEBUGGING: Output to STDERR so we know config loading is working
-        warn "[RemoteDB] Loading config from: $config_file\n";
-        
-        # Read and decode the JSON config
-        local $/;
-        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-        my $json_text = <$fh>;
-        close $fh;
-        $config = decode_json($json_text);
-        
-        warn "[RemoteDB] Config loaded successfully, keys: " . join(', ', keys %$config) . "\n";
-
-        # Apply environment variable overrides (for Docker/Kubernetes environments)
-        # This allows credentials and hostnames to be set via environment without changing db_config.json
-        $config = $self->_apply_env_overrides($config);
-        
-        # Store the raw config and expose a normalized contract via get_all_connections
-        $self->config($config);
-
-        # Lightweight logging
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
-            "Loaded config from $config_file with keys: " . join(', ', keys %$config));
+        $self->{configuration_status} = 'MISSING';
+        $self->{configuration_error} = "Could not locate configuration in any source (K8s Secrets, env vars, or db_config.json)";
+        $self->config({});
+        return;
         
     } catch {
+        warn "[RemoteDB] Configuration load exception: $_\n";
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'RemoteDB::_load_config',
             "Failed to load database configuration: $_");
-        die "RemoteDB: Cannot continue without database configuration";
+        
+        $self->{configuration_status} = 'ERROR';
+        $self->{configuration_error} = "Exception during configuration load: $_";
+        $self->config({});
+        return;
     };
 }
 
-# Apply environment variable overrides to configuration
-# Supports Docker/Kubernetes deployments where credentials/hosts come from environment
+sub _load_from_k8s_secrets {
+    my ($self) = @_;
+    
+    my %k8s_config = ();
+    my $k8s_secrets_found = 0;
+    
+    # Check for secrets in multiple locations (user home, project, then K8s standard)
+    my $home = $ENV{HOME} || '/tmp';
+    my @secret_paths = (
+        "$home/.comserv/secrets",             # User home directory
+        "$FindBin::Bin/../secrets",           # Project directory
+        '/var/run/secrets/comserv/',          # K8s standard location
+        '/opt/secrets/',                      # K8s custom location
+        '/var/run/secrets/default/',          # K8s default namespace
+    );
+    
+    foreach my $base_path (@secret_paths) {
+        next unless -d $base_path;
+        
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
+            "Checking K8s Secret mount point: $base_path");
+        
+        my $dbi_path = "$base_path/dbi";
+        
+        if (-d $dbi_path) {
+            opendir(my $dh, $dbi_path) or next;
+            my @secret_files = readdir($dh);
+            closedir($dh);
+            
+            foreach my $file (@secret_files) {
+                next if $file =~ /^\./;
+                
+                my $secret_file = "$dbi_path/$file";
+                next unless -f $secret_file;
+                
+                eval {
+                    local $/;
+                    open my $fh, "<", $secret_file or die "Cannot read $secret_file: $!";
+                    my $json_text = <$fh>;
+                    close $fh;
+                    
+                    my $loaded = decode_json($json_text);
+                    if (ref $loaded eq 'HASH') {
+                        %k8s_config = (%k8s_config, %$loaded);
+                        $k8s_secrets_found = 1;
+                        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                            "Loaded K8s Secret from: $secret_file (found " . scalar(keys %$loaded) . " connections)");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                        "Could not parse secret file $secret_file as JSON: $@");
+                }
+            }
+        }
+        
+        if (keys %k8s_config) {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                "Successfully loaded " . scalar(keys %k8s_config) . " database connections from K8s Secrets");
+            $self->{k8s_secrets_found} = 1;
+            return \%k8s_config;
+        }
+    }
+    
+    $self->{k8s_secrets_found} = $k8s_secrets_found;
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
+        "No K8s Secrets found in standard mount points");
+    return undef;
+}
+
+sub _load_from_env_variables {
+    my ($self) = @_;
+    
+    my %env_config = ();
+    
+    foreach my $env_var (sort keys %ENV) {
+        next unless $env_var =~ /^COMSERV_DB_(.+?)_([A-Z_]+)$/;
+        
+        my $conn_name_upper = $1;
+        my $field_upper = $2;
+        my $conn_name = lc($conn_name_upper);
+        my $field = lc($field_upper);
+        my $value = $ENV{$env_var};
+        
+        $env_config{$conn_name} ||= {};
+        
+        if ($field eq 'host') {
+            $env_config{$conn_name}->{host} = $value;
+        } elsif ($field eq 'port') {
+            $env_config{$conn_name}->{port} = $value;
+        } elsif ($field eq 'username' || $field eq 'user') {
+            $env_config{$conn_name}->{username} = $value;
+        } elsif ($field eq 'password' || $field eq 'pass') {
+            $env_config{$conn_name}->{password} = $value;
+        } elsif ($field eq 'database' || $field eq 'db') {
+            $env_config{$conn_name}->{database} = $value;
+        } elsif ($field eq 'db_type') {
+            $env_config{$conn_name}->{db_type} = $value;
+        } elsif ($field eq 'description') {
+            $env_config{$conn_name}->{description} = $value;
+        } elsif ($field eq 'priority') {
+            $env_config{$conn_name}->{priority} = $value;
+        }
+    }
+    
+    if (keys %env_config) {
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_env_variables',
+            "Successfully loaded " . scalar(keys %env_config) . " database connections from environment variables");
+        foreach my $conn_name (keys %env_config) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_env_variables',
+                "Connection '$conn_name' loaded from env: host=$env_config{$conn_name}->{host}, db=$env_config{$conn_name}->{database}");
+        }
+        return \%env_config;
+    }
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_env_variables',
+        "No COMSERV_DB_* environment variables found");
+    return undef;
+}
+
+sub _find_db_config_file {
+    my ($self) = @_;
+
+    my @search_paths = (
+        '/opt/comserv/db_config.json',
+        File::Spec->catfile($FindBin::Bin, '..', 'db_config.json'),
+        File::Spec->catfile($FindBin::Bin, 'db_config.json'),  # Also check current directory
+    );
+
+    if ($ENV{COMSERV_DB_CONFIG}) {
+        unshift @search_paths, $ENV{COMSERV_DB_CONFIG};
+    }
+    
+    foreach my $path (@search_paths) {
+        if (-f $path && -r $path) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_find_db_config_file',
+                "Found db_config.json at: $path");
+            return $path;
+        }
+    }
+    
+    return undef;
+}
+
 sub _apply_env_overrides {
     my ($self, $config) = @_;
     return $config unless $config;
-    
-    # Environment variable pattern: COMSERV_DB_<CONNECTION_NAME>_<FIELD>
-    # Example: COMSERV_DB_PRODUCTION_SERVER_HOST=mydbhost
-    #          COMSERV_DB_PRODUCTION_SERVER_PORT=3307
-    #          COMSERV_DB_PRODUCTION_SERVER_USERNAME=appuser
     
     foreach my $conn_name (keys %$config) {
         next if $conn_name =~ /^_/;
@@ -121,7 +264,6 @@ sub _apply_env_overrides {
         my $conn = $config->{$conn_name};
         my $env_prefix = 'COMSERV_DB_' . uc($conn_name);
         
-        # Check for field overrides
         foreach my $field (qw(host port username password database)) {
             my $env_var = $env_prefix . '_' . uc($field);
             if (defined $ENV{$env_var}) {

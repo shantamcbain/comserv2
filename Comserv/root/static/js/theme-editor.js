@@ -1047,38 +1047,58 @@ class ThemeEditor {
         popupElement.style.display = 'block';
 
         // Add event listeners
-        document.getElementById('bgColor').addEventListener('input', this.updateBackgroundPreview.bind(this));
-        document.getElementById('bgRepeat').addEventListener('change', this.updateBackgroundPreview.bind(this));
-        document.getElementById('bgPosition').addEventListener('change', this.updateBackgroundPreview.bind(this));
-        document.getElementById('bgSize').addEventListener('change', this.updateBackgroundPreview.bind(this));
+        const bgColorEl = document.getElementById('bgColor');
+        const bgRepeatEl = document.getElementById('bgRepeat');
+        const bgPositionEl = document.getElementById('bgPosition');
+        const bgSizeEl = document.getElementById('bgSize');
+        const bgImageInputEl = document.getElementById('bgImageInput');
+        const bgPreviewEl = document.getElementById('bgPreview');
+        const cancelBgBtnEl = document.getElementById('cancelBgBtn');
+        const applyBgBtnEl = document.getElementById('applyBgBtn');
+        const advancedBgBtnEl = document.getElementById('advancedBgBtn');
+        
+        if (bgColorEl) bgColorEl.addEventListener('input', this.updateBackgroundPreview.bind(this));
+        if (bgRepeatEl) bgRepeatEl.addEventListener('change', this.updateBackgroundPreview.bind(this));
+        if (bgPositionEl) bgPositionEl.addEventListener('change', this.updateBackgroundPreview.bind(this));
+        if (bgSizeEl) bgSizeEl.addEventListener('change', this.updateBackgroundPreview.bind(this));
 
         // Add image upload handler
-        document.getElementById('bgImageInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const imageUrl = `url(${event.target.result})`;
-                    document.getElementById('bgPreview').style.backgroundImage = imageUrl;
-                    this.currentBgImage = imageUrl;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
+        if (bgImageInputEl) {
+            bgImageInputEl.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageUrl = `url(${event.target.result})`;
+                        if (bgPreviewEl) {
+                            bgPreviewEl.style.backgroundImage = imageUrl;
+                        }
+                        this.currentBgImage = imageUrl;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
 
-        document.getElementById('cancelBgBtn').addEventListener('click', () => {
-            popupElement.style.display = 'none';
-        });
+        if (cancelBgBtnEl) {
+            cancelBgBtnEl.addEventListener('click', () => {
+                popupElement.style.display = 'none';
+            });
+        }
 
-        document.getElementById('applyBgBtn').addEventListener('click', () => {
-            this.applyBackgroundChanges(property);
-            popupElement.style.display = 'none';
-        });
+        if (applyBgBtnEl) {
+            applyBgBtnEl.addEventListener('click', () => {
+                this.applyBackgroundChanges(property);
+                popupElement.style.display = 'none';
+            });
+        }
 
-        document.getElementById('advancedBgBtn').addEventListener('click', () => {
-            popupElement.style.display = 'none';
-            this.openPropertyEditor(element);
-        });
+        if (advancedBgBtnEl) {
+            advancedBgBtnEl.addEventListener('click', () => {
+                popupElement.style.display = 'none';
+                this.openPropertyEditor(element);
+            });
+        }
 
         // Close popup when clicking outside
         document.addEventListener('click', (e) => {
@@ -1625,13 +1645,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Save button functionality
-    document.getElementById('save-theme-btn').addEventListener('click', () => {
-        // Set the theme variables to the hidden input
-        document.getElementById('theme-variables').value = JSON.stringify(themeVariables);
-        // Submit the form
-        document.getElementById('theme-editor-form').submit();
-    });
+    const saveThemeBtn = document.getElementById('save-theme-btn');
+    if (saveThemeBtn) {
+        saveThemeBtn.addEventListener('click', () => {
+            // Set the theme variables to the hidden input
+            const themeVarsInput = document.getElementById('theme-variables');
+            const themeForm = document.getElementById('theme-editor-form');
+            if (themeVarsInput && themeForm) {
+                themeVarsInput.value = JSON.stringify(themeVariables);
+                // Submit the form
+                themeForm.submit();
+            }
+        });
+    }
 
-    const editor = new ThemeEditor();
-    editor.init();
+    // Only initialize the theme editor if we're on the theme editor page
+    if (document.getElementById('theme-editor-form')) {
+        const editor = new ThemeEditor();
+        editor.init();
+    }
 });

@@ -164,6 +164,34 @@ has 'debug' => (
     documentation => 'Enable debug logging'
 );
 
+has 'docker_container' => (
+    is => 'rw',
+    isa => 'Str',
+    default => 'ollama',
+    documentation => 'Docker container name for shell-based execution'
+);
+
+has 'podman_container' => (
+    is => 'rw',
+    isa => 'Str',
+    default => 'ollama',
+    documentation => 'Podman container name for shell-based execution'
+);
+
+has 'use_docker' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0,
+    documentation => 'Use docker exec for commands instead of HTTP API'
+);
+
+has 'use_podman' => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0,
+    documentation => 'Use podman exec for commands instead of HTTP API'
+);
+
 =head1 METHODS
 
 =head2 _build_endpoint
@@ -709,6 +737,9 @@ Returns an arrayref of model names, or undef on failure.
 sub list_models {
     my ($self) = @_;
     
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'list_models',
+        "Attempting to list models via HTTP API");
+    
     my $endpoint = $self->endpoint;
     $endpoint =~ s/\/api\/generate$/\/api\/tags/;
     
@@ -718,27 +749,33 @@ sub list_models {
     try {
         $response = $self->ua->request($req);
     } catch {
-        $self->last_error("Failed to list models: $_");
-        return undef;
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+            "HTTP API failed: $_, attempting shell fallback");
+        return $self->list_models_shell();
     };
     
     unless ($response->is_success) {
-        $self->last_error("Failed to list models: " . $response->status_line);
-        return undef;
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+            "HTTP API returned " . $response->status_line . ", attempting shell fallback");
+        return $self->list_models_shell();
     }
     
     my $data;
     try {
         $data = decode_json($response->content);
     } catch {
-        $self->last_error("Failed to parse models response: $_");
-        return undef;
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+            "Failed to parse HTTP response: $_, attempting shell fallback");
+        return $self->list_models_shell();
     };
     
     my @models;
     if ($data->{models} && ref($data->{models}) eq 'ARRAY') {
-        @models = @{$data->{models}};  # Return full model objects with metadata
+        @models = @{$data->{models}};
     }
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'list_models',
+        "Successfully listed " . scalar(@models) . " models via HTTP API");
     
     return \@models;
 }
@@ -769,7 +806,6 @@ Returns a hashref with:
 sub pull_model {
     my ($self, %args) = @_;
     
-    # Log all received arguments for debugging
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
         "pull_model called with args: " . join(", ", map { "$_ => " . ($args{$_} // 'undef') } keys %args));
     
@@ -786,7 +822,6 @@ sub pull_model {
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model',
         "Model name extracted: '$model_name'");
     
-    # Validate model name (basic sanitization)
     unless ($model_name =~ /^[a-zA-Z0-9._:-]+$/) {
         $self->last_error("Invalid model name format");
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
@@ -800,20 +835,17 @@ sub pull_model {
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model',
         "Pulling model: $model_name");
     
-    # Build the pull endpoint
     my $endpoint = $self->endpoint;
     $endpoint =~ s/\/api\/generate$/\/api\/pull/;
     
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
         "Pull endpoint: $endpoint");
     
-    # Build the request payload
     my $payload = {
         name => $model_name,
         stream => JSON::false,
     };
     
-    # Encode the payload
     my $json_payload;
     try {
         $json_payload = encode_json($payload);
@@ -821,15 +853,11 @@ sub pull_model {
             "Request payload: $json_payload");
     } catch {
         $self->last_error("Failed to encode JSON payload: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
-            "Failed to encode JSON payload: $_");
-        return {
-            success => 0,
-            error => "Failed to encode JSON payload: $_"
-        };
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+            "Failed to encode JSON: $_, attempting shell fallback");
+        return $self->pull_model_shell(model => $model_name);
     };
     
-    # Create the HTTP request
     my $req = HTTP::Request->new(POST => $endpoint);
     $req->header('Content-Type' => 'application/json');
     $req->content($json_payload);
@@ -837,50 +865,35 @@ sub pull_model {
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
         "Sending POST request to Ollama API...");
     
-    # Send the request with extended timeout for model downloads
     my $original_timeout = $self->ua->timeout;
-    $self->ua->timeout(600);  # 10 minutes for model downloads
+    $self->ua->timeout(600);
     
     my $response;
     try {
         $response = $self->ua->request($req);
     } catch {
-        $self->ua->timeout($original_timeout);  # Restore original timeout
-        $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
-            "HTTP request failed: $_");
-        return {
-            success => 0,
-            error => "HTTP request failed: $_"
-        };
+        $self->ua->timeout($original_timeout);
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+            "HTTP request failed: $_, attempting shell fallback");
+        return $self->pull_model_shell(model => $model_name);
     };
     
-    # Restore original timeout
     $self->ua->timeout($original_timeout);
     
-    # Log response status
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
         "Response status: " . $response->status_line);
     
-    # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
-        my $content = $response->content || 'No content';
-        $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
-            "$error - Response content: $content");
-        return {
-            success => 0,
-            error => $error
-        };
+        my $error_msg = $response->status_line;
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+            "HTTP API returned $error_msg, attempting shell fallback");
+        return $self->pull_model_shell(model => $model_name);
     }
     
-    # Log response content for debugging
     my $content_preview = substr($response->content, 0, 500);
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
         "Response content preview: $content_preview");
     
-    # Parse the response
     my $result;
     try {
         my $data = decode_json($response->content);
@@ -888,7 +901,6 @@ sub pull_model {
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'pull_model',
             "Parsed response data: " . encode_json($data));
         
-        # Check if the pull was successful
         if ($data->{status} && $data->{status} =~ /success/i) {
             $result = {
                 success => 1,
@@ -903,17 +915,13 @@ sub pull_model {
             };
         }
     } catch {
-        $self->last_error("Failed to parse response: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
-            "Failed to parse response: $_");
-        return {
-            success => 0,
-            error => "Failed to parse response: $_"
-        };
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+            "Failed to parse HTTP response: $_, attempting shell fallback");
+        return $self->pull_model_shell(model => $model_name);
     };
     
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model',
-        "Successfully pulled model: $model_name");
+        "Successfully pulled model: $model_name via HTTP API");
     
     return $result;
 }
@@ -1322,6 +1330,414 @@ sub get_connection_info {
         port => $self->port,
         endpoint => $self->endpoint,
         model => $self->model,
+    };
+}
+
+=head2 _detect_container_runtime
+
+Detect which container runtime (docker/podman) is available on the system.
+
+Returns: 'docker', 'podman', or undef if neither is available.
+
+=cut
+
+sub _detect_container_runtime {
+    my ($self) = @_;
+    
+    my $docker_check = system('which docker > /dev/null 2>&1');
+    if ($docker_check == 0) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_container_runtime',
+            "Docker is available");
+        return 'docker';
+    }
+    
+    my $podman_check = system('which podman > /dev/null 2>&1');
+    if ($podman_check == 0) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_detect_container_runtime',
+            "Podman is available");
+        return 'podman';
+    }
+    
+    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_detect_container_runtime',
+        "Neither docker nor podman found on system");
+    return undef;
+}
+
+=head2 _exec_docker
+
+Execute ollama command via docker exec.
+
+Parameters:
+    - command: The ollama command to execute (e.g., 'pull llama3.1', 'list')
+
+Returns: Command output on success, undef on failure.
+
+=cut
+
+sub _exec_docker {
+    my ($self, $command) = @_;
+    
+    unless ($command) {
+        $self->last_error("No command provided");
+        return undef;
+    }
+    
+    my $container = $self->docker_container;
+    my $full_command = "docker exec $container ollama $command";
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_exec_docker',
+        "Executing: $full_command");
+    
+    my $output = `$full_command 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+        my $error = "Docker command failed with exit code $exit_code: $output";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_docker',
+            $error);
+        return undef;
+    }
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_exec_docker',
+        "Command succeeded, output length: " . length($output));
+    
+    return $output;
+}
+
+=head2 _exec_podman
+
+Execute ollama command via podman exec.
+
+Parameters:
+    - command: The ollama command to execute (e.g., 'pull llama3.1', 'list')
+
+Returns: Command output on success, undef on failure.
+
+=cut
+
+sub _exec_podman {
+    my ($self, $command) = @_;
+    
+    unless ($command) {
+        $self->last_error("No command provided");
+        return undef;
+    }
+    
+    my $container = $self->podman_container;
+    my $full_command = "podman exec $container ollama $command";
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_exec_podman',
+        "Executing: $full_command");
+    
+    my $output = `$full_command 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+        my $error = "Podman command failed with exit code $exit_code: $output";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_podman',
+            $error);
+        return undef;
+    }
+    
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_exec_podman',
+        "Command succeeded, output length: " . length($output));
+    
+    return $output;
+}
+
+=head2 list_models_shell
+
+Get list of installed models using 'ollama list' command via docker/podman exec.
+
+Returns: arrayref of model objects with metadata, or undef on failure.
+
+=cut
+
+sub list_models_shell {
+    my ($self) = @_;
+    
+    my $runtime = $self->_detect_container_runtime();
+    unless ($runtime) {
+        $self->last_error("No container runtime (docker/podman) available");
+        return undef;
+    }
+    
+    my $output;
+    if ($runtime eq 'docker') {
+        $output = $self->_exec_docker('list');
+    } else {
+        $output = $self->_exec_podman('list');
+    }
+    
+    unless ($output) {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models_shell',
+            "Failed to execute list command: " . $self->last_error);
+        return undef;
+    }
+    
+    my @models;
+    my @lines = split(/\n/, $output);
+    
+    foreach my $line (@lines) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless $line;
+        next if $line =~ /^NAME/i;
+        
+        my @parts = split(/\s+/, $line);
+        if (@parts >= 2) {
+            push @models, {
+                name => $parts[0],
+                digest => $parts[1],
+                size => $parts[2] || 'unknown',
+                modified => join(' ', @parts[3..$#parts]) || 'unknown'
+            };
+        }
+    }
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'list_models_shell',
+        "Successfully listed " . scalar(@models) . " models via shell");
+    
+    return \@models;
+}
+
+=head2 pull_model_shell
+
+Pull (download/install) a model using 'ollama pull' command via docker/podman exec.
+
+Parameters:
+    - model: Model name to pull (required)
+
+Returns: hashref with success/error status.
+
+=cut
+
+sub pull_model_shell {
+    my ($self, %args) = @_;
+    
+    my $model_name = $args{model} or do {
+        $self->last_error("No model name provided");
+        return {
+            success => 0,
+            error => "No model name provided"
+        };
+    };
+    
+    my $runtime = $self->_detect_container_runtime();
+    unless ($runtime) {
+        $self->last_error("No container runtime (docker/podman) available");
+        return {
+            success => 0,
+            error => "No container runtime available"
+        };
+    }
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model_shell',
+        "Pulling model '$model_name' via $runtime");
+    
+    my $output;
+    if ($runtime eq 'docker') {
+        $output = $self->_exec_docker("pull $model_name");
+    } else {
+        $output = $self->_exec_podman("pull $model_name");
+    }
+    
+    unless ($output) {
+        my $error = "Failed to pull model: " . $self->last_error;
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model_shell',
+            $error);
+        return {
+            success => 0,
+            error => $error
+        };
+    }
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model_shell',
+        "Successfully pulled model: $model_name");
+    
+    return {
+        success => 1,
+        message => "Model '$model_name' pulled successfully via $runtime",
+        runtime => $runtime
+    };
+}
+
+=head2 start_server
+
+Start the Ollama server on localhost using either systemctl or direct command.
+
+    my $result = $ollama->start_server(method => 'systemctl');
+    # or
+    my $result = $ollama->start_server(method => 'command');
+
+Returns a hashref with success, message, and method used.
+
+=cut
+
+sub start_server {
+    my ($self, %args) = @_;
+    
+    my $method = $args{method} || 'systemctl';  # Default to systemctl
+    my $async = $args{async} || 0;              # Synchronous by default
+    
+    # Only support localhost
+    if ($self->host ne 'localhost' && $self->host ne '127.0.0.1') {
+        $self->last_error("Server start only supported on localhost");
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'start_server',
+            "Attempted to start server on non-localhost host: " . $self->host);
+        return {
+            success => 0,
+            error => "Server start only supported on localhost"
+        };
+    }
+    
+    # Check if already connected
+    if ($self->check_connection()) {
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'start_server',
+            "Ollama server is already running on " . $self->host);
+        return {
+            success => 1,
+            message => "Ollama server is already running",
+            already_running => 1
+        };
+    }
+    
+    my $result;
+    
+    if ($method eq 'systemctl') {
+        $result = $self->_start_server_systemctl($async);
+    } elsif ($method eq 'command') {
+        $result = $self->_start_server_command($async);
+    } else {
+        $self->last_error("Unknown start method: $method");
+        return {
+            success => 0,
+            error => "Unknown start method: $method"
+        };
+    }
+    
+    return $result;
+}
+
+=head2 _start_server_systemctl
+
+Start Ollama using systemctl command.
+
+=cut
+
+sub _start_server_systemctl {
+    my ($self, $async) = @_;
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_start_server_systemctl',
+        "Starting Ollama via systemctl" . ($async ? " (async)" : ""));
+    
+    my $cmd = 'systemctl start ollama';
+    my $output = `$cmd 2>&1`;
+    my $exit_code = $?;
+    
+    if ($exit_code != 0) {
+        my $error = "Failed to start Ollama via systemctl: $output (exit code: $exit_code)";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_start_server_systemctl',
+            $error);
+        return {
+            success => 0,
+            error => $error
+        };
+    }
+    
+    # Wait for connection if synchronous
+    unless ($async) {
+        for (my $i = 0; $i < 10; $i++) {
+            sleep 1;
+            if ($self->check_connection()) {
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_start_server_systemctl',
+                    "Ollama server started successfully via systemctl");
+                return {
+                    success => 1,
+                    message => "Ollama server started successfully via systemctl",
+                    method => 'systemctl'
+                };
+            }
+        }
+        
+        # After 10 seconds, report timeout but mark as started
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_start_server_systemctl',
+            "Ollama start command executed but connection not confirmed within 10 seconds");
+        return {
+            success => 1,
+            message => "Start command executed, but connection not yet confirmed. Please try again in a moment.",
+            method => 'systemctl',
+            connection_pending => 1
+        };
+    }
+    
+    return {
+        success => 1,
+        message => "Ollama start command executed asynchronously",
+        method => 'systemctl'
+    };
+}
+
+=head2 _start_server_command
+
+Start Ollama using direct command (ollama serve in background).
+
+=cut
+
+sub _start_server_command {
+    my ($self, $async) = @_;
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_start_server_command',
+        "Starting Ollama via direct command" . ($async ? " (async)" : ""));
+    
+    # Start ollama serve in background
+    my $cmd = 'ollama serve > /tmp/ollama.log 2>&1 &';
+    my $output = `$cmd`;
+    my $exit_code = $?;
+    
+    if ($exit_code != 0 && $exit_code != 256) {  # 256 is normal for background process
+        my $error = "Failed to execute ollama serve: $output (exit code: $exit_code)";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_start_server_command',
+            $error);
+        return {
+            success => 0,
+            error => $error
+        };
+    }
+    
+    # Wait for connection if synchronous
+    unless ($async) {
+        for (my $i = 0; $i < 10; $i++) {
+            sleep 1;
+            if ($self->check_connection()) {
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_start_server_command',
+                    "Ollama server started successfully via direct command");
+                return {
+                    success => 1,
+                    message => "Ollama server started successfully",
+                    method => 'command'
+                };
+            }
+        }
+        
+        # After 10 seconds, report timeout but mark as started
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_start_server_command',
+            "Ollama start command executed but connection not confirmed within 10 seconds");
+        return {
+            success => 1,
+            message => "Start command executed, but connection not yet confirmed. Please try again in a moment.",
+            method => 'command',
+            connection_pending => 1
+        };
+    }
+    
+    return {
+        success => 1,
+        message => "Ollama start command executed asynchronously",
+        method => 'command'
     };
 }
 

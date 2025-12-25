@@ -1,0 +1,64 @@
+# Proxmox Documentation
+
+This page provides access to all Proxmox-related documentation in the Comserv system.
+
+## Current Infrastructure Overview
+
+**3-Host Proxmox Cluster** (Updated 2025-12-23)
+
+| Host | Version | Kernel | IP Address | Role | Status |
+|------|---------|--------|------------|------|--------|
+| **proxmoxws** | PVE 8.3.0 | 6.8.12-4 | 192.168.1.11 | K8s Control Plane + Worker | ✅ Active |
+| **proxmox720** | PVE 8.4.14 | 6.8.12-17 | 192.168.1.12 | K8s Worker Nodes | ✅ Active |
+| **proxmoxt210** | PVE 7.4 | 5.15.158-2 | 192.168.1.3 | Gateway/Infrastructure (Legacy) | ⚠️ Use Sparingly |
+
+### Key VMs Running
+
+**proxmoxws (PVE 8.3.0)**
+- VM 100: k8s-master (Ubuntu, containerd) - ✅ Running
+- VM 103: k8s-worker (Ubuntu, containerd) - ✅ Running
+- VM 500: mysqlserver (MariaDB, DR backup) - ⏸️ Stopped
+- VM 501: Fileserver - ⏸️ Stopped
+- VM 1002: comserserver (Future Catalyst) - ⏸️ Stopped
+
+**proxmox720 (PVE 8.4.14)**
+- VM 201: k8s-worker (Ubuntu, containerd) - ✅ Running
+- VM 202: k8s-worker2 (Ubuntu, containerd) - ⏸️ Stopped
+- VM 102: ComservProduction (Catalyst app) - ✅ Running
+- VM 105: ProxmoxMailGateway - ✅ Running
+- VM 108: ubuntuVminmailserver - ✅ Running
+
+**proxmoxt210 (PVE 7.4)**
+- VM 100: ProxmoxBackup
+- VM 101: Gateway
+- VM 103: OPNsense (Network firewall/router)
+
+### Production Database
+- **Location**: 192.168.1.198 (bare-metal, outside Proxmox)
+- **System**: MariaDB 10.x
+- **Port**: 3306
+- **Databases**: ency, shanta_forager
+
+## Available Documentation
+
+### [Proxmox Command Reference](/Documentation/proxmox_commands.tt)
+Comprehensive list of command-line operations for managing Proxmox VE environments.
+
+### [Proxmox Integration](/Documentation/proxmox_integration)
+Documentation on how Proxmox is integrated with the Comserv system.
+
+### [Proxmox API](/Documentation/proxmox/api)
+Information about the Proxmox API and how to use it.
+
+### [Proxmox Authentication](/Documentation/proxmox/authentication)
+Details about authentication methods and security for Proxmox.
+
+### [Proxmox IP Configuration](/Documentation/proxmox/ip_configuration)
+Guide for configuring IP addresses in Proxmox VMs and containers.
+
+## Quick Links
+
+- [Back to Documentation Index](/Documentation)
+- [Proxmox Command Reference](/Documentation/proxmox_commands.tt) (Most frequently used)
+- [Infrastructure Migration Plan](/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt)
+- [K8s Readiness Plan](/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt)

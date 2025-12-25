@@ -1,0 +1,91 @@
+[% META
+   title = "Environment Variables Audit Log"
+   description = "View audit log of environment variable changes"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Administration"
+   page_version = "0.01"
+   last_updated = "Tue Dec 09 18:15:00 UTC 2025"
+%]
+
+[% PageVersion = 'admin/environment_variables/audit_log.tt,v 0.01 2025/12/09 18:15:00 UTC Exp' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Environment Variables Audit Log</h1>
+        <p class="page-subtitle">Track all changes to environment variables</p>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+            <div class="alert alert-error" style="background-color: var(--light-color); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--error-color);">Error</h4>
+                <p>[% error_msg | html %]</p>
+            </div>
+            [% END %]
+            
+            <div class="action-bar" style="margin-bottom: var(--spacing-medium);">
+                <a href="[% c.uri_for('/admin/environment_variables') %]" class="btn btn-secondary">Back to Variables</a>
+            </div>
+            
+            [% IF audit_logs.size %]
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Variable Name</th>
+                            <th>Action</th>
+                            <th>Modified By</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH log IN audit_logs %]
+                        <tr>
+                            <td style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                                [% log.created_at %]
+                            </td>
+                            <td style="color: var(--text-color);">
+                                <code>[% log.variable_key | html %]</code>
+                            </td>
+                            <td style="color: var(--text-color);">
+                                [% IF log.action == 'CREATE' %]
+                                    <span class="badge badge-success">Created</span>
+                                [% ELSIF log.action == 'UPDATE' %]
+                                    <span class="badge badge-info">Updated</span>
+                                [% ELSIF log.action == 'DELETE' %]
+                                    <span class="badge badge-warning">Deleted</span>
+                                [% ELSE %]
+                                    <span class="badge">[% log.action | html %]</span>
+                                [% END %]
+                            </td>
+                            <td style="color: var(--text-color);">
+                                [% log.user | html %]
+                            </td>
+                            <td style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                                <span class="badge badge-[% log.status %]">[% log.status | ucfirst %]</span>
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+            [% ELSE %]
+            <div class="empty-state" style="text-align: center; padding: var(--spacing-large);">
+                <p style="color: var(--text-muted-color);">No audit log entries found.</p>
+            </div>
+            [% END %]
+            
+        </div>
+        
+    </div>
+    
+</div>

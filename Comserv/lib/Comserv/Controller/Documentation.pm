@@ -2,18 +2,45 @@ package Comserv::Controller::Documentation;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages);
+use Comserv::Controller::Documentation::ScanMethods qw(_scan_directories _categorize_pages _parse_meta_block _extract_md_metadata);
 use File::Find;
 use File::Basename;
 use File::Spec;
+use Digest::SHA qw(sha256_hex);
+use File::Path qw(make_path);
 use FindBin;
 use Time::Piece;
 use JSON;
+use File::Slurp;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Set the namespace to handle both /Documentation and /documentation routes
 __PACKAGE__->config(namespace => 'Documentation');
+
+# In-app helpers for safe, atomic JSON read/write
+sub _load_json_file {
+    my ($path) = @_;
+    return unless defined $path && -e $path;
+    local $/;
+    open my $fh, '<:encoding(UTF-8)', $path or return;
+    my $content = <$fh>;
+    close $fh;
+    return JSON->new->utf8->decode($content);
+}
+
+sub _atomic_write_json {
+    my ($path, $data) = @_;
+    return 0 unless defined $path;
+    my $tmp = $path . '.tmp';
+    {
+        open my $fh, '>:encoding(UTF-8)', $tmp or return 0;
+        print $fh JSON->new->utf8->pretty->encode($data);
+        close $fh;
+    }
+    rename $tmp, $path or return 0;
+    return 1;
+}
 
 # Add a chained action to handle the lowercase route
 sub documentation_base :Chained('/') :PathPart('documentation') :CaptureArgs(0) {
@@ -86,19 +113,16 @@ sub _load_categories_from_config {
     my ($self) = @_;
     
     # Path to the JSON config file
-    my $config_file = $FindBin::Bin . '/../root/Documentation/config/documentation_config.json';
+    my $config_file = $FindBin::Bin . '/../root/Documentation/config/DocumentationConfig.json';
     
     # Initialize with empty hash
     %{$self->documentation_categories} = ();
     
     if (-f $config_file) {
         eval {
-            # Read and parse JSON config
-            open my $fh, '<', $config_file or die "Cannot open config file: $!";
-            my $json_content = do { local $/; <$fh> };
-            close $fh;
-            
-            my $config = JSON->new->decode($json_content);
+            # Read and parse JSON config via in-module loader
+            my $config = _load_json_file($config_file);
+            unless (defined $config) { die "Failed to load JSON config"; }
             
             if ($config->{categories}) {
                 # Convert JSON categories to internal format
@@ -139,9 +163,8 @@ sub _load_categories_from_config {
         };
         
         if ($@) {
-            Comserv::Util::Logging::log_to_file("Error loading categories from JSON: $@");
-            # Fall back to default categories if JSON loading fails
-            $self->_load_default_categories();
+            Comserv::Util::Logging::log_to_file("Error loading categories from JSON: $@", 
+            undef, 'ERROR');
         }
     } else {
         Comserv::Util::Logging::log_to_file("JSON config file not found, using default categories");
@@ -211,6 +234,106 @@ sub auto :Private {
     }
 
     return 1; # Continue processing
+}
+
+# Persistent fingerprinting and auto-scan integration
+#
+# Automatically re-scan Documentation on access if the on-disk filesystem fingerprint
+# differs from the previously stored fingerprint. This reuses the existing _scan_directories
+# and _categorize_pages routines and keeps changes localized to this module.
+
+my $SCAN_STATE_REL_PATH = File::Spec->catfile('Documentation', 'config', 'scan_state.json');
+
+sub _fingerprint_fs {
+    my ($docs_root) = @_;
+    my @entries;
+    find(
+        {
+            no_chdir => 1,
+            wanted   => sub {
+                return unless -f $_;
+                return unless /\.(tt|md)$/i;
+                my $mt = (stat($_))[9] // 0;
+                push @entries, $File::Find::name . "\t" . $mt;
+            }
+        },
+        $docs_root
+    );
+    @entries = sort @entries;
+    my $flat = join("\n", @entries);
+    return sha256_hex($flat);
+}
+
+sub _read_stored_fingerprint {
+    my ($path) = @_;
+    return undef unless defined $path && -e $path;
+    local $/;
+    open my $fh, '<:encoding(UTF-8)', $path or return undef;
+    my $content = <$fh>;
+    close $fh;
+    if ($content =~ /"fingerprint"\s*:\s*"([^"]+)"/) {
+        return $1;
+    }
+    return undef;
+}
+
+sub _store_fingerprint {
+    my ($path, $fingerprint) = @_;
+    return 0 unless defined $path;
+    my $tmp = $path . '.tmp';
+    open my $fh, '>:encoding(UTF-8)', $tmp or return 0;
+    print $fh qq({"fingerprint":"$fingerprint"} );
+    close $fh;
+    rename $tmp, $path or return 0;
+    return 1;
+}
+
+sub _compute_and_get_docs_root {
+    my ($c) = @_;
+    # Resolve the Documentation root directory on disk
+    my $docs_root = $c->path_to('root', 'Documentation');
+    return $docs_root;
+}
+
+sub _ensure_scanned {
+    my ($self, $c) = @_;
+    # If we already have pages, we still want to auto-rescan if fingerprint changed
+    my $docs_root = _compute_and_get_docs_root($c);
+    my $state_path = File::Spec->catfile($docs_root, 'config', 'scan_state.json');
+
+    my $current_fp = $self->_fingerprint_fs($docs_root);
+    my $stored_fp  = _read_stored_fingerprint($state_path);
+
+    # Force rescan if documentation_pages is empty, regardless of fingerprint
+    my $force_scan = (scalar keys %{$self->documentation_pages} == 0);
+
+    if ($force_scan) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_scanned',
+            "Forcing scan because documentation_pages is empty");
+    }
+
+    if (!defined $stored_fp || $current_fp ne $stored_fp || $force_scan) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_scanned',
+            "Auto-scan triggered for Documentation (fingerprint changed).");
+        # Run the existing scan routines to refresh in-memory index
+        _scan_directories($self, $c);
+        _categorize_pages($self, $c);
+        # Update JSON config with newly scanned files
+        $self->_update_json_config_with_scanned_files($c);
+        # Update JSON config with newly scanned files
+        $self->_update_json_config_with_scanned_files($c);
+        # Persist new fingerprint atomically
+        _store_fingerprint($state_path, $current_fp) or do {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_scanned',
+                "Failed to persist new documentation fingerprint to $state_path");
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_scanned',
+            "Documentation fingerprint updated to $current_fp");
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_ensure_scanned',
+            "Documentation fingerprint unchanged; using cached index.");
+    }
+
 }
 
 # Main documentation index - handles /Documentation route
@@ -287,6 +410,10 @@ sub index :Path('/Documentation') :Args(0) {
     my %filtered_pages;
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
+
+        # TEMPORARY: Show ALL pages for debugging - REMOVE THIS LATER
+        $filtered_pages{$page_name} = $metadata;
+        next;  # Skip all the filtering logic temporarily
 
         # Log the admin status for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
@@ -367,7 +494,7 @@ sub index :Path('/Documentation') :Args(0) {
         my $page_data = {
             title => $title,
             path => $path,
-            url => $url,
+            url => $url->as_string,  # Convert to string for template
             site => $metadata->{site},
             roles => $metadata->{roles},
         };
@@ -468,6 +595,11 @@ sub view :Path('/Documentation') :Args(1) {
     # Ensure documentation has been scanned
     $self->_ensure_scanned($c);
 
+    # Log the number of pages found after scanning
+    my $pages_count = scalar keys %{$self->documentation_pages};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "After scanning, found $pages_count pages in documentation_pages hash");
+
     # Get the current user's role
     my $user_role = 'normal';  # Default to normal user
     my $is_admin = 0;  # Flag to track if user has admin role
@@ -532,7 +664,7 @@ sub view :Path('/Documentation') :Args(1) {
             $c->response->status(403);
             $c->stash(
                 error_msg => "Access denied: This documentation is not available for your site.",
-                template => 'Documentation/error.tt'
+                template => 'Documentation/Error.tt'
             );
             return;
         }
@@ -556,7 +688,7 @@ sub view :Path('/Documentation') :Args(1) {
             $c->response->status(403);
             $c->stash(
                 error_msg => "Access denied: You don't have permission to view this documentation.",
-                template => 'Documentation/error.tt'
+                template => 'Documentation/Error.tt'
             );
             return;
         }
@@ -589,7 +721,7 @@ sub view :Path('/Documentation') :Args(1) {
                     last_updated => $last_updated,
                     user_role => $user_role,
                     site_name => $site_name,
-                    template => 'Documentation/markdown_viewer.tt'
+                    template => 'Documentation/MarkdownViewer.tt'
                 };
                 
                 # Add special CSS and JavaScript for Linux commands documentation
@@ -663,19 +795,50 @@ sub view :Path('/Documentation') :Args(1) {
             last_updated => $last_updated,
             user_role => $user_role,
             site_name => $site_name,
-            template => 'Documentation/markdown_viewer.tt'
+            template => 'Documentation/MarkdownViewer.tt'
         };
-        
+
         # Add special CSS and JavaScript for Linux commands documentation
         if ($page eq 'linux_commands') {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Loading special CSS and JS for Linux commands documentation");
-            
+
             $stash_data->{additional_css} = ['/static/css/linux_commands.css'];
             $stash_data->{additional_js} = ['/static/js/linux_commands.js'];
         }
-        
+
         $c->stash(%$stash_data);
+        return;
+    }
+
+    # Try to find it as a .tt file in the Documentation directory (unregistered)
+    my $tt_path = "Documentation/$page.tt";
+    my $tt_full_path = $c->path_to('root', $tt_path);
+
+    if (-e $tt_full_path) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Found unregistered .tt file: $tt_path");
+
+        # Check admin access for unregistered files
+        unless ($is_admin) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                "Access denied to unregistered page $page: admin required");
+            $c->response->status(403);
+            $c->stash(
+                error_msg => "Access denied: Unregistered documentation requires admin privileges.",
+                template => 'Documentation/Error.tt'
+            );
+            return;
+        }
+
+        # Handle template files
+        $c->stash(
+            page_name => $page,
+            page_title => $self->_format_title($page),
+            user_role => $user_role,
+            site_name => $site_name,
+            template => $tt_path
+        );
         return;
     }
 
@@ -685,8 +848,487 @@ sub view :Path('/Documentation') :Args(1) {
     $c->response->status(404);
     $c->stash(
         error_msg => "Documentation page '$page' not found.",
-        template => 'Documentation/error.tt'
+        template => 'Documentation/Error.tt'
     );
+}
+
+# Comprehensive config management interface
+sub manage_config :Path('/Documentation/manage_config') :Args {
+    my ($self, $c, @args) = @_;
+
+    my $page_name;
+    if (@args) {
+        $page_name = join('/', @args);
+        $page_name =~ s/%20/ /g;
+        $page_name =~ tr/+/ /;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_config',
+        "Accessing documentation config management" . ($page_name ? " for page: $page_name" : ""));
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    # Load the full JSON config
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
+
+    # Available roles in the system
+    my @available_roles = qw(normal user editor admin developer);
+
+    # Get list of all categories
+    my @categories = sort keys %{$config->{categories}};
+
+    # Handle search parameters
+    my $search_query = $c->req->params->{search_query} || '';
+    my $search_docs = $c->req->params->{search_docs} || 0;
+    $search_query =~ s/^\s+|\s+$//g;
+
+    # Perform search if query provided
+    my @search_results;
+    if ($search_query && length($search_query) >= 2) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'manage_config',
+            "Performing search for: '$search_query', docs: $search_docs");
+
+        # Search in config JSON
+        push @search_results, $self->_search_config_json($config, $search_query);
+
+        # Search in Documentation files if requested
+        if ($search_docs) {
+            push @search_results, $self->_search_documentation_files($c, $search_query);
+        }
+
+        # Sort results by relevance
+        @search_results = sort { $b->{relevance} <=> $a->{relevance} || $a->{title} cmp $b->{title} } @search_results;
+    }
+
+    # If a specific page was requested, show detail view
+    my $selected_page;
+    my $show_detail_view = 0;
+    if ($page_name && $config->{pages}->{$page_name}) {
+        $selected_page = $page_name;
+        $show_detail_view = 1;
+    }
+
+    $c->stash(
+        template => 'admin/documentation/manage_config.tt',
+        config => $config,
+        available_roles => \@available_roles,
+        categories => \@categories,
+        selected_page => $selected_page,
+        show_detail_view => $show_detail_view,
+        search_query => $search_query,
+        search_docs => $search_docs,
+        search_results => \@search_results,
+    );
+}
+
+# Search helper methods for manage_config
+sub _search_config_json {
+    my ($self, $config, $query) = @_;
+    my @results;
+
+    # Search in categories
+    foreach my $cat_key (keys %{$config->{categories}}) {
+        my $category = $config->{categories}->{$cat_key};
+
+        if ($category->{title} =~ /\Q$query\E/i ||
+            $category->{description} =~ /\Q$query\E/i ||
+            $cat_key =~ /\Q$query\E/i) {
+
+            push @results, {
+                type => 'category',
+                title => "Category: $category->{title}",
+                key => $cat_key,
+                content => $category->{description} || '',
+                relevance => 8,
+                url => "#category-$cat_key"
+            };
+        }
+    }
+
+    # Search in pages
+    foreach my $page_key (keys %{$config->{pages}}) {
+        my $page = $config->{pages}->{$page_key};
+
+        if ($page_key =~ /\Q$query\E/i ||
+            $page->{title} =~ /\Q$query\E/i ||
+            $page->{path} =~ /\Q$query\E/i) {
+
+            my $relevance = 6;
+            $relevance = 10 if $page_key =~ /\Q$query\E/i;
+
+            push @results, {
+                type => 'page',
+                title => "Page: " . ($page->{title} || $page_key),
+                key => $page_key,
+                content => $page->{path} || '',
+                relevance => $relevance,
+                url => $page_key
+            };
+        }
+    }
+
+    return @results;
+}
+
+sub _search_documentation_files {
+    my ($self, $c, $query) = @_;
+    my @results;
+
+    my $docs_root = $c->path_to('root', 'Documentation');
+    my $pages = $self->documentation_pages;
+
+    # Find all .tt and .md files
+    find(
+        {
+            no_chdir => 1,
+            wanted   => sub {
+                return unless -f $_;
+                return unless /\.(tt|md)$/i;
+
+                my $rel_path = File::Spec->abs2rel($_, $docs_root);
+                my $file_path = $_;
+
+                # Check if this file is registered as a documentation page
+                my $is_registered_page = 0;
+                my $page_name;
+                foreach my $pn (keys %$pages) {
+                    my $page_data = $pages->{$pn};
+                    if ($page_data->{path} eq $rel_path) {
+                        $is_registered_page = 1;
+                        $page_name = $pn;
+                        last;
+                    }
+                }
+
+                eval {
+                    open my $fh, '<:encoding(UTF-8)', $file_path or die "Cannot open file: $!";
+                    my $content = do { local $/; <$fh> };
+                    close $fh;
+
+                    if ($content =~ /\Q$query\E/i) {
+                        # Create excerpt
+                        my $match_pos = CORE::index(lc($content), lc($query));
+                        my $excerpt = '';
+                        if ($match_pos >= 0) {
+                            my $start = $match_pos > 50 ? $match_pos - 50 : 0;
+                            my $end = $match_pos + length($query) + 50;
+                            $end = length($content) if $end > length($content);
+
+                            $excerpt = substr($content, $start, $end - $start);
+                            $excerpt =~ s/^\S*\s*//; # Remove partial word at start
+                            $excerpt =~ s/\s*\S*$//; # Remove partial word at end
+                            $excerpt = '...' . $excerpt . '...' if $start > 0 || $end < length($content);
+
+                            # Clean up for display
+                            $excerpt =~ s/\[%.*?%\]//g; # Remove TT syntax
+                            $excerpt =~ s/<[^>]*>//g; # Remove HTML tags
+                            $excerpt =~ s/\s+/ /g; # Normalize whitespace
+                            $excerpt = substr($excerpt, 0, 200) . '...' if length($excerpt) > 200;
+                        }
+
+                        my $result_type = $is_registered_page ? 'registered_file' : 'unregistered_file';
+                        my $title = $is_registered_page ?
+                            "Documentation Page: $page_name" :
+                            "Unregistered File: $rel_path";
+                        my $url = $is_registered_page ? $page_name : undef;
+                        my $relevance = $is_registered_page ? 4 : 3; # Lower relevance for unregistered files
+
+                        push @results, {
+                            type => $result_type,
+                            title => $title,
+                            key => $is_registered_page ? $page_name : $rel_path,
+                            content => $excerpt,
+                            relevance => $relevance,
+                            url => $url
+                        };
+                    }
+                };
+
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_search_documentation_files',
+                        "Error reading file $file_path: $@");
+                }
+            }
+        },
+        $docs_root
+    );
+
+    return @results;
+}
+
+# Save config changes
+sub save_config :Path('/Documentation/save_config') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->body('Access denied');
+        return;
+    }
+
+    # Only handle POST requests
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->body('Method not allowed');
+        return;
+    }
+
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
+
+    # Get the action type
+    my $action = $c->req->param('action');
+
+    if ($action eq 'update_page') {
+        my $original_page_name = $c->req->param('original_page_name');
+        my $page_name = $c->req->param('page_name');
+        my @roles = $c->req->param('roles');
+        my @categories = $c->req->param('categories');
+        my $title = $c->req->param('title');
+        my $path = $c->req->param('path');
+        my $format = $c->req->param('format');
+        my $site = $c->req->param('site');
+
+        if ($config->{pages}->{$original_page_name}) {
+            # If page name changed, move the entry
+            if ($original_page_name ne $page_name) {
+                $config->{pages}->{$page_name} = $config->{pages}->{$original_page_name};
+                delete $config->{pages}->{$original_page_name};
+            }
+
+            $config->{pages}->{$page_name}->{roles} = \@roles if @roles;
+            # Handle categories - always store as array for consistency
+            if (@categories) {
+                $config->{pages}->{$page_name}->{categories} = \@categories;
+                # Remove old single category field if it exists
+                delete $config->{pages}->{$page_name}->{category};
+            }
+            $config->{pages}->{$page_name}->{title} = $title if $title;
+            $config->{pages}->{$page_name}->{path} = $path if $path;
+            $config->{pages}->{$page_name}->{format} = $format if $format;
+            $config->{pages}->{$page_name}->{site} = $site if $site;
+            $config->{pages}->{$page_name}->{last_updated} = scalar localtime;
+        }
+    }
+    elsif ($action eq 'delete_page') {
+        my $page_name = $c->req->param('page_name');
+        delete $config->{pages}->{$page_name};
+    }
+    elsif ($action eq 'add_category') {
+        my $cat_key = $c->req->param('category_key');
+        my $cat_title = $c->req->param('category_title');
+        my $cat_desc = $c->req->param('category_description');
+        my @cat_roles = $c->req->param('category_roles');
+        my $cat_icon = $c->req->param('category_icon') || 'fas fa-file-alt';
+
+        $config->{categories}->{$cat_key} = {
+            title => $cat_title,
+            description => $cat_desc,
+            roles => \@cat_roles,
+            icon => $cat_icon,
+            site_filter => 'all',
+            display_order => scalar(keys %{$config->{categories}}) + 1,
+        };
+    }
+    elsif ($action eq 'update_category') {
+        my $cat_key = $c->req->param('category_key');
+        my $cat_title = $c->req->param('category_title');
+        my $cat_desc = $c->req->param('category_description');
+        my @cat_roles = $c->req->param('category_roles');
+
+        if ($config->{categories}->{$cat_key}) {
+            $config->{categories}->{$cat_key}->{title} = $cat_title;
+            $config->{categories}->{$cat_key}->{description} = $cat_desc;
+            $config->{categories}->{$cat_key}->{roles} = \@cat_roles;
+        }
+    }
+    elsif ($action eq 'delete_category') {
+        my $cat_key = $c->req->param('category_key');
+        delete $config->{categories}->{$cat_key};
+    }
+    elsif ($action eq 'add_page') {
+        my $page_name = $c->req->param('page_name');
+        my $file_path = $c->req->param('file_path');
+        my @roles = $c->req->param('roles');
+        my @categories = $c->req->param('categories');
+        my $title = $c->req->param('title');
+
+        # Extract metadata from the file if it exists
+        my $metadata = {};
+        if ($file_path) {
+            my $full_path = $c->path_to('root', $file_path);
+            if (-e $full_path) {
+                eval {
+                    open my $fh, '<:encoding(UTF-8)', $full_path or die "Cannot open file: $!";
+                    my $content = do { local $/; <$fh> };
+                    close $fh;
+
+                    if ($file_path =~ /\.tt$/) {
+                        $metadata = _parse_meta_block($content);
+                    } elsif ($file_path =~ /\.md$/) {
+                        $metadata = _extract_md_metadata($content, $page_name);
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'save_config',
+                        "Error reading metadata from $full_path: $@");
+                }
+            }
+        }
+
+        # Use provided values or fall back to metadata
+        my $final_title = $title || $metadata->{title} || $self->_format_title($page_name);
+        my $final_roles = @roles ? \@roles : ($metadata->{roles} ? [split(/\s*,\s*/, $metadata->{roles})] : ['admin', 'developer']);
+        my $final_categories = @categories ? \@categories : ($metadata->{category} ? [$metadata->{category}] : ['admin']);
+        my $final_format = $file_path =~ /\.md$/i ? 'markdown' : ($file_path =~ /\.tt$/i ? 'template' : 'unknown');
+
+        $config->{pages}->{$page_name} = {
+            path => $file_path,
+            site => $metadata->{site_specific} && $metadata->{site_specific} eq 'true' ? 'specific' : 'all',
+            roles => $final_roles,
+            categories => $final_categories,
+            title => $final_title,
+            description => $metadata->{description},
+            format => $final_format,
+            last_scanned => scalar localtime
+        };
+    }
+
+    # Save the updated config
+    my $clean_config = $self->_clean_for_json($config);
+    if (_atomic_write_json($config_file, $clean_config)) {
+        $c->response->redirect($c->uri_for('/Documentation/manage_config') . '?msg=saved');
+    } else {
+        $c->response->redirect($c->uri_for('/Documentation/manage_config') . '?msg=error');
+    }
+}
+
+# Edit category form
+sub edit_category_form :Path('/Documentation/edit_category') :Args(1) {
+    my ($self, $c, $cat_key) = @_;
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    # Available roles
+    my @available_roles = qw(normal user editor admin developer);
+
+    # Load current categories from config
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
+    my $categories = $config->{categories} || {};
+
+    # Check if category exists
+    unless ($categories->{$cat_key}) {
+        $c->response->status(404);
+        $c->stash(
+            error_msg => "Category '$cat_key' not found.",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    $c->stash(
+        template => 'admin/documentation/edit_category.tt',
+        available_roles => \@available_roles,
+        category => $categories->{$cat_key},
+        category_key => $cat_key,
+    );
+}
+
+# Add category form
+sub add_category_form :Path('/Documentation/add_category') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    # Available roles
+    my @available_roles = qw(normal user editor admin developer);
+
+    # Load current categories from config
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
+    my $existing_categories = $config->{categories} || {};
+
+    $c->stash(
+        template => 'admin/documentation/add_category.tt',
+        available_roles => \@available_roles,
+        existing_categories => $existing_categories,
+    );
+}
+
+# Reload configuration from file
+sub reload_config :Path('/Documentation/Config/reload') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reload_config',
+        "Reloading documentation configuration");
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->body('Access denied');
+        return;
+    }
+
+    # Clear cached categories to force reload
+    %{$self->documentation_categories} = ();
+
+    # Reload categories from config
+    $self->_load_categories_from_config();
+
+    $c->response->redirect($c->uri_for('/Documentation/manage_config') . '?msg=reloaded');
+}
+
+# Export configuration as JSON
+sub export_config :Path('/Documentation/Config/export') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'export_config',
+        "Exporting documentation configuration");
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->body('Access denied');
+        return;
+    }
+
+    # Load the current config
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+    my $config = _load_json_file($config_file) || { categories => {}, pages => {} };
+
+    # Set response headers for JSON download
+    $c->response->content_type('application/json');
+    $c->response->header('Content-Disposition' => 'attachment; filename=DocumentationConfig.json');
+
+    # Output the JSON
+    $c->response->body(JSON->new->utf8->pretty->encode($config));
 }
 
 # Edit roles for a documentation page
@@ -701,7 +1343,7 @@ sub edit_roles :Path('/Documentation/edit_roles') :Args(1) {
         $c->response->status(403);
         $c->stash(
             error_msg => "Access denied. Administrator privileges required.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -715,7 +1357,7 @@ sub edit_roles :Path('/Documentation/edit_roles') :Args(1) {
         $c->response->status(404);
         $c->stash(
             error_msg => "Documentation page '$page_name' not found.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -747,7 +1389,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         $c->response->status(403);
         $c->stash(
             error_msg => "Access denied. Administrator privileges required.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -757,7 +1399,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         $c->response->status(405);
         $c->stash(
             error_msg => "Method not allowed. POST required.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -771,7 +1413,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         $c->response->status(404);
         $c->stash(
             error_msg => "Documentation page '$page_name' not found.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -805,7 +1447,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
     }
     
     # Load the documentation configuration
-    my $config_path = $c->path_to('root', 'Documentation', 'config', 'documentation_config.json');
+    my $config_path = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
     my $role_config = {};  # Using a different variable name to avoid any conflicts
     
     if (-e $config_path) {
@@ -885,7 +1527,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         };
     }
     
-    # Save the updated configuration
+    # Save the updated configuration atomically
     eval {
         # Ensure the config directory exists
         my $config_dir = $c->path_to('root', 'Documentation', 'config');
@@ -898,10 +1540,8 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
         
         # Clean the role_config structure to remove any blessed objects before JSON encoding
         my $clean_config = $self->_clean_for_json($role_config);
-        
-        open my $fh, '>:encoding(UTF-8)', $config_path or die "Cannot write to $config_path: $!";
-        print $fh JSON->new->utf8->pretty->encode($clean_config);
-        close $fh;
+        my $config_path  = $config_dir . '/DocumentationConfig.json';
+        _atomic_write_json($config_path, $clean_config) or die "Atomic write failed";
     };
     
     if ($@) {
@@ -909,7 +1549,7 @@ sub update_roles :Path('/Documentation/update_roles') :Args(1) {
             "Error saving config file: $@");
         $c->stash(
             error_msg => "Error saving role changes: $@",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
@@ -940,21 +1580,6 @@ sub _check_admin_access {
     return 0;
 }
 
-# Ensure documentation scanning has been done
-sub _ensure_scanned {
-    my ($self, $c) = @_;
-    
-    # Check if we've already scanned (pages will be empty initially)
-    return if keys %{$self->documentation_pages} > 0;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_ensure_scanned',
-        "Performing initial documentation scan");
-    
-    # Import and call the scanning functions
-    _scan_directories($self, $c);
-    _categorize_pages($self, $c);
-}
-
 # Force a rescan of documentation (clears cache)
 sub rescan :Path('/Documentation/rescan') :Args(0) {
     my ($self, $c) = @_;
@@ -964,23 +1589,24 @@ sub rescan :Path('/Documentation/rescan') :Args(0) {
         $c->response->status(403);
         $c->stash(
             error_msg => "Access denied. Administrator privileges required.",
-            template => 'Documentation/error.tt'
+            template => 'Documentation/Error.tt'
         );
         return;
     }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rescan',
         "Forcing documentation rescan");
-    
+
     # Clear the cache
     %{$self->documentation_pages} = ();
-    
+
     # Force a rescan
     _scan_directories($self, $c);
     _categorize_pages($self, $c);
-    
-    # Redirect back to documentation index
-    $c->response->redirect($c->uri_for('/Documentation'));
+
+    # Redirect back to the referring page, or default to manage_config
+    my $referer = $c->req->referer || $c->uri_for('/Documentation/manage_config');
+    $c->response->redirect($referer);
 }
 
 # Helper method to format titles
@@ -1118,16 +1744,18 @@ sub search :Path('/documentation/search') :Args(0) {
                 next;
             }
             
-            # Check if query matches page name or content
+            # Check if query matches page name, path, or content
             my $title = $self->_format_title($page_name);
             my $matches_title = ($title =~ /\Q$query\E/i);
+            my $matches_path = ($metadata->{path} =~ /\Q$query\E/i);
             my $matches_content = 0;
             my $excerpt = '';
             
             # Try to read file content for search
-            if (-f $metadata->{path}) {
+            my $full_path = $c->path_to('root', $metadata->{path});
+            if (-f $full_path) {
                 eval {
-                    open my $fh, '<', $metadata->{path} or die "Cannot open file: $!";
+                    open my $fh, '<:encoding(UTF-8)', $full_path or die "Cannot open file: $!";
                     my $content = do { local $/; <$fh> };
                     close $fh;
                     
@@ -1162,15 +1790,17 @@ sub search :Path('/documentation/search') :Args(0) {
             }
             
             # Add to results if match found
-            if ($matches_title || $matches_content) {
+            if ($matches_title || $matches_path || $matches_content) {
+                my $relevance = $matches_title ? 10 : ($matches_path ? 8 : 5);
                 push @search_results, {
                     title => $title,
                     url => $c->uri_for($self->action_for('view'), [$page_name]),
+                    path => $metadata->{path},
                     category => $page_category,
                     site => $metadata->{site},
                     roles => $metadata->{roles},
-                    excerpt => $excerpt,
-                    relevance => $matches_title ? 10 : 5, # Title matches rank higher
+                    excerpt => $excerpt || $metadata->{path},
+                    relevance => $relevance,
                 };
             }
         }
@@ -1191,6 +1821,84 @@ sub search :Path('/documentation/search') :Args(0) {
         search_category => $category,
         search_results => \@search_results,
     );
+}
+
+
+# Update JSON configuration file with newly scanned files
+sub _update_json_config_with_scanned_files {
+    my ($self, $c) = @_;
+
+    my $config_file = $c->path_to('root', 'Documentation', 'config', 'DocumentationConfig.json');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
+        "Updating JSON config with scanned files at: $config_file");
+
+    # Load existing config
+    my $config = {};
+    if (-e $config_file) {
+        $config = _load_json_file($config_file) || {};
+    }
+
+    # Ensure config structure exists
+    $config->{categories} = $self->documentation_categories unless ref $config->{categories} eq 'HASH';
+    $config->{pages} = {} unless ref $config->{pages} eq 'HASH';
+
+    # Get discovered pages from scan
+    my $pages = $self->documentation_pages;
+    my $new_count = 0;
+    my $update_count = 0;
+
+    foreach my $page_name (keys %$pages) {
+        my $metadata = $pages->{$page_name};
+
+        # Check if page is new or needs update
+        my $is_new = !exists $config->{pages}->{$page_name};
+
+        # For new pages, force them into admin_guides category with admin role and prefixed title
+        my $category;
+        my $roles;
+        my $title;
+
+        if ($is_new) {
+            $category = 'admin_guides';
+            $roles = ['admin'];
+            my $original_title = $metadata->{title} || $self->_format_title($page_name);
+            $title = "UNCATEGORIZED: $original_title";
+            $new_count++;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
+                "Added uncategorized page to admin_guides: $page_name");
+        } else {
+            $category = $metadata->{category} || $self->_determine_page_category($page_name, $metadata->{path});
+            $roles = $metadata->{roles};
+            $title = $metadata->{title} || $self->_format_title($page_name);
+            $update_count++;
+        }
+
+        # Always update to keep data fresh
+        $config->{pages}->{$page_name} = {
+            path => $metadata->{path},
+            site => $metadata->{site},
+            roles => $roles,
+            format => $metadata->{format},
+            title => $title,
+            description => $metadata->{description},
+            category => $category,
+            last_scanned => scalar localtime
+        };
+    }
+
+    # Update timestamp
+    $config->{last_updated} = scalar localtime;
+
+    # Save updated config
+    my $clean_config = $self->_clean_for_json($config);
+    if (_atomic_write_json($config_file, $clean_config)) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
+            "Successfully updated JSON config: $new_count new pages, $update_count updated pages");
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_update_json_config_with_scanned_files',
+            "Failed to write JSON config file");
+    }
 }
 
 # Helper method to clean data structure for JSON encoding

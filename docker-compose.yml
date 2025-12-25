@@ -1,4 +1,4 @@
-version: '3.9'
+
 
 # Simplified Docker Compose for Comserv Development
 # Database: External MySQL on 192.168.1.198 (NOT local)
@@ -6,37 +6,13 @@ version: '3.9'
 # Prod Port: 5000 (Starman workers via Supervisor)
 
 services:
-  # Local MySQL for Configuration Storage
-  # Used for storing database_connections, app config during initialization
-  # NOT for production application data
-  config-db:
-    image: mysql:8.0
-    container_name: comserv-config-db
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${CONFIG_DB_ROOT_PASSWORD:-root_config_dev}
-      MYSQL_DATABASE: ${CONFIG_DB_NAME:-comserv_config}
-      MYSQL_USER: ${CONFIG_DB_USER:-comserv_config}
-      MYSQL_PASSWORD: ${CONFIG_DB_PASSWORD:-config_dev_password}
-      TZ: ${TZ:-UTC}
-    ports:
-      - "3307:3306"
-    volumes:
-      - config_db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - comserv-network
-
   # Redis Cache Service
   redis:
     image: redis:7-alpine
     container_name: comserv-redis
     restart: unless-stopped
+    labels:
+      - "description=Redis cache server for session storage and application caching"
     command: redis-server --requirepass ${REDIS_PASSWORD:-redispass_dev} --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
@@ -50,6 +26,11 @@ services:
       start_period: 30s
     networks:
       - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Development Web Service - Port 3000
   # Code is mounted for live development with comserv_server.pl debugging
@@ -58,7 +39,10 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-dev
-    restart: unless-stopped
+    network_mode: host
+    restart: always
+    labels:
+      - "description=Development web server (port 3000) with live code reload and debugging"
     environment:
       CATALYST_ENV: development
       CATALYST_DEBUG: 1
@@ -68,12 +52,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
-      # External Database Configuration (192.168.1.198)
-      COMSERV_DB_LOCAL_ENCY_HOST: ${DB_HOST:-192.168.1.198}
-      COMSERV_DB_LOCAL_ENCY_PORT: ${DB_PORT:-3306}
-      COMSERV_DB_LOCAL_ENCY_USERNAME: ${DB_USER:-shanta_forager}
-      COMSERV_DB_LOCAL_ENCY_PASSWORD: ${DB_PASSWORD:-UA=nPF8*m+T#}
-      COMSERV_DB_LOCAL_ENCY_DATABASE: ${DB_NAME:-ency}
+      # External Database Configuration (192.168.1.198) - via db_config.json
+      DB_LOAD_SOURCE: db_config
     ports:
       - "3000:3000"
     volumes:
@@ -85,18 +65,21 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
     depends_on:
-      config-db:
-        condition: service_healthy
       redis:
         condition: service_healthy
+    extra_hosts:
+      - "database:192.168.1.198"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
-    networks:
-      - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   # Production Web Service - Port 5000
   # Starman workers via Supervisor (production-grade setup)
@@ -105,7 +88,10 @@ services:
       context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-prod
-    restart: unless-stopped
+    network_mode: host
+    restart: always
+    labels:
+      - "description=Production web server (port 5000) with Starman workers via Supervisor"
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
@@ -115,12 +101,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
-      # External Database Configuration (192.168.1.198)
-      COMSERV_DB_LOCAL_ENCY_HOST: ${DB_HOST:-192.168.1.198}
-      COMSERV_DB_LOCAL_ENCY_PORT: ${DB_PORT:-3306}
-      COMSERV_DB_LOCAL_ENCY_USERNAME: ${DB_USER:-shanta_forager}
-      COMSERV_DB_LOCAL_ENCY_PASSWORD: ${DB_PASSWORD:-UA=nPF8*m+T#}
-      COMSERV_DB_LOCAL_ENCY_DATABASE: ${DB_NAME:-ency}
+      # External Database Configuration (192.168.1.198) - via db_config.json
+      DB_LOAD_SOURCE: db_config
     ports:
       - "5000:5000"
     volumes:
@@ -132,8 +114,6 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
     depends_on:
-      config-db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -142,17 +122,19 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    networks:
-      - comserv-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
 
 # Volumes for persistent data
 volumes:
-  config_db_data:
-    driver: local
   redis_data:
     driver: local
 
-# Network for inter-service communication
+# Note: Web services use network_mode: host and do not require custom networks
+# Redis uses comserv-network for inter-service communication
 networks:
   comserv-network:
     driver: bridge

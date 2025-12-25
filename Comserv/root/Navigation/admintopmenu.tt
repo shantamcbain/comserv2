@@ -236,6 +236,12 @@
                     <span class="submenu-section-title">Network Management</span>
                     <a href="/admin/network_devices"><i class="icon-network"></i>Network Devices</a>
                 </div>
+                
+                <!-- Docker/Infrastructure Management -->
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Infrastructure Management</span>
+                    <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
+                </div>
             </div>
         </div>
 

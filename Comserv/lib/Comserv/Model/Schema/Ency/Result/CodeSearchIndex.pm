@@ -50,27 +50,6 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['file_path']);
 
-eval {
-    __PACKAGE__->add_index(['content_hash']);
-};
-if ($@) {
-    warn "[CodeSearchIndex] Could not add index on content_hash: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['file_type']);
-};
-if ($@) {
-    warn "[CodeSearchIndex] Could not add index on file_type: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['min_role']);
-};
-if ($@) {
-    warn "[CodeSearchIndex] Could not add index on min_role: $@\n";
-}
-
 # Helper methods
 sub get_code_elements {
     my $self = shift;

@@ -87,6 +87,8 @@ All agents execute /updateprompt automatically at prompt start via workflow auto
 
 **Purpose**: Archive completed session when `current_session.md` exceeds 400 lines OR major task completed. Prepare for next session/working day.
 
+**🔴 MANDATORY ENFORCEMENT**: `/sessionhandoff` MUST use `current_session_template.md` as the format source for resetting `current_session.md`. All agents must enforce this template usage without exception. See Step 3 below for template application rules.
+
 **When to Use**:
 - When `current_session.md` approaches 400 lines
 - When major task completed (NOT time-based, NOT daily)
@@ -105,41 +107,51 @@ All agents execute /updateprompt automatically at prompt start via workflow auto
    - Use CURRENT timestamp and date (e.g., `2025-12-07_14-59-04_session_archive.md`)
    - **CRITICAL**: Full timestamp prevents data loss on multiple sessions/day
 
-3. **Reset current_session.md**: Use WriteFile to completely rewrite `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/session_history/current_session.md` with proper structure:
+3. **Reset current_session.md Using Template**: Use WriteFile to completely rewrite `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/session_history/current_session.md` using `current_session_template.md` as the format base:
 
-   **Header Section**:
-   - Session started timestamp (current date/time)
-   - Chat Counter reset: "Chat 1 onwards (new session)" OR continue numbering based on history
-   
-   **CRITICAL HANDOFF TRIGGERS Section** (unchanged):
-   - List of automatic handoff conditions
-   - Types of handoff (/chathandoff vs /sessionhandoff)
-   
-   **Session Progress Tracking Section**:
-   - Only heading: "No active chats yet - Session ready for Chat [N] onwards"
-   
-   **Previous Session Archive Section** (MOST IMPORTANT):
+   **MANDATORY TEMPLATE SOURCE**: 
+   - Read: `/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/session_history/current_session_template.md`
+   - Use EXACT structure from template lines 1-132 (Session Focus through New Session Instructions)
+   - Replace ALL placeholder fields: `[NEW SESSION FOCUS]`, `[AI_ASSISTANT_NAME]`, `[START_DATE]`, `[CURRENT_DATE]`, `[TIMESTAMP]`, `[CHAT_NUMBER]`, `[PREVIOUS_SESSION_STATUS]`, `[PRIMARY_SESSION_OBJECTIVE]`
+   - **ENFORCE**: All placeholders must be replaced with actual values (no placeholders in final file)
+
+   **Sections MUST Include** (in this order):
+   1. Header with Session Focus, AI Assistant, Session Start, Current Chat Start, System Date, Current Chat Number
+   2. ⚠️ CRITICAL HANDOFF TRIGGERS section (from template lines 12-26)
+   3. Session Progress Tracking section (from template lines 29-49)
+   4. New Session Instructions section (from template lines 52-60)
+   5. "Detailed Chat History (Latest First)" heading (from template line 63)
+   6. Previous Session Archive table showing all archived sessions with links
+   7. Usage Instructions section
+
+   **Previous Session Archive Section** (MOST IMPORTANT - NEW SESSIONS):
    - Create TABLE with columns: Archive File | Session Dates | Major Work | Key Accomplishments
    - **ADD NEW ENTRY AT TOP** with:
-     - Link to archived file: `[2025-12-07_14-59-04_session_archive.md](./2025-12-07_14-59-04_session_archive.md)`
-     - Chat numbers: "Chat 22" or "Chats 20-21"
-     - One-line summary of work: "Priority 4: Consolidation"
+     - Link to archived file: `[TIMESTAMP_session_archive.md](./TIMESTAMP_session_archive.md)`
+     - Chat numbers: "Chat N" or "Chats N-M"
+     - One-line summary of work from previous session
      - Bullet points of key accomplishments (2-3 items max)
    - **PRESERVE ALL EXISTING ENTRIES**: Never delete previous archive entries
    - This allows developers/AI to see historical context by opening current_session.md
-
-   **Usage Instructions** (add to help users navigate archives):
-   - "When opening this file, check archives to understand related work"
-   - "Use archive list to find relevant historical context"
-   - "Reference previous work to avoid duplication"
 
 4. **Reset Counter**: Execute `perl archive_session_resources.pl` to reset `.prompt_counter` to 0
 
 **Do NOT Use**: 
 - Do NOT use with `/chathandoff` in same prompt (session archive makes chat handoff redundant)
 - Do NOT use mid-session if file is <400 lines and task not complete
+- ❌ Do NOT reset current_session.md without using `current_session_template.md` as format source
+- ❌ Do NOT skip template placeholder replacement (all placeholders MUST be replaced with actual values)
+- ❌ Do NOT omit any required sections from template
 
-**Note**: Use WriteFile (not EditFile) for step 3 - complete file restructure, not incremental edit
+**Enforcement Rules** (Non-Negotiable):
+- ✅ ALWAYS read `current_session_template.md` BEFORE resetting current_session.md
+- ✅ ALWAYS use template structure as the format base
+- ✅ ALWAYS replace ALL placeholders with actual values
+- ✅ ALWAYS include ALL 7 required sections (Header, CRITICAL HANDOFF TRIGGERS, Session Progress Tracking, New Session Instructions, Detailed Chat History, Previous Session Archive, Usage Instructions)
+- ✅ ALWAYS preserve existing archive entries (never delete)
+- ❌ VIOLATION: If current_session.md reset without template usage, agent must immediately re-execute /sessionhandoff correctly and log violation to prompts_log.yaml
+
+**Note**: Use WriteFile (not EditFile) for step 3 - complete file restructure, not incremental edit. Read template first, then write new file using template as guide.
 
 **Resource Note**: Session Handoff is extremely resource-intensive (significant file processing). Developers should chat handoff before executing this function to prevent session exhaustion.
 

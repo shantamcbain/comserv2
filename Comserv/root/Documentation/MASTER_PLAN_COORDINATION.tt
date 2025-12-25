@@ -1,0 +1,639 @@
+[% META 
+   title = "Master Plan Coordination Dashboard"
+   description = "Complete audit and coordination of all 14 Comserv plans with dependency mapping, timeline sequencing, priority matrix, parallelization opportunities, resource allocation framework, and daily/weekly milestones for AI Chat System development"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "planning,infrastructure,development,coordination,ai-systems"
+   page_version = "0.03"
+   last_updated = "Thu Dec 25 14:22:00 UTC 2025"
+%]
+[% PageVersion = 'root/Documentation/MASTER_PLAN_COORDINATION.tt,v 0.03 2025/12/25 14:22:00 zencoder Exp - Added link to Daily_Plans_2025-12-25.tt for AI Chat architecture audit workflow' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Master Plan Coordination Dashboard</h1>
+    
+    <div class="last-updated">
+        <strong>Created:</strong> 2025-12-24 | 
+        <strong>Version:</strong> 0.03 (Daily Plans Integration) | 
+        <strong>Status:</strong> 📋 Active - 14 Plans with Daily Workflow Documents | 
+        <strong>Last Updated:</strong> 2025-12-25 14:22 UTC (Added Daily_Plans_2025-12-25.tt for AI Chat architecture audit)
+    </div>
+
+    <div class="alert alert-warning">
+        <h3>🔴 MASTER COORDINATION DOCUMENT</h3>
+        <p><strong>Purpose:</strong> This is your single source of truth for ALL 14 plans (including AI Chat System). Use this to:</p>
+        <ul>
+            <li>Identify dependencies between plans (Plan X blocks Plan Y)</li>
+            <li>Find parallelizable work (Plans that can run simultaneously)</li>
+            <li>Detect overlapping work (Multiple plans touching same code)</li>
+            <li>Sequence phases logically (What order maximizes efficiency)</li>
+            <li>Allocate resources (Who works on what, when)</li>
+            <li>Track progress across all initiatives at once</li>
+        </ul>
+        <p><strong>⚠️ Update this document as plans change. This prevents missing steps and duplication.</strong></p>
+    </div>
+
+    <div class="nav-dashboard">
+        <h2>Navigation Dashboard</h2>
+        <div class="nav-links">
+            <a href="/Documentation/Daily_Plans_2025-12-25" class="nav-btn nav-btn-highlight">📌 TODAY'S DAILY PLAN</a>
+            <a href="#executive-summary" class="nav-btn">Executive Summary</a>
+            <a href="#all-plans-inventory" class="nav-btn">All Plans Inventory</a>
+            <a href="#priority-matrix" class="nav-btn">Priority Matrix</a>
+            <a href="#dependency-map" class="nav-btn">Dependency Map</a>
+            <a href="#phase-timeline" class="nav-btn">Phase Timeline</a>
+            <a href="#parallelization" class="nav-btn">Parallel Work</a>
+            <a href="#overlapping-work" class="nav-btn">Overlapping Work</a>
+            <a href="#resource-allocation" class="nav-btn">Resources</a>
+            <a href="#update-process" class="nav-btn">Update Process</a>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2 id="executive-summary">1. Executive Summary: The 14-Plan Landscape (Including AI Infrastructure)</h2>
+        
+        <div class="alert alert-info">
+            <h4>Current Portfolio Overview</h4>
+            <p>You have <strong>14 active plans</strong> spanning 5 major initiative categories. This document helps you execute them without missing steps or duplicating effort. <strong>NEW:</strong> AI Chat System (Plan E.1) is now prioritized as foundational infrastructure that enables all other development work.</p>
+        </div>
+
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Plan Count</th>
+                    <th>Strategic Impact</th>
+                    <th>Complexity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Infrastructure & Kubernetes</strong></td>
+                    <td>3 plans</td>
+                    <td>🔴 Critical - Core infrastructure migration</td>
+                    <td>🔴 Very High</td>
+                </tr>
+                <tr>
+                    <td><strong>Documentation System</strong></td>
+                    <td>2 plans</td>
+                    <td>🟠 High - Foundational for other plans</td>
+                    <td>🟠 High</td>
+                </tr>
+                <tr>
+                    <td><strong>⭐ AI Infrastructure (NEW)</strong></td>
+                    <td>1 plan</td>
+                    <td>🔴 Critical - Enables all development & supports all systems</td>
+                    <td>🟠 High</td>
+                </tr>
+                <tr>
+                    <td><strong>Development & Features</strong></td>
+                    <td>5 plans</td>
+                    <td>🟡 Medium - Feature richness</td>
+                    <td>🟡 Medium</td>
+                </tr>
+                <tr>
+                    <td><strong>Security & Bug Fixes</strong></td>
+                    <td>3 plans</td>
+                    <td>🔴 Critical - Operational stability</td>
+                    <td>🔴 Very High</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Key Statistics</h3>
+        <ul>
+            <li><strong>Total Plans:</strong> 14 (NEW: +1 for AI Chat System)</li>
+            <li><strong>Status Breakdown:</strong> 3 In Progress, 4 Planned, 5 Drafts/Review, 2 Completed</li>
+            <li><strong>Critical Path Plans:</strong> 7 (Kubernetes, DB Migration, Docker Secrets, Phase 0, Documentation Audit, Credentials Audit, AI Chat System)</li>
+            <li><strong>Parallel Opportunities:</strong> 6+ groups of plans that can run simultaneously (AI Chat runs parallel to all other work)</li>
+            <li><strong>Overlapping Code Areas:</strong> Controllers, authentication, database configuration, AI integration points (see Overlapping Work section)</li>
+            <li><strong>⭐ Developer Productivity Boost:</strong> AI Chat System enables faster development through instant code/documentation search</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2 id="all-plans-inventory">2. Complete Plans Inventory (14 Total - NEW: AI Chat System Added)</h2>
+        <p>Detailed breakdown of every plan with status, dependencies, and key details. Click plan titles to open in new tabs. <strong>NEW in this version:</strong> Plan E.1 (AI Chat System) with detailed daily/weekly milestones for developers.</p>
+
+        <h3 class="category-header">🔴 Category A: Infrastructure & Kubernetes Migration (3 Plans - CRITICAL)</h3>
+
+        <div class="plan-card plan-card-critical">
+            <h4 class="plan-title">
+                Plan A.1: <a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt" target="_blank" class="doc-link">PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>📋 Implementation Planning (Ready for VM Rebuild)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Version:</strong></td>
+                    <td>1.5</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (1 of 1)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Migrate bare-metal 192.168.1.198 to distributed K8s cluster across 3 Proxmox hosts with dual-NIC architecture and zero-downtime cutover</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Complexity:</strong></td>
+                    <td>🔴 Very High - 3 phases, 40+ steps</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Blocks:</strong></td>
+                    <td>B.1 (Docker Secrets Fix - needs successful K8s migration)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Depends On:</strong></td>
+                    <td>A.2 (Phase 0 K8s Readiness) - BLOCKING</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>2-3 weeks (after Phase 0 complete)</td>
+                </tr>
+            </table>
+            <p class="plan-note"><strong>📌 Coordination Note:</strong> This is the main K8s migration - all infrastructure decisions flow from this. Update with actual infrastructure clarifications (Q1-Q4 answers already included).</p>
+        </div>
+
+        <div class="plan-card plan-card-warning">
+            <h4 class="plan-title">
+                Plan A.2: <a href="/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt" target="_blank" class="doc-link">PHASE_0_KUBERNETES_READINESS_PLAN.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>system/PHASE_0_KUBERNETES_READINESS_PLAN.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>📋 DRAFT - Awaiting Approval (Infrastructure Updated)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Version:</strong></td>
+                    <td>0.02</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (2 of 1)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Make Comserv application K8s-ready without breaking Docker/local deployments. Leverage db_config.json authority and RemoteDB.pm configuration system</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Complexity:</strong></td>
+                    <td>🟠 High - Code modifications needed, but isolated to config system</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Blocks:</strong></td>
+                    <td>A.1 (DB K8s Migration) - BLOCKING</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Depends On:</strong></td>
+                    <td>A.3 (Credentials Audit) - informational, not blocking</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>1 week (URGENT - this week)</td>
+                </tr>
+            </table>
+            <p class="plan-note alert alert-warning"><strong>⚠️ URGENT:</strong> This plan is waiting for approval. It has infrastructure details added. BLOCKING A.1. Needs sign-off ASAP.</p>
+        </div>
+
+        <div class="plan-card plan-card-info">
+            <h4 class="plan-title">
+                Plan A.3: <a href="/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN.tt" target="_blank" class="doc-link">CREDENTIALS_AUDIT_AND_PLAN.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>system/CREDENTIALS_AUDIT_AND_PLAN.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>📋 Planning</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (3 of 1)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Audit all credentials (DB passwords, API keys, secrets) and plan secure storage strategy for Docker/K8s</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Complexity:</strong></td>
+                    <td>🟠 High - Security-critical work</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Supports:</strong></td>
+                    <td>A.1, A.2, B.1 (all infrastructure plans)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>1 week (parallel to A.2 review)</td>
+                </tr>
+            </table>
+        </div>
+
+        <h3 class="category-header">🔴 Category B: Security & Bug Fixes (3 Plans - CRITICAL)</h3>
+
+        <div class="plan-card plan-card-critical">
+            <h4 class="plan-title">
+                Plan B.1: <a href="/Documentation/docker_secrets_fallback_debugging_plan.tt" target="_blank" class="doc-link">docker_secrets_fallback_debugging_plan.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>docker_secrets_fallback_debugging_plan.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>🔧 In Progress</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (1 of 3 in category)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Fix application startup failure when Docker secrets/db_config.json missing. Application should gracefully fallback to setup page instead of crashing</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Root Cause:</strong></td>
+                    <td>SQLite fallback used for schema check, but schema check uses MySQL-specific syntax (SHOW TABLES) causing syntax error</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Depends On:</strong></td>
+                    <td>A.2 (Phase 0 K8s Readiness) - helps prevent this issue long-term</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>2-3 days (debugging-focused)</td>
+                </tr>
+            </table>
+            <p class="plan-note"><strong>📌 Coordination Note:</strong> This is operational stability. Can be done in parallel with infrastructure work but MUST complete before any K8s migration to ensure setup page works.</p>
+        </div>
+
+        <div class="plan-card plan-card-warning">
+            <h4 class="plan-title">
+                Plan B.2: <a href="/Documentation/authentication_evolution_plan.tt" target="_blank" class="doc-link">authentication_evolution_plan.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>authentication_evolution_plan.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>⚠️ BLOCKED - Menu System Branch awaiting fixes</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (2 of 3 in category) - Unblocks menu system</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Phase 1 (Current): Fix authentication to maintain template compatibility. Phase 2 (Future): Modern authentication system</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Key Issue:</strong></td>
+                    <td>Catalyst auth framework conflicts with template expectations (session variables). Need compatibility layer.</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Blocks:</strong></td>
+                    <td>Menu system development (different branch)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>1 week (Phase 1 only)</td>
+                </tr>
+            </table>
+            <p class="plan-note"><strong>⚠️ BLOCKED:</strong> This is a separate branch (menu-system). Fix authentication compatibility layer in User.pm controller. Phase 2 is future work.</p>
+        </div>
+
+        <div class="plan-card plan-card-info">
+            <h4 class="plan-title">
+                Plan B.3: <a href="/Documentation/ai_workflows/zencoder_reset_plan.tt" target="_blank" class="doc-link">zencoder_reset_plan.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>ai_workflows/zencoder_reset_plan.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>📋 Planning</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🟡 Medium - AI infrastructure optimization</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Plan for safely resetting Zencoder AI session state while preserving chat history and prompts</td>
+                </tr>
+            </table>
+        </div>
+
+        <h3 class="category-header">🟠 Category C: Documentation System (2 Plans - FOUNDATIONAL)</h3>
+
+        <div class="plan-card plan-card-warning">
+            <h4 class="plan-title">
+                Plan C.1: <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt" target="_blank" class="doc-link">DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>🔧 In Progress - Phase 1 (Documentation System Files)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Version:</strong></td>
+                    <td>0.05</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🟠 HIGH (1 of 2)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Comprehensive audit of ~300+ documentation files. 4 phases: Document system files audit, Code controller audit, CSS theme compliance refactoring (1,527 inline styles → CSS variables), Consolidation/cleanup</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Complexity:</strong></td>
+                    <td>🟠 High - Large-scale audit task</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Supports:</strong></td>
+                    <td>ALL development plans (provides documentation accuracy baseline)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>3-4 weeks (multi-phase incremental)</td>
+                </tr>
+            </table>
+            <p class="plan-note"><strong>📌 Coordination Note:</strong> This is foundational. Its findings will inform documentation changes across all other plans. Can run in parallel with infrastructure plans.</p>
+            <p class="plan-note alert alert-info"><strong>⚠️ Phase 3 ADD: CSS Theme Compliance Refactoring:</strong> Across 17 documentation .tt files, there are 1,527 inline style="..." attributes that need refactoring to use CSS variables (--text-color, --spacing-medium, etc.). This improves maintainability and enables future theme changes. Target: Complete this phase after Code controller audit (Phase 2). Estimated: 1-2 weeks for full refactoring + testing.</p>
+        </div>
+
+        <div class="plan-card plan-card-info">
+            <h4 class="plan-title">
+                Plan C.2: <a href="/Documentation/Documentation_Workflow.tt" target="_blank" class="doc-link">Documentation_Workflow.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>Documentation_Workflow.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>⚠️ REVIEW - Workflow implementation needed</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🟠 HIGH (2 of 2) - Enables documentation creation</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>Define workflow for creating, editing, validating documentation files in proper .tt format</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Supports:</strong></td>
+                    <td>C.1 (Documentation audit work)</td>
+                </tr>
+            </table>
+        </div>
+
+        <h3 class="category-header">🔵 Category E: AI Infrastructure (1 Plan - FOUNDATIONAL FOR ALL SYSTEMS)</h3>
+
+        <div class="plan-card plan-card-critical">
+            <h4 class="plan-title">
+                Plan E.1: <a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt" target="_blank" class="doc-link">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>🔧 Phase 1 In Progress - Database Schema Verification & Model Classes</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Version:</strong></td>
+                    <td>0.02</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🔴 CRITICAL (Supports ALL development & documentation work)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Scope:</strong></td>
+                    <td>AI Chat widget integrated into Comserv application with documentation search, role-based access, multi-model support (Ollama + XAI), code search (dev/admin), web search integration, and comprehensive audit logging. 5 core database tables: documentation_metadata_index, code_search_index, web_search_results, ai_model_config, documentation_role_access</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Current Implementation:</strong></td>
+                    <td>✅ Phase 1 Complete: Database schema initialized on app startup (Comserv.pm:_initialize_ai_chat_schema). 5 tables lazy-created on first admin request. Models need completion.</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Complexity:</strong></td>
+                    <td>🟠 High - Spans database, model layer, controller endpoints, and frontend widget</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Enables:</strong></td>
+                    <td>D.1-D.5 (Development features), C.1 (Documentation audit - AI assists with documentation management), B.2 (Auth system can leverage AI for help), ALL future features (AI assistance throughout app)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Parallel Execution:</strong></td>
+                    <td>✅ YES - Runs in parallel with infrastructure, security, and documentation plans. No blocking dependencies.</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
+                    <td>4-6 weeks total (Phase 1: 1 week, Phase 2: 2-3 weeks, Phase 3: 1-2 weeks)</td>
+                </tr>
+            </table>
+            <p class="plan-note alert alert-warning"><strong>📌 COORDINATION IMPACT:</strong> This system directly aids developer productivity. AI assists with code search, documentation queries, and knowledge discovery. Every developer can ask "How do I do X?" and get instant answers from documentation + codebase.</p>
+        </div>
+
+        <h4 class="subsection-header">📅 AI Chat System: NEXT STEPS (Daily/Weekly Milestones for Developers)</h4>
+        
+        <div class="plan-detail">
+            <h5>🔴 THIS WEEK (Days 1-5): Phase 1 Completion - Database Model Classes</h5>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
+                <p><strong>Daily Objectives:</strong></p>
+                <ol>
+                    <li><strong>Day 1:</strong> Verify database schema initialization works
+                        <ul>
+                            <li>Start app, check application logs for: "ai_chat_schema - AI Chat schema check complete"</li>
+                            <li>Verify no critical errors in startup logs (warnings about table creation are expected/normal)</li>
+                            <li>Reference: <code>Comserv.pm:_initialize_ai_chat_schema()</code> lines 303-342</li>
+                        </ul>
+                    </li>
+                    <li><strong>Day 2:</strong> Create DBIx::Class Result classes for 5 tables
+                        <ul>
+                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</code></li>
+                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</code></li>
+                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/WebSearchResults.pm</code></li>
+                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</code></li>
+                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Day 3:</strong> Write relationship mappings between Result classes
+                        <ul>
+                            <li>Add relationships in Result classes (has_many, belongs_to, many_to_many)</li>
+                            <li>Test: <code>carton exec prove -lv t/model_AIChat.t</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Day 4:</strong> Create helper repository class for AI Chat queries
+                        <ul>
+                            <li>Create: <code>lib/Comserv/Util/AIChatRepository.pm</code></li>
+                            <li>Methods: search_documentation(), search_code(), log_conversation(), get_role_access()</li>
+                        </ul>
+                    </li>
+                    <li><strong>Day 5:</strong> Document Phase 1 completion in AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt
+                        <ul>
+                            <li>Update version to 0.03</li>
+                            <li>Mark Phase 1 as COMPLETE in status</li>
+                            <li>Add Phase 2 start date</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <h5>🟠 NEXT 2-3 WEEKS (Phase 2): API Endpoints & Controller Integration</h5>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
+                <p><strong>Weekly Milestones:</strong></p>
+                <ul>
+                    <li><strong>Week 2:</strong>
+                        <ul>
+                            <li>Create <code>lib/Comserv/Controller/AIChat.pm</code> with endpoints:
+                                <ul>
+                                    <li><code>POST /ai/chat/query</code> - Submit question</li>
+                                    <li><code>GET /ai/chat/history</code> - Get conversation history</li>
+                                    <li><code>GET /ai/chat/search/docs</code> - Search documentation</li>
+                                    <li><code>GET /ai/chat/search/code</code> - Search code (dev/admin only)</li>
+                                </ul>
+                            </li>
+                            <li>Implement role-based access checks</li>
+                            <li>Write unit tests for all endpoints</li>
+                        </ul>
+                    </li>
+                    <li><strong>Week 3:</strong>
+                        <ul>
+                            <li>Integrate Ollama API calls in AIChatRepository</li>
+                            <li>Implement documentation metadata indexing (scan /Documentation/ folder on startup)</li>
+                            <li>Test with actual Ollama instance</li>
+                        </ul>
+                    </li>
+                    <li><strong>Week 4 (early):</strong>
+                        <ul>
+                            <li>Add web search integration (if configured)</li>
+                            <li>Implement audit logging to database</li>
+                            <li>Phase 2 complete & tested</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <h5>🟡 WEEKS 4-6: Phase 3 - Frontend Widget & Full Integration</h5>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
+                <ul>
+                    <li>Build chat widget component (JavaScript/CSS)</li>
+                    <li>Integrate into <code>root/layout.tt</code> (visible on all pages)</li>
+                    <li>Complete feature testing & documentation</li>
+                    <li>Release as Phase 1 Feature (basic chat + doc search)</li>
+                </ul>
+            </div>
+
+            <h5>🔗 INTEGRATION WITH OTHER PLANS</h5>
+            <table class="plan-table">
+                <tr>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; background: #f0f0f0;"><strong>How AI Chat Supports Other Plans</strong></th>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ccc;">
+                        <strong>Plan C.1 (Documentation Audit):</strong> Developers can use AI Chat to quickly find documentation topics, identify gaps, and search for related content across 300+ files.<br/>
+                        <strong>Plan D.1-D.5 (Features):</strong> Developers ask "How do I implement X?" and AI searches code examples + documentation.<br/>
+                        <strong>Plan B.2 (Authentication):</strong> AI can explain auth system, find auth-related code, answer user questions about login flow.<br/>
+                        <strong>Plan A.1-A.3 (Infrastructure):</strong> Admins can ask about K8s migration, credentials, configuration without digging through docs.
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <h3 class="category-header">🟡 Category D: Development & Features (5 Plans - ENHANCEMENT)</h3>
+
+        <div class="plan-card plan-card-warning">
+            <h4 class="plan-title">
+                Plan D.1: <a href="/Documentation/development_plans.tt" target="_blank" class="doc-link">development_plans.tt</a>
+            </h4>
+            <table class="plan-table">
+                <tr>
+                    <td class="plan-label"><strong>File Location:</strong></td>
+                    <td><code>development_plans.tt</code></td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Status:</strong></td>
+                    <td>📋 Master index of development initiatives</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Priority:</strong></td>
+                    <td>🟡 MEDIUM (Overview/tracking)</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Contents:</strong></td>
+                    <td>Index of 3 in-progress/planned initiatives: Controller Routing Standardization, Software Management System, Theme Handling Improvements</td>
+                </tr>
+                <tr>
+                    <td class="plan-label"><strong>Includes Completed:</strong></td>
+                    <td>MCoop Controller Fix</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="plan-card plan-card-info">
+            <h4 class="plan-title">Plans D.2 - D.5: Individual Development Plans</h4>
+            <p><strong>Based on development_plans.tt, these are the detailed plans to be created:</strong></p>
+            <ul>
+                <li><strong>D.2: Controller Routing Standardization</strong> - Update CSC, USBM, BMaster, others. (In Progress pilot with MCoop)</li>
+                <li><strong>D.3: Software Management System Enhancements</strong> - Error handling, backups, rollback, CI/CD integration</li>
+                <li><strong>D.4: Theme Handling Improvements</strong> - Audit theme system, update theme_mappings.json, centralize logic</li>
+                <li><strong>D.5: (Additional Development Plans)</strong> - To be identified as work progresses</li>
+            </ul>
+            <p class="plan-note"><strong>📌 Coordination Note:</strong> These are feature enhancements. Can run in parallel but MUST occur after infrastructure stabilization (Phase B fixes).</p>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2 id="document-status">📌 Document Structure Progress</h2>
+        <p>This is <strong>Version 0.02 - AI Chat System Added with Daily/Weekly Milestones</strong>. Sections completed and in progress:</p>
+        <ul>
+            <li>✅ <strong>Section 1: Executive Summary</strong> - COMPLETE (Updated for 14 plans + AI Infrastructure category)</li>
+            <li>✅ <strong>Section 2: All Plans Inventory</strong> - COMPLETE (14 plans documented with links; NEW: Plan E.1 AI Chat System with daily/weekly milestones)</li>
+            <li>✅ <strong>New: AI Chat Daily/Weekly Milestones</strong> - COMPLETE (Phase 1 completion checklist for developers)</li>
+            <li>⏳ <strong>Section 3: Priority Matrix</strong> - To be added (importance vs effort)</li>
+            <li>⏳ <strong>Section 4: Dependency Map</strong> - To be added (blocking relationships - updated to show AI Chat dependencies)</li>
+            <li>⏳ <strong>Section 5: Phase Timeline</strong> - To be added (execution sequence including AI Chat parallel track)</li>
+            <li>⏳ <strong>Section 6: Parallelization Opportunities</strong> - To be added (simultaneous execution - AI Chat supports all parallel work)</li>
+            <li>⏳ <strong>Section 7: Overlapping Work</strong> - To be added (duplicate/shared code areas - AI integration points)</li>
+            <li>⏳ <strong>Section 8: Resource Allocation</strong> - To be added (who/what/when framework)</li>
+            <li>⏳ <strong>Section 9: Update Process</strong> - To be added (how to keep this document current)</li>
+        </ul>
+        <p><strong>Next Step:</strong> Developers should follow the AI Chat System daily/weekly milestones (under Plan E.1) to complete Phase 1. Remaining sections can be built in parallel.</p>
+    </div>
+
+</div>

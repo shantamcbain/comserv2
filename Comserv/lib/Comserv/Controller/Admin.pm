@@ -5,6 +5,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::DockerManager;
 use Comserv::Controller::Admin::Git;
 use Data::Dumper;
 use JSON;
@@ -1568,7 +1569,7 @@ sub check_system_requirements {
 }
 
 # Schema Manager action - manage database schema and create AI conversation tables
-sub schema_manager : Chained('admin_check') : PathPart('schema_manager') : Args(0) {
+sub schema_manager : Chained('base') : PathPart('schema_manager') : Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_manager', 
@@ -1741,11 +1742,11 @@ sub db_connections :Chained('base') :PathPart('db-connections') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connections', 
         "Starting database connections management");
     
-    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $host = $ENV{CONFIG_DB_HOST};
     my $port = $ENV{CONFIG_DB_PORT} || 3306;
-    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
-    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
-    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    my $user = $ENV{CONFIG_DB_USER};
+    my $pass = $ENV{CONFIG_DB_PASSWORD};
+    my $db = $ENV{CONFIG_DB_NAME};
     
     my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
     my @connections;
@@ -1787,11 +1788,11 @@ sub db_connection_edit :Chained('base') :PathPart('db-connection-edit') :Args(1)
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_edit', 
         "Starting database connection edit for ID: $id");
     
-    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $host = $ENV{CONFIG_DB_HOST};
     my $port = $ENV{CONFIG_DB_PORT} || 3306;
-    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
-    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
-    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    my $user = $ENV{CONFIG_DB_USER};
+    my $pass = $ENV{CONFIG_DB_PASSWORD};
+    my $db = $ENV{CONFIG_DB_NAME};
     
     my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
     
@@ -1866,11 +1867,11 @@ sub db_connection_delete :Chained('base') :PathPart('db-connection-delete') :Arg
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_connection_delete', 
         "Deleting database connection ID: $id");
     
-    my $host = $ENV{CONFIG_DB_HOST} || 'config-db';
+    my $host = $ENV{CONFIG_DB_HOST};
     my $port = $ENV{CONFIG_DB_PORT} || 3306;
-    my $user = $ENV{CONFIG_DB_USER} || 'comserv_config';
-    my $pass = $ENV{CONFIG_DB_PASSWORD} || 'config_dev_password';
-    my $db = $ENV{CONFIG_DB_NAME} || 'comserv_config';
+    my $user = $ENV{CONFIG_DB_USER};
+    my $pass = $ENV{CONFIG_DB_PASSWORD};
+    my $db = $ENV{CONFIG_DB_NAME};
     
     my $dsn = "DBI:mysql:database=$db;host=$host;port=$port";
     
@@ -1904,6 +1905,213 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
+
+sub docker_containers :Chained('base') :PathPart('docker-containers') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
+        "Starting Docker containers management page");
+    
+    my $docker_manager = Comserv::Util::DockerManager->new();
+    
+    $c->stash(
+        template => 'admin/docker_containers.tt',
+        docker_available => !$docker_manager->in_docker_container,
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
+        "Completed Docker containers management page");
+}
+
+sub docker_status :Chained('base') :PathPart('docker-status') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_status',
+        "Getting status for service: $service");
+    
+    my $docker_manager = Comserv::Util::DockerManager->new();
+    
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            error => 'Cannot manage containers from within a Docker container'
+        }));
+        return;
+    }
+    
+    my $result = $docker_manager->check_container_status($service);
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_status',
+        "Completed status check for service: $service");
+}
+
+sub docker_restart :Chained('base') :PathPart('docker-restart') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
+        "Restarting service: $service");
+    
+    my $docker_manager = Comserv::Util::DockerManager->new();
+    
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            error => 'Cannot restart containers from within a Docker container'
+        }));
+        return;
+    }
+    
+    my $force = $c->request->params->{force} || 0;
+    my @services = $service ? ($service) : ();
+    
+    my $result = $docker_manager->restart_containers(
+        services => \@services,
+        force => $force
+    );
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
+        "Completed restart for service: $service - Success: " . $result->{success});
+}
+
+sub docker_logs :Chained('base') :PathPart('docker-logs') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
+        "Getting logs for service: $service");
+
+    my $docker_manager = Comserv::Util::DockerManager->new();
+
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            output => '',
+            error => 'Cannot get container logs from within a Docker container'
+        }));
+        return;
+    }
+
+    my $lines = $c->request->params->{lines} || 50;
+    my $result = $docker_manager->get_container_logs($service, $lines);
+
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
+        "Completed getting logs for service: $service");
+}
+
+sub docker_list :Chained('base') :PathPart('docker-list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
+        "Listing all Docker containers");
+
+    my $docker_manager = Comserv::Util::DockerManager->new();
+
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            containers => [],
+            error => 'Cannot list containers from within a Docker container'
+        }));
+        return;
+    }
+
+    my $result = $docker_manager->list_containers();
+
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
+        "Completed listing Docker containers - Found: " . scalar(@{$result->{containers}}));
+}
+
+sub docker_start :Chained('base') :PathPart('docker-start') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
+        "Starting service: $service");
+
+    my $docker_manager = Comserv::Util::DockerManager->new();
+
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            error => 'Cannot start containers from within a Docker container'
+        }));
+        return;
+    }
+
+    my $result = $docker_manager->start_container($service);
+
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
+        "Completed starting service: $service - Success: " . $result->{success});
+}
+
+sub docker_stop :Chained('base') :PathPart('docker-stop') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
+        "Stopping service: $service");
+
+    my $docker_manager = Comserv::Util::DockerManager->new();
+
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            error => 'Cannot stop containers from within a Docker container'
+        }));
+        return;
+    }
+
+    my $result = $docker_manager->stop_container($service);
+
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
+        "Completed stopping service: $service - Success: " . $result->{success});
+}
+
+sub docker_up :Chained('base') :PathPart('docker-up') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
+        "Creating and starting service: $service");
+
+    my $docker_manager = Comserv::Util::DockerManager->new();
+
+    if ($docker_manager->in_docker_container) {
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(JSON->new->pretty->encode({
+            success => 0,
+            error => 'Cannot create containers from within a Docker container'
+        }));
+        return;
+    }
+
+    my $result = $docker_manager->up_container($service);
+
+    $c->response->content_type('application/json; charset=utf-8');
+    $c->response->body(JSON->new->pretty->encode($result));
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
+        "Completed creating/starting service: $service - Success: " . $result->{success});
+}
 
 __PACKAGE__->meta->make_immutable;
 

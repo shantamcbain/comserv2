@@ -1,10 +1,22 @@
-[% PageVersion = 'Documentation/AIAssistants.tt,v 1.1 2025/04/24 shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/AIAssistants.tt,v 1.2 2025/12/06 shanta Exp shanta (DEPRECATED)' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
+<div class="alert-box" style="border: 2px solid #d9534f; background-color: #f2dede; padding: 15px; margin-bottom: 20px;">
+    <h2 style="color: #d9534f;">⚠️ DEPRECATED - See comserv-ai-guidelines-consolidated.yaml</h2>
+    <p><strong>This file is DEPRECATED as of 2025-12-06.</strong></p>
+    <p>All AI guidelines have been consolidated into a single authoritative source:</p>
+    <ul>
+        <li><strong>New Location</strong>: <code>/Comserv/root/comserv-ai-guidelines-consolidated.yaml</code></li>
+        <li><strong>Status</strong>: ACTIVE - Primary reference for all AI assistants</li>
+        <li><strong>Deprecation Period</strong>: This file will be kept for reference until 2025-12-20, then archived to <code>/Documentation/session_history/</code></li>
+    </ul>
+    <p>Please update your references to use the consolidated YAML file instead.</p>
+</div>
+
 <div class="warning-box">
-    <h2>⚠️ IMPORTANT: File Modification Guidelines</h2>
+    <h2>⚠️ IMPORTANT: File Modification Guidelines (ARCHIVED - See deprecation notice above)</h2>
     <p><strong>WARNING TO ALL AI ASSISTANTS</strong>: Never replace or modify existing files without explicit permission from the user. Always ask for confirmation before making changes to the codebase.</p>
 </div>
 

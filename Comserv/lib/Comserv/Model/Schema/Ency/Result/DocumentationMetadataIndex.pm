@@ -58,20 +58,6 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['file_path']);
 
-eval {
-    __PACKAGE__->add_index(['content_hash']);
-};
-if ($@) {
-    warn "[DocumentationMetadataIndex] Could not add index on content_hash: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['file_type']);
-};
-if ($@) {
-    warn "[DocumentationMetadataIndex] Could not add index on file_type: $@\n";
-}
-
 # Relationships to AI messages that cited this doc
 __PACKAGE__->has_many(
     'ai_citations' => 'Comserv::Model::Schema::Ency::Result::AiMessage',

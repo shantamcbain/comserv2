@@ -5,22 +5,21 @@ ARG BASE_IMAGE=perl:5.40.0
 
 FROM ${BASE_IMAGE} as builder
 
-# Install system dependencies for building and running Comserv
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl git wget pkg-config mariadb-client libmariadb-dev \
-    libssl-dev libexpat-dev zlib1g-dev libjson-c-dev \
-    libxml2-dev locales ca-certificates \
-    libc-dev libgdbm-dev libbz2-dev libdb-dev \
-    perl-doc cpanplus && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies for building Comserv (Debian 12 compatible)
+RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
+    (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
+    apt-get install -y --no-install-recommends \
+      build-essential curl git wget pkg-config default-mysql-client libmariadb-dev \
+      libssl-dev libexpat-dev zlib1g-dev libxml2-dev locales ca-certificates \
+      libc6-dev libgdbm-dev libbz2-dev libdb-dev && \
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Set locale
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # Install cpanm
 RUN curl -L https://cpanmin.us | perl - App::cpanminus
-
 # Create application directory
 WORKDIR /opt/comserv
 ENV PERL_LOCAL_LIB_ROOT=/opt/comserv/local
@@ -36,7 +35,11 @@ RUN mkdir -p /opt/comserv/local/lib/perl5
 # Install CPAN dependencies
 # Note: Do NOT force-rebuild YAML::XS as it causes binary incompatibility with Perl 5.40.0
 # Application uses YAML::Tiny for all YAML operations
-RUN cpanm --local-lib=/opt/comserv/local --notest --installdeps .
+# Use multiple mirrors for better dependency resolution
+RUN cpanm --local-lib=/opt/comserv/local --notest \
+    --mirror https://cpan.metacpan.org \
+    --mirror https://www.cpan.org \
+    --installdeps .
 
 # Verify critical modules
 RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Core modules loaded\n"'
@@ -45,9 +48,12 @@ RUN perl -e 'use Catalyst; use DBIx::Class; use Template; use Starman; print "Co
 # Stage 2: Runtime image
 FROM ${BASE_IMAGE}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash mariadb-client libmariadb3 libssl3 libxml2 curl locales \
-    ca-certificates supervisor && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
+    (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
+    apt-get install -y --no-install-recommends \
+      bash default-mysql-client libmariadb3 libssl3 libxml2 curl locales \
+      ca-certificates supervisor && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
@@ -93,7 +99,7 @@ RUN chmod +x /opt/comserv/create-supervisor-config.sh && \
 # Health check - will check dynamic port using /health endpoint
 # /health endpoint bypasses database queries and returns immediately
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD PORT=${WEB_PORT:-3000} && curl -f http://localhost:$PORT/health || exit 1
+    CMD curl -f http://localhost:${WEB_PORT:-3000}/health || exit 1
 
 EXPOSE 3000 5000
 
