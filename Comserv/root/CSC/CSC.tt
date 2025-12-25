@@ -1,6 +1,6 @@
 [% META title = 'Computer Systems Consulting' %]
 [% PageVersion = 'CSC/CSC.tt,v 0.03 2025/04/29 shanta Exp shanta ' %]
-[% debug %]
+[% IF debug %][% debug %][% END %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
     [% "Debugging HostName: " _ HostName %]

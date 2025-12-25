@@ -71,34 +71,6 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 
-eval {
-    __PACKAGE__->add_index(['query']);
-};
-if ($@) {
-    warn "[WebSearchResult] Could not add index on query: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['is_verified']);
-};
-if ($@) {
-    warn "[WebSearchResult] Could not add index on is_verified: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['created_at']);
-};
-if ($@) {
-    warn "[WebSearchResult] Could not add index on created_at: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['found_by_user_id']);
-};
-if ($@) {
-    warn "[WebSearchResult] Could not add index on found_by_user_id: $@\n";
-}
-
 # Relationships
 __PACKAGE__->belongs_to(
     'found_by_user' => 'Comserv::Model::Schema::Ency::Result::User',

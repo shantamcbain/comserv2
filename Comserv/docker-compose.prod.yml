@@ -1,5 +1,3 @@
-
-
 services:
   web-prod:
     build:
@@ -7,32 +5,42 @@ services:
       dockerfile: Dockerfile
     container_name: comserv-web-prod
     restart: always
+    labels:
+      - "description=Production web server with Starman workers and monitoring"
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
       WEB_PORT: 5000
       TZ: UTC
-      # Production database configuration - Uses db_config.json priority system
-      DB_HOST: ${DB_HOST_PROD:-192.168.1.198}
-      DB_PORT: ${DB_PORT_PROD:-3306}
-      DB_NAME: ${DB_NAME_PROD:-ency}
-      DB_USER: ${DB_USER_PROD:-shanta_forager}
-      DB_PASS: ${DB_PASS_PROD:-UA=nPF8*m+T#}
-      # Production features
       ENABLE_MONITORING: 1
       ENABLE_LOGGING: 1
+      COMSERV_DB_PRODUCTION_SERVER_HOST: "${COMSERV_DB_PRODUCTION_SERVER_HOST:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_HOST environment variable}"
+      COMSERV_DB_PRODUCTION_SERVER_PORT: "${COMSERV_DB_PRODUCTION_SERVER_PORT:-3306}"
+      COMSERV_DB_PRODUCTION_SERVER_USERNAME: "${COMSERV_DB_PRODUCTION_SERVER_USERNAME:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_USERNAME environment variable}"
+      COMSERV_DB_PRODUCTION_SERVER_PASSWORD: "${COMSERV_DB_PRODUCTION_SERVER_PASSWORD:?REQUIRED: Set COMSERV_DB_PRODUCTION_SERVER_PASSWORD environment variable (use K8s Secret or secure env source)}"
+      COMSERV_DB_PRODUCTION_SERVER_DATABASE: "${COMSERV_DB_PRODUCTION_SERVER_DATABASE:-ency}"
+      COMSERV_DB_PRODUCTION_FORAGER_HOST: "${COMSERV_DB_PRODUCTION_FORAGER_HOST:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_HOST environment variable}"
+      COMSERV_DB_PRODUCTION_FORAGER_PORT: "${COMSERV_DB_PRODUCTION_FORAGER_PORT:-3306}"
+      COMSERV_DB_PRODUCTION_FORAGER_USERNAME: "${COMSERV_DB_PRODUCTION_FORAGER_USERNAME:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_USERNAME environment variable}"
+      COMSERV_DB_PRODUCTION_FORAGER_PASSWORD: "${COMSERV_DB_PRODUCTION_FORAGER_PASSWORD:?REQUIRED: Set COMSERV_DB_PRODUCTION_FORAGER_PASSWORD environment variable (use K8s Secret or secure env source)}"
+      COMSERV_DB_PRODUCTION_FORAGER_DATABASE: "${COMSERV_DB_PRODUCTION_FORAGER_DATABASE:-shanta_forager}"
     ports:
       - "5000:5000"
+    networks:
+      comserv-prod-network:
+        ipv4_address: 172.22.0.2
     volumes:
       # Code is read-only in production
       - ./lib:/opt/comserv/lib:ro
       - ./script:/opt/comserv/script:ro
-      - ./root:/opt/comserv/root:ro
+      - ./root/static:/opt/comserv/root/static:ro
+      - ./root/Documentation:/opt/comserv/root/Documentation:ro
       - ./config:/opt/comserv/config:ro
       - ./t:/opt/comserv/t:ro
-      # Config (read-only)
-      - ./db_config.json:/opt/comserv/db_config.json:ro
-      # Persistent volumes for critical data
+      # Note: db_config.json NOT mounted in production
+      # Use K8s Secrets mounted to /var/run/secrets/comserv/dbi/ instead
+      # Or provide all configuration via environment variables (COMSERV_DB_*)
+      # Persistent volumes for critical data (NOT nested inside bind mounts)
       - comserv-prod-logs:/opt/comserv/root/log
       - comserv-prod-sessions:/opt/comserv/root/session
       - comserv-prod-backups:/opt/comserv/backups
@@ -42,8 +50,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    networks:
-      - comserv-network
+
     logging:
       driver: "json-file"
       options:
@@ -58,47 +65,27 @@ services:
         reservations:
           cpus: '2'
           memory: 2G
-    # Extra hosts for multi-server setup (if needed)
-    extra_hosts:
-      - "db-prod.example.com:${DB_HOST_PROD_IP}"
 
   # Optional: Nginx reverse proxy for production
-  nginx:
-    image: nginx:alpine
-    container_name: comserv-nginx-prod
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - web-prod
-    networks:
-      - comserv-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "5"
-
-  # Optional: config-db service for dynamic DB connections (used by Phase 4+)
-  config-db:
-    image: mysql:8.0
-    container_name: comserv-config-db
-    environment:
-      MYSQL_ROOT_PASSWORD: root_config_dev
-      MYSQL_DATABASE: comserv_config
-      MYSQL_USER: comserv_config
-      MYSQL_PASSWORD: config_dev_password
-    ports:
-      - "3307:3306"
-    volumes:
-      - comserv-config-db-data:/var/lib/mysql
-    networks:
-      - comserv-network
-    restart: unless-stopped
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: comserv-nginx-prod
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - web-prod
+  #   networks:
+  #     - comserv-bridge
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "20m"
+  #       max-file: "5"
 
 volumes:
   comserv-prod-logs:
@@ -108,10 +95,12 @@ volumes:
   comserv-prod-backups:
     driver: local
 
-  # Data volume for config-db
-  comserv-config-db-data:
-    driver: local
-
 networks:
-  comserv-network:
+  comserv-prod-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-comserv-prod
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1

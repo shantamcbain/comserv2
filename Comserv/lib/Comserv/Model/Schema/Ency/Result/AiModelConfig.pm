@@ -79,42 +79,6 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-
-eval {
-    __PACKAGE__->add_index(['role']);
-};
-if ($@) {
-    warn "[AiModelConfig] Could not add index on role: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['agent_type']);
-};
-if ($@) {
-    warn "[AiModelConfig] Could not add index on agent_type: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['model_name']);
-};
-if ($@) {
-    warn "[AiModelConfig] Could not add index on model_name: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['enabled']);
-};
-if ($@) {
-    warn "[AiModelConfig] Could not add index on enabled: $@\n";
-}
-
-eval {
-    __PACKAGE__->add_index(['priority']);
-};
-if ($@) {
-    warn "[AiModelConfig] Could not add index on priority: $@\n";
-}
-
 __PACKAGE__->add_unique_constraint(['role', 'agent_type', 'model_name']);
 
 # Helper methods

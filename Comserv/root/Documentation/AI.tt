@@ -1,16 +1,55 @@
-[% PageVersion = 'Documentation/AI.tt,v 0.01 2024/11/28 Shanta Exp shanta ' %]
+[% PageVersion = 'Documentation/AI.tt,v 0.02 2025/12/07 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>AI Integration Plan</h1>
-<p>This document outlines the integration of AI features into the Comserv application, focusing on enhancing user interactions and data management.</p>
+<h1>AI Integration and Ollama Server Management</h1>
+<p>This document outlines the integration of AI features into the Comserv application, including Ollama server management, auto-startup capabilities, and API endpoints.</p>
+
+<h2>Ollama Server Management</h2>
+
+<h3>Start Server Endpoint</h3>
+<p><code>/ai/start_server</code> - Starts the Ollama server when it is not running.</p>
+<ul>
+    <li><strong>Method:</strong> POST</li>
+    <li><strong>Required Permissions:</strong> admin, developer, or editor roles</li>
+    <li><strong>Parameters:</strong>
+        <ul>
+            <li><code>startup_method</code> (optional): Method to start the server. Default is <code>command</code> (direct execution). Currently supported: <code>command</code></li>
+        </ul>
+    </li>
+    <li><strong>Response:</strong> JSON object with status, message, and timestamp</li>
+</ul>
+
+<h3>Auto-Startup on Query Failure</h3>
+<p>When a query is sent to the <code>/ai/generate</code> endpoint and the Ollama server is not running on localhost:</p>
+<ul>
+    <li>The system automatically attempts to start the server using the configured startup method</li>
+    <li>After successful startup, the query is automatically retried</li>
+    <li>This behavior only applies to localhost connections (remote servers must be manually started)</li>
+    <li>If startup fails, an error message is returned to the user</li>
+</ul>
+
+<h2>Generate Endpoint</h2>
+<p><code>/ai/generate</code> - Sends a prompt to the Ollama AI model for processing.</p>
+<ul>
+    <li><strong>Method:</strong> POST</li>
+    <li><strong>Parameters:</strong>
+        <ul>
+            <li><code>prompt</code> (required): The user's input prompt</li>
+            <li><code>model</code> (optional): AI model to use (default: llama3.1)</li>
+            <li><code>host</code> (optional): Ollama server host (default: localhost)</li>
+        </ul>
+    </li>
+    <li><strong>Auto-Startup Feature:</strong> If Ollama is not running on localhost, the server will be automatically started and the query retried</li>
+</ul>
 
 <h2>Objectives</h2>
 <ul>
     <li>Implement AI-driven recommendations for content management.</li>
     <li>Utilize natural language processing for user queries and interactions.</li>
     <li>Enhance data analysis capabilities for better decision-making.</li>
+    <li>Provide automatic server lifecycle management for seamless AI integration.</li>
 </ul>
 
 <h2>Implementation Steps</h2>
@@ -18,8 +57,9 @@
     <li>Research and select appropriate AI frameworks and libraries.</li>
     <li>Integrate AI components into the existing architecture.</li>
     <li>Test AI functionalities in a controlled environment.</li>
+    <li>Implement automatic Ollama server startup on demand.</li>
     <li>Deploy AI features in production and monitor performance.</li>
 </ol>
 
 <h2>Future Enhancements</h2>
-<p>Explore additional AI capabilities such as predictive analytics and automated content generation.</p>
+<p>Explore additional AI capabilities such as predictive analytics, automated content generation, and advanced server lifecycle management.</p>

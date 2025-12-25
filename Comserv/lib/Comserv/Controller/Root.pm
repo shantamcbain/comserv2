@@ -185,14 +185,63 @@ sub get_server_ip :Private {
 # Auto method to set up common stash variables for all requests
 sub auto :Private {
     my ($self, $c) = @_;
-    
+
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip database queries for health checks and monitoring endpoints
         if ($c->req->path =~ m{^/health(?:/|$)}) {
             return 1; # Allow /health to proceed without database setup
         }
-        
+
+        # Skip setup redirect for setup pages themselves and static assets
+        # Note: $c->req->path returns path WITHOUT leading slash (e.g., "setup/k8s-secrets")
+        unless ($c->req->path =~ m{^/?setup(?:/|$)} || $c->req->path =~ m{^/?static/}) {
+            # Check RemoteDB configuration status for K8s secrets migration
+            eval {
+                # Get RemoteDB instance - force instantiation with new()
+                my $remotedb_class = $c->model('RemoteDB');
+                my $remotedb;
+
+                # If we got a class name string, instantiate it
+                if (!ref($remotedb_class)) {
+                    eval {
+                        require Comserv::Model::RemoteDB;
+                        $remotedb = Comserv::Model::RemoteDB->new();
+                        $remotedb->_load_config();
+                    };
+                } else {
+                    $remotedb = $remotedb_class;
+                }
+
+                if ($remotedb && ref($remotedb) && $remotedb->{configuration_status}) {
+                    if ($remotedb->{configuration_status} =~ /^(MISSING|ERROR|FALLBACK)$/) {
+                        my $error_msg = $remotedb->{configuration_error} || "Unknown configuration error";
+
+                        # In dev mode, redirect to K8s setup wizard
+                        if ($c->config->{debug} || $ENV{COMSERV_DEV_MODE}) {
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                                "Dev mode: redirecting to K8s secrets setup (status: " . $remotedb->{configuration_status} . ")");
+                            $c->response->redirect($c->uri_for('/setup/k8s-secrets'));
+                            $c->detach();
+                            return 0;
+                        } elsif ($remotedb->{configuration_status} ne 'FALLBACK') {
+                            # In production, only block for MISSING/ERROR, not FALLBACK
+                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                                "Production mode: returning 503 - database configuration required");
+                            $c->response->status(503);
+                            $c->response->body('Service Unavailable: Database configuration required. Contact administrator.');
+                            $c->detach();
+                            return 0;
+                        }
+                    }
+                }
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                    "Error checking RemoteDB configuration status: $@");
+            }
+        }
+
         # CRITICAL: Capture debug parameter from URL query string
         # URL format: http://host/path?debug=1 activates debug mode
         my $debug_param = $c->req->params->{debug};
@@ -1702,6 +1751,21 @@ sub begin :Private {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
+    
+    if ($c->res->content_type && $c->res->content_type =~ m{^text/html}i) {
+        $c->res->headers->header(
+            'Content-Security-Policy' => 
+                "default-src 'self'; " .
+                "script-src 'self' 'unsafe-inline'; " .
+                "style-src 'self' 'unsafe-inline'; " .
+                "img-src 'self' data: https:; " .
+                "font-src 'self'; " .
+                "frame-src 'none'; " .
+                "object-src 'none'; " .
+                "base-uri 'self'; " .
+                "form-action 'self';"
+        );
+    }
     
     # Calculate request duration
     if ($c->stash->{_request_start_time}) {

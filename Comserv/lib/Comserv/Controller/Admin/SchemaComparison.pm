@@ -1687,7 +1687,7 @@ __PACKAGE__->add_columns(
 };
         
         # Add size if applicable
-        if ($field->{type} =~ /\((\d+)\)/s) {
+        if ($field->{type} =~ m{\((\d+)\)}s) {
             $content .= qq{        size => $1,
 };
         }

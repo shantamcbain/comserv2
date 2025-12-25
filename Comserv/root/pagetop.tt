@@ -31,6 +31,25 @@
 [% END %]
 [% END %]
 
+<!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->
+[% IF k8s_migration_needed && is_admin %]
+<div class="k8s-migration-banner" style="background-color: #fff3cd; border-bottom: 2px solid #ff9800; padding: 12px 15px; color: #856404; font-family: Arial, sans-serif;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong style="font-size: 14px;">⚠️ K8s Migration Ready</strong>
+            <p style="margin: 5px 0 0 0; font-size: 13px;">
+                [% k8s_migration_message %]
+            </p>
+        </div>
+        <div style="margin-left: 15px;">
+            <a href="[% k8s_setup_url %]" style="background-color: #ff9800; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 13px; display: inline-block;">
+                Migrate to K8s Secrets
+            </a>
+        </div>
+    </div>
+</div>
+[% END %]
+
 <!-- Include Debug Template - shows session/stash when debug_mode=1 -->
 [% IF c.session.debug_mode == 1 %]
 [% INCLUDE 'debug.tt' %]
@@ -94,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     <!-- Main Menu -->
-    <nav>
+    <nav id="main-menu">
         <ul class="horizontal-menu">
             <li class="horizontal-dropdown">
                 <a href="[% c.session.return_url %]" class="dropbtn">Back</a>

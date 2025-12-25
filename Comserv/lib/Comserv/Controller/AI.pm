@@ -22,6 +22,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Model::Ollama;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -85,7 +86,7 @@ sub index :Path :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/index.md',
+        template => 'ai/index.tt',
         page_title => 'AI Assistant',
         username => $username,
         can_select_model => $can_select_model,
@@ -166,6 +167,7 @@ sub generate :Local :Args(0) {
         (length($system) > 0 ? 'provided' : 'none'));
     
     my $response_data;
+    my $ollama_started = 0;
     
     try {
         # Get Ollama model
@@ -185,8 +187,39 @@ sub generate :Local :Args(0) {
         }
         my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
         
+        $ollama->host($current_host);
+        $ollama->port($current_port) if $current_port;
+        $ollama->model($current_model) if $current_model;
+        $ollama->clear_endpoint;
+        
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'generate', "Ollama model configured (host: $current_host), querying API...");
+            'generate', "Ollama model configured (host: $current_host), checking connection...");
+        
+        # Check if server is connected, if not try to start it
+        unless ($ollama->check_connection()) {
+            # Only localhost can be auto-started
+            if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                    'generate', "Ollama not connected on $current_host, attempting to start server...");
+                
+                my $start_result = $ollama->start_server(method => 'command', async => 0);
+                if ($start_result && $start_result->{success}) {
+                    $ollama_started = 1;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                        'generate', "Ollama server started successfully for user '$username'");
+                } else {
+                    my $error = $start_result->{error} || 'Unknown error';
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                        'generate', "Failed to auto-start Ollama server for user '$username': $error");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
+            }
+        }
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'generate', "Querying Ollama API with model: $current_model");
         
         # Query the API
         my $response = $ollama->query(
@@ -362,7 +395,7 @@ sub result :Local :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/result.md',
+        template => 'ai/result.tt',
         page_title => 'AI Result',
         prompt => $prompt,
         ai_response => $ai_response,
@@ -669,15 +702,17 @@ sub models :Local :Args(0) {
     
     # Set template variables
     $c->stash(
-        template => 'ai/models.md',
+        template => 'ai/models.tt',
         page_title => 'AI Models',
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model
     );
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'models', "AI models interface loaded for user: $username (can_select: " . ($can_select_model ? 'yes' : 'no') . ") with " . scalar(@$servers) . " servers configured");
+# ADD THIS LINE (requires 'use JSON;'):
+$c->stash(servers_json => encode_json($servers || []));  # Safe fallback to empty array
 }
 
 =head2 pull_model
@@ -1294,6 +1329,156 @@ sub set_host :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 start_server
+
+Start the Ollama server. Supports both systemctl and direct command methods.
+Only allows starting localhost server.
+
+=cut
+
+sub start_server :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Set response content type
+    $c->response->content_type('application/json');
+    
+    # Check authentication
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "Unauthorized access attempt to AI start server");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(401);
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    # Check permissions - only admin/developer/editor can start servers
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_manage_servers = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_manage_servers = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+    
+    unless ($can_manage_servers) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "Unauthorized server start attempt by user: $username");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'Insufficient permissions to start servers'
+        });
+        $c->response->body($error_response);
+        $c->response->status(403);
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'start_server', "Processing AI start server request");
+    
+    # Get JSON payload
+    my $json_data;
+    try {
+        my $body = $c->request->body_data;
+        if ($body && ref($body) eq 'HASH') {
+            $json_data = $body;
+        } else {
+            # Try to parse raw body as JSON
+            my $raw_body = $c->request->body;
+            $json_data = decode_json($raw_body) if $raw_body;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'start_server', "Failed to parse JSON request body: $_");
+    };
+    
+    unless ($json_data) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'start_server', "No JSON data received in start server request");
+        
+        my $error_response = encode_json({
+            success => JSON::false,
+            error => 'JSON data is required'
+        });
+        $c->response->body($error_response);
+        $c->response->status(400);
+        return;
+    }
+    
+    # Extract parameters
+    my $server_host = $json_data->{host} || 'localhost';
+    my $server_port = $json_data->{port} || 11434;
+    my $method = $json_data->{method} || 'systemctl';  # Default to systemctl
+    my $async = $json_data->{async} || 0;              # Default to synchronous
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'start_server', "Start server request from user '$username': host=$server_host, port=$server_port, method=$method, async=$async");
+    
+    my $response_data;
+    
+    try {
+        # Get Ollama model
+        my $ollama = $c->model('Ollama');
+        unless ($ollama) {
+            die "Failed to load Ollama model";
+        }
+        
+        # Configure for specific server
+        $ollama->host($server_host);
+        $ollama->port($server_port);
+        $ollama->clear_endpoint;  # Force rebuild of endpoint URL
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'start_server', "Ollama model configured for $server_host:$server_port, attempting to start server...");
+        
+        # Start the server
+        my $result = $ollama->start_server(
+            method => $method,
+            async => $async
+        );
+        
+        unless ($result && $result->{success}) {
+            my $error = $result->{error} || $ollama->last_error || 'Unknown error';
+            die "Server start failed: $error";
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'start_server', "Server start successful for user '$username': $server_host:$server_port via $method");
+        
+        # Build JSON response
+        $response_data = {
+            success => JSON::true,
+            message => $result->{message} || "Ollama server started successfully",
+            server => "$server_host:$server_port",
+            method => $method,
+            already_running => $result->{already_running} ? JSON::true : JSON::false,
+            connection_pending => $result->{connection_pending} ? JSON::true : JSON::false
+        };
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'start_server', "Server start failed for user '$username': $error");
+        
+        $response_data = {
+            success => JSON::false,
+            error => 'Failed to start server: ' . $error
+        };
+        $c->response->status(500);
+    };
+    
+    my $json_response = encode_json($response_data);
+    $c->response->body($json_response);
+}
+
 =head2 _get_current_ollama_config
 
 Private method to determine current Ollama configuration with automatic fallback.
@@ -1324,8 +1509,9 @@ sub _get_current_ollama_config {
                 '_get_current_ollama_config', "Using session preferred host: $current_host");
         } else {
             # Test localhost first, fallback to 192.168.1.171 if not available
-            $ollama->set_host('localhost');
-            if ($ollama->check_connection()) {
+            # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
+            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+            if ($test_ollama && $test_ollama->check_connection()) {
                 $current_host = 'localhost';
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     '_get_current_ollama_config', "Localhost is available, using localhost");
@@ -1358,6 +1544,63 @@ sub _get_current_ollama_config {
     };
     
     return ($current_host, $current_port, $current_model, $installed_models);
+}
+
+sub server_status : Local {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $json_data;
+    try {
+        my $body = $c->request->body_data;
+        if ($body && ref($body) eq 'HASH') {
+            $json_data = $body;
+        } else {
+            my $raw_body = $c->request->body;
+            $json_data = decode_json($raw_body) if $raw_body;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'server_status', "Failed to parse JSON: $_");
+    };
+    
+    my $host = $json_data->{host} || $c->session->{ollama_host} || 'localhost';
+    my $port = $json_data->{port} || $c->session->{ollama_port} || 11434;
+    
+    my $response;
+    try {
+        my $ua = LWP::UserAgent->new(timeout => 3);
+        my $url = "http://$host:$port/api/tags";
+        my $http_response = $ua->get($url);
+        
+        if ($http_response->is_success) {
+            $response = encode_json({
+                success => JSON::true,
+                running => JSON::true,
+                host => $host,
+                port => $port
+            });
+        } else {
+            $response = encode_json({
+                success => JSON::true,
+                running => JSON::false,
+                host => $host,
+                port => $port,
+                error => 'Server not responding'
+            });
+        }
+    } catch {
+        $response = encode_json({
+            success => JSON::true,
+            running => JSON::false,
+            host => $host,
+            port => $port,
+            error => $_
+        });
+    };
+    
+    $c->response->body($response);
 }
 
 =head1 AUTHOR

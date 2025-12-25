@@ -1,0 +1,133 @@
+name: 03 - Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/comserv
+  DEPLOY_DIR: /opt/comserv-staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: http://${{ secrets.STAGING_HOST }}:3000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "🚀 Starting deployment to staging..."
+            
+            # Navigate to deploy directory
+            cd ${{ env.DEPLOY_DIR }}
+            
+            # Set image tag
+            IMAGE_TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+            echo "📦 Using image tag: $IMAGE_TAG"
+            
+            # Update .env with new image tag
+            sed -i "s/COMSERV_IMAGE_TAG=.*/COMSERV_IMAGE_TAG=$IMAGE_TAG/" .env || \
+            echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+            
+            # Pull latest image
+            echo "⬇️  Pulling image from registry..."
+            docker login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ${{ env.REGISTRY }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG
+            
+            # Start containers
+            echo "🐳 Starting Docker Compose..."
+            docker-compose -f docker-compose.staging.yml down || true
+            docker-compose -f docker-compose.staging.yml up -d
+            
+            # Wait for services
+            echo "⏳ Waiting for services to be healthy..."
+            RETRY_COUNT=0
+            MAX_RETRIES=12
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+                echo "✅ Health check passed!"
+                break
+              fi
+              RETRY_COUNT=$((RETRY_COUNT+1))
+              echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying in 10s..."
+              sleep 10
+            done
+            
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Health checks failed after $MAX_RETRIES attempts"
+              docker-compose -f docker-compose.staging.yml logs
+              exit 1
+            fi
+            
+            echo "✅ Deployment to staging successful!"
+            echo "🌐 Application available at: http://${{ secrets.STAGING_HOST }}:3000"
+
+      - name: Run smoke tests
+        if: success()
+        run: |
+          echo "🧪 Running smoke tests..."
+          sleep 5
+          
+          # Basic HTTP test
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.STAGING_HOST }}:3000/)
+          if [ $RESPONSE -eq 200 ]; then
+            echo "✅ Basic HTTP test passed"
+          else
+            echo "❌ HTTP test failed with status $RESPONSE"
+            exit 1
+          fi
+          
+          # Health endpoint test
+          HEALTH=$(curl -s http://${{ secrets.STAGING_HOST }}:3000/health)
+          if [ ! -z "$HEALTH" ]; then
+            echo "✅ Health endpoint responsive"
+          else
+            echo "❌ Health endpoint not responding"
+            exit 1
+          fi
+
+      - name: Notify Slack (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: "✅ Staging deployment successful - Image: ${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag || 'latest' }}"
+
+      - name: Notify Slack (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_MESSAGE: "❌ Staging deployment failed - Check GitHub Actions for details"
+
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            echo "🔄 Rolling back staging deployment..."
+            cd ${{ env.DEPLOY_DIR }}
+            docker-compose -f docker-compose.staging.yml down || true
+            echo "⏹️  Containers stopped"
+

@@ -402,10 +402,10 @@
     <div class="search-container">
         <form method="GET" action="[% c.uri_for('/documentation/search') %]" class="search-form">
             <div class="search-input-group">
-                <input type="text" 
-                       name="q" 
-                       value="[% c.req.param('q') | html %]" 
-                       placeholder="Search documentation..." 
+                <input type="text"
+                       name="q"
+                       value="[% c.req.param('q') | html %]"
+                       placeholder="Search documentation..."
                        class="search-input"
                        minlength="2"
                        required>
@@ -413,7 +413,7 @@
                     <option value="">All Categories</option>
                     [% FOREACH category_key IN sorted_categories %]
                         [% category = categories.$category_key %]
-                        <option value="[% category_key %]" 
+                        <option value="[% category_key %]"
                                 [% IF c.req.param('category') == category_key %]selected[% END %]>
                             [% category.title || category_key | ucfirst %]
                         </option>
@@ -422,6 +422,15 @@
                 <button type="submit" class="search-button">Search</button>
             </div>
         </form>
+
+        [% IF is_admin %]
+        <div style="margin-top: 15px; text-align: center;">
+            <button onclick="rescanDocumentation()" class="search-button" style="background: #28a745;" title="Scan for new or modified documentation files">
+                🔄 Rescan Files
+            </button>
+            <span id="rescan-status" style="margin-left: 10px; color: #666; font-size: 14px;"></span>
+        </div>
+        [% END %]
     </div>
 
     <!-- Search Results (if search was performed) -->
@@ -537,9 +546,14 @@
                                     <div class="roles-edit-hint">
                                         Click roles above to edit access permissions
                                     </div>
-                                    <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-btn">
-                                        Edit Roles
-                                    </a>
+                                    <div>
+                                        <a href="/Documentation/manage_config/[% page_name | uri %]" class="edit-roles-btn" style="background: #48bb78; margin-right: 8px;">
+                                            Manage File Config
+                                        </a>
+                                        <a href="/Documentation/edit_roles/[% page_name %]" class="edit-roles-btn">
+                                            Edit Roles
+                                        </a>
+                                    </div>
                                 </div>
                             [% END %]
                         </div>
@@ -633,9 +647,14 @@
                                         <div class="roles-edit-hint">
                                             Click roles above to edit access permissions
                                         </div>
-                                        <a href="/Documentation/edit_roles/[% page.title %]" class="edit-roles-btn">
-                                            Edit Roles
-                                        </a>
+                                        <div>
+                                            <a href="/Documentation/manage_config/[% page.title | uri %]" class="edit-roles-btn" style="background: #48bb78; margin-right: 8px;">
+                                                Manage File Config
+                                            </a>
+                                            <a href="/Documentation/edit_roles/[% page.title %]" class="edit-roles-btn">
+                                                Edit Roles
+                                            </a>
+                                        </div>
                                     </div>
                                 [% END %]
                             </div>
@@ -680,6 +699,39 @@ function toggleContainer(header) {
 // Function to handle role editing
 function editRoles(pageName) {
     window.location.href = '/Documentation/edit_roles/' + encodeURIComponent(pageName);
+}
+
+// Function to trigger manual rescan
+function rescanDocumentation() {
+    const statusEl = document.getElementById('rescan-status');
+    if (statusEl) {
+        statusEl.textContent = 'Scanning...';
+        statusEl.style.color = '#667eea';
+    }
+
+    fetch('[% c.uri_for('/Documentation/rescan') %]')
+        .then(response => {
+            if (response.redirected) {
+                // Show success message before redirect
+                if (statusEl) {
+                    statusEl.textContent = '✓ Scan complete! Reloading...';
+                    statusEl.style.color = '#28a745';
+                }
+                // Redirect to the page (which will show updated content)
+                setTimeout(() => {
+                    window.location.href = response.url;
+                }, 1000);
+            } else {
+                throw new Error('Rescan failed');
+            }
+        })
+        .catch(error => {
+            console.error('Rescan error:', error);
+            if (statusEl) {
+                statusEl.textContent = '✗ Error scanning files';
+                statusEl.style.color = '#dc3545';
+            }
+        });
 }
 
 // Initialize container as closed

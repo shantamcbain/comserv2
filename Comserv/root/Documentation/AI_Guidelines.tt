@@ -1,4 +1,17 @@
-# AI Assistant Guidelines for Comserv System
+# ⚠️ DEPRECATED - See comserv-ai-guidelines-consolidated.yaml
+
+**This file is DEPRECATED as of 2025-12-06.** 
+
+All AI guidelines have been consolidated into a single authoritative source:
+- **New Location**: `/Comserv/root/comserv-ai-guidelines-consolidated.yaml`
+- **Status**: ACTIVE - Primary reference for all AI assistants
+- **Deprecation Period**: This file will be kept for reference until 2025-12-20, then archived to `/Documentation/session_history/`
+
+Please update your references to use the consolidated YAML file instead.
+
+---
+
+# AI Assistant Guidelines for Comserv System (DEPRECATED - See consolidated YAML above)
 
 ## IMPORTANT: File Modification Guidelines
 

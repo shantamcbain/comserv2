@@ -1,37 +1,56 @@
 # Project Summary
 
-## Overview of Languages, Frameworks, and Main Libraries Used
-The project is primarily developed in Perl, utilizing the following frameworks and libraries:
-- **Perl Frameworks**: 
-  - Catalyst (indicated by the structure of the project and the use of controllers and models)
-- **Template Toolkit**: The `.tt` files suggest that Template Toolkit is used for rendering views.
-- **DBIx::Class**: The presence of model files and schema management indicates the use of DBIx::Class for database interactions.
+## Overview
+The project appears to be a web application called "Comserv" that utilizes various programming languages, libraries, and frameworks primarily based on Perl. It is designed to manage cloud services, including API interactions, user management, and documentation management. The project also involves deployment configurations for Docker and Kubernetes.
+
+### Languages and Frameworks
+- **Primary Language**: Perl
+- **Frameworks**: 
+  - Catalyst (web application framework)
+- **Libraries**:
+  - Moose (object system for Perl)
+  - PDF::API2 (for PDF manipulation)
+  - JSON::XS (for JSON parsing)
+  - LWP (for web requests)
+  - DBI (for database interaction)
+  - DBD::MariaDB (for MariaDB database support)
+  - YAML (for configuration files)
+  
+### Containerization
+- **Docker**: Used for containerizing the application with Dockerfiles and docker-compose configurations.
 
 ## Purpose of the Project
-The project's purpose appears to be the development of a web application that manages various aspects of community services or resources, possibly including workshops, user management, and project tracking. It seems to provide a structured interface for administrators and users to interact with the underlying data.
+The purpose of the Comserv project is to provide a comprehensive solution for managing various cloud services, including API integrations, user management, and documentation workflows. It also aims to facilitate easy deployment and configuration management through Docker and Kubernetes.
 
-## List of Build/Configuration/Project Files
-- `/Comserv/Makefile.PL`
-- `/Comserv/cpanfile`
-- `/Comserv/deploy_schema.pl`
-- `/Comserv/script/comserv_cgi.pl`
-- `/Comserv/script/comserv_create.pl`
-- `/Comserv/script/comserv_fastcgi.pl`
-- `/Comserv/script/comserv_server.pl`
-- `/Comserv/script/comserv_test.pl`
-- `/Comserv/script/create_migration_script.pl`
-- `/Comserv/script/initialize_db.pl`
-- `/Comserv/script/migrate_schema.pl`
+## Configuration and Build Files
+Here is a list of relevant configuration and build files:
+- **Dockerfile**: `/Comserv/Dockerfile`
+- **Makefile**: `/Comserv/Makefile`
+- **Makefile.PL**: `/Comserv/Makefile.PL`
+- **docker-compose.dev.yml**: `/Comserv/deploy/docker-compose.dev.yml`
+- **docker-compose.prod.yml**: `/Comserv/deploy/docker-compose.prod.yml`
+- **docker-compose.staging.yml**: `/Comserv/deploy/docker-compose.staging.yml`
+- **docker-entrypoint.sh**: `/Comserv/deploy/docker-entrypoint.sh`
+- **supervisord.conf**: `/Comserv/sql/supervisord.conf`
+- **comserv.conf**: `/Comserv/sql/comserv.conf`
+- **cpanfile**: `/Comserv/config/cpanfile`
+- **db_config.json**: `/Comserv/config/db_config.json`
+- **db_config.json.template**: `/Comserv/config/db_config.json.template`
+- **create-supervisor-config.sh**: `/Comserv/config/create-supervisor-config.sh`
+- **npm_config_deploy.yml**: `/Comserv/deploy/npm_config_deploy.yml`
 
-## Source Files Location
-The source files can be found in the following directories:
-- `/Comserv/lib/Comserv/Controller`
-- `/Comserv/lib/Comserv/Model`
-- `/Comserv/lib/Comserv/Model/Schema`
-- `/Comserv/lib/Comserv/Util`
-- `/Comserv/lib/Comserv/View`
+## Source Files
+Source files can be found in the following directories:
+- `/Comserv/lib/Comserv/` - Contains the main application logic, including controllers, models, and views.
+- `/Comserv/local/lib/perl5/` - Contains locally installed Perl libraries.
+- `/Comserv/inc/` - Contains additional modules and libraries.
 
-## Documentation Files Location
+## Documentation Files
 Documentation files are located in:
-- `/Comserv/root/Documentation`
-- `/Documentation` (additional documentation files)
+- `/Comserv/README.md` - Overview of the project.
+- `/Comserv/root/Documentation/` - Comprehensive documentation covering various aspects of the project, including guides, API documentation, and user manuals.
+- `/Comserv/root/Documentation/changelog/` - Contains changelogs for tracking project updates.
+- `/Comserv/root/Documentation/admin/` - Administrative documentation and guides.
+- `/Comserv/root/Documentation/features/` - Documentation regarding features of the application.
+
+This summary provides a comprehensive overview of the Comserv project, highlighting its structure, purpose, and essential files for configuration and documentation.

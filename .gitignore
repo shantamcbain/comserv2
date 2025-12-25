@@ -28,9 +28,11 @@ inc/
 
 # ExtUtils::MakeMaker
 /blib/
+Comserv/blib/
 /_eumm/
 /*.gz
 /Makefile
+Comserv/Makefile
 /Makefile.old
 /MANIFEST.bak
 /pm_to_blib
@@ -50,6 +52,10 @@ Comserv/local/
 /Comserv/db_config.json.template
 /Comserv/config/api_credentials.json
 /Comserv/comserv.psgi
+# Environment variable files (NEVER commit these - contain secrets)
+.env
+.env.*
+!.env.example
 
 # Logs
 Comserv/logs/
@@ -72,8 +78,7 @@ DefaultDBI.tt
 /git_commit_message.txt
 /grokpromts.txt
 
-# Zencoder chat history and conversation summaries
-/.zencoder/
+
 
 # Server logs
 server.log

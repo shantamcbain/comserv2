@@ -2,9 +2,13 @@ version: '3.9'
 
 services:
   web-staging:
-    image: ghcr.io/${{ secrets.IMAGE_REGISTRY }}/comserv:main
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: comserv-web-staging
     restart: unless-stopped
+    labels:
+      - "description=Staging web server for pre-production testing and validation"
     environment:
       CATALYST_ENV: staging
       CATALYST_DEBUG: 0
@@ -18,6 +22,9 @@ services:
       DB_PASS: ${DB_PASS_STAGING}
     ports:
       - "5000:5000"
+    networks:
+      comserv-staging-network:
+        ipv4_address: 172.21.0.2
     volumes:
       # Source code (read-only in staging)
       - ./lib:/opt/comserv/lib:ro
@@ -37,8 +44,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    networks:
-      - comserv-network
     logging:
       driver: "json-file"
       options:
@@ -63,5 +68,11 @@ volumes:
     driver: local
 
 networks:
-  comserv-network:
+  comserv-staging-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-comserv-staging
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1

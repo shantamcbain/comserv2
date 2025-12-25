@@ -1,0 +1,454 @@
+[% META
+        title = "Comserv Infrastructure: Server-Specific Migration Amendment"
+   description = "Amendment to production migration plan with specific VM configurations, dual-DB sync strategy, and integration with existing 3-host Proxmox K8s infrastructure"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,database"
+   page_version = "1.1"
+   last_updated = "Tue Dec 23 17:18:00 UTC 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt,v 1.1 2025/12/23 zencoder Exp - Updated with actual 3-host Proxmox infrastructure: proxmoxws (control + worker), proxmox720 (workers), production DB bare-metal 192.168.1.198, with infrastructure clarification questions answered' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Amendment: Comserv Production Database Migration</h1>
+    <p style="color: var(--text-color); font-family: var(--body-font); font-size: 1.1em;"><strong>Server-Specific Plan with Dual-DB Sync Strategy</strong></p>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-23 |
+        Status: 📋 Server-Specific Configuration |
+        Scope: Integrate existing K8s infrastructure + keep 192.168.1.198 in sync during migration
+    </div>
+
+    <!-- ACTUAL INFRASTRUCTURE OVERVIEW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">1. Actual Infrastructure Overview</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Proxmox Servers</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Server</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>IP</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox Version</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Cluster Status</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Role</strong></th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxt210</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.3</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">7.4-20</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ Clustered (primary)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Cluster gateway + network management</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmox720</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.100.2</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">8.4.14</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">❌ NOT clustered (join blocked by VMs)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Production DB host + K8s worker</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxws</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.227</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">8.3</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">❌ NOT clustered (join blocked by VMs)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">K8s master + worker nodes</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">Current VMs by Server</h3>
+            
+            <div style="background-color: #e3f2fd; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); margin-top: 0;">proxmoxt210 (192.168.1.3) - Gateway/Control</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="background-color: var(--light-color);">
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">VMID</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Name</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Status</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Purpose</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">100</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">ProxmoxBackup</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Backup server (will migrate)</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">101</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Gateway</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Network gateway (keep as-is)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">103</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">OPNsense</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Firewall/routing (critical - keep running)</td>
+                    </tr>
+                </table>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Action</strong>: No K8s VMs here. This server acts as cluster gateway/control point.</p>
+            </div>
+
+            <div style="background-color: #fff3cd; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: #d84315; margin-top: 0;">proxmox720 (192.168.100.2) - Production DB + K8s Worker</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="background-color: var(--light-color);">
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">VMID</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Name</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Status</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Purpose</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Action</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">102</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">ComservProduction</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ CRITICAL: Current Comserv application (db host?)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ Verify if this hosts 192.168.1.198 DB</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">105</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">ProxmoxMailGateway</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Mail relay (keep running)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Keep as-is</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">108</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">ubuntuVminmailserver</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Mail server (keep running)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Keep as-is</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">201</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">✅ K8s worker node (existing)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Integrate into plan</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">202</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker2</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">✅ K8s worker node (existing)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Start and integrate into plan</td>
+                    </tr>
+                </table>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>⚠️ CRITICAL FINDING</strong>: VMID 102 (ComservProduction) may be hosting the 192.168.1.198 database. Need verification.</p>
+            </div>
+
+            <div style="background-color: #e8f5e9; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: #2e7d32; margin-top: 0;">proxmoxws (192.168.123.227) - K8s Master + Database Services</h4>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="background-color: var(--light-color);">
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">VMID</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Name</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Status</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Purpose</th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Action</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">100</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">k8s-master</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">✅ K8s control plane (existing)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Use as primary master</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">103</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker2</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">✅ K8s worker node (existing)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Integrate into plan</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">200</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Cloudron</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Cloud infrastructure (keep as-is)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Keep as-is</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">500</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">mysqlserver</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ Database server (purpose unclear)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ Verify if related to Comserv</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">501</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Fileserver</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">NFS/storage (keep running)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Use for K8s storage backend</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">502</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">ubuntu-miner</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Mining VM (keep as-is)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Keep as-is</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">503</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">PostgresServer</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Stopped</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Development? (keep as-is)</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Keep as-is</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">1002</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">comserserver</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">Running</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ Another Comserv server?</td>
+                        <td style="padding: 8px; border: 1px solid var(--border-color); color: var(--text-color);">⚠️ Verify purpose/relationship</td>
+                    </tr>
+                </table>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>✅ GOOD NEWS</strong>: K8s master and 2 workers already running! Can integrate into migration.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CRITICAL QUESTIONS TO RESOLVE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">2. Critical Questions That Determine Migration Path</h2>
+            
+            <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #d32f2f; margin-top: 0;">❓ MUST CLARIFY BEFORE PROCEEDING</h3>
+                
+                <h4 style="color: var(--text-color); margin-top: 15px;">✅ Question 1: Where is the production database 192.168.1.198?</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>ANSWER: Bare-metal server outside Proxmox with IP 192.168.1.198</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Implication:</strong> Production database runs on dedicated bare-metal infrastructure independent of Proxmox hypervisors. Network isolation requires careful K8s network policy configuration for StatefulSet access.</p>
+
+                <h4 style="color: var(--text-color); margin-top: 20px;">✅ Question 2: What is VMID 1002 (comserserver) on proxmoxws?</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>ANSWER: Reserved for future use as production Catalyst application server (not part of database migration)</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Implication:</strong> VMID 1002 is out of scope for this database migration. Future Catalyst application scaling may utilize this VM for multi-instance deployment.</p>
+
+                <h4 style="color: var(--text-color); margin-top: 20px;">✅ Question 3: What is VMID 500 (mysqlserver) on proxmoxws?</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>ANSWER: Originally created as production database, but not needed for this migration (non-Docker approach). Retain as backup.</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Implication:</strong> VMID 500 serves as a disaster recovery backup. Not part of K8s migration path, but maintain as fallback option.</p>
+
+                <h4 style="color: var(--text-color); margin-top: 20px;">✅ Question 4: Existing K8s Setup</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>ANSWER: Use existing K8s nodes as-is to leverage work already completed. Original intent was for production Catalyst.</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Context:</strong> K8s master/worker nodes were started for implementation but have not been changed in some time with no active use.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Clarifying Note:</strong> Do each application server instance (if scaled) need its own K8s master/worker nodes, or can multiple Catalyst instances share the same cluster?</p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Implication:</strong> Existing K8s cluster will host both MariaDB StatefulSet and future Catalyst application deployments. Single cluster design simplifies operations.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DUAL-DB SYNC STRATEGY -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">3. Dual-Database Sync Strategy During Migration</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">Instead of a risky big-bang cutover, keep both 192.168.1.198 and Kubernetes databases in sync during migration period.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Option A: Using Application-Level Priority (Recommended)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Leverage the existing <code>db_config.json</code> priority system in Comserv.</p>
+
+            <div style="background-color: #e3f2fd; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); margin-top: 0;">Phase 1: Both DBs Running (Weeks 1-4)</h4>
+                <pre style="background-color: var(--light-color); padding: 10px; font-family: monospace; color: var(--text-color); overflow-x: auto;"><code>
+# db_config.json priority order (DURING MIGRATION):
+Priority 1: 192.168.1.198 (production_server) - CURRENT LIVE DB - Reads & Writes
+Priority 2: mariadb.comserv-prod.svc.cluster.local - NEW K8S DB - REPLICA (Reads only)
+Priority 3-N: Other fallbacks...
+
+# How this works:
+1. Application connects to 192.168.1.198 first
+2. If it fails, tries K8s database
+3. All writes go to 192.168.1.198 (source of truth)
+4. K8s database replicates from 192.168.1.198 via MySQL replication
+                </code></pre>
+
+                <h4 style="color: var(--text-color); margin-top: 15px;">Implementation Steps:</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+                    <li><strong>Set up MySQL replication</strong>: Configure 192.168.1.198 as primary, K8s MariaDB pods as replicas</li>
+                    <li><strong>Verify replication lag</strong>: Monitor <code>SHOW SLAVE STATUS\G</code> - ensure Seconds_Behind_Master &lt; 1</li>
+                    <li><strong>Test failover</strong>: Manually set Priority 1 to K8s DB, verify app works, revert</li>
+                    <li><strong>Run monitoring</strong>: Alert if replication lag exceeds 5 seconds</li>
+                </ol>
+
+                <h4 style="color: var(--text-color); margin-top: 15px;">Advantages:</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Zero app code changes required</li>
+                    <li>Automatic fallback if K8s DB has issues</li>
+                    <li>Gradual confidence building during testing period</li>
+                    <li>Can abort migration at any time during week 1-4</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">Option B: Database-Level Replication (Master-Master)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Set both databases to accept writes, replicate in both directions.</p>
+
+            <div style="background-color: #f3e5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); margin-top: 0;">When to Use This Approach</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Only if you need to:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Distribute writes across both databases</li>
+                    <li>Test K8s database thoroughly before full cutover</li>
+                </ul>
+
+                <h4 style="color: var(--text-color); margin-top: 15px;">⚠️ Complexity Warnings</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>UUID conflicts:</strong> Auto-increment IDs must be carefully managed (use UUID v4 instead)</li>
+                    <li><strong>Write conflicts:</strong> Same record modified on both DBs simultaneously → requires conflict resolution logic</li>
+                    <li><strong>Operational overhead:</strong> Monitoring, debugging is significantly more complex</li>
+                </ul>
+
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>Recommendation:</strong> Use Option A (Application-level priority) instead. Simpler and safer.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">Option C: Canary Deployment (Gradual Traffic Shift)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Route percentage of reads to K8s DB, keep all writes on 192.168.1.198.</p>
+
+            <div style="background-color: #ede7f6; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); margin-top: 0;">Timeline</h4>
+                <pre style="background-color: var(--light-color); padding: 10px; font-family: monospace; color: var(--text-color);">
+Week 3: 192.168.1.198 primary, K8s replica
+        All writes → 192.168.1.198
+        Reads → 100% to 192.168.1.198, 0% to K8s
+
+Week 4, Day 1: Increase K8s read traffic
+        Reads → 95% to 192.168.1.198, 5% to K8s (test with non-critical queries)
+
+Week 4, Day 2: More K8s reads
+        Reads → 80% to 192.168.1.198, 20% to K8s
+
+Week 4, Day 3: K8s fully online
+        Reads → 100% to K8s DB
+        Writes → Still 100% to 192.168.1.198
+
+Week 5: Final cutover (writes to K8s)
+        Reads & Writes → 100% to K8s DB
+        Keep 192.168.1.198 as fallback for 3 days
+                </pre>
+
+                <h4 style="color: var(--text-color); margin-top: 15px;">Implementation:</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Modify Comserv's <code>RemoteDB.pm</code> to support percentage-based routing:</p>
+                <pre style="background-color: var(--light-color); padding: 10px; font-family: monospace; color: var(--text-color); overflow-x: auto;"><code>
+# pseudo-code for RemoteDB.pm
+sub get_connection {
+    my ($self, $readonly) = @_;
+    
+    if ($readonly) {
+        # Read-only queries: use percentage routing
+        my $rand = int(rand(100));
+        if ($rand < 20) {  # 20% to K8s
+            return $self->_connect_k8s_replica();
+        } else {           # 80% to 192.168.1.198
+            return $self->_connect_baremetal();
+        }
+    } else {
+        # Write queries: always use primary
+        return $self->_connect_baremetal();  # 192.168.1.198
+    }
+}
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>Recommendation for your case:</strong> Start with Option A (Application priority), then implement Option C (Canary) for final cutover if risk tolerance is high.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USING APP SCHEMA SYSTEM -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">4. Leveraging Comserv Schema System for Migration</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">The Comserv application already has infrastructure to handle database configuration changes. We can use this.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Where Configuration Lives</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Config Source</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Location</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Used During Migration</strong></th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>db_config.json</code> (Priority-based)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">File on disk or K8s mounted volume</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ YES - primary routing mechanism</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color;">Environment Variables (<code>COMSERV_DB_*</code>)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Set in docker-compose or K8s deployment</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ YES - override json file</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>RemoteDB.pm</code> (Connection logic)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Code: <code>lib/Comserv/Model/RemoteDB.pm</code></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ YES - add custom logic here</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Schema Comparison UI (<code>/admin/compare_schema</code>)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Admin controller endpoint</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ YES - verify sync between DBs</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">Migration Configuration Strategy</h3>
+
+            <div style="background-color: #e8f5e9; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: #2e7d32; margin-top: 0;">Step 1: Update db_config.json (Weeks 1-3)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Add K8s database as Priority 2:</p>
+                <pre style="background-color: var(--light-color); padding: 10px; font-family: monospace; color: var(--text-color); overflow-x: auto;"><code>
+{
+  "production_server": {
+    "db_type": "mariadb",
+    "host": "192.168.1.198",  ← PRIMARY (live)
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "priority": 1  ← HIGHEST
+  },
+  
+  "k8s_galera_primary": {
+    "db_type": "mariadb",
+    "host": "mariadb.comserv-prod.svc.cluster.local",  ← REPLICA
+    "port": 3306,
+    "username": "shanta_forager",
+    "password": "UA=nPF8*m+T#",
+    "database": "ency",
+    "priority": 2  ← FALLBACK (read-only)
+  },
+  
+  // ... other existing entries
+}
+                </code></pre>
+
+                <h4 style="color: #2e7d32; margin-top: 15px;">Step 2: Set MySQL Replication (Week 2-3)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Configure 192.168.1.198 as replication master, K8s pods as replicas.</p>
+                <pre style="background-color: var(--light-color); padding: 10px; font-family: monospace; color: var(--text-color); overflow-x: auto;"><code>
+# On 192.168.1.198 (primary):
+mysql> GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%.%.%.%' IDENTIFIED BY 'repl_password';
+mysql> FLUSH BINARY LOGS;
+mysql> SHOW MASTER STATUS;
+# Save: File: mysql-bin.000001, Position: 154
+
+# On K8s mariadb-0 pod (replica):
+kubectl exec -it mariadb-0 -n comserv-prod -- mysql -u root -p << EOF
+CHANGE MASTER TO
+  MASTER_HOST='192.168.1.198',
+  MASTER_PORT=3306,
+  MASTER_USER='repl',
+  MASTER_PASSWORD='repl_password',
+  MASTER_LOG_FILE='mysql-bin.000001',
+  MASTER_LOG_POS=154;
+
+START SLAVE;
+SHOW SLAVE STATUS\G

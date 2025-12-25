@@ -83,6 +83,8 @@ requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
 requires 'HTTP::Request';
+requires 'WWW::Form::UrlEncoded';
+requires 'HTTP::Entity::Parser';
 requires 'Try::Tiny';
 requires 'Text::Markdown';
 requires 'YAML::Tiny';

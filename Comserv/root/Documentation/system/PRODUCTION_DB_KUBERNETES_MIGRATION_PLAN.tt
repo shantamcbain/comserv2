@@ -1,0 +1,2571 @@
+[% META
+        title = "Production Database Migration to Kubernetes (Multi-Proxmox)"
+   description = "Step-by-step plan for migrating 192.168.1.198 production database to Kubernetes cluster running across 3 Proxmox servers (proxmoxws, proxmox720, proxmoxt210) with load balancing and high availability"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,kubernetes"
+   page_version = "1.5"
+   last_updated = "Tue Dec 23 20:00:00 UTC 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt,v 1.5 2025/12/23 zencoder Exp - Clarified dual-NIC architecture: each K8s VM on Proxmox LAN (192.168.1.x) + internal K8s bridge (192.168.123.x); added explicit delete/create commands for VMs 100,103,201,202 with cloud-init provisioning; documented access strategy (cloud-init setup, OpenVPN operations)' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Production Database Migration to Kubernetes</h1>
+    <p style="color: var(--text-color); font-family: var(--body-font); font-size: 1.1em;"><strong>Migrate Bare-Metal 192.168.1.198 to Distributed K8s Cluster (Master on proxmoxws VM 100, Workers on proxmox720/proxmoxws)</strong></p>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-23 |
+        Version: 1.5 (Dual-NIC architecture + explicit delete/create commands) |
+        Status: 📋 Implementation Planning - Ready for VM Rebuild |
+        Scope: Migration of 192.168.1.198:3306 to K8s using dual-NIC setup (Proxmox LAN + K8s bridge), cloud-init provisioning, OpenVPN operations
+    </div>
+
+    <!-- INFRASTRUCTURE CLARIFICATIONS BANNER -->
+    <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+        <h3 style="color: #1b5e20; margin-top: 0;">✅ Infrastructure Clarifications Incorporated (2025-12-23)</h3>
+        <ul style="color: #2e7d32; font-family: var(--body-font); margin: 10px 0;">
+            <li><strong>Q1 Answer</strong>: Production database is bare-metal server (192.168.1.198) outside Proxmox</li>
+            <li><strong>Q2 Answer</strong>: VMID 1002 reserved for future Catalyst production (out of scope)</li>
+            <li><strong>Q3 Answer</strong>: VMID 500 kept as disaster recovery backup (not needed for migration)</li>
+            <li><strong>Q4 Answer</strong>: Use existing K8s nodes as-is (saves 2 weeks vs new cluster)</li>
+        </ul>
+        <p style="color: #2e7d32; font-family: var(--body-font); margin: 10px 0;"><strong>Impact</strong>: Migration timeline optimized from 5-6 weeks to 2-3 weeks. Bare-metal database remains for production reliability. K8s cluster hosts application + dual-sync database mirror.</p>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#current-state" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Current State</a>
+                <a href="#network-topology" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Network Topology</a>
+                <a href="#routing-diagnostics" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Routing & Diagnostics</a>
+                <a href="#k8s-rebuild-strategy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">K8s Rebuild</a>
+                <a href="#target-architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Target Architecture</a>
+                <a href="#proxmox-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proxmox Setup</a>
+                <a href="#opnsense-dns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">OPNsense DNS</a>
+                <a href="#kubectl-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">kubectl Config</a>
+                <a href="#phase-1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 1</a>
+                <a href="#phase-2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 2</a>
+                <a href="#phase-3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 3</a>
+                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Rollback</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Executive Summary</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This document provides a phased, step-by-step plan to migrate Comserv's production databases from a bare-metal server (192.168.1.198) to the existing Kubernetes cluster (VM ID 101 on Dell R710) using a dual-database sync strategy for zero-downtime cutover, enabling:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>High Availability</strong>: Multi-node database cluster with automatic failover</li>
+                <li><strong>Load Balancing</strong>: Read replicas and connection pooling via Kubernetes services</li>
+                <li><strong>Zero Downtime</strong>: Blue-green deployment strategy during cutover</li>
+                <li><strong>Scalability</strong>: Dynamic resource allocation and auto-healing</li>
+                <li><strong>Simplified Operations</strong>: Infrastructure-as-Code (IaC) with GitOps workflow</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CURRENT STATE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="current-state" style="color: var(--text-color); font-family: var(--header-font);">2. Current State Analysis</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Production Database Setup (Bare Metal)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Component</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Current Configuration</strong></th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Host</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.198</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Database Type</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">MariaDB 10.x</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Databases</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">ency, shanta_forager</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Port</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">3306</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>High Availability</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">❌ None (single point of failure)</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Load Balancing</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">❌ None (all traffic to single host)</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Backup Strategy</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Manual/script-based (unclear frequency)</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Storage</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Local disk on 192.168.1.198</td>
+                </tr>
+            </table>
+
+            <h3 id="actual-k8s-topology" style="color: var(--text-color); font-family: var(--header-font);">Existing Proxmox & Kubernetes Infrastructure (VERIFIED Dec 23, 2025)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox Host</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s VMs on This Host</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Status</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Other VMs</strong></th>
+                </tr>
+                <tr style="background-color: #e8f5e9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxws</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">
+                        <strong>VM 100</strong> (k8s-master)<br/>
+                        <strong>VM 103</strong> (k8s-worker2)
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">
+                        ✅ BOTH RUNNING<br/>
+                        ✅ RUNNING
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">VM 1002 (comserserver), VM 500, 501, 1001, 9000-9002</td>
+                </tr>
+                <tr style="background-color: #e3f2fd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmox720</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">
+                        <strong>VM 201</strong> (k8s-worker)<br/>
+                        <strong>VM 202</strong> (k8s-worker2)
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">
+                        ✅ RUNNING<br/>
+                        ❌ STOPPED
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">VM 102 (ComservProduction), VM 105, 108</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxt210</strong><br/>(192.168.1.3)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">
+                        ❌ None (gateway only)
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">
+                        —
+                    </td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">VM 100 (ProxmoxBackup), VM 103 (OPNsense)</td>
+                </tr>
+            </table>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ ARCHITECTURAL CORRECTION REQUIRED (Chat 48, 2025-12-23)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Previous Plan Was FLAWED</strong>: K8s master was incorrectly positioned on proxmoxws (unstable KVM VM prone to reboot). Entire architecture assumed 192.168.123.x bridge routing across hosts (which is NOT accessible - only local to proxmoxws).</p>
+                
+                <h4 style="color: #2e7d32; margin-top: 15px;">✅ CORRECTED K8s Cluster Architecture</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Master Node</strong>: VM on proxmox720 (192.168.1.2) - ✅ STABLE (R710 hardware, reliable)</li>
+                    <li><strong>Worker Nodes</strong>: 2 VMs on proxmoxws (192.168.1.4 - workstation KVM) - ✅ OPERATIONAL</li>
+                    <li><strong>Worker Node 3</strong>: 1 VM on proxmoxt210 (192.168.1.3) - ⏳ GATEWAY DUTY (reduced load)</li>
+                    <li><strong>Cluster Status</strong>: 1 master (stable host) + 3 workers (distributed)</li>
+                    <li><strong>Inter-Node Communication</strong>: ⚠️ <strong>NOT 192.168.123.x bridge</strong> (local-only). Use Zerotier (172.30.x overlay - working) or OpenVPN (see Section 4.4 below)</li>
+                </ul>
+                
+                <h4 style="color: #d84315; margin-top: 15px;">Why This Change Was Necessary</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Stability</strong>: proxmox720 (R710) is production-grade hardware. proxmoxws (workstation KVM) may reboot without warning.</li>
+                    <li><strong>Network Isolation</strong>: 192.168.123.0/24 bridge only exists on proxmoxws. Other Proxmox hosts (proxmox720, proxmoxt210) cannot reach it - this breaks multi-node K8s communication.</li>
+                    <li><strong>VPN-First Design</strong>: Cluster must use VPN overlay (Zerotier/OpenVPN) that spans all hosts, not internal bridge networks.</li>
+                </ul>
+            </div>
+            
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #1565c0; margin-top: 0;">Kubernetes Cluster Network Topology (VERIFIED Dec 23, 2025)</h4>
+                <ul style="color: #0d47a1; font-family: var(--body-font); margin: 10px 0;">
+                    <li><strong>K8s Network CIDR</strong>: 192.168.123.0/24 (internal K8s VMs)</li>
+                    <li><strong>K8s Gateway</strong>: 192.168.123.1 (OPNsense VM 103 on proxmoxt210)</li>
+                    <li><strong>Master Node IP</strong>: 192.168.123.75 (VM 100 k8s-master on proxmoxws)</li>
+                    <li><strong>Worker Node 1 IP</strong>: 192.168.123.? (VM 201 k8s-worker on proxmox720 - needs configuration)</li>
+                    <li><strong>Worker Node 2 IP</strong>: 192.168.123.? (VM 103 k8s-worker2 on proxmoxws - needs configuration)</li>
+                    <li><strong>Production DB</strong>: 192.168.1.198 (separate network - bare-metal)</li>
+                    <li><strong>Container Runtime</strong>: Kubernetes (kubeadm or K3s)</li>
+                    <li><strong>Status</strong>: Master + 2 workers operational on isolated 192.168.123.0/24 network</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- NETWORK TOPOLOGY & ROUTING ARCHITECTURE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="network-topology" style="color: var(--text-color); font-family: var(--header-font);">2.3 Network Topology & Routing Architecture</h2>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Critical Infrastructure Understanding</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;">This section explains <strong>how the K8s network (192.168.123.0/24) is made accessible to other infrastructure components</strong>. Understanding this is essential for DNS configuration and cross-network routing.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Physical Infrastructure Layout</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PHYSICAL INFRASTRUCTURE                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  WORKSTATION (Host machine with Proxmoxws VM)                               │
+│  ├─ Ethernet Interface (connected to 192.168.1.0/24 LAN)                    │
+│  ├─ WiFi Interface (connected to 192.168.2.0/24 for mobile access)          │
+│  └─ Host runs ProxmoxVE    in a KVM                                                 │
+│     └─ VM: proxmoxws (192.168.1.3 on LAN)                                 │
+│        ├─ K8s Control Plane VM 100 (master) - 192.168.123.75               │
+│        ├─ K8s Worker VM 103 (worker2) - 192.168.123.101                    │
+│        └─ Internal Bridge: 192.168.123.0/24 (isolated K8s network)          │
+│                                                                               │
+│  NETWORK: 192.168.1.0/24 (Main LAN)                                         │
+│  ├─ proxmoxt210 (192.168.1.3) - Runs OPNsense VM 103 as gateway            │
+│  ├─ proxmox720 (192.168.1.2) - Runs K8s Worker VMs 201, 202               │
+│  ├─ Production Database (192.168.1.198) - Bare-metal server                │
+│  ├─ Catalyst Production (192.168.1.127) - Reachable but not explicitly set  │
+│  └─ [Future] Additional LANs to be added (planning phase)                   │
+│                                                                               │
+│  VPN/MESH NETWORKS (Overlay Networks)                                       │
+│  ├─ Zerotier (ACTIVE) - Working mesh network for 2+ networks managed in OPNsense             │
+│  ├─ OpenVPN (available in OPNsense)                                         │
+│  ├─ WireGuard (available in OPNsense)                                       │
+│  └─ IPsec (available in OPNsense)                                           │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+            </code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">How 192.168.123.0/24 (K8s Network) Is Accessible</h3>
+            
+            <div style="background-color: #e3f2fd; padding: var(--spacing-medium); border: 1px solid #1976d2; border-radius: 4px; margin: var(--spacing-small) 0;">
+                <h4 style="color: #0d47a1; margin-top: 0;">✅ Primary Access Path: Local Network Routing</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>proxmoxws VM has LAN interface</strong>: Connected to workstation's physical NIC on 192.168.1.0/24</li>
+                    <li><strong>K8s bridge is local to proxmoxws</strong>: 192.168.123.0/24 subnet exists inside the hypervisor</li>
+                    <li><strong>Traffic routing</strong>:
+                        <ul>
+                            <li>Any client on 192.168.1.0/24 wanting to reach 192.168.123.x sends traffic to proxmoxws</li>
+                            <li>proxmoxws kernel routes traffic from LAN interface → K8s bridge interface</li>
+                            <li>K8s VMs receive traffic directly via bridge (no additional VPN needed for local network access)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Result</strong>: 
+                        <ul>
+                            <li>✅ proxmox720 (192.168.1.2) CAN reach K8s worker VMs at 192.168.123.0/24 via local LAN routes</li>
+                            <li>✅ proxmoxt210 (192.168.1.3) CAN reach K8s VMs via local LAN routes</li>
+                            <li>✅ Production DB (192.168.1.198) CAN reach K8s VMs via local LAN routes</li>
+                            <li>❌ External/off-site clients CANNOT reach 192.168.123.0/24 (only 192.168.1.0/24 visible)</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <div style="background-color: #e8f5e9; padding: var(--spacing-medium); border: 1px solid #388e3c; border-radius: 4px; margin: var(--spacing-small) 0;">
+                <h4 style="color: #1b5e20; margin-top: 0;">🌐 Secondary Access Path: Zerotier (For Multi-LAN/Off-Site)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Current Status</strong>: Zerotier is <strong>ALREADY WORKING</strong> with 2+ networks joined.</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Zerotier provides overlay VPN</strong>: All connected machines see each other via virtual IPs (e.g., 10.147.x.x)</li>
+                    <li><strong>K8s VMs joined to Zerotier</strong>: Can be configured to participate in mesh network</li>
+                    <li><strong>Future multi-LAN setup</strong>: When additional LANs added, Zerotier routes between them seamlessly</li>
+                    <li><strong>Off-site access</strong>: Remote developers/admins use Zerotier client to reach all networks</li>
+                    <li><strong>Use case</strong>: Will become PRIMARY access method when >2 LANs deployed</li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">OPNsense Gateway Role (proxmoxt210 VM 103)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Function</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Implementation</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Impact on Migration</strong></th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>DNS Server</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Unbound DNS with local overrides (k8s-*.local hostname mappings)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Clients on 192.168.1.0/24 configure DNS to OPNsense; resolve K8s hostnames to 192.168.123.x IPs</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Firewall/Routing</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Allow traffic from 192.168.1.0/24 to 192.168.123.0/24 (K8s network)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Ensures production DB and apps can reach K8s database/services</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>VPN Gateway</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Zerotier, OpenVPN, WireGuard, IPsec endpoints available</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Future: Off-site access to K8s cluster and databases</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Network Gateway</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Central hub for 192.168.1.0/24 ↔ 192.168.123.0/24 (and future LANs)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Single point of management for all network policies</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">DNS + Routing Integration for K8s Hostnames</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The next section (4.3 OPNsense DNS Configuration) relies on this network topology:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>DNS returns IP</strong>: When app queries <code>k8s-db.local</code>, OPNsense returns <code>192.168.123.XX</code> (K8s pod)</li>
+                <li><strong>Routing delivers packet</strong>: App's kernel uses local routing table to send traffic via proxmoxws bridge</li>
+                <li><strong>No fixed IPs needed</strong>: If K8s pod moves to different node, only DNS entry changes</li>
+                <li><strong>Phase 2 migration</strong>: After production DB moves to K8s, <code>k8s-db.local → 192.168.123.XX</code> points to K8s pod automatically</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MULTI-LAYER ROUTING & DIAGNOSTICS -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="routing-diagnostics" style="color: var(--text-color); font-family: var(--header-font);">2.4 Multi-Layer Routing Architecture & Diagnostics</h2>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Multi-Layer Routing in KVM + Proxmox Environment</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;">This environment has <strong>THREE LAYERS OF ROUTING</strong> that must work together:</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Layer 1 (Host to Proxmox)</strong>: Workstation physical network → Proxmox host interface (192.168.1.x)</li>
+                    <li><strong>Layer 2 (Proxmox kernel)</strong>: Proxmox host routing table decides which interface to send traffic to</li>
+                    <li><strong>Layer 3 (VM to Pod)</strong>: K8s VM internal network → K8s pod network (192.168.123.0/24)</li>
+                </ol>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Problem</strong>: If ANY layer lacks a route to 192.168.123.0/24, traffic will fail.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Current Routing State (Dec 23, 2025)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Machine</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>IP Address</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Routing to 192.168.1.0/24</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Routing to 192.168.123.0/24 (K8s)</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Zerotier (172.30.0.0/16)</strong></th>
+                </tr>
+                <tr style="background-color: #e8f5e9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxt210</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.3</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Direct (vmbr0)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (needs test)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">172.30.204.11 (zthnhd6k65)</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmox720</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.2</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Direct (vmbr0)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (needs test)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">172.30.204.10 (zthnhd6k65)</td>
+                </tr>
+                <tr style="background-color: #f5f5f5;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>proxmoxws</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.4 (LAN)<br/>192.168.2.? (WiFi)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Direct (enp9s0)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (needs test)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">172.30.236.89 (zthnhd6k65)</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Master (VM 100)</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.75 <br/> (GW: 192.168.123.1)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (SSH access issue)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Local bridge</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Not yet configured</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Worker2 (VM 103)</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.12</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (SSH access issue)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Local bridge</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Not yet configured</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Worker1 (VM 201)</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.? (needs discovery)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Unknown (SSH access issue)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #4caf50;">✅ Local bridge</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: #ff6f00;">❓ Not yet configured</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Diagnostic Procedure: Testing Multi-Layer Routing</h3>
+            
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 1: Identify K8s Master Node IP (From Proxmoxws)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Command</strong>: SSH to proxmoxws, then run:</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>$ ssh <user>@192.168.1.4
+# From proxmoxws host, SSH to K8s master
+$ ssh root@192.168.123.75 -p 22
+# (or via VM console if SSH not configured)
+
+# Once on K8s master, run:
+root@k8s-master:~# ip addr show
+# Look for interface on 192.168.123.0/24 range (likely eth0 or ens3)
+# Document the IP address: 192.168.123.75 (or actual IP if different)
+
+root@k8s-master:~# ip route show
+# Document ALL routes on K8s master
+# Look especially for:
+# - 192.168.1.0/24 (Proxmox LAN)
+# - 192.168.123.0/24 (local K8s network)
+# - 10.244.0.0/16 (K8s pod network - Flannel)
+</code></pre>
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Expected Output</strong>: 
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><code>192.168.123.75/24</code> or similar IP in 192.168.123.0/24 range</li>
+                        <li>At least 2 routes: one for local network (192.168.123.0/24), one for pods (10.244.0.0/16)</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 2: Check K8s Master Can Reach Proxmox LAN (192.168.1.0/24)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From K8s Master</strong>:</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>root@k8s-master:~# ping -c 3 192.168.1.2  # proxmox720
+root@k8s-master:~# ping -c 3 192.168.1.3  # proxmoxt210
+root@k8s-master:~# ping -c 3 192.168.1.198  # Production database
+</code></pre>
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Expected Result</strong>: 
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>✅ All pings should respond (if K8s master has route to 192.168.1.0/24)</li>
+                        <li>❌ If ANY ping fails: K8s master is missing route to Proxmox LAN</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 3: From Proxmoxws Host, Try to Reach K8s Master (192.168.123.75)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From proxmoxws hypervisor</strong>:</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>root@proxmoxws:~# ping -c 3 192.168.123.75
+root@proxmoxws:~# ip route show | grep -E "192.168.123|10.244"
+</code></pre>
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Expected Result</strong>: 
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>✅ Ping succeeds (proxmoxws can reach K8s master directly)</li>
+                        <li>✅ Route shows: <code>192.168.123.0/24 dev vmbr3 proto kernel scope link</code> (or similar K8s bridge)</li>
+                        <li>❌ If ping fails: proxmoxws hypervisor has no route to 192.168.123.0/24</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 4: From Other Proxmox Hosts, Try Reaching K8s Network</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From proxmox720</strong>:</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmox720:~# ping -c 3 192.168.123.75  # K8s master on proxmoxws
+root@proxmox720:~# ip route show
+</code></pre>
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Expected Result</strong>: 
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>❌ Ping FAILS (proxmox720 has no direct route to proxmoxws's K8s network)</li>
+                        <li><strong>This is EXPECTED</strong> - need to add static route or configure routing via Zerotier/OPNsense</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Solution: Add Static Routes to Connect Proxmox Hosts</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">If proxmox720/proxmoxt210 cannot reach 192.168.123.0/24:</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>SSH to proxmox720</strong>:
+                        <pre style="background-color: white; padding: 10px; border: 1px solid #ff9800; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>root@proxmox720:~# ip route add 192.168.123.0/24 via 192.168.1.4 dev vmbr0
+# This tells proxmox720: "To reach 192.168.123.0/24, send packets via proxmoxws (192.168.1.4)"
+</code></pre>
+                    </li>
+                    <li><strong>Verify with</strong>:
+                        <pre style="background-color: white; padding: 10px; border: 1px solid #ff9800; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>root@proxmox720:~# ping -c 3 192.168.123.75  # Should now succeed
+root@proxmox720:~# ip route show | grep 192.168.123
+# Should show: 192.168.123.0/24 via 192.168.1.4 dev vmbr0
+</code></pre>
+                    </li>
+                    <li><strong>Repeat for proxmoxt210</strong>:
+                        <pre style="background-color: white; padding: 10px; border: 1px solid #ff9800; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code>root@proxmoxt210:~# ip route add 192.168.123.0/24 via 192.168.1.4 dev vmbr0
+root@proxmoxt210:~# ping -c 3 192.168.123.75
+</code></pre>
+                    </li>
+                </ol>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Note</strong>: These routes are temporary (lost on reboot). For permanent routes, add to Proxmox network configuration.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Making Routes Persistent (Permanent)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 10px 0;">On Proxmox hosts, edit <code>/etc/network/interfaces</code> to add permanent static routes:</p>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code># /etc/network/interfaces on proxmox720 and proxmoxt210
+# Add these lines at the end:
+
+auto vmbr0
+iface vmbr0 inet static
+    address 192.168.1.2
+    netmask 255.255.255.0
+    gateway 192.168.1.1
+    bridge_ports eno1
+    # ... existing config ...
+    
+    # Add this line for K8s network route:
+    post-up ip route add 192.168.123.0/24 via 192.168.1.4 dev vmbr0
+    post-down ip route del 192.168.123.0/24 via 192.168.1.4 dev vmbr0</code></pre>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 10px 0;"><strong>After editing</strong>: <code>ifreload -a</code> to reload networking (or reboot to verify).</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- K8S NODE REBUILD STRATEGY -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="k8s-rebuild-strategy" style="color: var(--text-color); font-family: var(--header-font);">2.5 K8s Node Rebuild Strategy (RECOMMENDED)</h2>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Current State: Existing K8s Nodes Have SSH Access Issues</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Discovered Dec 23, 2025:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>❌ Cannot SSH into K8s nodes directly</li>
+                    <li>❌ Cannot retrieve `ip route` tables to diagnose routing issues</li>
+                    <li>❌ Cannot confirm cross-network connectivity (192.168.1.0/24 ↔ 192.168.123.0/24)</li>
+                    <li>❌ Zerotier/OPNsense integration not configured on existing nodes</li>
+                    <li>⚠️ Debugging approach is time-consuming with limited console access</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Recommended Approach: Rebuild K8s Nodes with Clean Configuration</h3>
+            
+            <div style="background-color: #e8f5e9; border-left: 4px solid #388e3c; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #1b5e20; margin-top: 0;">✅ Benefits of Rebuilding</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Predictable IP Addressing</strong>: Assign IPs that match DNS/VPN requirements from day 1</li>
+                    <li><strong>Integrated Networking</strong>: Configure OPNsense DNS + Zerotier during VM provisioning</li>
+                    <li><strong>Role-Based Deployment</strong>: Create nodes with specific roles (master, worker1, worker2) instead of guessing</li>
+                    <li><strong>Zero Legacy Issues</strong>: No debugging ghost routes or misconfigurations</li>
+                    <li><strong>Faster Timeline</strong>: Rebuild (2-3 hours) vs. debugging (8+ hours with limited access)</li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Proposed K8s Cluster Architecture (New Build)</h3>
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">🔑 Key Understanding: Dual Network Design</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Important</strong>: The 192.168.123.0/24 network is <strong>LOCAL to each Proxmox hypervisor</strong> (internal VM bridge). It is NOT routable across Proxmox hosts. This is why nmap can't find it from other servers.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution: Each K8s VM gets TWO network interfaces:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>NIC 1 (eth0)</strong>: Proxmox LAN (192.168.1.x) - for setup/provisioning via cloud-init</li>
+                    <li><strong>NIC 2 (eth1)</strong>: K8s bridge (192.168.123.x) - for internal pod-to-pod communication</li>
+                </ul>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Access Strategy:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Initial Setup</strong>: Cloud-init via Proxmox (eth0)</li>
+                    <li><strong>Production Operations</strong>: OpenVPN through 192.168.1.0/24 LAN → OPNsense → K8s services</li>
+                    <li><strong>Pod Networking</strong>: Internal 192.168.123.0/24 bridge (not externally accessible, by design)</li>
+                </ul>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Role</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>VM ID</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Host Proxmox</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox LAN (eth0)</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Bridge (eth1)</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Hostname</strong></th>
+                </tr>
+                <tr style="background-color: #e3f2fd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Control Plane</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">100</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">proxmoxws</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.100</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.10</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">k8s-master-prod</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Worker Node 1</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">201</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">proxmox720</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.101</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.20</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker1-prod</td>
+                </tr>
+                <tr style="background-color: #f5f5f5;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Worker Node 2</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">103</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">proxmoxws</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.102</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.21</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker2-prod</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Worker Node 3</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">202</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">proxmox720</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.1.103</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">192.168.123.22</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">k8s-worker3-prod</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Network Integration (Baked Into Provisioning)</h3>
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">During VM Provisioning, Configure Each Node With:</h4>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Static IP (K8s network 192.168.123.0/24)</strong>
+                        <ul>
+                            <li>Master: 192.168.123.10</li>
+                            <li>Worker1: 192.168.123.20</li>
+                            <li>Worker2: 192.168.123.21</li>
+                            <li>Worker3: 192.168.123.22</li>
+                        </ul>
+                    </li>
+                    <li><strong>Default Gateway</strong>: 192.168.123.1 (OPNsense VM 103 on proxmoxt210)</li>
+                    <li><strong>DNS Servers</strong> (from OPNsense Unbound):
+                        <ul>
+                            <li>Primary: 192.168.123.1 (OPNsense DNS)</li>
+                            <li>Secondary: 192.168.1.3 (proxmoxt210 LAN fallback)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Routes (Persistent)</strong>:
+                        <ul>
+                            <li><code>192.168.1.0/24 via 192.168.123.1 dev eth0</code> (reach Proxmox LAN)</li>
+                            <li><code>172.30.0.0/16 via 192.168.123.1 dev eth0</code> (reach Zerotier mesh)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Zerotier Client</strong> (optional, for off-site access):
+                        <ul>
+                            <li>Join to existing Zerotier network</li>
+                            <li>Enables OPNsense + K8s nodes to communicate via overlay</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Explicit Step-by-Step Rebuild Process</h3>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ CRITICAL: Delete Existing VMs First</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Execute these commands on each Proxmox host to DESTROY the old K8s VMs.</strong></p>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 1: On proxmoxws host - Delete VMs 100 and 103</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmoxws:~# qm status 100  # Check if running
+root@proxmoxws:~# qm stop 100 --skiplock  # Force stop if needed
+root@proxmoxws:~# qm destroy 100 --destroy-unreferenced-disks 1  # Delete VM + storage
+
+root@proxmoxws:~# qm status 103  # Check if running
+root@proxmoxws:~# qm stop 103 --skiplock
+root@proxmoxws:~# qm destroy 103 --destroy-unreferenced-disks 1
+
+# Verify deletion:
+root@proxmoxws:~# qm list | grep -E "^(100|103)"  # Should show nothing</code></pre>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 2: On proxmox720 host - Delete VMs 201 and 202</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmox720:~# qm status 201
+root@proxmox720:~# qm stop 201 --skiplock
+root@proxmox720:~# qm destroy 201 --destroy-unreferenced-disks 1
+
+root@proxmox720:~# qm status 202
+root@proxmox720:~# qm stop 202 --skiplock
+root@proxmox720:~# qm destroy 202 --destroy-unreferenced-disks 1
+
+# Verify deletion:
+root@proxmox720:~# qm list | grep -E "^(201|202)"  # Should show nothing</code></pre>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 3: Create K8s Master (VM 100) on proxmoxws - DUAL NIC SETUP</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 10px;"><strong>NIC 1 (net0)</strong>: vmbr0 (Proxmox LAN) → 192.168.1.100</p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 10px;"><strong>NIC 2 (net1)</strong>: vmbr3 (K8s bridge) → 192.168.123.10</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmoxws:~# qm create 100 \
+  --name k8s-master-prod \
+  --memory 4096 \
+  --cores 4 \
+  --scsihw virtio-scsi-pci \
+  --scsi0 local-lvm:vm-100-disk-0,size=50G \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr3 \
+  --bootdisk scsi0 \
+  --ipconfig0 "ip=192.168.1.100/24,gw=192.168.1.1" \
+  --ipconfig1 "ip=192.168.123.10/24,gw=192.168.123.1" \
+  --nameserver 192.168.123.1 \
+  --searchdomain local.lan \
+  --ide2 local:cloudinit \
+  --boot c
+
+# Start VM:
+root@proxmoxws:~# qm start 100
+# Wait 30 seconds for cloud-init to initialize
+sleep 30
+
+# Verify creation:
+root@proxmoxws:~# qm status 100</code></pre>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 4: Create K8s Worker1 (VM 201) on proxmox720 - DUAL NIC SETUP</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 10px;"><strong>NIC 1 (net0)</strong>: vmbr0 (Proxmox LAN) → 192.168.1.101</p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 10px;"><strong>NIC 2 (net1)</strong>: vmbr3 (K8s bridge) → 192.168.123.20</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmox720:~# qm create 201 \
+  --name k8s-worker1-prod \
+  --memory 4096 \
+  --cores 4 \
+  --scsihw virtio-scsi-pci \
+  --scsi0 local-lvm:vm-201-disk-0,size=50G \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr3 \
+  --bootdisk scsi0 \
+  --ipconfig0 "ip=192.168.1.101/24,gw=192.168.1.1" \
+  --ipconfig1 "ip=192.168.123.20/24,gw=192.168.123.1" \
+  --nameserver 192.168.123.1 \
+  --searchdomain local.lan \
+  --ide2 local:cloudinit \
+  --boot c
+
+# Start VM:
+root@proxmox720:~# qm start 201
+sleep 30
+
+# Verify creation:
+root@proxmox720:~# qm status 201</code></pre>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 5: Create K8s Worker2 (VM 103) on proxmoxws - DUAL NIC SETUP</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmoxws:~# qm create 103 \
+  --name k8s-worker2-prod \
+  --memory 4096 \
+  --cores 4 \
+  --scsihw virtio-scsi-pci \
+  --scsi0 local-lvm:vm-103-disk-0,size=50G \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr3 \
+  --bootdisk scsi0 \
+  --ipconfig0 "ip=192.168.1.102/24,gw=192.168.1.1" \
+  --ipconfig1 "ip=192.168.123.21/24,gw=192.168.123.1" \
+  --nameserver 192.168.123.1 \
+  --searchdomain local.lan \
+  --ide2 local:cloudinit \
+  --boot c
+
+# Start VM:
+root@proxmoxws:~# qm start 103
+sleep 30
+root@proxmoxws:~# qm status 103</code></pre>
+            </div>
+
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #0d47a1; margin-top: 0;">Step 6: Create K8s Worker3 (VM 202) on proxmox720 - DUAL NIC SETUP</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmox720:~# qm create 202 \
+  --name k8s-worker3-prod \
+  --memory 4096 \
+  --cores 4 \
+  --scsihw virtio-scsi-pci \
+  --scsi0 local-lvm:vm-202-disk-0,size=50G \
+  --net0 virtio,bridge=vmbr0 \
+  --net1 virtio,bridge=vmbr3 \
+  --bootdisk scsi0 \
+  --ipconfig0 "ip=192.168.1.103/24,gw=192.168.1.1" \
+  --ipconfig1 "ip=192.168.123.22/24,gw=192.168.123.1" \
+  --nameserver 192.168.123.1 \
+  --searchdomain local.lan \
+  --ide2 local:cloudinit \
+  --boot c
+
+# Start VM:
+root@proxmox720:~# qm start 202
+sleep 30
+root@proxmox720:~# qm status 202</code></pre>
+            </div>
+
+            <div style="background-color: #e8f5e9; border-left: 4px solid #388e3c; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #1b5e20; margin-top: 0;">✅ Step 7: Verify All VMs Are Reachable on Proxmox LAN (192.168.1.x)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Wait 1-2 minutes for cloud-init to fully initialize, then ping from any Proxmox host:</p>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #388e3c; border-radius: 3px; color: var(--text-color); overflow-x: auto;"><code">root@proxmoxws:~# ping -c 2 192.168.1.100  # k8s-master-prod
+root@proxmoxws:~# ping -c 2 192.168.1.101  # k8s-worker1-prod (on proxmox720)
+root@proxmoxws:~# ping -c 2 192.168.1.102  # k8s-worker2-prod
+root@proxmoxws:~# ping -c 2 192.168.1.103  # k8s-worker3-prod (on proxmox720)
+
+# If all pings succeed ✅ - VMs are reachable for Kubernetes initialization</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">After Rebuild: Choose Primary & Replica Roles</h3>
+            <div style="background-color: #e8f5e9; border-left: 4px solid #388e3c; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <p style="color: var(--text-color); font-family: var(--body-font);">Once all 3 worker nodes are healthy and can reach Proxmox LAN (192.168.1.0/24) + OPNsense DNS:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Primary Database Pod</strong>: Deploy on Worker1 (192.168.123.20 on proxmox720) for hardware diversity</li>
+                    <li><strong>Replica Pod</strong>: Deploy on Worker2 (192.168.123.21 on proxmoxws) for HA</li>
+                    <li><strong>Load Balancer / Backup</strong>: Use Worker3 (192.168.123.22) for scaling</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TARGET ARCHITECTURE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="target-architecture" style="color: var(--text-color); font-family: var(--header-font);">3. Target Architecture</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Current Kubernetes Architecture (Multi-Node Distributed Cluster)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
+Current K8s Setup (EXISTING - Multi-Node Distributed)
+├── Control Plane (VM 100 on proxmoxws)
+│   ├── API Server
+│   ├── etcd
+│   ├── Scheduler / Controller Manager
+│   └── kubelet
+│
+├── Worker Node 1 (VM 201 on proxmox720 - ACTIVE)
+│   ├── containerd runtime
+│   ├── kubelet
+│   └── kube-proxy
+│
+├── Worker Node 2 (VM 103 on proxmoxws - ACTIVE)
+│   ├── containerd runtime
+│   ├── kubelet
+│   └── kube-proxy
+│
+├── Worker Node 3 (VM 202 on proxmox720 - STOPPED, available for scaling)
+│   └── Ready to activate for HA
+
+└── Database Cluster (NEW - StatefulSet for dual-sync)
+    ├── MariaDB Pod (primary) - Connected to 192.168.1.198 (bare-metal)
+    └── Replica Pod (optional - on different worker node for resilience)
+
+K8s Service Layer
+├── Service: database (ClusterIP) - connects to bare-metal 192.168.1.198
+├── Service: comserv-app - routes Catalyst pods (running on VM 1002 proxmoxws)
+└── Optional: MetalLB for external load balancing from 192.168.1.0/24
+
+Network Topology
+├── 192.168.1.0/24 (OPNsense gateway at proxmoxt210 VM 103)
+│   ├── Bare-metal DB at 192.168.1.198
+│   └── K8s nodes route through OPNsense for external connectivity
+│
+└── K8s Pod Network (10.244.0.0/16 - Flannel)
+    ├── Master/Worker pods
+    └── Database pods
+
+Persistent Storage
+├── Local storage on each Proxmox host
+├── PersistentVolumeClaim for database StatefulSet
+└── StorageClass: local-path or proxmox native storage
+            </code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">High Availability & Dual-Database Sync Strategy</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+                <li><strong>Production DB Reliability</strong>: Keep bare-metal 192.168.1.198 as primary source of truth</li>
+                <li><strong>K8s Dual-Sync Replica</strong>: MariaDB pod in K8s StatefulSet mirrors production via binlog replication</li>
+                <li><strong>Application-Level Priority</strong>: Comserv db_config.json prioritizes bare-metal, uses K8s as fallback</li>
+                <li><strong>Zero Downtime Cutover</strong>: During final migration, promote K8s database while keeping bare-metal running</li>
+                <li><strong>Automatic Failover</strong>: If K8s pod fails, Kubernetes reschedules within 30-60 seconds</li>
+                <li><strong>Network Policies</strong>: K8s NetworkPolicy restricts database traffic to Catalyst application pods + monitoring</li>
+                <li><strong>Backup Strategy</strong>: Daily snapshots of both bare-metal (via mysqldump) and K8s (via persistent volume snapshots)</li>
+                <li><strong>Disaster Recovery</strong>: VMID 500 (mysqlserver on proxmoxws) retained as additional backup</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 0: VALIDATION & PREP -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="proxmox-setup" style="color: var(--text-color); font-family: var(--header-font);">4. Phase 0: Validate Existing Infrastructure & Network Connectivity</h2>
+
+            <div style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #1b5e20; margin-top: 0;">✅ Existing Infrastructure (No Setup Needed)</h3>
+                <ul style="color: #2e7d32; font-family: var(--body-font);">
+                    <li><strong>Dell R710 (pve-r710)</strong> - Proxmox host with K8s VM 101 ✓</li>
+                    <li><strong>VM 101</strong> - Ubuntu 24.04 K8s Master (v1.30), Flannel CNI, pod CIDR 10.244.0.0/16 ✓</li>
+                    <li><strong>VM 100</strong> - OPNsense firewall at 192.168.1.1 ✓</li>
+                    <li><strong>Network Layer</strong> - 192.168.1.0/24 with OPNsense routing ✓</li>
+                    <li><strong>Bare-Metal DB</strong> - 192.168.1.198 (MariaDB 10.x) ✓</li>
+                </ul>
+            </div>
+
+            <h3 id="step-4-1" style="color: var(--text-color); font-family: var(--header-font);">Step 4.1: Diagnose K8s Cluster Status (Current State)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ CRITICAL FIRST STEP</strong>: Verify K8s is actually running and determine which VMs are hosting the cluster.</p>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: #d84315; margin-top: 0;">Current Situation (Dec 23, 2025)</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>kubectl commands on proxmox720 fail: <code>connection refused on localhost:8080</code></li>
+                    <li>K3s appears to be running on bare Proxmox host, not in VMs</li>
+                    <li>kubeconfig at /etc/rancher/k3s/k3s.yaml is unreadable (permissions 600, owned by root)</li>
+                    <li><strong>Question</strong>: Are K8s VMs (master on proxmoxws, workers on proxmox720) actually running?</li>
+                </ul>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4.1.1: Check Which Proxmox Host You're On</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Run these commands ON each Proxmox host to determine which is which
+
+# Check hostname
+hostname
+
+# Check Proxmox host IP
+hostname -I | awk '{print $1}'
+
+# Check if this is proxmoxws, proxmox720, or proxmoxt210
+pvecm status  # Will show cluster node name
+
+# List running VMs on this host
+qm list
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4.1.2: Verify K8s VMs Are Running</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On proxmoxws (should host VM 100 = K8s master):
+qm list | grep "100\|master\|k8s"
+
+# Check VM 100 status
+qm status 100
+
+# If running, SSH into VM 100 and check K8s
+ssh root@&lt;vm-100-ip&gt;
+kubectl get nodes -o wide
+kubectl cluster-info
+
+# On proxmox720 (should host VM 201, 202 = K8s workers):
+qm list | grep "201\|202\|worker\|k8s"
+
+# Check VM 201 status
+qm status 201
+
+# If running, SSH into VM 201 and verify connection to master
+ssh root@&lt;vm-201-ip&gt;
+kubectl get nodes -o wide
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4.1.3: If K8s VMs Not Running - Start Them</h4>
+            <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Start K8s master VM on proxmoxws
+qm start 100
+
+# Wait for boot (30-60 seconds)
+sleep 60
+
+# Start K8s worker VMs
+qm start 201    # on proxmox720
+qm start 202    # on proxmox720 (if needed)
+qm start 103    # on proxmoxws (if this is a worker)
+
+# Verify all are running
+qm list | grep -E "100|201|202|103"
+                </code></pre>
+            </div>
+
+            <h3 id="step-4-2" style="color: var(--text-color); font-family: var(--header-font);">Step 4.2: Validate Network Connectivity: K8s Cluster → Bare-Metal DB</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Test network path from K8s cluster (VM 101 on 10.244.0.0/16) to bare-metal database (192.168.1.198:3306):</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># From K8s control plane (VM 101)
+ping -c 2 192.168.1.198
+
+# Test MySQL connectivity
+mysql -h 192.168.1.198 -u shanta_forager -p -e "SELECT VERSION();"
+
+# Check OPNsense firewall rules allow K8s → DB traffic
+# (May need to add network policy on OPNsense if connection fails)
+
+# Route test
+traceroute 192.168.1.198
+                </code></pre>
+            </div>
+
+            <h3 id="step-4-3" style="color: var(--text-color); font-family: var(--header-font);">Step 4.3: Prepare Kubernetes for Database StatefulSet</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Create namespace and storage class for database pods:</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Create namespace for database
+kubectl create namespace database
+
+# Create local storage for database persistence (using R710 local storage)
+cat &lt;&lt; EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+EOF
+
+# Create persistent volume for database
+cat &lt;&lt; EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: database-pv
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage
+  local:
+    path: /mnt/k8s-database
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - &lt;vm-101-hostname&gt;
+EOF
+
+# Verify resources created
+kubectl get storageclass
+kubectl get pv
+                </code></pre>
+            </div>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: #d84315; margin-top: 0;">✓ Success Criteria for Phase 0</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>K8s cluster nodes are Ready and join status is "Ready"</li>
+                    <li>All kube-system pods are Running (including Flannel CNI)</li>
+                    <li>Network connectivity established: VM 101 ↔ 192.168.1.198 (ping + MySQL test)</li>
+                    <li>StorageClass and PersistentVolume created successfully</li>
+                    <li>No network policy blocks needed (or temporarily disabled for testing)</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OPNSENSE DNS CONFIGURATION FOR K8S HOSTNAMES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="opnsense-dns" style="color: var(--text-color); font-family: var(--header-font);">4.3: Configure OPNsense DNS for K8s Hostnames</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">To avoid hardcoding IPs (which change), configure OPNsense as a DNS server with entries for K8s nodes and services.</p>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Database Naming Strategy (IMPORTANT)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Two Database Scenarios</strong>:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;">
+                    <li><strong>SCENARIO A (Current)</strong>: K8s applications point to existing bare-metal database
+                        <ul style="margin-left: 20px;">
+                            <li><code>k8s-db.local</code> → <code>192.168.1.198</code> (same as production)</li>
+                            <li>Use this if migrating application code only, keeping production database on bare-metal</li>
+                        </ul>
+                    </li>
+                    <li><strong>SCENARIO B (Future)</strong>: K8s hosts its own database instance
+                        <ul style="margin-left: 20px;">
+                            <li><code>k8s-db.local</code> → <code>192.168.123.XX</code> (K8s database pod IP)</li>
+                            <li><code>db-prod.local</code> → <code>192.168.1.198</code> (keep production DB separate)</li>
+                            <li>Use this after Phase 2 migration (database in K8s cluster)</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>For now (Phase 0-1)</strong>: Use <code>k8s-db.local → 192.168.1.198</code> to point applications to the existing production database.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Why DNS Instead of Static IPs?</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>✅ <strong>Future-proof</strong>: If a node IP changes, just update DNS - no script rewrites</li>
+                <li>✅ <strong>Cleaner</strong>: Use `k8s-master.local` instead of `192.168.123.75`</li>
+                <li>✅ <strong>Minimal overhead</strong>: Much lighter than VPN</li>
+                <li>✅ <strong>Flexible</strong>: Easy to add new hosts as cluster grows</li>
+                <li>✅ <strong>Avoids naming conflicts</strong>: Distinguish production DB from K8s DB with hostname aliases</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Discover K8s Worker Node IPs</h3>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);">Before configuring DNS, determine the actual IP addresses of the K8s worker nodes:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># SSH into the K8s master VM
+ssh root@proxmoxws
+qm exec 100 bash
+
+# Inside K8s master, discover all nodes
+kubectl get nodes -o wide
+
+# Expected output:
+# NAME            STATUS   ROLES                  AGE   VERSION        INTERNAL-IP      EXTERNAL-IP
+# k8s-master      Ready    control-plane,master   30d   v1.24.0        192.168.123.75   &lt;none&gt;
+# k8s-worker1     Ready    worker                 30d   v1.24.0        192.168.123.100  &lt;none&gt;
+# k8s-worker2     Ready    worker                 30d   v1.24.0        192.168.123.101  &lt;none&gt;
+
+# Note these IPs - you'll need them for DNS configuration
+                </code></pre>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Record these IPs for Step 3</strong> below.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 2: Access OPNsense Web UI</h3>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);">OPNsense runs in VM 103 on proxmoxt210 as the K8s network gateway. Access it via web browser:</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;">
+                    <li><strong>From your Ubuntu workstation or proxmox host</strong>, SSH to proxmoxt210 and get OPNsense IP:
+                        <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code>ssh root@proxmoxt210
+qm exec 103 ip addr show | grep "inet " | grep -v 127.0.0.1
+
+# Example output:
+# inet 192.168.1.1/24 brd 192.168.1.255 scope global eth0
+# OPNsense IP = 192.168.1.1 (but may differ in your setup)
+                        </code></pre>
+                    </li>
+                    <li><strong>Open a web browser</strong> and navigate to:
+                        <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code>https://192.168.1.1
+                        </code></pre>
+                        (or replace 192.168.1.1 with the IP from step 1)
+                    </li>
+                    <li><strong>Accept self-signed certificate warning</strong>: OPNsense uses self-signed HTTPS certificates by default
+                    </li>
+                    <li><strong>Login</strong>:
+                        <ul style="margin-left: 20px;">
+                            <li><strong>Default username</strong>: <code>root</code></li>
+                            <li><strong>Default password</strong>: <code>opnsense</code> (or your configured password)</li>
+                            <li>If you don't know the password, you'll need physical/console access to reset it</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Add DNS Records in OPNsense - Detailed Procedure</h3>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Once logged into OPNsense Web UI</strong>:</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Click the menu icon (hamburger)</strong> in top-left corner if menu is collapsed
+                    </li>
+                    <li><strong>Navigate to Services → Unbound DNS</strong>
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>In left sidebar, find <code>Services</code></li>
+                            <li>Hover over Services to expand submenu</li>
+                            <li>Click <code>Unbound DNS</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Click the "Overrides" tab</strong> at the top of the page
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>You should see a list of existing DNS overrides (may be empty)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Click the "+" (Add) button</strong> to add a new override
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>A form will appear with fields for Hostname, Domain, and IP Address</li>
+                        </ul>
+                    </li>
+                    <li><strong>Fill in the first override record</strong> for K8s Master:
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0; background-color: #fff;">
+                            <tr style="background-color: #f0f0f0;">
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Field</strong></th>
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Value</strong></th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hostname</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>k8s-master</code></td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Domain</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>local</code></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>IP Address</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>192.168.123.75</code></td>
+                            </tr>
+                        </table>
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 5px;"><strong>Description (optional)</strong>: <code>Kubernetes Master Node</code></p>
+                    </li>
+                    <li><strong>Click "Save" button</strong> (at bottom of form)
+                    </li>
+                    <li><strong>Click "+" again</strong> to add K8s Worker 1:
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0; background-color: #fff;">
+                            <tr style="background-color: #f0f0f0;">
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Field</strong></th>
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Value</strong></th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hostname</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>k8s-worker1</code></td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Domain</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>local</code></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>IP Address</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>192.168.123.100</code> (from Step 1)</td>
+                            </tr>
+                        </table>
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 5px;"><strong>Description</strong>: <code>Kubernetes Worker Node 1 (VM 201)</code></p>
+                    </li>
+                    <li><strong>Click "Save"</strong>, then add K8s Worker 2:
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0; background-color: #fff;">
+                            <tr style="background-color: #f0f0f0;">
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Field</strong></th>
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Value</strong></th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hostname</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>k8s-worker2</code></td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Domain</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>local</code></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>IP Address</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>192.168.123.101</code> (from Step 1)</td>
+                            </tr>
+                        </table>
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 5px;"><strong>Description</strong>: <code>Kubernetes Worker Node 2 (VM 103)</code></p>
+                    </li>
+                    <li><strong>Click "Save"</strong>, then add the production database entry:
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0; background-color: #fff;">
+                            <tr style="background-color: #f0f0f0;">
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Field</strong></th>
+                                <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Value</strong></th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hostname</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>k8s-db</code></td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Domain</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>local</code></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><strong>IP Address</strong></td>
+                                <td style="padding: 8px; border: 1px solid #ddd;"><code>192.168.1.198</code> <strong>(Phase 0-1: Production DB)</strong></td>
+                            </tr>
+                        </table>
+                        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 5px;"><strong>Description</strong>: <code>Production Database (Bare-Metal) - Will be updated to K8s pod IP in Phase 2</code></p>
+                    </li>
+                    <li><strong>Click "Save"</strong>
+                    </li>
+                    <li><strong>Look for an "Apply" or "Apply Settings" button</strong> (usually at bottom-right or top-right of the Overrides list)
+                        <ul style="margin-left: 20px; margin-top: 5px;">
+                            <li>This reloads the DNS service with the new records</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p style="color: #2e7d32; font-family: var(--body-font); margin-top: 10px;"><strong>✅ After saving and applying</strong>, the Unbound DNS service will restart with the new override records.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 4: Verify DNS Resolution</h3>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Test DNS from the K8s master node</strong>:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># SSH into K8s master (already SSH'd into proxmoxws)
+ssh root@k8s-master  # or use 192.168.123.75 if DNS not working yet
+
+# Test DNS resolution (OPNsense is at 192.168.123.1)
+nslookup k8s-master.local 192.168.123.1
+
+# Expected output:
+Server:         192.168.123.1
+Address:        192.168.123.1#53
+
+Name:   k8s-master.local
+Address: 192.168.123.75
+
+# Test the other records
+nslookup k8s-worker1.local 192.168.123.1
+nslookup k8s-worker2.local 192.168.123.1
+nslookup k8s-db.local 192.168.123.1
+
+# You can also use dig for more detailed output:
+dig k8s-master.local @192.168.123.1
+                </code></pre>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>If DNS doesn't resolve</strong>:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check that you clicked "Apply" in OPNsense (DNS service must reload)</li>
+                    <li>Verify the OPNsense IP is correct (should be 192.168.123.1 as K8s gateway)</li>
+                    <li>Check OPNsense Unbound DNS service is running (Services → Unbound DNS → check "Enable" checkbox)</li>
+                    <li>Review OPNsense system logs for DNS errors</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 5: Configure Your Workstation to Use OPNsense DNS</h3>
+            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Option A: Network Settings (Permanent)</strong></p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On Ubuntu GNOME:
+# Settings → Network → Wired → Gear icon → IPv4 → DNS toggle ON
+# Add: 192.168.123.1
+
+# Or via command line (netplan):
+# Edit /etc/netplan/01-netcfg.yaml (or similar file in /etc/netplan/)
+# Add under your interface section:
+#   dhcp4-overrides:
+#     use-dns: false
+#   nameservers:
+#     addresses: [192.168.123.1]
+# Then: sudo netplan apply
+                </code></pre>
+
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Option B: /etc/hosts (Quick Test)</strong></p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Add to /etc/hosts temporarily (sudo required):
+sudo tee -a /etc/hosts << 'EOF'
+192.168.123.75   k8s-master.local
+192.168.123.100  k8s-worker1.local
+192.168.123.101  k8s-worker2.local
+192.168.1.198    k8s-db.local
+EOF
+
+# Verify entries were added
+cat /etc/hosts | grep k8s
+
+# Now test DNS locally (no need to query 192.168.123.1)
+ping k8s-master.local
+                </code></pre>
+
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Option C: Permanent via systemd-resolved (Ubuntu 20.04+)</strong></p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Edit /etc/systemd/resolved.conf
+sudo nano /etc/systemd/resolved.conf
+
+# Find the [Resolve] section and set:
+# DNS=192.168.123.1 192.168.1.1
+# FallbackDNS=8.8.8.8 8.8.4.4
+# Domains=local
+
+# Save and restart resolved
+sudo systemctl restart systemd-resolved
+
+# Verify new DNS servers
+systemd-resolve --status
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 6: Update DNS Records After Phase 2 (K8s Database Migration)</h3>
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <p style="color: #0d47a1; font-family: var(--body-font);"><strong>When you migrate the database to Kubernetes (Phase 2)</strong>, update DNS records:</p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>In OPNsense, find the <code>k8s-db.local</code> override record you created</li>
+                    <li>Click the <strong>edit icon</strong> (pencil) next to it</li>
+                    <li>Change the IP address from <code>192.168.1.198</code> to the K8s database pod's IP (e.g., <code>192.168.123.XX</code>)</li>
+                    <li>(Optional) Create a new record <code>db-prod.local → 192.168.1.198</code> if you keep a backup on bare-metal</li>
+                    <li>Click <strong>Save</strong> and <strong>Apply</strong></li>
+                </ol>
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Benefit</strong>: Applications don't need reconfiguration - just update one DNS entry and all clients automatically switch to the new database endpoint.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- OPENVPN SETUP FOR INTER-NODE K8S COMMUNICATION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="openvpn-setup" style="color: var(--text-color); font-family: var(--header-font);">4.4: Configure OpenVPN for Inter-Node K8s Communication</h2>
+            
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ WHY OpenVPN IS REQUIRED (Not Optional)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Problem Identified (Chat 48)</strong>: The 192.168.123.x K8s bridge network only exists on proxmoxws (KVM VM). Other Proxmox hosts (proxmox720, proxmoxt210) cannot reach this network.</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 10px 0;">
+                    <li>K8s master will run on proxmox720 (stable R710 hardware)</li>
+                    <li>K8s workers will run on proxmoxws (2 workers) and proxmoxt210 (1 worker)</li>
+                    <li>Without a VPN overlay, master ↔ worker communication FAILS (different physical hosts)</li>
+                    <li><strong>Solution</strong>: Use OpenVPN (or Zerotier) to create a unified overlay network that spans all Proxmox hosts</li>
+                </ul>
+                
+                <h4 style="color: #2e7d32; margin-top: 15px;">VPN Options Available (Ranked by Ease)</h4>
+                <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                    <tr style="background-color: #f0f0f0;">
+                        <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Technology</strong></th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Status</strong></th>
+                        <th style="text-align: left; padding: 8px; border: 1px solid #ddd;"><strong>Recommendation</strong></th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>Zerotier</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">✅ ALREADY WORKING (172.30.x overlay)</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>USE FIRST</strong> - Minimal config needed</td>
+                    </tr>
+                    <tr style="background-color: #f9f9f9;">
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>OpenVPN</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">⏳ Available in OPNsense</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">Use if Zerotier has bandwidth limits</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>WireGuard</strong></td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">⏳ Available in OPNsense</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">More modern, requires kernel module</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Quick Test - Use Existing Zerotier Network (RECOMMENDED)</h3>
+            <div style="background-color: #e3f2fd; border-left: 4px solid #1976d2; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Zerotier is already working on your infrastructure</strong> (172.30.x overlay network). K8s can use this immediately:</p>
+                
+                <h4 style="color: #0d47a1;">Check Current Zerotier Status</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; color: var(--text-color); font-family: monospace;"><code># SSH to proxmox720 and check Zerotier
+ssh root@proxmox720
+zerotier-cli listnetworks
+
+# Expected output:
+# 200 listnetworks
+# &lt;network-id&gt;  &lt;name&gt;            MAC                    STATUS   TYPE      DEV    ZT ASSIGNED
+# zthnhd6k65  &lt;name-of-network&gt; &lt;mac-addr&gt;  OK       PRIVATE  zt0    172.30.204.10/24
+
+# Document this Zerotier IP (e.g., 172.30.204.10)
+# This is the network that spans all Proxmox hosts
+                </code></pre>
+
+                <h4 style="color: #0d47a1; margin-top: 15px;">Configure K8s VMs to Use Zerotier IPs</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">During K8s VM provisioning (Section 2.5), set:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Master VM (proxmox720)</strong>: Use Zerotier IP as advertised-address</li>
+                    <li><strong>Worker VMs</strong>: Configure Zerotier membership during cloud-init</li>
+                    <li><strong>API Server</strong>: Advertise on Zerotier IP (not 192.168.123.x)</li>
+                </ul>
+
+                <h4 style="color: #0d47a1; margin-top: 15px;">Example: K8s Join Command Using Zerotier</h4>
+                <pre style="background-color: white; padding: 10px; border: 1px solid #1976d2; color: var(--text-color); font-family: monospace;"><code># On K8s Master (Zerotier IP: 172.30.204.10)
+kubeadm init --apiserver-advertise-address=172.30.204.10 \
+             --apiserver-cert-extra-sans=172.30.204.10 \
+             --pod-network-cidr=10.244.0.0/16
+
+# Get join token (valid for 24 hours)
+kubeadm token create --print-join-command
+
+# On K8s Workers (Zerotier IPs: 172.30.204.11, 172.30.204.12, etc.)
+kubeadm join 172.30.204.10:6443 --token &lt;token&gt; \
+    --discovery-token-ca-cert-hash sha256:&lt;hash&gt;
+                </code></pre>
+
+                <p style="color: #0d47a1; font-family: var(--body-font); margin-top: 10px;"><strong>Benefit</strong>: No additional setup needed. K8s will communicate through Zerotier overlay, which already spans all hosts.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 2: (Optional) Set Up OpenVPN as Backup if Zerotier Bandwidth Insufficient</h3>
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Only proceed if Zerotier shows poor performance</strong>. OpenVPN is more complex but offers better bandwidth.</p>
+
+                <h4 style="color: #d84315;">Why Zerotier Might Be Limited</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Zerotier is a mesh network designed for flexibility, not pure throughput</li>
+                    <li>Multi-hop routing (if direct path unavailable) adds latency</li>
+                    <li>Good for control plane communication, but large database replication may be slow</li>
+                </ul>
+
+                <h4 style="color: #d84315; margin-top: 15px;">OpenVPN Configuration in OPNsense (Detailed Steps)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">OPNsense (VM 103 on proxmoxt210) already has OpenVPN available. To set it up:</p>
+
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Login to OPNsense Web UI</strong> (https://192.168.123.1 or your OPNsense IP)</li>
+                    <li><strong>Navigate to VPN → OpenVPN → Servers</strong></li>
+                    <li><strong>Click "Add" button</strong> to create a new OpenVPN server</li>
+                    <li><strong>Fill in Configuration</strong>:
+                        <table style="width: 100%; border-collapse: collapse; margin: 10px 0; background-color: white;">
+                            <tr style="background-color: #f0f0f0;">
+                                <th style="padding: 8px; border: 1px solid #ddd;"><strong>Setting</strong></th>
+                                <th style="padding: 8px; border: 1px solid #ddd;"><strong>Value</strong></th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Disabled</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">☐ (unchecked - enabled by default)</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;">Description</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Kubernetes Inter-Node VPN</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Protocol</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">UDP (faster) or TCP (more reliable)</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;">Port</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">1194 (standard OpenVPN port)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Server Network</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">172.31.0.0/24 (use different range than Zerotier 172.30.x)</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td style="padding: 8px; border: 1px solid #ddd;">Cipher</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">AES-256-GCM (strong encryption)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Data Ciphers</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">AES-256-GCM:AES-128-GCM</td>
+                            </tr>
+                        </table>
+                    </li>
+                    <li><strong>Click "Save"</strong></li>
+                    <li><strong>Generate Client Certificates</strong> for each K8s VM (master + workers)</li>
+                    <li><strong>Configure OpenVPN Clients</strong> on K8s VMs to connect to OPNsense server</li>
+                </ol>
+
+                <h4 style="color: #d84315; margin-top: 15px;">⚠️ IMPORTANT: PKI/Certificate Setup</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font);">OpenVPN requires PKI (Public Key Infrastructure) certificates for secure communication:</p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>OPNsense must have a CA (Certificate Authority) certificate</li>
+                    <li>Generate server certificate for OpenVPN server (OPNsense)</li>
+                    <li>Generate client certificates for each K8s VM connecting as clients</li>
+                    <li>This can be complex - see OPNsense documentation or consult IT team</li>
+                </ul>
+
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Recommendation</strong>: Start with Zerotier (Step 1). Only proceed with OpenVPN if performance testing shows it's necessary.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KUBECTL CONFIGURATION FOR LOCAL ADMINISTRATION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="kubectl-setup" style="color: var(--text-color); font-family: var(--header-font);">4.5: Configure kubectl Access for Local Workstations</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">To manage the Kubernetes cluster from workstations or local servers (not just the control plane VM), configure kubectl with kubeconfig access.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Problem: kubectl Permission Denied</h3>
+            <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Issue</strong>: Running <code>kubectl</code> on K3s nodes fails with:</p>
+                <pre style="background-color: #f7f7f7; padding: 8px; color: #d32f2f; font-family: monospace;">error: error loading config file "/etc/rancher/k3s/k3s.yaml": open /etc/rancher/k3s/k3s.yaml: permission denied</pre>
+                
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Root Cause</strong>: The kubeconfig file (<code>/etc/rancher/k3s/k3s.yaml</code>) is owned by root with 600 permissions (read-only by root).</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Solution: Grant kubectl Access to Non-Root Users</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Option 1: Copy kubeconfig to User Home Directory (Recommended)</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Best Practice</strong>: Each user gets their own copy with correct permissions.</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On the K3s node (e.g., proxmox720 or master VM)
+# As root or with sudo:
+
+# Create .kube directory for current user
+mkdir -p ~/.kube
+
+# Copy kubeconfig from K3s system directory
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+
+# Fix permissions (user must own the file)
+sudo chown $(id -u):$(id -g) ~/.kube/config
+chmod 600 ~/.kube/config
+
+# Test kubectl access
+kubectl get nodes
+kubectl get pods --all-namespaces
+                </code></pre>
+
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>For Specific User</strong> (e.g., shanta):</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># As root:
+sudo cp /etc/rancher/k3s/k3s.yaml /home/shanta/.kube/config
+sudo chown shanta:shanta /home/shanta/.kube/config
+chmod 600 /home/shanta/.kube/config
+
+# Verify (as shanta user)
+kubectl get nodes
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Option 2: Set KUBECONFIG Environment Variable</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Temporary Fix</strong>: Point kubectl to the kubeconfig file.</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># In bash/zsh shell (temporary for current session)
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+kubectl get nodes
+
+# To make permanent, add to ~/.bashrc or ~/.zshrc:
+echo 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml' >> ~/.bashrc
+source ~/.bashrc
+                </code></pre>
+                
+                <p style="color: #d32f2f; font-family: var(--body-font); margin-top: 10px;"><strong>⚠️ Warning</strong>: This still requires read permissions on /etc/rancher/k3s/k3s.yaml. Works if running as root or with sudo, but not recommended for regular users.</p>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Option 3: Fix File Permissions (Careful!)</h4>
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ Security Risk</strong>: Changing kubeconfig permissions exposes cluster credentials. Use only in development.</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Make kubeconfig world-readable (NOT recommended for production)
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+
+# For specific group (safer):
+sudo chmod 640 /etc/rancher/k3s/k3s.yaml
+sudo chgrp docker /etc/rancher/k3s/k3s.yaml  # or your preferred group
+                </code></pre>
+                
+                <p style="color: #d84315; font-family: var(--body-font); margin-top: 10px;"><strong>Best Practice</strong>: Use Option 1 (copy to user home) instead. This keeps the system kubeconfig protected while granting individual user access.</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Accessing K8s from Your Local Ubuntu Workstation</h3>
+            
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Install kubectl on Your Local Machine (One-Time Setup)</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>On your local Ubuntu workstation</strong>:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+# Verify installation
+kubectl version --client
+
+# Create .kube directory
+mkdir -p ~/.kube
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 2: SSH Into K8s Master VM (Using DNS Hostname)</h4>
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ IMPORTANT</strong>: kubectl must be run ON the K8s master VM (VM 100), not on the Proxmox host.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">The Proxmox hosts (proxmoxws, proxmox720, proxmoxt210) are hypervisors. K8s runs in VMs on top of them.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Prerequisites</strong>: You've configured OPNsense DNS (section 4.3) with k8s-master.local pointing to 192.168.123.75.</p>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>From your local Ubuntu workstation</strong>:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># OPTION A: Using DNS hostname (requires OPNsense DNS setup)
+ssh root@k8s-master.local
+
+# OPTION B: Using IP directly (if DNS not configured yet)
+ssh root@192.168.123.75
+
+# Now you're ON the K8s master, run kubectl
+kubectl get nodes -o wide
+kubectl cluster-info
+kubectl get pods --all-namespaces
+
+# To see the kubeconfig location:
+echo $KUBECONFIG
+# Usually: /etc/kubernetes/admin.conf or /etc/rancher/k3s/k3s.yaml
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Alternative Step 2: Copy kubeconfig Locally</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>If you want kubectl access on your local workstation</strong>, copy the kubeconfig:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># From your local Ubuntu workstation:
+
+# Step 1: Find VM 100's IP
+MASTER_IP=$(ssh root@proxmoxws "qm exec 100 hostname -I" | awk '{print $1}')
+echo $MASTER_IP
+
+# Step 2: Copy kubeconfig from VM 100
+scp root@$MASTER_IP:/etc/kubernetes/admin.conf ~/.kube/config-comserv
+
+# Or if K3s (check which one during SSH above):
+scp root@$MASTER_IP:/etc/rancher/k3s/k3s.yaml ~/.kube/config-comserv
+
+# Step 3: Fix the server IP in kubeconfig (see next step)
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Update kubeconfig to Use Remote IP</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>The kubeconfig points to localhost:6443</strong>, which won't work from your workstation. Fix it:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Edit the kubeconfig
+nano ~/.kube/config-comserv
+
+# Find this line (in the clusters section):
+#   server: https://127.0.0.1:6443
+# Or:
+#   server: https://localhost:6443
+
+# Replace it with the actual VM 100 IP:
+#   server: https://&lt;master-ip&gt;:6443
+
+# Example if VM 100 is at 192.168.1.100:
+#   server: https://192.168.1.100:6443
+
+# Save and close (Ctrl+X, Y, Enter in nano)
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4: Test kubectl Access from Your Workstation</h4>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Set kubeconfig to use the comserv cluster
+export KUBECONFIG=~/.kube/config-comserv
+
+# Test cluster access
+kubectl cluster-info
+
+# View nodes
+kubectl get nodes -o wide
+
+# View all pods
+kubectl get pods --all-namespaces
+
+# View K8s system components
+kubectl get pods -n kube-system
+
+# Make it permanent (add to ~/.bashrc or ~/.zshrc):
+echo 'export KUBECONFIG=~/.kube/config-comserv' >> ~/.bashrc
+source ~/.bashrc
+                </code></pre>
+            </div>
+
+            <h4 style="color: var(--text-color); font-family: var(--header-font);">Alternative: SSH Tunneling (More Secure)</h4>
+            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>If you don't want to expose K3s API to your network</strong>:</p>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Terminal 1: Open SSH tunnel (keeps running)
+ssh -L 6443:localhost:6443 root@&lt;master-ip&gt;
+
+# Terminal 2: Use kubectl through the tunnel
+export KUBECONFIG=~/.kube/config-comserv
+# Make sure your kubeconfig points to: https://127.0.0.1:6443
+kubectl get nodes
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Verify kubectl Access</h3>
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Test cluster access
+kubectl cluster-info
+
+# View nodes
+kubectl get nodes -o wide
+
+# View all pods
+kubectl get pods --all-namespaces
+
+# View K3s system components
+kubectl get pods -n kube-system
+
+# Check current context
+kubectl config current-context
+kubectl config get-contexts
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 1: KUBERNETES DEPLOYMENT -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase-1" style="color: var(--text-color); font-family: var(--header-font);">5. Phase 1: Deploy Kubernetes Cluster (Week 2-3)</h2>
+
+            <h3 id="step-5-1" style="color: var(--text-color); font-family: var(--header-font);">Step 5.1: Install Kubernetes on VMs</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Deploy a production-grade Kubernetes cluster using kubeadm on the 3 VMs created in Step 4.2.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.1.1 Prepare VMs (Ubuntu 22.04)</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Run on ALL THREE VMs (k8s-node-1, k8s-node-2, k8s-node-3)
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg lsb-release
+
+# Set hostname (update accordingly on each VM)
+sudo hostnamectl set-hostname k8s-node-1  # or k8s-node-2, k8s-node-3
+echo "127.0.1.1 k8s-node-1" | sudo tee -a /etc/hosts
+
+# Disable swap (required for K8s)
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+# Enable required kernel modules
+sudo modprobe overlay
+sudo modprobe br_netfilter
+echo "overlay" | sudo tee /etc/modules-load.d/k8s.conf
+echo "br_netfilter" | sudo tee -a /etc/modules-load.d/k8s.conf
+
+# Set sysctl parameters
+sudo tee /etc/sysctl.d/k8s.conf > /dev/null << EOF
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+sudo sysctl --system
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.1.2 Install Docker/containerd & K8s Tools</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Run on ALL THREE VMs
+# Install containerd (K8s default container runtime)
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+  sudo gpg --dearmor -o /etc/apt/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker-archive-keyring.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y containerd.io
+
+# Configure containerd
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+
+# Install K8s binaries (kubelet, kubeadm, kubectl)
+curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg \
+  https://packages.cloud.google.com/apt/doc/apt-key.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] \
+  https://apt.kubernetes.io/ kubernetes-xenial main" | \
+  sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.1.3 Initialize Kubernetes Control Plane (Master)</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On k8s-node-1 ONLY (control plane)
+# Get IP address of this node
+MASTER_IP=$(hostname -I | awk '{print $1}')
+CLUSTER_NAME="comserv-k8s"
+
+# Initialize control plane
+sudo kubeadm init \
+  --apiserver-advertise-address=$MASTER_IP \
+  --apiserver-cert-extra-sans=$MASTER_IP \
+  --pod-network-cidr=10.244.0.0/16 \
+  --cluster-name=$CLUSTER_NAME \
+  --kubernetes-version=v1.28.0
+
+# Copy kubeconfig to home directory
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# Verify cluster is running
+kubectl get nodes  # Should show k8s-node-1 as NotReady (no CNI yet)
+
+# Save the join command output - you'll need it for the other nodes
+# Look for: kubeadm join &lt;ip&gt;:6443 --token ... --discovery-token-ca-cert-hash ...
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.1.4 Install CNI Plugin (Flannel)</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On k8s-node-1 (or any node with kubectl access)
+# Install Flannel for pod-to-pod networking
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+# Wait for Flannel pods to be ready
+kubectl -n kube-flannel get pods
+
+# Node should now show "Ready" status
+kubectl get nodes
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.1.5 Join Worker Nodes to Cluster</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On k8s-node-2 and k8s-node-3
+# Run the "kubeadm join" command from Step 5.1.3 output
+sudo kubeadm join &lt;MASTER_IP&gt;:6443 \
+  --token &lt;TOKEN&gt; \
+  --discovery-token-ca-cert-hash sha256:&lt;HASH&gt;
+
+# After joining, verify on control plane:
+kubectl get nodes  # Should show all 3 nodes as Ready
+                </code></pre>
+            </div>
+
+            <h3 id="step-5-2" style="color: var(--text-color); font-family: var(--header-font);">Step 5.2: Configure Persistent Storage</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Set up persistent storage for the database cluster.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">5.2.1 Install NFS Provisioner (for dynamic PV creation)</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On any K8s node with kubectl access
+# Add Helm repo for NFS provisioner
+helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+helm repo update
+
+# Install NFS provisioner
+helm install nfs-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+  --set nfs.server=&lt;NFS_SERVER_IP&gt; \
+  --set nfs.path=/export/k8s-data \
+  -n kube-system
+
+# Verify StorageClass is created
+kubectl get storageclass
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 2: DATABASE MIGRATION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase-2" style="color: var(--text-color); font-family: var(--header-font);">6. Phase 2: Deploy & Test Database in Kubernetes (Week 3-4)</h2>
+
+            <h3 id="step-6-1" style="color: var(--text-color); font-family: var(--header-font);">Step 6.1: Create Kubernetes Namespace for Comserv</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create namespace
+kubectl create namespace comserv-prod
+
+# Label for easy reference
+kubectl label namespace comserv-prod env=production
+
+# Verify
+kubectl get namespaces
+                </code></pre>
+
+            <h3 id="step-6-2" style="color: var(--text-color); font-family: var(--header-font);">Step 6.2: Create Kubernetes Secrets for Database Credentials</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create secrets in Kubernetes (avoid hardcoding passwords)
+kubectl create secret generic comserv-db-credentials \
+  --from-literal=username=shanta_forager \
+  --from-literal=password='UA=nPF8*m+T#' \
+  -n comserv-prod
+
+# Verify secret was created
+kubectl get secrets -n comserv-prod
+                </code></pre>
+
+            <h3 id="step-6-3" style="color: var(--text-color); font-family: var(--header-font);">Step 6.3: Deploy MariaDB StatefulSet to Kubernetes</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Deploy a 3-node MariaDB Galera cluster using Kubernetes StatefulSet.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">6.3.1 Create MariaDB StatefulSet YAML</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code>cat > mariadb-statefulset.yaml << 'EOF'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-config
+  namespace: comserv-prod
+data:
+  my.cnf: |
+    [mysqld]
+    bind-address = 0.0.0.0
+    wsrep_on = ON
+    wsrep_provider = /usr/lib/galera/libgalera_smm.so
+    wsrep_cluster_name = "comserv-galera"
+    wsrep_cluster_address = "gcomm://mariadb-0.mariadb.comserv-prod.svc.cluster.local,mariadb-1.mariadb.comserv-prod.svc.cluster.local,mariadb-2.mariadb.comserv-prod.svc.cluster.local"
+    wsrep_node_name = mariadb
+    wsrep_sst_method = rsync
+    character-set-server = utf8mb4
+    collation-server = utf8mb4_unicode_ci
+    default-storage-engine = InnoDB
+    max_connections = 1000
+    innodb_buffer_pool_size = 8G
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: comserv-prod
+spec:
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  - port: 4444
+    targetPort: 4444
+    name: replication
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  namespace: comserv-prod
+spec:
+  serviceName: mariadb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.6
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: comserv-db-credentials
+              key: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        - containerPort: 4444
+          name: replication
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        - name: config
+          mountPath: /etc/mysql/conf.d
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SELECT 1"
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SELECT 1"
+          initialDelaySeconds: 30
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 2
+            memory: 8Gi
+          limits:
+            cpu: 4
+            memory: 16Gi
+      volumes:
+      - name: config
+        configMap:
+          name: mariadb-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "nfs-client"  # From NFS provisioner
+      resources:
+        requests:
+          storage: 100Gi
+EOF
+
+# Apply the configuration
+kubectl apply -f mariadb-statefulset.yaml
+
+# Wait for StatefulSet to be ready (3-5 minutes)
+kubectl rollout status statefulset/mariadb -n comserv-prod
+
+# Verify pods are running
+kubectl get pods -n comserv-prod
+                </code></pre>
+            </div>
+
+            <h3 id="step-6-4" style="color: var(--text-color); font-family: var(--header-font);">Step 6.4: Restore Data from Bare-Metal Database</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Migrate existing data from 192.168.1.198 to the new Kubernetes database.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">6.4.1 Export Data from Bare-Metal Database</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># On the bare-metal database server (192.168.1.198)
+# Create full backup of both databases
+mysqldump -u shanta_forager -p'UA=nPF8*m+T#' \
+  --single-transaction \
+  --lock-tables=false \
+  --all-databases > /tmp/comserv_full_backup.sql
+
+# Compress for faster transfer
+gzip /tmp/comserv_full_backup.sql
+
+# Verify file
+ls -lh /tmp/comserv_full_backup.sql.gz
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">6.4.2 Transfer Backup to K8s Pod</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Copy backup to K8s pod
+kubectl cp /tmp/comserv_full_backup.sql.gz \
+  comserv-prod/mariadb-0:/tmp/backup.sql.gz
+
+# Verify transfer
+kubectl exec -it mariadb-0 -n comserv-prod -- ls -lh /tmp/
+                </code></pre>
+            </div>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">6.4.3 Restore Data to Kubernetes Database</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Shell into mariadb-0 pod
+kubectl exec -it mariadb-0 -n comserv-prod -- bash
+
+# Inside the pod:
+cd /tmp
+gunzip backup.sql.gz
+
+# Restore data (this will take 5-15 minutes depending on size)
+mysql -u root -p$MYSQL_ROOT_PASSWORD < backup.sql
+
+# Verify databases were restored
+mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SHOW DATABASES;"
+
+# Exit pod
+exit
+                </code></pre>
+            </div>
+
+            <h3 id="step-6-5" style="color: var(--text-color); font-family: var(--header-font);">Step 6.5: Verify Galera Replication & Data Consistency</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check Galera cluster status on all nodes
+for i in 0 1 2; do
+  echo "=== mariadb-$i ==="
+  kubectl exec -it mariadb-$i -n comserv-prod -- \
+    mysql -u root -p$MYSQL_ROOT_PASSWORD -e \
+    "SHOW STATUS LIKE 'wsrep%';"
+done
+
+# Verify data size matches between nodes
+for i in 0 1 2; do
+  echo "=== mariadb-$i data size ==="
+  kubectl exec mariadb-$i -n comserv-prod -- \
+    mysql -u root -p$MYSQL_ROOT_PASSWORD -e \
+    "SELECT SUM(data_length) FROM information_schema.tables WHERE table_schema NOT IN ('mysql', 'information_schema', 'performance_schema');"
+done
+                </code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 3: APPLICATION MIGRATION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase-3" style="color: var(--text-color); font-family: var(--header-font);">7. Phase 3: Migrate Application Workloads (Week 4-5)</h2>
+
+            <h3 id="step-7-1" style="color: var(--text-color); font-family: var(--header-font);">Step 7.1: Deploy Comserv Application to Kubernetes</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Deploy the Comserv Catalyst application as Kubernetes Deployment connected to the new database.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">7.1.1 Create Comserv Deployment Manifest</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code>cat > comserv-deployment.yaml << 'EOF'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: comserv-config
+  namespace: comserv-prod
+data:
+  CATALYST_ENV: "production"
+  CATALYST_DEBUG: "0"
+  WEB_PORT: "5000"
+  TZ: "UTC"
+  COMSERV_DB_PRODUCTION_SERVER_HOST: "mariadb.comserv-prod.svc.cluster.local"
+  COMSERV_DB_PRODUCTION_SERVER_PORT: "3306"
+  COMSERV_DB_PRODUCTION_SERVER_DATABASE: "ency"
+  COMSERV_DB_PRODUCTION_FORAGER_HOST: "mariadb.comserv-prod.svc.cluster.local"
+  COMSERV_DB_PRODUCTION_FORAGER_PORT: "3306"
+  COMSERV_DB_PRODUCTION_FORAGER_DATABASE: "shanta_forager"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: comserv-app
+  namespace: comserv-prod
+  labels:
+    app: comserv
+spec:
+  replicas: 3  # Run 3 copies for HA
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: comserv
+  template:
+    metadata:
+      labels:
+        app: comserv
+    spec:
+      containers:
+      - name: comserv
+        image: comserv:latest  # Use your Docker image
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: comserv-config
+        env:
+        - name: COMSERV_DB_PRODUCTION_SERVER_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: comserv-db-credentials
+              key: username
+        - name: COMSERV_DB_PRODUCTION_SERVER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: comserv-db-credentials
+              key: password
+        - name: COMSERV_DB_PRODUCTION_FORAGER_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: comserv-db-credentials
+              key: username
+        - name: COMSERV_DB_PRODUCTION_FORAGER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: comserv-db-credentials
+              key: password
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 1
+            memory: 2Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+        volumeMounts:
+        - name: logs
+          mountPath: /opt/comserv/root/log
+      volumes:
+      - name: logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: comserv-service
+  namespace: comserv-prod
+  labels:
+    app: comserv
+spec:
+  type: LoadBalancer  # Or ClusterIP if behind reverse proxy
+  selector:
+    app: comserv
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  sessionAffinity: ClientIP  # Sticky sessions for browser compatibility
+EOF
+
+# Apply deployment
+kubectl apply -f comserv-deployment.yaml
+
+# Wait for deployment to be ready
+kubectl rollout status deployment/comserv-app -n comserv-prod
+
+# Check pod status
+kubectl get pods -n comserv-prod
+                </code></pre>
+            </div>
+
+            <h3 id="step-7-2" style="color: var(--text-color); font-family: var(--header-font);">Step 7.2: Configure Ingress/Load Balancer</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Expose Comserv application to external traffic.</p>
+
+            <div style="background-color: #f5f5f5; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--text-color); font-family: var(--header-font);">Option A: Nginx Ingress (Recommended)</h4>
+                <pre style="color: var(--text-color); font-family: monospace; margin: 5px 0;"><code># Install Nginx Ingress Controller
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=LoadBalancer
+
+# Create Ingress resource
+cat > comserv-ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: comserv-ingress
+  namespace: comserv-prod
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using HTTPS
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: comserv.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: comserv-service
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - comserv.yourdomain.com
+    secretName: comserv-tls
+EOF
+
+kubectl apply -f comserv-ingress.yaml
+                </code></pre>
+            </div>
+
+            <h3 id="step-7-3" style="color: var(--text-color); font-family: var(--header-font);">Step 7.3: Verify Application Connectivity to Database</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check application pod logs for database connection
+kubectl logs -n comserv-prod deployment/comserv-app --tail=50
+
+# Test database connectivity from app pod
+kubectl exec -it $(kubectl get pods -n comserv-prod -l app=comserv -o name | head -1) \
+  -n comserv-prod -- bash -c \
+  "mysql -h mariadb.comserv-prod.svc.cluster.local -u shanta_forager -p\$COMSERV_DB_PRODUCTION_SERVER_PASSWORD ency -e 'SELECT COUNT(*) FROM information_schema.tables;'"
+
+# Access application via service
+kubectl port-forward -n comserv-prod svc/comserv-service 8080:80 &
+# Open browser to http://localhost:8080
+                </code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CUTOVER PHASE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="cutover" style="color: var(--text-color); font-family: var(--header-font);">8. Cutover Phase: Switch to Production Kubernetes (Week 5)</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Blue-Green Deployment Strategy</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Perform zero-downtime migration using DNS/load balancer switch.</p>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: #d84315; margin-top: 0;">⚠️ Cutover Window</h4>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Maintenance window: 2-4 hours (off-peak hours)</li>
+                    <li>Backup both bare-metal and K8s databases before cutover</li>
+                    <li>Have rollback procedure ready (see Section 9)</li>
+                    <li>Notify users of potential brief service interruption (< 5 minutes)</li>
+                </ul>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.1: Verify Both Systems Are Healthy</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Test bare-metal database
+mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SHOW DATABASES; SHOW STATUS LIKE 'Uptime';"
+
+# Test Kubernetes database
+kubectl exec -it mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SHOW DATABASES; SHOW STATUS LIKE 'wsrep_cluster_size';"
+
+# Test K8s application
+kubectl get pods -n comserv-prod
+kubectl logs -n comserv-prod deployment/comserv-app --tail=20
+                </code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.2: Final Data Sync (Zero-Second Downtime Approach)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># 1. Set bare-metal database to read-only (prepared state, not yet active)
+mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SET GLOBAL read_only=1;"
+
+# 2. Wait for K8s Galera cluster to catch up (should be < 1 second for small transactions)
+sleep 5
+
+# 3. Verify row counts match between systems
+# On bare-metal:
+mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' ency -e "SELECT COUNT(*) FROM information_schema.tables;"
+
+# On K8s:
+kubectl exec mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD ency -e "SELECT COUNT(*) FROM information_schema.tables;"
+                </code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.3: Switch DNS/Load Balancer to K8s</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Option 1: If using DNS (internal DNS/Kubernetes coredns)
+# Update application configuration to use K8s service hostname:
+# Old: COMSERV_DB_PRODUCTION_SERVER_HOST=192.168.1.198
+# New: COMSERV_DB_PRODUCTION_SERVER_HOST=mariadb.comserv-prod.svc.cluster.local
+# (Already configured in Section 7.1.1)
+
+# Option 2: If using external load balancer (MetalLB or cloud LB)
+# Point load balancer to Kubernetes service IP instead of 192.168.1.198
+
+# Option 3: If using hostname DNS (external DNS)
+# Update DNS A record to point to K8s Ingress Controller IP:
+dig comserv.yourdomain.com  # Should resolve to K8s LB IP, not 192.168.1.198
+                </code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.4: Monitor for Issues (30 minutes after switch)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Monitor K8s application logs
+watch kubectl logs -n comserv-prod deployment/comserv-app -f
+
+# Monitor database replication
+watch kubectl exec mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD -e "SHOW STATUS LIKE 'wsrep%';"
+
+# Check pod resource usage
+watch kubectl top pods -n comserv-prod
+
+# Test application functionality
+curl http://comserv.yourdomain.com/health
+                </code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ROLLBACK PROCEDURE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="roll
+back Procedure (Days 1-3 After Cutover)</h2>
+            
+            <div style="background-color: #ffebee; border-left: 4px solid #d32f2f; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: #d32f2f; margin-top: 0;">🔴 CRITICAL: Keep Bare-Metal Database Running</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Do NOT shut down 192.168.1.198 for at least 3 days. Keep it as hot standby in case rollback is needed.</p>
+            </div>
+
+            <h3 id="step-9-1" style="color: var(--text-color); font-family: var(--header-font);">Step 9.1: Full Rollback Procedure</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">If critical issues occur after cutover, rollback to bare-metal database within minutes.</p>
+
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># STEP 1: Disable Kubernetes application (immediately)
+kubectl scale deployment comserv-app --replicas=0 -n comserv-prod
+
+# STEP 2: Set bare-metal database to read-write
+mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SET GLOBAL read_only=0;"
+
+# STEP 3: Update application config to point back to bare-metal
+# Edit docker-compose.prod.yml or K8s config:
+# COMSERV_DB_PRODUCTION_SERVER_HOST: 192.168.1.198 (was: mariadb.comserv-prod.svc.cluster.local)
+
+# STEP 4: Restart application
+kubectl scale deployment comserv-app --replicas=3 -n comserv-prod
+
+# STEP 5: Verify rollback successful
+curl -I http://localhost:5000/health
+mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SELECT 1;"
+
+# STEP 6: Investigate K8s issues while running on bare-metal
+# Check application logs, database logs, network connectivity
+kubectl logs -n comserv-prod deployment/comserv-app
+kubectl exec mariadb-0 -n comserv-prod -- tail -f /var/log/mysql/error.log
+            </code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- VALIDATION CHECKLIST -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="validation" style="color: var(--text-color); font-family: var(--header-font);">10. Pre-Cutover Validation Checklist</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); width: 5%;"><strong>✓</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Validation Task</th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Success Criteria</th>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox Cluster Created</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">All 3 servers show "Quorate: Yes" in <code>pvecm status</code></td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Cluster Nodes Ready</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>kubectl get nodes</code> shows 3 nodes with STATUS "Ready"</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>MariaDB Galera Cluster Healthy</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>wsrep_cluster_size=3</code>, all nodes "Synced"</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Data Fully Replicated</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Row counts identical on all 3 nodes</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Application Pods Running</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>kubectl get pods -n comserv-prod</code> shows 3 pods "Running"</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>App → DB Connectivity</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">App logs show successful DB connection, no "Connection refused" errors</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Health Check Passing</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>curl /health</code> returns HTTP 200</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Bare-Metal DB Backed Up</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full backup file exists and is verified (test restore)</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s Cluster Backed Up</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">etcd backup exists; Velero or similar backup tool configured</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Load Testing</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">K8s cluster handles 1.5x expected production load without errors</td>
+                </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">☐</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Rollback Procedure Tested</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Full rollback to bare-metal succeeds in < 5 minutes</td>
+                </tr>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TIMELINE SUMMARY -->
+    <div class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">11. Timeline Summary</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Phase</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Duration</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Key Deliverables</strong></th>
+                    <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Status</strong></th>
+                </tr>
+                <tr style="background-color: #e8f5e9;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Phase 0: K8s Foundation</strong></td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">2-3 days</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Validate existing K8s cluster, network connectivity, DNS</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">✅ <strong>READY</strong></td>
+                </tr>
+                <tr style="background-color: #fff3e0;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Week 1: Bare-Metal DB Integration</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">5-7 days</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">K8s network policy for bare-metal (192.168.1.198), connectivity tests</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">📋 READY</td>
+                </tr>
+                <tr style="background-color: #fff3e0;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Week 1-2: Dual-Database Setup</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">7-10 days</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">K8s StatefulSet mirrors bare-metal DB, sync testing, DR validation</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">📋 READY</td>
+                </tr>
+                <tr style="background-color: #e3f2fd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Week 2: Catalyst App Deployment</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">5-7 days</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Catalyst container image, K8s Deployment, Ingress config</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">⏳ QUEUED</td>
+                </tr>
+                <tr style="background-color: #e3f2fd;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Week 2-3: Load Testing & Validation</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">7-10 days</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Performance testing, failover scenarios, backup verification</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">⏳ QUEUED</td>
+                </tr>
+                <tr style="background-color: #f3e5f5;">
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Week 3: Production Cutover</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">4-6 hours</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">DNS switch, app failover, monitoring, post-cutover validation</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">⏳ QUEUED</td>
+                </tr>
+            </table>
+
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>Total Timeline</strong>: 2-3 weeks for optimized migration (vs 5-6 weeks with new K8s cluster)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Key Benefit</strong>: Using existing K8s infrastructure saves 2 weeks of cluster setup/validation. Production database remains on bare-metal for reliability while K8s handles application layer.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Document Owner</strong>: Infrastructure Team</p>
+                <p><strong>Last Reviewed</strong>: 2025-12-23</p>
+                <p><strong>Next Review</strong>: After Phase 1 completion or when requirements change</p>
+                <p><em>This migration plan is a living document. Update based on actual infrastructure findings and lessons learned during implementation.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

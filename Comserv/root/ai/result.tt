@@ -38,6 +38,7 @@
         <button type="button" id="copy-btn" class="button secondary">Copy Response</button>
         <a href="/ai/query_form" class="button">New Query</a>
         <a href="/ai" class="button primary">Back to AI Home</a>
+        <a href="/" class="button return-menu">Return to Menu</a>
     </div>
 
     [% END %]
@@ -173,6 +174,15 @@
 
 .button:not(.primary):not(.secondary):hover {
     background: #1976d2;
+}
+
+.button.return-menu {
+    background: #666;
+    color: white;
+}
+
+.button.return-menu:hover {
+    background: #444;
 }
 </style>
 
