@@ -152,31 +152,59 @@ sub generate :Local :Args(0) {
         'generate', "Request content-type: '$content_type'");
     
     if ($content_type =~ /application\/json/i) {
-        my $raw_body = $c->request->body;
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'generate', "JSON body received, length: " . (defined $raw_body ? length($raw_body) : 'UNDEF'));
-        
-        if ($raw_body && length($raw_body) > 0) {
-            try {
-                my $json_data = decode_json($raw_body);
+        # For JSON requests, read body using most reliable method
+        my $json_data;
+        try {
+            my $raw_body;
+            
+            # Try multiple methods to read body (most reliable first)
+            if ($c->req->can('content')) {
+                $raw_body = $c->req->content;
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    'generate', "JSON parsed successfully: prompt='" . ($json_data->{prompt} || 'EMPTY') . "'");
-                
-                $prompt = $json_data->{prompt} || '';
-                $format = $json_data->{format} || '';
-                $system = $json_data->{system} || '';
-                $page_context = $json_data->{page_context} || 'general';
-                $page_path = $json_data->{page_path} || '';
-                $page_title = $json_data->{page_title} || '';
-                $agent_id = $json_data->{agent_id} || 'general';
-                $agent_name = $json_data->{agent_name} || 'AI Assistant';
-            } catch {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'generate', "Failed to parse JSON body: $_");
-            };
+                    'generate', "Using \$c->req->content method");
+            } elsif ($c->req->can('body')) {
+                my $body = $c->req->body;
+                if (ref($body) && $body->can('seek')) {
+                    seek($body, 0, 0);
+                    $raw_body = do { local $/; <$body> };
+                    seek($body, 0, 0);
+                } else {
+                    $raw_body = $body;
+                }
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Using \$c->req->body method");
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Raw body length: " . (defined $raw_body ? length($raw_body) : 'UNDEF') . ", first 200 chars: " . (defined $raw_body ? substr($raw_body, 0, 200) : 'N/A'));
+            
+            if ($raw_body && length($raw_body) > 0) {
+                $json_data = decode_json($raw_body);
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "JSON parsed successfully: keys=" . join(', ', keys %$json_data) . ", prompt exists=" . (defined $json_data->{prompt} ? 'yes (len=' . length($json_data->{prompt}) . ')' : 'no'));
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'generate', "No JSON body content received or body is empty");
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'generate', "Failed to read/parse JSON body: $_");
+        };
+        
+        if ($json_data && ref($json_data) eq 'HASH') {
+            $prompt = $json_data->{prompt} || '';
+            $format = $json_data->{format} || '';
+            $system = $json_data->{system} || '';
+            $page_context = $json_data->{page_context} || 'general';
+            $page_path = $json_data->{page_path} || '';
+            $page_title = $json_data->{page_title} || '';
+            $agent_id = $json_data->{agent_id} || 'general';
+            $agent_name = $json_data->{agent_name} || 'AI Assistant';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "'");
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                'generate', "JSON content-type but body is empty or missing");
+                'generate', "JSON parsing resulted in no data or invalid hash");
         }
     } else {
         # Fall back to form/query parameters
