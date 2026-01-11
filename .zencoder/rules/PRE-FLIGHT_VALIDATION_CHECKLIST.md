@@ -17,16 +17,16 @@ This is NOT optional. Failure to complete this checklist blocks chat continuatio
 
 ## PART 1: REQUIRED FILE READING (Complete in Order)
 
-Before proceeding with ANY work, you MUST read these files:
+Before proceeding with ANY work, you MUST read these sections:
 
-- [ ] **Read 1st**: `ask_questions_enforcement.md` - Understand text question prohibition
-- [ ] **Read 2nd**: `keywords-global.md` - Understand global keywords
-- [ ] **Read 3rd**: `keywords-execution-protocol.md` - Understand keyword execution
-- [ ] **Read 4th**: `updateprompt-workflow.md` - Understand workflow gates
-- [ ] **Read 5th**: `zencoder-role-specification.md` - Understand master rules
-- [ ] **Read 6th**: Agent-specific role file (e.g., `cleanup-agent-role.md`)
+- [ ] **Read 1st**: `coding-standards.yaml` Rule 1 - Understand ask_questions() enforcement
+- [ ] **Read 2nd**: `coding-standards.yaml` Rule 5 - Understand global keywords (/chathandoff, /newsession, /validatett)
+- [ ] **Read 3rd**: `coding-standards.yaml` Rule 2 - Understand /updateprompt workflow gate and keyword execution
+- [ ] **Read 4th**: `coding-standards.yaml` Rule 2 - Understand workflow gate execution patterns
+- [ ] **Read 5th**: `coding-standards.yaml` metadata section - Understand consolidated source of truth
+- [ ] **Read 6th**: Agent-specific section in `coding-standards.yaml` (e.g., `agents:cleanup`)
 
-**If ANY file is unread**: STOP and read it before proceeding.
+**If ANY section is unread**: STOP and read it before proceeding.
 
 ---
 

@@ -1,0 +1,492 @@
+[% META
+    title = 'AiConversation Model - AI Chat Session Management'
+    description = 'Comprehensive documentation for AiConversation model covering database schema, conversation lifecycle, message threading, user associations, and usage examples for managing AI chat sessions'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,ai-integration,messaging'
+    page_version = '1.00'
+    last_updated = '2026-01-09 14:57:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/AiConversation.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="aiconversation-model">AiConversation Model - AI Chat Session Management</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#relationships">Relationships & Message Threading</a></li>
+                    <li><a href="#conversation-lifecycle">Conversation Lifecycle & Status</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for AiConversation model</li>
+                    <li><strong>Message Threading:</strong> Documented conversation-to-message relationships</li>
+                    <li><strong>Helper Methods:</strong> Documented display_title, message_count, and latest_message helpers</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>AiConversation</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm) 
+                    provides a database schema for managing AI chat sessions in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>User-specific conversation creation and management</li>
+                    <li>Conversation threading with message history</li>
+                    <li>Conversation status tracking (active, archived)</li>
+                    <li>Flexible metadata storage for conversation context</li>
+                    <li>Automatic timestamp management (created_at, updated_at)</li>
+                    <li>Helper methods for conversation display and analysis</li>
+                    <li>Cascade deletion of messages when conversation is deleted</li>
+                </ul>
+                <p>
+                    AiConversation serves as the foundation for the AI Chat System (E.1 integration), 
+                    allowing users to maintain separate conversation threads with AI assistants and access 
+                    complete chat history with metadata context.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: ai_conversations</h3>
+                <p><strong>Purpose:</strong> Store AI conversation sessions, user associations, and conversation metadata</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Indexes:</strong> user_id (for fast user conversation lookup)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated conversation ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>user_id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Foreign key to User table - identifies conversation owner (REQUIRED)</td>
+                    </tr>
+                    <tr>
+                        <td>title</td>
+                        <td>VARCHAR(255)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Human-readable conversation title/subject (optional, "New Conversation" if NULL)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>created_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when conversation was created (auto-set)</td>
+                    </tr>
+                    <tr>
+                        <td>updated_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP ON UPDATE</td>
+                        <td>Timestamp when conversation was last modified (auto-updated)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>status</td>
+                        <td>ENUM('active', 'archived')</td>
+                        <td>NO</td>
+                        <td>'active'</td>
+                        <td>Conversation status: 'active' (ongoing) or 'archived' (closed/historical)</td>
+                    </tr>
+                    <tr>
+                        <td>metadata</td>
+                        <td>LONGTEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON or text metadata storage (context, settings, custom fields, etc.)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships & Message Threading</h2>
+                
+                <h3>Many-to-One Relationships</h3>
+                <ul>
+                    <li><strong>belongs_to 'user':</strong> The user who owns this conversation
+                        <ul>
+                            <li>Foreign Key: AiConversation.user_id → User.id</li>
+                            <li>Usage: <code>my $user = $conversation->user;</code></li>
+                            <li>Cascade: NO (user deletion doesn't automatically delete conversations)</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>One-to-Many Relationships</h3>
+                <ul>
+                    <li><strong>has_many 'ai_messages':</strong> Messages in this conversation thread
+                        <ul>
+                            <li>Foreign Key: AiMessage.conversation_id → AiConversation.id</li>
+                            <li>Cascade Delete: YES (deleting conversation deletes all associated messages)</li>
+                            <li>Usage: <code>my @messages = $conversation->ai_messages->all;</code></li>
+                            <li>Purpose: Provides chronological message history for the conversation</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Message Threading Structure</h3>
+                <p>Conversations are containers for related AI messages:</p>
+                <ul>
+                    <li><strong>Conversation:</strong> One conversation per user-initiated chat session</li>
+                    <li><strong>Messages:</strong> Individual messages within the conversation (user + AI)</li>
+                    <li><strong>Chronology:</strong> Messages ordered by created_at timestamp</li>
+                    <li><strong>Context:</strong> Conversation metadata provides additional context</li>
+                </ul>
+            </section>
+
+            <section id="conversation-lifecycle">
+                <h2>Conversation Lifecycle & Status Management</h2>
+                
+                <h3>Conversation Status Values</h3>
+                <ul>
+                    <li><strong>'active'</strong> - Conversation is ongoing and can receive new messages (default on creation)</li>
+                    <li><strong>'archived'</strong> - Conversation is closed/historical and should not receive new messages</li>
+                </ul>
+
+                <h3>Typical Conversation Lifecycle</h3>
+                <ol>
+                    <li><strong>Creation:</strong> User initiates new conversation → status = 'active'</li>
+                    <li><strong>Active Phase:</strong> Messages exchanged between user and AI assistants</li>
+                    <li><strong>Updated Tracking:</strong> updated_at timestamp refreshed with each new message</li>
+                    <li><strong>Archival:</strong> User closes conversation → status = 'archived'</li>
+                    <li><strong>Historical Access:</strong> Archived conversations accessible for reference/audit</li>
+                </ol>
+
+                <h3>Metadata Field Usage</h3>
+                <p>The metadata field supports flexible JSON storage for conversation context:</p>
+                <ul>
+                    <li><strong>AI Agent Type:</strong> Which agent handled the conversation (MainAgent, ReviewAgent, etc.)</li>
+                    <li><strong>Model Configuration:</strong> Which AI model was used (Claude, GPT-4, etc.)</li>
+                    <li><strong>Context Tags:</strong> Topic classification (support, documentation, code-review, etc.)</li>
+                    <li><strong>Custom Settings:</strong> Conversation-specific parameters (temperature, model, etc.)</li>
+                    <li><strong>Integration Data:</strong> References to external systems or data sources</li>
+                </ul>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Conversations:</strong></p>
+                    <pre><code>my $conversation = $schema->resultset('AiConversation')->create({
+    user_id => 42,
+    title => 'Database Schema Migration Discussion',
+    status => 'active',
+    metadata => '{"agent_type": "MainAgent", "model": "Claude"}',
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Conversations:</strong></p>
+                    <pre><code>my $conv = $schema->resultset('AiConversation')->find(5);
+my @active = $schema->resultset('AiConversation')->search({
+    user_id => 42,
+    status => 'active'
+})->all;
+my @recent = $schema->resultset('AiConversation')->search({
+    user_id => 42
+}, { 
+    order_by => { -desc => 'updated_at' },
+    rows => 10
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Updating Conversations:</strong></p>
+                    <pre><code>$conversation->update({
+    status => 'archived',
+    title => 'Updated Title'
+});
+
+$conversation->title('New Title');
+$conversation->status('archived');
+$conversation->update;</code></pre>
+                </div>
+
+                <h3>Helper Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_display_title():</strong> Get conversation title or default</p>
+                    <pre><code>my $title = $conversation->get_display_title();
+# Returns: $conversation->title if set, else 'New Conversation'</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_message_count():</strong> Count messages in conversation</p>
+                    <pre><code>my $count = $conversation->get_message_count();
+# Returns: Number of AiMessage rows with this conversation_id</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_latest_message():</strong> Retrieve most recent message</p>
+                    <pre><code>my $last_msg = $conversation->get_latest_message();
+if ($last_msg) {
+    print "Last message: " . $last_msg->content;
+    print "From: " . $last_msg->role;
+}</code></pre>
+                </div>
+
+                <h3>Relationship Queries</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Access Messages:</strong></p>
+                    <pre><code>my @messages = $conversation->ai_messages->all;
+my @sorted = $conversation->ai_messages->search(
+    {},
+    { order_by => { -asc => 'created_at' } }
+)->all;
+my $msg_count = $conversation->ai_messages->count;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Access Owner:</strong></p>
+                    <pre><code>my $owner = $conversation->user;
+my $owner_name = $conversation->user->username;</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Create New Conversation for User</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $user = $schema->resultset('User')->find(42);
+my $conversation = $schema->resultset('AiConversation')->create({
+    user_id => $user->id,
+    title => 'Kubernetes Migration Discussion',
+    status => 'active',
+    metadata => JSON::MaybeXS::encode_json({
+        agent_type => 'MainAgent',
+        model => 'Claude',
+        context_tags => ['infrastructure', 'k8s', 'deployment']
+    })
+});
+
+print "Created conversation #" . $conversation->id . "\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Retrieve User's Active Conversations</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $user = $schema->resultset('User')->find(42);
+my @active = $schema->resultset('AiConversation')->search({
+    user_id => $user->id,
+    status => 'active'
+}, {
+    order_by => { -desc => 'updated_at' }
+})->all;
+
+foreach my $conv (@active) {
+    my $title = $conv->get_display_title();
+    my $msg_count = $conv->get_message_count();
+    print "- $title ($msg_count messages)\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 3: Display Conversation History</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $conversation = $schema->resultset('AiConversation')->find(5);
+
+print "Conversation: " . $conversation->get_display_title() . "\n";
+print "Status: " . $conversation->status . "\n";
+print "Created: " . $conversation->created_at . "\n";
+print "Messages: " . $conversation->get_message_count() . "\n\n";
+
+my @messages = $conversation->ai_messages->search(
+    {},
+    { order_by => { -asc => 'created_at' } }
+)->all;
+
+foreach my $msg (@messages) {
+    print "[" . $msg->role . "] " . $msg->content . "\n";
+    print "  (" . $msg->created_at . ")\n\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 4: Archive Completed Conversation</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $conversation = $schema->resultset('AiConversation')->find(5);
+
+if ($conversation->status eq 'active') {
+    $conversation->update({ status => 'archived' });
+    print "Conversation archived\n";
+} else {
+    print "Conversation already archived\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Update Conversation Metadata</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+my $conversation = $schema->resultset('AiConversation')->find(5);
+my $meta = decode_json($conversation->metadata || '{}');
+
+$meta->{tags} = ['resolved', 'archived'];
+$meta->{resolution_time} = time();
+
+$conversation->update({
+    metadata => encode_json($meta)
+});
+
+print "Metadata updated\n";</code></pre>
+                </div>
+
+                <h3>Example 6: List Recent Conversations with Preview</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $user = $schema->resultset('User')->find(42);
+my @recent = $schema->resultset('AiConversation')->search({
+    user_id => $user->id
+}, {
+    order_by => { -desc => 'updated_at' },
+    rows => 5
+})->all;
+
+foreach my $conv (@recent) {
+    my $title = $conv->get_display_title();
+    my $msg_count = $conv->get_message_count();
+    my $last_msg = $conv->get_latest_message();
+    my $preview = substr($last_msg->content, 0, 50) if $last_msg;
+    
+    print "[$conv->id] $title\n";
+    print "  Messages: $msg_count | Status: " . $conv->status . "\n";
+    print "  Last: $preview...\n";
+    print "  Updated: " . $conv->updated_at . "\n\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--warning-color); margin-top: 0;">Problem: Conversation Has No Title</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Conversation.title is NULL, causing display issues</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Always use get_display_title() helper:
+                        <ul>
+                            <li>Helper returns "New Conversation" if title is NULL</li>
+                            <li>OR: Set title when creating conversation: <code>title => 'Initial Topic'</code></li>
+                            <li>OR: Use auto-generated title from first message content</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Messages Not Appearing</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> get_message_count() returns 0 even though messages were added</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Check message-conversation association:
+                        <ul>
+                            <li>Verify messages have correct conversation_id set</li>
+                            <li>Check message creation: <code>conversation_id => $conv->id</code></li>
+                            <li>Verify relationship is properly loaded: <code>$conversation->ai_messages()</code></li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Invalid Status Value</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Database error when setting status to invalid value</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Status is ENUM with only 2 valid values:
+                        <ul>
+                            <li>Valid: 'active' or 'archived' ONLY</li>
+                            <li>Invalid: 'pending', 'completed', 'draft', etc.</li>
+                            <li>Use: <code>$conv->status('archived');</code></li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Metadata Storage Issues</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Metadata not saved or causes charset errors</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Metadata field is flexible but requires proper encoding:
+                        <ul>
+                            <li>Store as JSON: <code>encode_json($hash)</code></li>
+                            <li>Retrieve as JSON: <code>decode_json($conversation->metadata)</code></li>
+                            <li>Field is LONGTEXT: supports up to 4GB of data</li>
+                            <li>NULL is allowed if no metadata needed</li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Cascade Delete Not Working</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> Deleting conversation leaves orphaned messages in ai_messages table</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> Cascade delete IS configured and should work automatically:
+                        <ul>
+                            <li>Verify database cascade constraints are properly set</li>
+                            <li>Manually delete messages if cascade doesn't work: <code>$conversation->ai_messages->delete;</code></li>
+                            <li>Then delete conversation: <code>$conversation->delete;</code></li>
+                        </ul>
+                    </p>
+                </div>
+
+                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                    <h3 style="color: var(--info-color); margin-top: 0;">Problem: Timestamps Not Auto-Updating</h3>
+                    <p style="margin: 5px 0;"><strong>Symptoms:</strong> updated_at not changing when conversation is modified</p>
+                    <p style="margin: 5px 0;"><strong>Solution:</strong> MySQL triggers handle auto-update:
+                        <ul>
+                            <li>Ensure database has AUTO UPDATE trigger on ai_conversations table</li>
+                            <li>Verify MySQL version supports CURRENT_TIMESTAMP ON UPDATE</li>
+                            <li>Fallback: Manually set: <code>updated_at => DateTime->now</code></li>
+                        </ul>
+                    </p>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                    <h2 style="color: var(--success-color); margin-top: 0;">See Also</h2>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><a href="/Documentation/models/AiMessage">AiMessage Model</a> - Individual messages in conversations</li>
+                        <li><a href="/Documentation/models/User">User Model</a> - Conversation owners</li>
+                        <li><a href="/Documentation/models/AiModelConfig">AiModelConfig Model</a> - AI model configuration</li>
+                        <li><a href="/Documentation/AI">AI Chat System</a> - Full AI integration documentation</li>
+                        <li><a href="/Documentation/models/">Model Index</a> - Complete model documentation</li>
+                        <li><a href="/admin">Admin Interface</a> - Conversation management UI</li>
+                    </ul>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="row" style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <div class="col-100">
+            <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                Last Updated: 2026-01-09 | Version: 1.00 | Category: Model Documentation
+            </div>
+        </div>
+    </div>
+</div>

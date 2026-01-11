@@ -1,0 +1,360 @@
+[%
+   title = "AI Chat Multi-Turn Conversation & Preview Fix - December 27, 2025"
+   description = "Fixed multi-turn conversation support and improved conversation preview in /ai/conversations list. Users can now ask follow-up questions in the same conversation."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "ai-systems,chat,ux,fixes"
+   page_version = "0.01"
+   last_updated = "Sat Dec 27 01:27:00 UTC 2025"
+%]
+[% PageVersion = 'root/Documentation/AI_Chat_Multi_Turn_Conversation_Fix.tt,v 0.01 2025/12/27 01:27:00 zencoder Exp - Fixed multi-turn conversations and conversation preview' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>AI Chat Multi-Turn Conversation & Preview Fix</h1>
+    <h2>December 27, 2025</h2>
+
+    <div class="last-updated">
+        <strong>Created:</strong> 2025-12-27 01:27 UTC |
+        <strong>Status:</strong> ✅ IMPLEMENTED |
+        <strong>Related:</strong> <a href="/Documentation/AI_Chat_Conversation_Saving_Fix">Conversation Saving Fix</a> | <a href="/ai/conversations">View Conversations</a>
+    </div>
+
+    <div class="alert alert-success">
+        <h3>✅ Multi-Turn Conversations Now Work</h3>
+        <p><strong>Issues Fixed:</strong></p>
+        <ul style="margin: 5px 0;">
+            <li>Users can now ask multiple questions in the SAME conversation</li>
+            <li>Conversation preview now shows readable Q&A format instead of just numbers</li>
+            <li>Current conversation ID is displayed in the chat interface</li>
+            <li>Conversation is reused for follow-up messages instead of creating new ones</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2>Problems Addressed</h2>
+
+        <h3>Issue #1: Each Prompt Created New Conversation</h3>
+        <p><strong>What Was Happening:</strong></p>
+        <ul>
+            <li>User sends Prompt #1 → Conversation #1 created with 2 messages (Q+A)</li>
+            <li>User sends Prompt #2 → Conversation #2 created with 2 messages (Q+A)</li>
+            <li>User sends Prompt #3 → Conversation #3 created with 2 messages (Q+A)</li>
+            <li>Result: 3 separate conversations instead of 1 conversation with 3 Q&A pairs</li>
+        </ul>
+
+        <p><strong>Impact:</strong></p>
+        <ul>
+            <li>Users cannot have multi-turn conversations</li>
+            <li>Each question is isolated from previous context</li>
+            <li>Conversation list becomes cluttered with many single-exchange conversations</li>
+            <li>No way to continue a conversation (all are closed/new)</li>
+        </ul>
+
+        <h3>Issue #2: Conversations List Shows Only Numbers</h3>
+        <p><strong>What Was Happening:</strong></p>
+        <ul>
+            <li>Conversations list shows ID numbers without meaningful content</li>
+            <li>Preview text doesn't clearly indicate what the conversation is about</li>
+            <li>Users can't identify conversations at a glance</li>
+        </ul>
+
+        <p><strong>Example of Old View:</strong></p>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+Conversation #1234
+Status: active
+Messages: 2
+Created: 2025-12-27 01:15
+[Preview text - possibly just AI response]
+        </pre>
+
+        <p><strong>Example of New View:</strong></p>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+What is machine learning?
+Status: active
+Messages: 4
+Created: 2025-12-27 01:15
+Q: What is machine learning? | A: Machine learning is a subset of...
+        </pre>
+    </div>
+
+    <div class="content-section">
+        <h2>Solutions Implemented</h2>
+
+        <h3>Fix #1: Support Multi-Turn Conversations</h3>
+
+        <h4>Backend Changes (/Comserv/lib/Comserv/Controller/AI.pm)</h4>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+            <p><strong>1. Accept conversation_id parameter:</strong></p>
+            <pre><code>my $conversation_id = $json_data->{conversation_id} || 
+                   $c->request->params->{conversation_id};</code></pre>
+
+            <p><strong>2. Reuse existing conversation OR create new:</strong></p>
+            <pre><code>unless ($final_conversation_id) {
+    # Create new conversation (first message)
+    my $conversation = $schema->resultset('AiConversation')->create({...});
+    $final_conversation_id = $conversation->id;
+} else {
+    # Reuse existing conversation (follow-up message)
+    # Just log and continue
+}</code></pre>
+
+            <p><strong>3. Add messages to the same conversation:</strong></p>
+            <pre><code># Both user and AI messages use the SAME conversation_id
+$schema->resultset('AiMessage')->create({
+    conversation_id => $final_conversation_id,
+    role => 'user',
+    content => $prompt,
+    ...
+});
+
+$schema->resultset('AiMessage')->create({
+    conversation_id => $final_conversation_id,
+    role => 'assistant',
+    content => $ai_response,
+    ...
+});</code></pre>
+        </div>
+
+        <h4>Frontend Changes (/Comserv/root/ai/index.tt)</h4>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+            <p><strong>1. Track current conversation ID:</strong></p>
+            <pre><code>let currentConversationId = null;</code></pre>
+
+            <p><strong>2. Include conversation_id in requests:</strong></p>
+            <pre><code>const requestBody = {
+    prompt: prompt,
+    model: selectedModel,
+    history: conversationHistory.slice(-10)
+};
+
+if (currentConversationId) {
+    requestBody.conversation_id = currentConversationId;
+}</code></pre>
+
+            <p><strong>3. Update conversation ID when response received:</strong></p>
+            <pre><code>if (data.conversation_id) {
+    currentConversationId = data.conversation_id;
+    // Display it and show "saved" notification
+}</code></pre>
+
+            <p><strong>4. Display current conversation ID:</strong></p>
+            <pre><code>document.getElementById('conversation-id-display').textContent = 
+    data.conversation_id;
+document.getElementById('conversation-info').style.display = 'block';</code></pre>
+        </div>
+
+        <h3>Fix #2: Improve Conversation Preview</h3>
+
+        <h4>Backend Changes (/Comserv/lib/Comserv/Controller/AI.pm)</h4>
+
+        <p>Updated the <code>conversations</code> action to generate better preview text:</p>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+            <pre><code># Get all messages for conversation
+my @messages = $conv->ai_messages->all;
+
+# Find first user message (question) and AI response (answer)
+foreach my $msg (@messages) {
+    if ($msg->role eq 'user' && !$user_msg) {
+        $user_msg = $msg->content;
+    }
+    if ($msg->role eq 'assistant' && !$ai_msg) {
+        $ai_msg = $msg->content;
+    }
+}
+
+# Create readable preview
+$preview = "Q: " . substr($user_msg, 0, 60) . "...";
+$preview .= " | A: " . substr($ai_msg, 0, 40) . "...";
+            </code></pre>
+        </div>
+
+        <p><strong>Result Format:</strong></p>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+Q: What is the difference between AI and machine learning? | A: AI is the broader field, while machine learning is...
+        </pre>
+    </div>
+
+    <div class="content-section">
+        <h2>User Experience Flow</h2>
+
+        <h3>How It Works Now</h3>
+
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 10px 0;">
+            <p><strong>Step 1: First Message</strong></p>
+            <ol>
+                <li>User types prompt and sends</li>
+                <li>Server creates new conversation</li>
+                <li>Server saves both user message and AI response</li>
+                <li>Server returns <code>conversation_id: 42</code></li>
+                <li>Client displays: "Conversation #42 saved"</li>
+                <li>Conversation ID "42" appears in header</li>
+            </ol>
+
+            <p><strong>Step 2: Follow-Up Question (Same Conversation)</strong></p>
+            <ol>
+                <li>User types follow-up prompt</li>
+                <li>Client sends request WITH <code>conversation_id: 42</code></li>
+                <li>Server finds existing conversation #42</li>
+                <li>Server adds new message pair to conversation #42</li>
+                <li>Conversation now has 4 messages (2 Q&A pairs)</li>
+                <li>No new "saved" notification (same conversation)</li>
+            </ol>
+
+            <p><strong>Step 3: View Conversation</strong></p>
+            <ol>
+                <li>User clicks "Conversations" button</li>
+                <li>Sees conversation list with improved previews</li>
+                <li>Preview shows: Q: [first question] | A: [first answer snippet]</li>
+                <li>Message count shows "4" (all Q&A pairs)</li>
+                <li>User can click "View" to see full conversation with all exchanges</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2>Technical Details</h2>
+
+        <h3>Files Modified</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+            <tr style="background-color: #f5f5f5;">
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">File</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Changes</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>Controller/AI.pm</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">
+                    - Added conversation_id parameter parsing<br>
+                    - Modified conversation saving logic to support reuse<br>
+                    - Updated conversations action preview generation
+                </td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>root/ai/index.tt</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">
+                    - Added currentConversationId state variable<br>
+                    - Updated fetch request to include conversation_id<br>
+                    - Added conversation ID display in header<br>
+                    - Show "saved" notification on first message
+                </td>
+            </tr>
+        </table>
+
+        <h3>Database Impact</h3>
+        <ul>
+            <li><strong>ai_conversations:</strong> Fewer new rows (reused across multi-turn)</li>
+            <li><strong>ai_messages:</strong> More messages per conversation (2 per exchange)</li>
+            <li><strong>Result:</strong> Better organized conversation history with context preserved</li>
+        </ul>
+
+        <h3>API Changes</h3>
+        <p><strong>/ai/chat Request (NEW):</strong></p>
+        <pre><code>{
+  "prompt": "What is Python?",
+  "model": "qwen2.5-coder:1.5b-base",
+  "history": [...],
+  "conversation_id": 42  // ← NEW: Include for follow-up
+}</code></pre>
+
+        <p><strong>/ai/chat Response (SAME):</strong></p>
+        <pre><code>{
+  "success": true,
+  "response": "Python is a high-level programming language...",
+  "model": "qwen2.5-coder:1.5b-base",
+  "conversation_id": 42  // ← Still returned (now reused)
+}</code></pre>
+    </div>
+
+    <div class="content-section">
+        <h2>Testing the Fix</h2>
+
+        <h3>Verification Steps</h3>
+        <ol>
+            <li><strong>Start fresh conversation:</strong>
+                <ul>
+                    <li>Go to /ai</li>
+                    <li>Type first prompt and send</li>
+                    <li>Verify: "Conversation #[N] saved" appears</li>
+                    <li>Verify: "Conversation #[N]" shows in header</li>
+                </ul>
+            </li>
+            <li><strong>Ask follow-up question:</strong>
+                <ul>
+                    <li>Type another prompt in same chat</li>
+                    <li>Send it</li>
+                    <li>Verify: NO new "saved" notification (same conversation)</li>
+                    <li>Verify: Conversation ID in header stays the same</li>
+                </ul>
+            </li>
+            <li><strong>Check conversation list:</strong>
+                <ul>
+                    <li>Click "Conversations" button</li>
+                    <li>Verify: Only ONE conversation shows (not multiple)</li>
+                    <li>Verify: Preview shows "Q: [first question] | A: [answer snippet]"</li>
+                    <li>Verify: Message count shows "4" (2 Q&A pairs)</li>
+                </ul>
+            </li>
+            <li><strong>View conversation details:</strong>
+                <ul>
+                    <li>Click "View" on conversation</li>
+                    <li>Verify: All 4 messages show (2 from user, 2 from AI)</li>
+                    <li>Verify: Messages appear in order (chronological)</li>
+                </ul>
+            </li>
+            <li><strong>Test persistence:</strong>
+                <ul>
+                    <li>Go back to /ai</li>
+                    <li>Do NOT select the conversation</li>
+                    <li>Start new conversation (different topic)</li>
+                    <li>Verify: NEW conversation_id appears in header</li>
+                    <li>Check conversations list</li>
+                    <li>Verify: BOTH conversations exist with different previews</li>
+                </ul>
+            </li>
+        </ol>
+
+        <h3>Expected Results</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+            <tr style="background-color: #f5f5f5;">
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Test</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expected Behavior</th>
+                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Result</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">First message saved</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Notification shows conversation ID</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;">Follow-up in same conversation</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Same conversation ID, no new notification</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">Conversation list preview</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Shows Q &amp; A format, not just numbers</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;">View full conversation</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Shows all message pairs in order</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="content-section">
+        <h2>Related Fixes</h2>
+        <ul>
+            <li><strong>Dec 26:</strong> Fixed DBSchemaManager to auto-create AI Chat tables</li>
+            <li><strong>Dec 27 (Part 1):</strong> Added conversation saving to /ai/chat endpoint</li>
+            <li><strong>Dec 27 (Part 2, this):</strong> Fixed multi-turn conversations and improved previews</li>
+        </ul>
+    </div>
+
+</div>

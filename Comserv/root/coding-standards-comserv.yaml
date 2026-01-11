@@ -22,13 +22,14 @@
 
 metadata:
   title: "Comserv Comprehensive Coding Standards"
-  version: "2.0-consolidated"
-  last_updated: "2025-12-06T22:51:00Z"
+  version: "2.1-with-filename-conventions"
+  last_updated: "2025-12-28T16:59:00Z"
   previous_versions:
     "1.0": "Initial partial standards (deprecated 2025-12-06)"
   consolidation_status: "Complete - all scattered guidelines merged"
   related_files:
-    ai_guidelines: "/Comserv/root/comserv-ai-guidelines-consolidated.yaml (separate - AI-specific)"
+    zencoder_standards: "/.zencoder/coding-standards.yaml (Zencoder IDE integration, agents, execution protocol)"
+    comserv_standards: "This file (Comserv development, Perl/TT/SQL, project-specific)"
     templates: "/Comserv/root/Documentation/[application|documentation]_tt_template.tt"
     deprecated: "/Comserv/root/coding-standards-comserv-v1-deprecated.yaml (archived)"
 
@@ -70,6 +71,111 @@ project_overview:
     config: "/Comserv/config/ - Configuration files"
     scripts: "/Comserv/script/ - Utility scripts"
     docs: "/Comserv/root/Documentation/ - System documentation (.tt format ONLY)"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 1A: FILENAME & RESOURCE NAMING CONVENTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+filename_conventions:
+  
+  primary_standard: "PascalCase for ALL files"
+  
+  description: |
+    All new files MUST use PascalCase naming (CapitalizedWords, NoSpaces, NoHyphens, NoUnderscores).
+    This removes ambiguity between hyphens (-) and underscores (_) and creates a single, 
+    unambiguous naming convention across all file types and directories.
+  
+  format_specification:
+    pattern: "PascalCase"
+    examples:
+      - "✅ CleanupAgentRole.md"
+      - "✅ VirtualMachineDataFetch.tt"
+      - "✅ NetworkDeviceManager.pm"
+      - "✅ CreateSupervisorConfig.sh"
+      - "✅ DailyAuditReport.yaml"
+      - "❌ cleanup-agent-role.md (hyphenated - avoid)"
+      - "❌ virtual_machine_data_fetch.tt (underscores - avoid)"
+      - "❌ create_supervisor_config.sh (underscores - avoid)"
+    
+    edge_cases:
+      acronyms: "Keep acronyms in PascalCase - AIController.pm (NOT AIcontroller or AIController)"
+      single_words: "Single words are lowercase first letter - controller.pm (NOT Controller.pm)"
+      multi_acronyms: "AIConfigSQLManager.pm (each acronym capitalized)"
+  
+  enforcement_scope:
+    new_files: "MANDATORY - All files created after 2025-12-28 MUST use PascalCase"
+    existing_files: "Optional - Existing files retain current naming; rename only during major refactors"
+    rationale: |
+      Lower-risk rollout: New files follow standard immediately. Existing files migrate gradually
+      as they're modified, preventing large renaming commits that create git history noise.
+  
+  file_types_affected:
+    documentation: ".tt files (Template Toolkit), .md files (Markdown)"
+    code: ".pm files (Perl modules), .pl files (Perl scripts)"
+    configuration: ".yaml files (YAML config), .json files (JSON config), .sh files (Shell scripts)"
+    all_types: "Consistent PascalCase across entire codebase"
+  
+  implementation_guidance:
+    for_zencoder_agents: |
+      - Check filename against standard before creating any new files
+      - If filename uses hyphens (-) or underscores (_), rename to PascalCase
+      - Document the filename in audit logs when creating new files
+    
+    for_developers: |
+      - When adding new features, create files in PascalCase
+      - Pre-commit hooks will enforce this (see 'ENFORCEMENT' section below)
+      - Existing legacy filenames do NOT require immediate renaming
+    
+    for_ai_assistants: |
+      - **CRITICAL**: Always verify filename format BEFORE writing files
+      - Use this checklist: Is filename PascalCase? Does it contain NO hyphens? NO underscores?
+      - If uncertain, ask user for clarification on intended filename
+  
+  migration_strategy:
+    phase_1_new_standard: "2025-12-28 onwards - All new files use PascalCase"
+    phase_2_active_refactor: "Next 2-4 weeks - When editing existing files, rename to PascalCase"
+    phase_3_batch_migration: "Q1 2026 - Batch rename remaining legacy files (via git commit)"
+    phase_4_verification: "Q1 2026 - Verify all files follow standard; document grandfathered exceptions"
+
+filename_enforcement:
+  
+  pre_commit_hook:
+    status: "🟡 PLANNED - To be implemented via .githooks/"
+    description: "Automatically reject commits with new files using hyphens or underscores"
+    trigger: "File creation or rename with - or _ in name"
+    action: "Warn user; request PascalCase rename before commit"
+  
+  ai_assistant_enforcement:
+    zencoder: |
+      MANDATORY ENFORCEMENT (this is a CRITICAL Cleanup Agent responsibility):
+      1. Before creating any file: Check filename is PascalCase
+      2. If not: Rename file to PascalCase standard
+      3. Document all filename decisions in audit logs
+      4. Flag any legacy filenames encountered during work
+    
+    continue: |
+      Recommended: Same enforcement as Zencoder for consistency
+      Check: /Comserv/root/.continue/rules/CONTINUE.md (external tool - owner: Continue)
+    
+    other_tools: |
+      Coordinate with teams using Cursor, Ollama, or other AI tools
+      See: /.zencoder/rules/keywords-global.md for cross-tool standards
+  
+  repository_metadata:
+    rules_file: "/.zencoder/rules/FILENAME_CONVENTIONS.md (supplementary reference)"
+    tracking_file: "/Comserv/root/Documentation/session_history/filename_migration_log.md (audit trail)"
+    contact: "See Cleanup Agent responsibilities in /.zencoder/rules/cleanup-agent-role.md"
+
+example_migrations:
+  existing_to_new:
+    - "cleanup-agent-role.md → CleanupAgentRole.md"
+    - "virtual_machine_data_fetch.tt → VirtualMachineDataFetch.tt"
+    - "add_network_device.tt → AddNetworkDevice.tt"
+    - "git_pull.tt → GitPull.tt"
+    - "list_migrations.tt → ListMigrations.tt"
+    - "create_supervisor_config.sh → CreateSupervisorConfig.sh"
 
 ---
 

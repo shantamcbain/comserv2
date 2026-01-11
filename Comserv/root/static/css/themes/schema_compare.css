@@ -1,14 +1,33 @@
 /* Schema Compare Theme Styles */
 /* Following the Documentation pattern and theme system */
 
-/* Schema Compare Container */
+/* Schema Compare Container - Match header background */
 .schema-compare-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: var(--spacing-medium, 20px);
     font-family: var(--body-font, 'Verdana, Helvetica, sans-serif');
-    color: var(--text-color, #000000);
-    background-color: var(--background-color, #ffffff);
+    color: var(--text-color, #000000) !important;
+    background-color: var(--nav-bg, #ccffff) !important;
+}
+
+/* Ensure all text elements inherit proper colour from theme */
+.schema-compare-container,
+.schema-compare-container table,
+.schema-compare-container th,
+.schema-compare-container td,
+.schema-compare-container p,
+.schema-compare-container span,
+.schema-compare-container div,
+.schema-compare-container h1,
+.schema-compare-container h2,
+.schema-compare-container h3,
+.schema-compare-container h4,
+.schema-compare-container h5,
+.schema-compare-container h6,
+.schema-compare-container button,
+.schema-compare-container a {
+    color: var(--text-color, #000000) !important;
 }
 
 /* Header Styles */
@@ -17,15 +36,25 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-medium, 20px);
-    padding-bottom: var(--spacing-small, 10px);
-    border-bottom: 2px solid var(--border-color, #cccccc);
+    padding: var(--spacing-medium, 20px);
+    background-color: var(--nav-bg, #ccffff) !important;
+    border-bottom: 2px solid var(--border-color, #cccccc) !important;
+    border-radius: 4px 4px 0 0;
 }
 
 .schema-compare-header h1 {
     margin: 0;
-    color: var(--text-color, #000000);
+    padding: 0;
+    color: #000000 !important;
     font-family: var(--header-font, 'Verdana, Helvetica, sans-serif');
     font-size: var(--font-size-xlarge, 24px);
+    text-shadow: none !important;
+    background-color: transparent !important;
+}
+
+.schema-compare-header h1 i {
+    color: #000000 !important;
+    margin-right: 10px;
 }
 
 .schema-compare-context {
@@ -35,14 +64,20 @@
 }
 
 .context-item {
-    color: var(--text-color, #000000);
+    color: #000000 !important;
     font-size: var(--font-size-small, 14px);
+    background-color: transparent !important;
+}
+
+.context-item strong {
+    color: #000000 !important;
+    font-weight: bold;
 }
 
 .refresh-btn {
-    background-color: var(--button-bg, #f2f2f2);
-    color: var(--button-text, #000000);
-    border: 1px solid var(--button-border, #cccccc);
+    background-color: #f2f2f2 !important;
+    color: #000000 !important;
+    border: 1px solid #cccccc !important;
     padding: 8px 15px;
     border-radius: 4px;
     cursor: pointer;
@@ -51,13 +86,19 @@
 }
 
 .refresh-btn:hover {
-    background-color: var(--button-hover-bg, #e0e0e0);
+    background-color: #e0e0e0 !important;
+}
+
+.refresh-btn i {
+    color: #000000 !important;
+    margin-right: 5px;
 }
 
 .intro {
-    color: var(--text-color, #000000);
+    color: #000000 !important;
     font-size: var(--font-size-base, 16px);
     margin-bottom: var(--spacing-medium, 20px);
+    background-color: transparent !important;
 }
 
 /* Summary Statistics */
@@ -72,8 +113,8 @@
     display: flex;
     align-items: center;
     padding: var(--spacing-medium, 20px);
-    background-color: var(--secondary-color, #f9f9f9);
-    border: 1px solid var(--border-color, #cccccc);
+    background-color: var(--secondary-color, #f9f9f9) !important;
+    border: 1px solid var(--border-color, #cccccc) !important;
     border-radius: 8px;
     transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -95,23 +136,23 @@
 }
 
 .stat-icon.databases {
-    background-color: var(--primary-color, #ccffff);
-    color: var(--text-color, #000000);
+    background-color: var(--primary-color, #ccffff) !important;
+    color: var(--text-color, #000000) !important;
 }
 
 .stat-icon.connected {
     background-color: var(--success-color, #009900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .stat-icon.tables {
     background-color: var(--accent-color, #FF9900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .stat-icon.status {
     background-color: var(--warning-color, #ff0000);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .stat-content {
@@ -121,42 +162,125 @@
 
 .stat-label {
     font-size: var(--font-size-small, 14px);
-    color: var(--text-color, #000000);
+    color: var(--text-color, #000000) !important;
     margin-bottom: 5px;
 }
 
 .stat-number {
     font-size: var(--font-size-large, 20px);
     font-weight: bold;
-    color: var(--text-color, #000000);
+    color: var(--text-color, #000000) !important;
 }
 
 /* Debug Information */
 .debug-info {
-    background-color: var(--secondary-color, #f9f9f9);
-    border: 1px solid var(--border-color, #cccccc);
+    background-color: var(--secondary-color, #f9f9f9) !important;
+    border: 1px solid var(--border-color, #cccccc) !important;
     border-radius: 4px;
     padding: var(--spacing-medium, 20px);
     margin-bottom: var(--spacing-medium, 20px);
+    color: var(--text-color, #000000) !important;
 }
 
 .debug-info h5 {
     margin-top: 0;
-    color: var(--text-color, #000000);
+    color: var(--text-color, #000000) !important;
+}
+
+.debug-info p {
+    color: var(--text-color, #000000) !important;
 }
 
 /* Instructions */
 .instructions-info {
-    background-color: var(--secondary-color, #f9f9f9);
-    border-left: 4px solid var(--primary-color, #ccffff);
+    background-color: var(--secondary-color, #f9f9f9) !important;
+    border-left: 4px solid var(--primary-color, #ccffff) !important;
     padding: var(--spacing-medium, 20px);
     margin-bottom: var(--spacing-large, 30px);
     border-radius: 0 4px 4px 0;
+    color: var(--text-color, #000000) !important;
+}
+
+.instructions-info strong {
+    color: var(--text-color, #000000) !important;
 }
 
 .instructions-info ol {
     margin-bottom: 0;
     margin-top: var(--spacing-small, 10px);
+}
+
+/* Legend Styles */
+.legend {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: var(--legend-bg, #f8f9fa) !important;
+    border-radius: 4px;
+    color: var(--text-color, #000000) !important;
+}
+
+.legend strong {
+    color: var(--text-color, #000000) !important;
+}
+
+.legend-items {
+    display: flex;
+    gap: 20px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-color, #000000) !important;
+}
+
+.legend-item span {
+    color: var(--text-color, #000000) !important;
+}
+
+.legend-color {
+    width: 20px;
+    height: 15px;
+    border-radius: 2px;
+}
+
+.legend-table-data {
+    background-color: var(--schema-table-data-color, #007bff);
+}
+
+.legend-result-data {
+    background-color: var(--schema-result-data-color, #6f42c1);
+}
+
+.legend-warning {
+    background-color: var(--schema-warning-color, #ffecb3);
+    position: relative;
+}
+
+.legend-icon {
+    position: absolute;
+    left: 2px;
+    top: -2px;
+    font-size: 10px;
+    color: var(--text-color, #000000);
+}
+
+.legend-missing {
+    background-color: var(--schema-missing-color, #fff3cd);
+}
+
+/* Field Debug Info */
+.field-debug-info {
+    background-color: var(--debug-bg, #f0f0f0);
+    color: var(--text-color, #000000);
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #cccccc);
 }
 
 /* Schema Sections */
@@ -202,17 +326,17 @@
 
 .status-badge.connected {
     background-color: var(--success-color, #009900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .status-badge.error {
     background-color: var(--warning-color, #ff0000);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .status-badge.unknown {
     background-color: var(--accent-color, #FF9900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .table-count {
@@ -227,8 +351,9 @@
 /* Section Content */
 .section-content {
     display: none;
-    background-color: var(--background-color, #ffffff);
+    background-color: var(--nav-bg, #ccffff) !important;
     padding: var(--spacing-medium, 20px);
+    color: var(--text-color, #000000) !important;
 }
 
 .section-content.expanded {
@@ -241,12 +366,12 @@
 }
 
 .table-group-header {
-    background-color: var(--secondary-color, #f9f9f9);
+    background-color: var(--secondary-color, #f9f9f9) !important;
     padding: var(--spacing-medium, 20px);
     border-bottom: 2px solid var(--border-color, #cccccc);
     font-weight: bold;
     font-size: var(--font-size-large, 20px);
-    color: var(--text-color, #000000);
+    color: var(--text-color, #000000) !important;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
@@ -255,12 +380,12 @@
 }
 
 .table-group-header:hover {
-    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1)) !important;
 }
 
 .table-group-header .group-count {
-    background-color: var(--accent-color, #FF9900);
-    color: white;
+    background-color: var(--accent-color, #FF9900) !important;
+    color: var(--button-text, #ffffff) !important;
     padding: 4px 8px;
     border-radius: 12px;
     font-size: var(--font-size-small, 14px);
@@ -274,6 +399,8 @@
 .table-group-content {
     display: none;
     padding: var(--spacing-medium, 20px);
+    background-color: var(--background-color, #ffffff) !important;
+    color: var(--text-color, #000000) !important;
 }
 
 .table-group-content.expanded {
@@ -282,16 +409,17 @@
 
 /* Table Comparison Cards */
 .table-comparison-card {
-    border: 1px solid var(--border-color, #cccccc);
+    border: 1px solid var(--border-color, #cccccc) !important;
     border-radius: 6px;
     margin-bottom: var(--spacing-medium, 20px);
-    background-color: var(--background-color, #ffffff);
+    background-color: var(--primary-color, #ccffff) !important;
+    color: var(--text-color, #000000) !important;
 }
 
 .table-comparison-header {
     padding: var(--spacing-medium, 20px);
-    background-color: var(--table-header-bg, #f2f2f2);
-    border-bottom: 1px solid var(--border-color, #cccccc);
+    background-color: var(--table-header-bg, #f2f2f2) !important;
+    border-bottom: 1px solid var(--border-color, #cccccc) !important;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -299,7 +427,7 @@
 }
 
 .table-comparison-header:hover {
-    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1));
+    background-color: var(--nav-hover-bg, rgba(0, 0, 0, 0.1)) !important;
 }
 
 .table-comparison-title {
@@ -310,7 +438,7 @@
 
 .table-comparison-title h4 {
     margin: 0;
-    color: var(--text-color, #000000);
+    color: var(--text-color, #000000) !important;
 }
 
 .table-comparison-actions {
@@ -331,20 +459,20 @@
 
 .sync-btn {
     background-color: var(--success-color, #009900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .sync-btn:hover {
-    background-color: #007700;
+    background-color: color-mix(in srgb, var(--success-color, #009900) 80%, black);
 }
 
 .create-btn {
     background-color: var(--accent-color, #FF9900);
-    color: white;
+    color: var(--button-text, #ffffff);
 }
 
 .create-btn:hover {
-    background-color: #e68a00;
+    background-color: color-mix(in srgb, var(--accent-color, #FF9900) 80%, black);
 }
 
 .batch-sync-btn {
@@ -357,23 +485,23 @@
 }
 
 .sync-to-result-btn {
-    background-color: #007bff;
-    color: white;
-    border-color: #0056b3;
+    background-color: var(--schema-table-data-color, #007bff);
+    color: var(--button-text, #ffffff);
+    border-color: color-mix(in srgb, var(--schema-table-data-color, #007bff) 60%, black);
 }
 
 .sync-to-result-btn:hover {
-    background-color: #0056b3;
+    background-color: color-mix(in srgb, var(--schema-table-data-color, #007bff) 80%, black);
 }
 
 .sync-to-table-btn {
-    background-color: #6f42c1;
-    color: white;
-    border-color: #5a2d91;
+    background-color: var(--schema-result-data-color, #6f42c1);
+    color: var(--button-text, #ffffff);
+    border-color: color-mix(in srgb, var(--schema-result-data-color, #6f42c1) 60%, black);
 }
 
 .sync-to-table-btn:hover {
-    background-color: #5a2d91;
+    background-color: color-mix(in srgb, var(--schema-result-data-color, #6f42c1) 80%, black);
 }
 
 .expand-icon {
@@ -419,7 +547,7 @@
 }
 
 .field-header-row {
-    background-color: var(--table-header-bg, #f2f2f2) !important;
+    background-color: #f2f2f2 !important;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -428,9 +556,10 @@
 
 .field-header {
     font-weight: bold;
-    color: var(--text-color, #000000);
+    color: #000000 !important;
     padding: var(--spacing-small, 10px) !important;
-    border-bottom: 2px solid var(--border-color, #cccccc);
+    border-bottom: 2px solid var(--border-color, #cccccc) !important;
+    background-color: #f2f2f2 !important;
 }
 
 .missing-indicator {
@@ -459,9 +588,9 @@
 }
 
 .field-comparison-table th {
-    background-color: var(--table-header-bg, #f2f2f2);
+    background-color: #f2f2f2 !important;
     font-weight: bold;
-    color: var(--text-color, #000000);
+    color: #000000 !important;
     position: sticky;
     top: 0;
 }
@@ -471,24 +600,24 @@
 }
 
 .table-row {
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--schema-table-data-color, #007bff);
 }
 
 .result-row {
-    border-left: 4px solid #6f42c1;
+    border-left: 4px solid var(--schema-result-data-color, #6f42c1);
 }
 
 .missing-row {
     border-left: 4px solid var(--warning-color, #ff0000);
-    background-color: var(--warning-bg, #fff3cd) !important;
+    background-color: var(--schema-missing-color, #fff3cd) !important;
 }
 
 .has-differences {
-    background-color: #fff8e1 !important;
+    background-color: var(--schema-missing-color, #fff8e1) !important;
 }
 
 .field-different {
-    background-color: #ffecb3 !important;
+    background-color: var(--schema-warning-color, #ffecb3) !important;
     font-weight: bold;
     position: relative;
 }
@@ -499,7 +628,7 @@
     left: 2px;
     top: 50%;
     transform: translateY(-50%);
-    color: #ff9800;
+    color: var(--accent-color, #ff9800);
     font-size: 12px;
 }
 
@@ -512,19 +641,21 @@
 .source-column {
     font-weight: bold;
     min-width: 80px;
-    background-color: var(--table-header-bg, #f2f2f2);
+    background-color: #f2f2f2 !important;
+    color: #000000 !important;
 }
 
 .table-row {
-    background-color: var(--table-row-bg, #ffffff);
+    background-color: var(--primary-color, #ccffff);
+    color: var(--text-color, #000000);
 }
 
 .result-row {
-    background-color: var(--result-row-bg, #f8f9fa);
+    background-color: var(--secondary-color, #f8f9fa);
 }
 
 .missing-row {
-    background-color: var(--warning-bg, #fff3cd);
+    background-color: var(--schema-missing-color, #fff3cd);
     color: var(--warning-text, #856404);
 }
 
@@ -555,7 +686,7 @@
 .sync-field-btn,
 .create-field-btn {
     background-color: var(--primary-color, #007bff);
-    color: white;
+    color: var(--button-text, #ffffff);
     border: none;
     padding: 5px 10px;
     border-radius: 4px;
@@ -590,7 +721,8 @@
 .field-value {
     flex: 1;
     padding: 8px;
-    background-color: var(--background-color, #ffffff);
+    background-color: var(--primary-color, #ccffff);
+    color: var(--text-color, #000000);
     border: 1px solid var(--border-color, #cccccc);
     border-radius: 3px;
     font-family: monospace;
@@ -598,15 +730,16 @@
 }
 
 .field-value.different {
-    background-color: #fff3cd;
-    border-color: #ffeaa7;
+    background-color: var(--schema-alert-warning-bg, #fff3cd);
+    color: var(--text-color, #000000);
+    border-color: var(--schema-alert-warning-border, #ffeaa7);
 }
 
 .field-value.missing {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
+    background-color: var(--schema-alert-danger-bg, #f8d7da);
+    border-color: var(--schema-alert-danger-border, #f5c6cb);
     font-style: italic;
-    color: #721c24;
+    color: var(--schema-alert-danger-text, #721c24);
 }
 
 .field-checkbox {
@@ -615,8 +748,9 @@
 }
 
 .field-checkbox:checked + .field-value {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
+    background-color: var(--schema-alert-success-bg, #d4edda);
+    color: var(--text-color, #000000);
+    border-color: var(--schema-alert-success-border, #c3e6cb);
     font-weight: bold;
 }
 
@@ -638,7 +772,7 @@
 }
 
 .difference-indicator.missing {
-    background-color: #6c757d;
+    background-color: var(--schema-text-muted, #6c757d);
 }
 
 /* Action Buttons */
@@ -652,7 +786,7 @@
 
 .sync-field-btn {
     background-color: var(--success-color, #009900);
-    color: white;
+    color: var(--button-text, #ffffff);
     border: 1px solid var(--success-color, #009900);
     padding: 8px 16px;
     border-radius: 4px;
@@ -662,18 +796,18 @@
 }
 
 .sync-field-btn:hover {
-    background-color: #007700;
+    background-color: color-mix(in srgb, var(--success-color, #009900) 80%, black);
 }
 
 .sync-field-btn:disabled {
-    background-color: #6c757d;
-    border-color: #6c757d;
+    background-color: var(--schema-text-muted, #6c757d);
+    border-color: var(--schema-text-muted, #6c757d);
     cursor: not-allowed;
 }
 
 .sync-all-btn {
     background-color: var(--success-color, #009900);
-    color: white;
+    color: var(--button-text, #ffffff);
     border: 1px solid var(--success-color, #009900);
     padding: 8px 16px;
     border-radius: 4px;
@@ -684,12 +818,12 @@
 }
 
 .sync-all-btn:hover {
-    background-color: #007700;
+    background-color: color-mix(in srgb, var(--success-color, #009900) 80%, black);
 }
 
 .sync-all-btn:disabled {
-    background-color: #6c757d;
-    border-color: #6c757d;
+    background-color: var(--schema-text-muted, #6c757d);
+    border-color: var(--schema-text-muted, #6c757d);
     cursor: not-allowed;
 }
 
@@ -718,7 +852,7 @@
 }
 
 .error-message {
-    background-color: #ffe6e6;
+    background-color: var(--schema-alert-danger-bg, #ffe6e6);
     border: 1px solid var(--warning-color, #ff0000);
     color: var(--warning-color, #ff0000);
 }
@@ -755,7 +889,8 @@
     width: 100%;
     border-collapse: collapse;
     margin-bottom: var(--spacing-medium, 20px);
-    background-color: var(--background-color, #ffffff);
+    background-color: var(--primary-color, #ccffff);
+    color: var(--text-color, #000000);
 }
 
 .schema-table th,
@@ -767,9 +902,9 @@
 }
 
 .schema-table th {
-    background-color: var(--table-header-bg, #f2f2f2);
+    background-color: #f2f2f2 !important;
     font-weight: bold;
-    color: var(--text-color, #000000);
+    color: #000000 !important;
     position: sticky;
     top: 0;
 }

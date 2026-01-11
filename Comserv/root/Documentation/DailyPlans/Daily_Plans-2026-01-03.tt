@@ -1,0 +1,193 @@
+[% META 
+   title = "Daily Plan - January 3, 2026"
+   description = "Saturday: A.2 K8s Readiness Phase 1A (Requirements + Docker Analysis) - DEFERRED FROM JAN 2, E.1 Phase 3 Validation, B.3 theme audit findings review"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,infrastructure"
+   page_version = "0.02"
+   last_updated = "Thu Jan 02 17:13:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt,v 0.02 2026/01/03 17:13:00 zencoder Exp - Saturday: A.2 Phase 1A START (deferred from Jan 2); E.1 Phase 3 validation; B.3 theme findings review' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color);">Daily Plan: Saturday, January 3, 2026 (A.2 Phase 1A START - K8s Requirements + Docker Analysis)</h1>
+    
+    <div class="alert alert-warning" style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ff6b6b; margin: 15px 0;">
+        <h3 style="color: #d9534f; margin-top: 0;">⚠️ TIMELINE ADJUSTMENT (Jan 2 Deferred Work)</h3>
+        <p>Jan 2's planned A.2, E.1, A.3 tasks were deferred to make room for documentation synchronization and configuration consolidation work. This plan now includes those deferred tasks + original Jan 3 work.</p>
+    </div>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Context:</strong> Saturday - Heavy day with deferred Jan 2 work | 
+        <strong>Status:</strong> 3 Main Tasks | 
+        <strong>Last Updated:</strong> 2026-01-03
+    </div>
+
+    <h2>🔴 Priority 1: A.2 K8s Readiness - Phase 1A START (4-5 hours - DEFERRED FROM JAN 2)</h2>
+    
+    <h3>Task 1A: Create A.2 Requirements Specification (ORIGINALLY SCHEDULED JAN 2)</h3>
+    <ol>
+        <li><strong>Gather K8s Environment Prerequisites:</strong>
+            <ul>
+                <li>Research: Minimum K8s version requirements for Comserv</li>
+                <li>Document: Required cluster size, node resources (CPU/memory), storage (persistent volumes)</li>
+                <li>List: Required K8s add-ons (ingress controller, storage provisioner, monitoring)</li>
+                <li>Identify: Load balancing strategy (service type, external LB)</li>
+            </ul>
+        </li>
+        <li><strong>Application Readiness Assessment:</strong>
+            <ul>
+                <li>Audit: Docker image structure - Is current Dockerfile K8s-ready?</li>
+                <li>Check: Health checks configured (liveness/readiness probes needed?)</li>
+                <li>Review: Environment variable usage (injectable via ConfigMap/Secrets?)</li>
+                <li>Verify: Database connection strategy for stateless pods</li>
+                <li>Confirm: Volume requirements for persistent data</li>
+            </ul>
+        </li>
+        <li><strong>Create Draft Specification Document:</strong>
+            <ul>
+                <li>Write: /Documentation/A2_Kubernetes_Readiness_Specification.tt</li>
+                <li>Sections: Overview, K8s Requirements, Application Changes Needed, Migration Timeline</li>
+                <li>Format: Use documentation_tt_template.tt as base</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> A.2 Requirements Specification (500+ words) with clear list of prerequisites and application changes needed</p>
+
+    <h3>Task 1B: Docker Image K8s Readiness Assessment (PART OF PHASE 1)</h3>
+    <ol>
+        <li><strong>Audit Current Dockerfile:</strong>
+            <ul>
+                <li>Check: Health check endpoint configured (HEALTHCHECK instruction)</li>
+                <li>Verify: Non-root user for container execution</li>
+                <li>Assess: Image layer optimization (minimal layers, efficient caching)</li>
+                <li>Document: Changes needed for K8s deployment (liveness/readiness probes)</li>
+            </ul>
+        </li>
+        <li><strong>Create Dockerfile K8s-Ready Version:</strong>
+            <ul>
+                <li>Add: HEALTHCHECK for K8s probes</li>
+                <li>Add: Metadata labels for K8s (app, version, environment)</li>
+                <li>Test: Build and run locally to verify</li>
+                <li>Document: Changes made and rationale</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>Task 1C: Database Connection Pooling & Stateless Design (CONTINUES TO JAN 4)</h3>
+    <ol>
+        <li><strong>Review Database Connection Strategy:</strong>
+            <ul>
+                <li>Audit: Current DB connection pooling (DBIx::Class configuration)</li>
+                <li>Assess: Connection limits for multi-pod environment</li>
+                <li>Plan: Dynamic connection string via environment variables</li>
+            </ul>
+        </li>
+        <li><strong>Design K8s Secrets Integration:</strong>
+            <ul>
+                <li>Document: Required K8s secrets (DB_HOST, DB_USER, DB_PASS, etc.)</li>
+                <li>Plan: Volume mount for secrets in Kubernetes</li>
+                <li>Create: example-secrets.yaml template for K8s deployment</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> K8s-ready Dockerfile + example-secrets.yaml + connection pooling documentation (note: may continue to Jan 4)</p>
+
+    <h2>🟠 Priority 2: E.1 Phase 3 Completion Validation (1-1.5 hours - DEFERRED FROM JAN 2)</h2>
+    
+    <h3>Task: End-to-End AI Chat Widget Testing</h3>
+    <ol>
+        <li><strong>Verify Widget UI/UX:</strong>
+            <ul>
+                <li>Access application at http://localhost:5000</li>
+                <li>Hard refresh browser (Ctrl+Shift+R)</li>
+                <li>Check: "Chat with AI" button visible and styled correctly</li>
+                <li>Test: Open/close chat panel smoothly</li>
+                <li>Test: Type message and submit</li>
+                <li>Verify: Response displays with proper formatting</li>
+            </ul>
+        </li>
+        <li><strong>Validate Database Recording:</strong>
+            <ul>
+                <li>Connect to MariaDB console</li>
+                <li>Query: SELECT COUNT(*) FROM ai_conversations; (should be > 0)</li>
+                <li>Query: SELECT * FROM ai_messages LIMIT 5; (verify message storage)</li>
+                <li>Check: Timestamps are current (not null)</li>
+            </ul>
+        </li>
+        <li><strong>Document Final Status:</strong>
+            <ul>
+                <li>Create: /Documentation/E1_Phase3_Completion_Report.tt</li>
+                <li>Include: What works ✅, what needs fixing ❌, any blockers for Phase 4</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> E.1 Phase 3 Completion Report + verified working widget</p>
+
+    <h2>🟡 Priority 3: B.3 Theme Audit Findings Review (1-2 hours)</h2>
+    
+    <h3>Task: Review Dec 26 B.3 Audit Findings</h3>
+    <ol>
+        <li><strong>Read B3ThemeHandlingAuditReport.tt (from Dec 26):</strong>
+            <ul>
+                <li>Key finding: 1,936 inline styles across 56 .tt files</li>
+                <li>Note: 13 theme CSS files identified (including legacy)</li>
+                <li>Review: Recommendations for standardization</li>
+            </ul>
+        </li>
+        <li><strong>Prioritize Quick Wins:</strong>
+            <ul>
+                <li>Identify: 5-10 files with most inline styles (lowest-hanging fruit)</li>
+                <li>Plan: Refactor to use CSS variables (var(--text-color) etc.)</li>
+                <li>Estimate: Effort per file and total timeline</li>
+            </ul>
+        </li>
+        <li><strong>Create B.3 Execution Plan:</strong>
+            <ul>
+                <li>File: /Documentation/B3_Theme_Refactor_Plan.tt</li>
+                <li>Include: Phased approach (which files Jan 6-8, which later)</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> B.3 Theme Refactor Plan document + prioritized file list</p>
+
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="padding: 10px;">Task</th>
+            <th style="padding: 10px;">Duration</th>
+            <th style="padding: 10px;">Status</th>
+            <th style="padding: 10px;">Note</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">A.2 Phase 1A (Req Spec + Docker)</td>
+            <td style="padding: 10px;">4-5 hours</td>
+            <td style="padding: 10px;">🔴 Priority 1</td>
+            <td style="padding: 10px;">Deferred from Jan 2</td>
+        </tr>
+        <tr style="background: #f5f5f5;">
+            <td style="padding: 10px;">E.1 Phase 3 Validation</td>
+            <td style="padding: 10px;">1-1.5 hours</td>
+            <td style="padding: 10px;">🟠 Priority 2</td>
+            <td style="padding: 10px;">Deferred from Jan 2</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">B.3 Theme Findings</td>
+            <td style="padding: 10px;">1-2 hours</td>
+            <td style="padding: 10px;">🟡 Priority 3</td>
+            <td style="padding: 10px;">Original Jan 3 task</td>
+        </tr>
+    </table>
+
+    <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0;">
+        <h3>Tomorrow's Plan (Jan 4 - Sunday)</h3>
+        <p><strong>A.2 Phase 1 Completion & A.3 Start:</strong> Complete A.2 DB connection pooling, begin A.3 credentials audit scope planning (originally Jan 2 task)</p>
+    </div>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px;">
+        <p><strong>Daily Plan v0.02 (Updated Jan 2) | Saturday January 3, 2026 | Deferred work from Jan 2 integrated</strong></p>
+    </div>
+</div>

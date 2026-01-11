@@ -41,6 +41,7 @@
             <div class="form-actions">
                 <button type="submit" class="submit-button">Submit Query</button>
                 <button type="reset" class="reset-button">Clear Form</button>
+                <a href="/ai/conversations" class="back-link">View Conversations</a>
                 <a href="/ai" class="back-link">Back to AI Home</a>
             </div>
         </form>

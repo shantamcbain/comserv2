@@ -2,7 +2,7 @@ package Comserv::Model::Schema::Ency::Result::DocumentationMetadataIndex;
 use base 'DBIx::Class::Core';
 use warnings FATAL => 'all';
 
-__PACKAGE__->table('documentation_metadata_index');
+__PACKAGE__->table('documentationmetadataindex');
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',

@@ -38,6 +38,12 @@
                 <a href="/ai/query_form"><i class="icon-form"></i>AI Query Form</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
+                [% IF c.session.roles.grep('admin').size %]
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Admin</span>
+                        <a href="/admin/ai/configure"><i class="icon-config"></i>AI Configuration</a>
+                    </div>
+                [% END %]
             </div>
         </div>
 

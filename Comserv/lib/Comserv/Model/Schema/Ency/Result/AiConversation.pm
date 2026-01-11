@@ -33,6 +33,10 @@ __PACKAGE__->add_columns(
         default_value => 'active',
         is_nullable => 0,
     },
+    metadata => {
+        data_type => 'longtext',
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');

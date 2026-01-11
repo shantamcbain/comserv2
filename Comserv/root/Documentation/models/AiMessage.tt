@@ -1,0 +1,650 @@
+[% META
+    title = 'AiMessage Model - AI Chat Message History and Tracking'
+    description = 'Comprehensive documentation for AiMessage model covering message structure, conversation threading, role types, metadata storage, agent integration, and usage examples for managing AI-generated and user messages'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,ai-integration,messaging'
+    page_version = '1.00'
+    last_updated = '2026-01-09 15:14:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/AiMessage.tt,v 1.00 2026/01/09 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="aimessage-model">AiMessage Model - AI Chat Message History and Tracking</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#message-roles">Message Roles (User vs Assistant)</a></li>
+                    <li><a href="#agent-types">Supported Agent Types</a></li>
+                    <li><a href="#metadata-tracking">Metadata & Tracking</a></li>
+                    <li><a href="#relationships">Relationships & Associations</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 9, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for AiMessage model</li>
+                    <li><strong>Agent Types:</strong> Documented 5 supported agent types (documentation, helpdesk, ency, beekeeping, hamradio)</li>
+                    <li><strong>Metadata Fields:</strong> Documented search context, sources cited, and performance metrics</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>AiMessage</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm) 
+                    provides a database schema for storing and managing individual messages within AI conversations in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Message threading within conversations (user and assistant roles)</li>
+                    <li>Agent-specific message classification (documentation, helpdesk, ency, beekeeping, hamradio agents)</li>
+                    <li>Rich content storage with support for markdown and formatted text</li>
+                    <li>Flexible metadata storage for message context and settings</li>
+                    <li>Search context tracking (queries, filters, source information)</li>
+                    <li>Source citation tracking (links to WebSearchResult and other references)</li>
+                    <li>Performance metrics (response time, token usage)</li>
+                    <li>Message verification and quality assurance tracking</li>
+                    <li>User and IP address association for audit trails</li>
+                </ul>
+                <p>
+                    AiMessage works in conjunction with AiConversation to provide a complete chat history system, 
+                    allowing users to maintain conversation threads with AI assistants and track the sources and context of AI responses.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: ai_messages</h3>
+                <p><strong>Purpose:</strong> Store individual messages (user and AI) within conversations</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Key Indexes:</strong> conversation_id (for fast conversation retrieval)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated message ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>conversation_id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Foreign key to AiConversation - groups messages into conversations (REQUIRED, indexed)</td>
+                    </tr>
+                    <tr>
+                        <td>user_id</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Foreign key to User - if user_id is NULL, message was generated by AI, else by user</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>role</td>
+                        <td>ENUM</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Message role: 'user' (human message) or 'assistant' (AI-generated)</td>
+                    </tr>
+                    <tr>
+                        <td>content</td>
+                        <td>TEXT</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Message content/body (REQUIRED, markdown or plain text supported)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>created_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when message was created (auto-set)</td>
+                    </tr>
+                    <tr>
+                        <td>metadata</td>
+                        <td>JSON</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON metadata (language, tone, formatting, custom fields)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>agent_type</td>
+                        <td>ENUM</td>
+                        <td>YES</td>
+                        <td>'documentation'</td>
+                        <td>Agent type that processed message: 'documentation', 'helpdesk', 'ency', 'beekeeping', 'hamradio' (default: 'documentation')</td>
+                    </tr>
+                    <tr>
+                        <td>model_used</td>
+                        <td>VARCHAR(100)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>AI model used for response (e.g., 'Claude', 'GPT-4', 'Llama')</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>search_context</td>
+                        <td>JSON</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON search context (queries, filters applied, scope, limit)</td>
+                    </tr>
+                    <tr>
+                        <td>sources_cited</td>
+                        <td>JSON</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>JSON array of cited sources (WebSearchResult IDs, document references)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>user_role</td>
+                        <td>VARCHAR(100)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>User's role at time of message ('admin', 'developer', 'editor', etc.)</td>
+                    </tr>
+                    <tr>
+                        <td>response_time_ms</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>AI response generation time in milliseconds (performance tracking)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>tokens_used</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Total tokens consumed by AI model (for billing/quota tracking)</td>
+                    </tr>
+                    <tr>
+                        <td>is_verified</td>
+                        <td>BOOLEAN</td>
+                        <td>NO</td>
+                        <td>0</td>
+                        <td>Quality verification: 0=unverified, 1=verified/approved (default: 0)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>ip_address</td>
+                        <td>VARCHAR(45)</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Source IP address of request (for audit/security tracking, supports IPv6)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="message-roles">
+                <h2>Message Roles (User vs Assistant)</h2>
+                
+                <h3>Role Types</h3>
+                <ul>
+                    <li><strong>'user':</strong> Message from human user
+                        <ul>
+                            <li>user_id SHOULD be populated (identifies which user sent the message)</li>
+                            <li>agent_type typically 'documentation' (the user's context)</li>
+                            <li>model_used typically NULL (no model involved)</li>
+                            <li>response_time_ms and tokens_used typically NULL</li>
+                        </ul>
+                    </li>
+                    <li><strong>'assistant':</strong> Response generated by AI agent
+                        <ul>
+                            <li>user_id typically NULL (AI-generated, not from a specific user)</li>
+                            <li>agent_type specifies which AI agent generated the response</li>
+                            <li>model_used should be populated (which LLM was used)</li>
+                            <li>response_time_ms and tokens_used should be populated</li>
+                            <li>sources_cited typically populated (references in the response)</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Role Detection Helpers</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_user_message():</strong> Check if message is from user</p>
+                    <pre><code>if ($message->is_user_message) {
+    print "Message from user: " . $message->user->username . "\n";
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_assistant_message():</strong> Check if message is AI-generated</p>
+                    <pre><code>if ($message->is_assistant_message) {
+    print "AI Response using " . $message->model_used . "\n";
+    print "Response time: " . $message->response_time_ms . " ms\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="agent-types">
+                <h2>Supported Agent Types</h2>
+                <p>AiMessage supports 5 different agent types for specialized AI workflows:</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Agent Type</th>
+                        <th>Purpose</th>
+                        <th>Use Case</th>
+                    </tr>
+                    <tr>
+                        <td><strong>'documentation'</strong></td>
+                        <td>Technical documentation and code help</td>
+                        <td>Default agent; answers questions about code, architecture, features</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td><strong>'helpdesk'</strong></td>
+                        <td>Customer support and user assistance</td>
+                        <td>Help desk tickets, user support requests, troubleshooting</td>
+                    </tr>
+                    <tr>
+                        <td><strong>'ency'</strong></td>
+                        <td>Encyclopedia and knowledge base queries</td>
+                        <td>Factual information, encyclopedic content, general knowledge</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td><strong>'beekeeping'</strong></td>
+                        <td>Specialized beekeeping domain knowledge</td>
+                        <td>Beekeeping questions, apiculture advice, hive management</td>
+                    </tr>
+                    <tr>
+                        <td><strong>'hamradio'</strong></td>
+                        <td>Amateur radio and RF engineering</td>
+                        <td>Ham radio questions, equipment recommendations, frequency info</td>
+                    </tr>
+                </table>
+
+                <h3>Agent Type Usage</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $message = $schema->resultset('AiMessage')->create({
+    conversation_id => 123,
+    role => 'assistant',
+    content => 'To keep bees healthy...',
+    agent_type => 'beekeeping',
+    model_used => 'Claude',
+    response_time_ms => 2500,
+    tokens_used => 450
+});
+
+# Query by agent type
+my @doc_responses = $schema->resultset('AiMessage')->search({
+    agent_type => 'documentation',
+    role => 'assistant'
+})->all;</code></pre>
+                </div>
+            </section>
+
+            <section id="metadata-tracking">
+                <h2>Metadata & Tracking Fields</h2>
+                
+                <h3>Metadata (JSON Field)</h3>
+                <p>The metadata field supports flexible JSON storage for message context:</p>
+                <ul>
+                    <li><strong>language:</strong> Language of message ('en', 'es', 'fr', etc.)</li>
+                    <li><strong>tone:</strong> Tone of response ('formal', 'casual', 'technical', etc.)</li>
+                    <li><strong>formatting:</strong> Content format ('markdown', 'html', 'plain_text')</li>
+                    <li><strong>custom_fields:</strong> Domain-specific metadata (agent-dependent)</li>
+                    <li><strong>tags:</strong> Array of topic tags for categorization</li>
+                </ul>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+my $message = $schema->resultset('AiMessage')->create({
+    conversation_id => 123,
+    role => 'assistant',
+    content => 'The answer is...',
+    metadata => JSON::MaybeXS::encode_json({
+        language => 'en',
+        tone => 'technical',
+        formatting => 'markdown',
+        tags => ['api', 'rest', 'authentication']
+    })
+});</code></pre>
+                </div>
+
+                <h3>Search Context (JSON Field)</h3>
+                <p>The search_context field tracks how the response was generated:</p>
+                <ul>
+                    <li><strong>query:</strong> Original user query</li>
+                    <li><strong>filters:</strong> Applied search filters</li>
+                    <li><strong>scope:</strong> Scope of search (documentation, code, external, etc.)</li>
+                    <li><strong>limit:</strong> Result limit applied</li>
+                    <li><strong>order_by:</strong> Sorting criteria</li>
+                </ul>
+
+                <h3>Sources Cited (JSON Array)</h3>
+                <p>The sources_cited field tracks references in the response:</p>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $sources = JSON::MaybeXS::decode_json($message->sources_cited);
+# Array of source IDs: [100, 205, 310] (WebSearchResult IDs)
+
+foreach my $source_id (@$sources) {
+    my $source = $schema->resultset('WebSearchResult')->find($source_id);
+    print "Cited: " . $source->result_title . "\n";
+}</code></pre>
+                </div>
+
+                <h3>Performance Metrics</h3>
+                <ul>
+                    <li><strong>response_time_ms:</strong> How long AI took to generate response (milliseconds)</li>
+                    <li><strong>tokens_used:</strong> Total tokens consumed (for billing and quota management)</li>
+                    <li><strong>user_role:</strong> User's role at time of interaction (for permission/quota rules)</li>
+                </ul>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships & Associations</h2>
+                
+                <h3>Many-to-One Relationships</h3>
+                <ul>
+                    <li><strong>belongs_to 'conversation':</strong> Parent conversation for message threading
+                        <ul>
+                            <li>Foreign Key: AiMessage.conversation_id → AiConversation.id</li>
+                            <li>Usage: <code>my $conv = $message->conversation;</code></li>
+                            <li>Purpose: Groups messages into conversation threads</li>
+                        </ul>
+                    </li>
+                    <li><strong>belongs_to 'user':</strong> User who wrote the message (optional, left join)
+                        <ul>
+                            <li>Foreign Key: AiMessage.user_id → User.id (LEFT JOIN)</li>
+                            <li>Usage: <code>my $author = $message->user;</code></li>
+                            <li>Purpose: NULL for AI messages, populated for user messages</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Messages:</strong></p>
+                    <pre><code>my $user_msg = $schema->resultset('AiMessage')->create({
+    conversation_id => 42,
+    user_id => 10,
+    role => 'user',
+    content => 'How do I authenticate users in Catalyst?',
+    ip_address => '192.168.1.100'
+});
+
+my $ai_resp = $schema->resultset('AiMessage')->create({
+    conversation_id => 42,
+    role => 'assistant',
+    content => 'In Catalyst you can use...',
+    agent_type => 'documentation',
+    model_used => 'Claude',
+    response_time_ms => 2000,
+    tokens_used => 350
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Messages:</strong></p>
+                    <pre><code>my $message = $schema->resultset('AiMessage')->find(500);
+
+my @conversation = $schema->resultset('AiMessage')->search({
+    conversation_id => 42
+}, {
+    order_by => { -asc => 'created_at' }
+})->all;
+
+my @ai_responses = $schema->resultset('AiMessage')->search({
+    role => 'assistant',
+    agent_type => 'documentation'
+})->all;</code></pre>
+                </div>
+
+                <h3>Helper Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_formatted_time():</strong> Get formatted creation timestamp</p>
+                    <pre><code>my $formatted = $message->get_formatted_time();
+# Returns: '2026-01-09 15:30:45'</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_content_preview($length):</strong> Get truncated content preview</p>
+                    <pre><code>my $preview = $message->get_content_preview(100);
+# Returns first 100 chars + '...' if longer</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_sources():</strong> Get array of cited source IDs</p>
+                    <pre><code>my $sources = $message->get_sources();
+# Returns: [100, 205, 310] (array reference)</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>get_search_info():</strong> Get search context as hash</p>
+                    <pre><code>my $context = $message->get_search_info();
+# Returns: { query => '...', filters => [...], ... }</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Store User Question</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $user = $schema->resultset('User')->find(42);
+my $conversation = $schema->resultset('AiConversation')->find(100);
+
+my $message = $schema->resultset('AiMessage')->create({
+    conversation_id => $conversation->id,
+    user_id => $user->id,
+    role => 'user',
+    content => 'How do I optimize database queries in DBIx::Class?',
+    ip_address => '203.0.113.42'
+});
+
+print "User message #" . $message->id . " stored\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Store AI Response with Sources</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+# Find sources that answer the question
+my @sources = $schema->resultset('WebSearchResult')->search({
+    is_verified => 1,
+    source_type => 'web'
+})->all;
+
+my @source_ids = map { $_->id } @sources;
+
+my $ai_message = $schema->resultset('AiMessage')->create({
+    conversation_id => 100,
+    role => 'assistant',
+    content => 'To optimize queries, use prefetch...',
+    agent_type => 'documentation',
+    model_used => 'Claude',
+    response_time_ms => 3200,
+    tokens_used => 650,
+    sources_cited => JSON::MaybeXS::encode_json(\@source_ids),
+    metadata => JSON::MaybeXS::encode_json({
+        language => 'en',
+        tone => 'technical',
+        formatting => 'markdown'
+    })
+});
+
+print "AI response #" . $ai_message->id . " stored\n";</code></pre>
+                </div>
+
+                <h3>Example 3: Retrieve Conversation Thread</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $conversation = $schema->resultset('AiConversation')->find(100);
+
+my @messages = $conversation->ai_messages->search(
+    {},
+    { order_by => { -asc => 'created_at' } }
+)->all;
+
+foreach my $msg (@messages) {
+    my $role = $msg->role;
+    my $author = $msg->is_user_message ? $msg->user->username : $msg->model_used;
+    my $preview = $msg->get_content_preview(80);
+    my $time = $msg->get_formatted_time;
+    
+    print "[$time] $author ($role): $preview\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 4: Quality Verification Workflow</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @unverified = $schema->resultset('AiMessage')->search({
+    role => 'assistant',
+    is_verified => 0
+}, {
+    rows => 20,
+    order_by => { -asc => 'created_at' }
+})->all;
+
+foreach my $msg (@unverified) {
+    print "Message #" . $msg->id . "\n";
+    print "Agent: " . $msg->agent_type . "\n";
+    print "Model: " . $msg->model_used . "\n";
+    print "Response time: " . $msg->response_time_ms . " ms\n";
+    print "Content: " . $msg->get_content_preview(200) . "\n\n";
+    
+    # Admin reviews and marks as verified
+    $msg->update({ is_verified => 1 });
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Search by Agent Type and Time Range</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use DateTime;
+
+my $start = DateTime->new( year => 2026, month => 1, day => 1 );
+my $end = DateTime->new( year => 2026, month => 1, day => 9 );
+
+my @beekeeping = $schema->resultset('AiMessage')->search({
+    agent_type => 'beekeeping',
+    role => 'assistant',
+    created_at => {
+        -between => [$start, $end]
+    }
+}, {
+    order_by => { -desc => 'created_at' }
+})->all;
+
+print "Found " . scalar(@beekeeping) . " beekeeping responses this week\n";
+my $total_tokens = 0;
+foreach my $msg (@beekeeping) {
+    $total_tokens += $msg->tokens_used || 0;
+}
+print "Total tokens used: $total_tokens\n";</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="alert alert-warning">
+                    <h3>Issue 1: NULL User for Assistant Messages</h3>
+                    <p><strong>Problem:</strong> Calling $message->user on assistant messages returns undef</p>
+                    <p><strong>Cause:</strong> AI messages have user_id=NULL; relationship uses LEFT JOIN</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $author = $message->is_user_message 
+    ? $message->user->username 
+    : ($message->model_used || 'AI Assistant');</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 2: Parsing JSON Fields</h3>
+                    <p><strong>Problem:</strong> metadata, search_context, sources_cited are returned as JSON strings, not hashes</p>
+                    <p><strong>Cause:</strong> DBIx::Class may not auto-inflate JSON; need manual parsing</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>use JSON::MaybeXS;
+
+my $meta = $message->metadata;
+my $meta_hash = ref $meta eq 'HASH' ? $meta : JSON::MaybeXS::decode_json($meta);
+my $language = $meta_hash->{language};</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 3: Long Content Causing Memory Issues</h3>
+                    <p><strong>Problem:</strong> Message with 100KB+ content causes slowdown</p>
+                    <p><strong>Cause:</strong> TEXT field allows unlimited size; loading/processing is slow</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Retrieve with SELECT limited columns
+my @msgs = $schema->resultset('AiMessage')->search(
+    { conversation_id => 42 },
+    { columns => [qw(id role created_at)] }
+)->all;
+
+# Load content only when needed
+my $full_msg = $schema->resultset('AiMessage')->find($msg->id);</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 4: Sources Not Found After Deletion</h3>
+                    <p><strong>Problem:</strong> sources_cited references deleted WebSearchResult</p>
+                    <p><strong>Cause:</strong> No referential integrity between messages and WebSearchResult</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $sources = $message->get_sources();
+foreach my $source_id (@$sources) {
+    my $source = $schema->resultset('WebSearchResult')->find($source_id);
+    unless ($source) {
+        warn "Source #$source_id no longer exists\n";
+    }
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 5: Agent Type Constraints</h3>
+                    <p><strong>Problem:</strong> Error when creating message with invalid agent_type</p>
+                    <p><strong>Cause:</strong> agent_type is ENUM; only 5 values allowed</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my @valid_agents = qw(documentation helpdesk ency beekeeping hamradio);
+
+if (grep { $_ eq $agent } @valid_agents) {
+    $message->agent_type($agent);
+} else {
+    warn "Invalid agent type: $agent\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/AiConversation">AiConversation Model</a> - Parent conversations for messages</li>
+                        <li><a href="/Documentation/models/WebSearchResult">WebSearchResult Model</a> - Sources cited in messages</li>
+                        <li><a href="/Documentation/models/User">User Model</a> - User associations and authors</li>
+                        <li><a href="/Documentation/features">Feature: AI Integration</a> - High-level AI workflows</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div class="last-updated">
+                <small>Last updated: <span id="update-date">2026-01-09</span></small>
+            </div>
+        </div>
+    </div>
+</div>

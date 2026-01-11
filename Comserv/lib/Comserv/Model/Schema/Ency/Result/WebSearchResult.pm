@@ -2,7 +2,7 @@ package Comserv::Model::Schema::Ency::Result::WebSearchResult;
 use base 'DBIx::Class::Core';
 use warnings FATAL => 'all';
 
-__PACKAGE__->table('web_search_results');
+__PACKAGE__->table('websearchresult');
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',

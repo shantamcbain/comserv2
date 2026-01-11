@@ -15,7 +15,7 @@ alwaysApply: false
 
 ## 🔴 ask_questions() ENFORCEMENT - Text Questions Prohibited
 
-**See**: `/.zencoder/rules/ask_questions_enforcement.md` (Single source of truth - all rules, examples, self-detection workflow)
+**See**: `/.zencoder/coding-standards.yaml` Rule 1 (Single source of truth - all rules, examples, self-detection workflow)
 
 ---
 
@@ -63,7 +63,7 @@ IF .md file in /Documentation/ AND NO .tt equivalent:
 
 ### 2. Template Conformance Validation (HIGH PRIORITY)
 
-**Rule**: Every `.tt` file in `/Documentation/` MUST conform to `documentation_tt_template.tt`
+**Rule**: Every `.tt` file in `/Documentation/` MUST conform to `DocumentationTtTemplate.tt`
 
 **Mandatory Elements**:
 1. **META Block** (required for documentation files)
@@ -142,6 +142,9 @@ FOR EACH .tt file in /Documentation/:
 - Before accepting ANY `.tt` file edit/creation
 - On `/validatett` command (run manually)
 - Daily scan of all `.tt` files in `/Documentation/`
+
+**Template Location**:
+- **File**: `/Comserv/root/Documentation/DocumentationTtTemplate.tt`
 
 **Tool Integration**:
 - Regex validation: Check META block structure
@@ -416,6 +419,49 @@ Generated: 2025-12-04 13:00:00
 
 ---
 
+## SEQUENTIAL EDITING ENFORCEMENT (MANDATORY)
+
+**Status**: 🔴 CRITICAL - Prevents batch edit failures and resource waste  
+**Effective**: 2026-01-06  
+**Reason**: Batch Edit Incident (Prompt 99) - 7 simultaneous edits caused context loss and file corruption
+
+### The Rule
+- ✅ **ONE file at a time**
+- ✅ **ONE edit per iteration** (single old_string → new_string)
+- ✅ **Verify after EACH edit** before proceeding to next
+- ✅ **/updateprompt after each file completion**
+
+### Prohibited Pattern
+```
+❌ BAD: Multiple Edit calls in single batch
+<invoke name="Edit">...</invoke>
+<invoke name="Edit">...</invoke>
+<invoke name="Edit">...</invoke>  ← Risk: Context loss, string match failure
+```
+
+### Correct Pattern
+```
+✅ GOOD: Sequential execution
+1. /updateprompt --phase before
+2. Read file A
+3. Edit file A once
+4. Verify success
+5. /updateprompt --phase after
+6. Next file: Start at step 1
+```
+
+### Violation Penalty
+- **First violation** (batch edits): Log to prompts_log.yaml, revert to sequential
+- **Repeated violations**: Agent role review required, workflow audit
+
+### When Multi-File Work Needed
+IF user requests "fix 2 files":
+1. Complete file #1 fully (all edits, /updateprompt)
+2. Log completion in prompts_log.yaml
+3. Complete file #2 fully (separate session or prompt)
+
+---
+
 ## AGENT CONFIGURATION
 
 **Name**: `DocumentationSyncAgent`
@@ -472,8 +518,9 @@ This agent succeeds when:
 
 ---
 
-**Agent Status**: Ready for deployment  
+**Agent Status**: Restored to active rules (2026-01-05)
 **Version**: 1.0  
 **Created**: 2025-12-04  
 **Author**: Comserv Documentation System Audit  
-**Next Review**: 2025-12-11 (after initial cleanup)
+**Restoration Reason**: Fixed documentation sync gap by restoring archived agent specification
+**Next Review**: 2026-01-05 (after testing workflow)

@@ -1,0 +1,488 @@
+[% META
+    title = 'RemoteDB Model - Multi-Database Connection Handler'
+    description = 'Comprehensive documentation for RemoteDB model covering K8s Secrets integration, environment variable configuration, database connection management, multi-connection support, and schema operations'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,database,configuration'
+    page_version = '0.02'
+    last_updated = '2026-01-11'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/RemoteDB.tt,v 0.02 2026/01/11 DocumentationSyncAgent Exp - Version consolidation from 1.01; all methods validated against HEAD' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="remotedb-model">RemoteDB Model - Multi-Database Connection Handler</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#configuration">Configuration (K8s Secrets, Environment, Files)</a></li>
+                    <li><a href="#connections">Connection Management</a></li>
+                    <li><a href="#api">Public API Methods</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v0.02 - Jan 11, 2026)</h3>
+                <p><strong>Version Consolidation Update:</strong> Consolidated from v1.01 to v0.02. All multi-database connection methods verified against HEAD commits. K8s Secrets integration confirmed functional.</p>
+                <p><strong>Previous v1.01 Changes (Jan 8, 2026):</strong></p>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Commit 06e153c1:</strong> Major refactor - separated config loading into helper methods (_load_from_k8s_secrets, _load_from_env_variables, _find_db_config_file)</li>
+                    <li><strong>Commit 20375ea1:</strong> Fixed db_config.json path lookup - corrected relative path for development environment</li>
+                    <li><strong>Commit 5ea1762a:</strong> Fixed path resolution for production database connectivity</li>
+                    <li><strong>New Features:</strong> Configuration status tracking (ACTIVE/FALLBACK/MISSING/ERROR), enhanced K8s Secrets support with multiple mount point detection</li>
+                    <li><strong>Documentation Updated:</strong> Reflects new helper methods, configuration status attributes, and K8s Secrets path detection</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>RemoteDB</strong> model (Comserv/lib/Comserv/Model/RemoteDB.pm) provides a unified interface for managing 
+                    multiple database connections across the Comserv application. It supports:
+                </p>
+                <ul>
+                    <li>Multi-database connection pooling and management</li>
+                    <li>Kubernetes Secrets integration (primary configuration source)</li>
+                    <li>Environment variable-based configuration (COMSERV_DB_*)</li>
+                    <li>Legacy db_config.json fallback (deprecated)</li>
+                    <li>User-specific database preferences</li>
+                    <li>Connection testing and validation</li>
+                    <li>Dynamic connection switching</li>
+                    <li>Schema comparison and validation</li>
+                </ul>
+                <p>
+                    RemoteDB is a Moose-based singleton model that loads database configuration from multiple sources 
+                    with a strict priority order, ensuring flexible deployment across development, staging, and production 
+                    environments.
+                </p>
+            </section>
+
+            <section id="configuration">
+                <h2>Configuration Sources (Priority Order)</h2>
+                
+                <h3>1. Kubernetes Secrets (PRIMARY) - v1.01 Enhanced</h3>
+                <p>
+                    RemoteDB first attempts to load configuration from Kubernetes Secrets mounted as files (NEW in v1.01: Multiple mount point detection).
+                    The K8s Secrets helper method checks these locations in order:
+                </p>
+                <ol>
+                    <li><code>$HOME/.comserv/secrets/dbi/</code> - User home directory (development)</li>
+                    <li><code>[Project Root]/secrets/dbi/</code> - Project directory (development/testing)</li>
+                    <li><code>/var/run/secrets/comserv/dbi/</code> - K8s custom mount</li>
+                    <li><code>/opt/secrets/dbi/</code> - K8s alternative mount</li>
+                    <li><code>/var/run/secrets/default/dbi/</code> - K8s default namespace</li>
+                </ol>
+                <p>
+                    Each mount point can contain multiple JSON files (one per database connection). File naming is flexible; 
+                    each file should contain a single database connection hash or multiple connections as a top-level hash.
+                </p>
+                <p>Expected secret file format (single connection per file or hash of connections):</p>
+                <pre><code>
+# File: /var/run/secrets/comserv/dbi/ency.json
+{
+  "ency": {
+    "host": "10.0.0.50",
+    "port": 3306,
+    "username": "comserv_user",
+    "password": "secure_password",
+    "database": "encydb"
+  },
+  "forager": {
+    "host": "10.0.0.51",
+    "port": 3306,
+    "username": "forager_user",
+    "password": "forager_password",
+    "database": "foragerdb"
+  }
+}
+                </code></pre>
+                <p><strong>Method:</strong> <code>_load_from_k8s_secrets()</code> (NEW in v1.01, refactored from inline code)</p>
+                <p><strong>Status Flag:</strong> Sets <code>configuration_status = 'ACTIVE'</code> when K8s Secrets are found</p>
+
+                <h3>2. Environment Variables (FALLBACK) - v1.01 Refactored</h3>
+                <p>
+                    If K8s Secrets are unavailable, RemoteDB reads configuration from environment variables with 
+                    the naming convention: <code>COMSERV_DB_[CONNECTION_NAME]_[FIELD]</code>
+                    (NEW in v1.01: Extracted into separate helper method for clarity and testability)
+                </p>
+                <p>Example for 'ency' database:</p>
+                <pre><code>
+COMSERV_DB_ENCY_HOST=localhost
+COMSERV_DB_ENCY_PORT=3306
+COMSERV_DB_ENCY_USERNAME=root
+COMSERV_DB_ENCY_PASSWORD=password
+COMSERV_DB_ENCY_DATABASE=encydb
+                </code></pre>
+                <p><strong>Method:</strong> <code>_load_from_env_variables()</code> (NEW in v1.01, refactored from inline code)</p>
+                <p><strong>Status Flag:</strong> Sets <code>configuration_status = 'ACTIVE'</code> when environment variables are found</p>
+
+                <h3>3. File-Based Configuration (DEPRECATED) - v1.01 Path Fixes</h3>
+                <p>
+                    For backward compatibility, RemoteDB can load from <code>db_config.json</code> if neither K8s Secrets 
+                    nor environment variables are available. This method is deprecated and logs a warning.
+                </p>
+                <p>
+                    <strong>v1.01 Path Resolution Fixes:</strong>
+                </p>
+                <ul>
+                    <li><strong>Commit 20375ea1:</strong> Fixed path lookup for development - now correctly checks relative path <code>[Project Root]/db_config.json</code></li>
+                    <li><strong>Commit 5ea1762a:</strong> Fixed production path resolution - ensures db_config.json is found in all deployment scenarios</li>
+                    <li><strong>New Helper Method:</strong> <code>_find_db_config_file()</code> (NEW in v1.01) centralizes path detection logic</li>
+                </ul>
+                <p>
+                    <code>_find_db_config_file()</code> checks these locations in order:
+                </p>
+                <ol>
+                    <li><code>/opt/comserv/db_config.json</code> - Docker/Kubernetes container path</li>
+                    <li><code>$COMSERV_DB_CONFIG</code> environment variable path (if set)</li>
+                    <li><code>[Project Root]/../db_config.json</code> - Development relative path</li>
+                </ol>
+                <p><strong>⚠ Important:</strong> Migrate to K8s Secrets for production security.</p>
+                <p><strong>Status Flag:</strong> Sets <code>configuration_status = 'FALLBACK'</code> when db_config.json is used (instead of K8s Secrets)</p>
+                <p><strong>Methods:</strong> <code>_find_db_config_file()</code> (NEW in v1.01, refactored path detection)</p>
+
+                <h3>Configuration Status</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Status</th>
+                        <th>Meaning</th>
+                        <th>Action Required</th>
+                    </tr>
+                    <tr>
+                        <td><code>ACTIVE</code></td>
+                        <td>K8s Secrets loaded successfully</td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td><code>FALLBACK</code></td>
+                        <td>Using db_config.json (K8s Secrets missing)</td>
+                        <td>Migrate to K8s Secrets</td>
+                    </tr>
+                    <tr>
+                        <td><code>MISSING</code></td>
+                        <td>No configuration found anywhere</td>
+                        <td>Admin setup required - add K8s Secrets or db_config.json</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="connections">
+                <h2>Connection Management</h2>
+                
+                <h3>Attributes</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Attribute</th>
+                        <th>Type</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>connections</code></td>
+                        <td>HashRef</td>
+                        <td>Cache of all loaded database connections (name → connection_details)</td>
+                    </tr>
+                    <tr>
+                        <td><code>selected_connection</code></td>
+                        <td>HashRef</td>
+                        <td>Currently active connection for operations</td>
+                    </tr>
+                    <tr>
+                        <td><code>config</code></td>
+                        <td>HashRef</td>
+                        <td>Loaded configuration from K8s/env/file</td>
+                    </tr>
+                    <tr>
+                        <td><code>logging</code></td>
+                        <td>Logging instance</td>
+                        <td>Logging utility (singleton)</td>
+                    </tr>
+                    <tr style="background-color: #f0f8ff;">
+                        <td><code>configuration_status</code></td>
+                        <td>String (ACTIVE|FALLBACK|MISSING|ERROR)</td>
+                        <td><strong>NEW (v1.01):</strong> Indicates config source: ACTIVE=K8s Secrets, FALLBACK=db_config.json, MISSING=none found, ERROR=exception</td>
+                    </tr>
+                    <tr style="background-color: #f0f8ff;">
+                        <td><code>configuration_error</code></td>
+                        <td>String</td>
+                        <td><strong>NEW (v1.01):</strong> Human-readable error message if configuration status is not ACTIVE</td>
+                    </tr>
+                    <tr style="background-color: #f0f8ff;">
+                        <td><code>k8s_secrets_found</code></td>
+                        <td>Boolean</td>
+                        <td><strong>NEW (v1.01):</strong> Internal flag tracking whether K8s Secrets were successfully loaded</td>
+                    </tr>
+                </table>
+
+                <h3>Connection Selection Workflow</h3>
+                <ol>
+                    <li>User calls <code>select_connection($name)</code></li>
+                    <li>RemoteDB loads configuration if not already cached</li>
+                    <li>Selected connection stored in <code>selected_connection</code> attribute</li>
+                    <li>All subsequent database operations use selected connection</li>
+                    <li>User can switch connections at runtime without reconnecting</li>
+                </ol>
+
+                <h3>User Preferences</h3>
+                <p>RemoteDB supports persistent user database preferences (stored in database):</p>
+                <ul>
+                    <li><code>set_user_preferred_connection($user_id, $connection_name)</code> - Save preference</li>
+                    <li><code>get_user_preferred_connection($user_id)</code> - Retrieve saved preference</li>
+                    <li><code>clear_user_preferred_connection($user_id)</code> - Reset to default</li>
+                    <li><code>select_connection_with_preference($user_id)</code> - Auto-select based on preference</li>
+                </ul>
+            </section>
+
+            <section id="api">
+                <h2>Public API Methods</h2>
+                
+                <h3>Connection Operations</h3>
+                
+                <h4>get_all_connections()</h4>
+                <p><strong>Returns:</strong> HashRef of all configured connections</p>
+                <p><strong>Usage:</strong></p>
+                <pre><code>
+my %connections = %{$model->get_all_connections()};
+foreach my $name (keys %connections) {
+    print "Available: $name\n";
+}
+                </code></pre>
+
+                <h4>select_connection($name)</h4>
+                <p><strong>Parameters:</strong> Connection name (e.g., 'ency', 'forager')</p>
+                <p><strong>Returns:</strong> True on success, dies on failure</p>
+                <p><strong>Usage:</strong></p>
+                <pre><code>
+$model->select_connection('ency');
+# All subsequent operations use ency database
+                </code></pre>
+
+                <h4>get_connection($name)</h4>
+                <p><strong>Returns:</strong> Connection details HashRef for given name</p>
+                <p><strong>Fields:</strong> host, port, username, password, database</p>
+
+                <h4>get_connection_info()</h4>
+                <p><strong>Returns:</strong> Details of currently selected connection</p>
+
+                <h4>test_connection($name)</h4>
+                <p><strong>Parameters:</strong> Connection name to test</p>
+                <p><strong>Returns:</strong> Boolean (true if connection successful)</p>
+                <p><strong>Usage:</strong> Validates database connectivity before use</p>
+
+                <h3>Database Operations</h3>
+                
+                <h4>execute_query($sql, $params)</h4>
+                <p><strong>Parameters:</strong> SQL statement, optional bind parameters array</p>
+                <p><strong>Returns:</strong> DBI statement handle</p>
+                <p><strong>Executes:</strong> Query against selected database</p>
+
+                <h4>list_tables()</h4>
+                <p><strong>Returns:</strong> Array of table names in selected database</p>
+
+                <h4>get_table_schema($table_name)</h4>
+                <p><strong>Returns:</strong> Column definitions for table (HashRef)</p>
+                <p><strong>Fields per column:</strong> name, type, nullable, key, default, extra</p>
+
+                <h3>Schema Validation</h3>
+                
+                <h4>get_schema_comparison_status()</h4>
+                <p><strong>Returns:</strong> Schema validation results comparing ency and forager</p>
+                <p><strong>Useful for:</strong> Detecting schema drift between environments</p>
+
+                <h4>add_connection($name, $config_hash)</h4>
+                <p><strong>Parameters:</strong> Connection name, configuration (host, port, username, password, database)</p>
+                <p><strong>Adds:</strong> Dynamic connection at runtime (useful for testing)</p>
+
+                <h3>Private Helper Methods (NEW in v1.01)</h3>
+                <p>
+                    The following private methods are used internally by RemoteDB for configuration loading. 
+                    They are documented for developers extending or troubleshooting the model.
+                </p>
+
+                <h4>_load_config()</h4>
+                <p><strong>Purpose:</strong> Main configuration loading orchestrator</p>
+                <p><strong>Behavior:</strong> Attempts to load config in priority order: K8s Secrets → env vars → db_config.json</p>
+                <p><strong>Sets:</strong> configuration_status attribute (ACTIVE/FALLBACK/MISSING/ERROR)</p>
+
+                <h4>_load_from_k8s_secrets()</h4>
+                <p><strong>Purpose:</strong> Load configuration from Kubernetes Secrets mounted as files</p>
+                <p><strong>Returns:</strong> HashRef of loaded connections, or undef if no K8s Secrets found</p>
+                <p><strong>Checks locations:</strong> 5 standard K8s mount points (see Configuration section)</p>
+                <p><strong>File format:</strong> JSON files in [mount-point]/dbi/ directory</p>
+                <p><strong>NEW in v1.01:</strong> Refactored from inline code in _load_config()</p>
+
+                <h4>_load_from_env_variables()</h4>
+                <p><strong>Purpose:</strong> Load configuration from COMSERV_DB_* environment variables</p>
+                <p><strong>Returns:</strong> HashRef of loaded connections, or empty hash if no env vars found</p>
+                <p><strong>Env var pattern:</strong> COMSERV_DB_[CONNECTION_NAME]_[FIELD] (e.g., COMSERV_DB_ENCY_HOST)</p>
+                <p><strong>NEW in v1.01:</strong> Refactored from inline code in _load_config()</p>
+
+                <h4>_find_db_config_file()</h4>
+                <p><strong>Purpose:</strong> Locate db_config.json file in filesystem</p>
+                <p><strong>Returns:</strong> Path to db_config.json if found, undef otherwise</p>
+                <p><strong>Checks locations:</strong></p>
+                <ul>
+                    <li>/opt/comserv/db_config.json (Docker/K8s)</li>
+                    <li>$COMSERV_DB_CONFIG path (if environment variable set)</li>
+                    <li>[Project Root]/../db_config.json (development)</li>
+                </ul>
+                <p><strong>NEW in v1.01:</strong> Refactored path detection into dedicated method</p>
+                <p><strong>Related fixes:</strong> Commits 20375ea1 (dev path) and 5ea1762a (production path)</p>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+
+                <h3>Basic Connection Selection</h3>
+                <pre><code>
+# In Catalyst controller
+my $model = $c->model('RemoteDB');
+$model->select_connection('ency');
+
+# Execute query against ency database
+my $sth = $model->execute_query('SELECT * FROM users');
+while (my $row = $sth->fetchrow_hashref) {
+    print $row->{username};
+}
+                </code></pre>
+
+                <h3>Switch Databases at Runtime</h3>
+                <pre><code>
+# Switch to forager
+$model->select_connection('forager');
+my $tables = $model->list_tables();
+                </code></pre>
+
+                <h3>Test All Connections</h3>
+                <pre><code>
+my %all_conns = %{$model->get_all_connections()};
+foreach my $name (keys %all_conns) {
+    if ($model->test_connection($name)) {
+        print "✓ $name: OK\n";
+    } else {
+        print "✗ $name: FAILED\n";
+    }
+}
+                </code></pre>
+
+                <h3>User Database Preferences</h3>
+                <pre><code>
+# Save user's preferred database
+$model->set_user_preferred_connection($user_id, 'forager');
+
+# Later, automatically select user's preference
+$model->select_connection_with_preference($user_id);
+                </code></pre>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+
+                <h3>Check Configuration Status (NEW in v1.01)</h3>
+                <p>
+                    Use the new <code>configuration_status</code> attribute to diagnose config loading issues:
+                </p>
+                <pre><code>
+my $model = $c->model('RemoteDB');
+warn "Status: " . ($model->{configuration_status} // 'UNKNOWN');
+warn "Error: " . ($model->{configuration_error} // 'None');
+                </code></pre>
+                <p><strong>Status meanings:</strong></p>
+                <ul>
+                    <li><code>ACTIVE</code> - Successfully loaded from K8s Secrets (primary)</li>
+                    <li><code>FALLBACK</code> - Using db_config.json (K8s Secrets not found, should migrate)</li>
+                    <li><code>MISSING</code> - No configuration found anywhere; admin setup required</li>
+                    <li><code>ERROR</code> - Exception occurred during config load; check <code>configuration_error</code> for details</li>
+                </ul>
+
+                <h3>K8s Secrets Not Detected (NEW in v1.01 Path Detection)</h3>
+                <p>
+                    <strong>Symptom:</strong> <code>configuration_status = 'FALLBACK'</code> even though K8s Secrets should be mounted
+                </p>
+                <p>
+                    <strong>Root causes:</strong>
+                </p>
+                <ul>
+                    <li>K8s Secrets mounted to wrong path (not in standard mount points)</li>
+                    <li>Secrets missing in dbi/ subdirectory</li>
+                    <li>Secret files not in JSON format</li>
+                </ul>
+                <p>
+                    <strong>Solutions (v1.01):</strong>
+                </p>
+                <ol>
+                    <li>Verify K8s Secret mount path: Check pod annotations/volumes for mount points</li>
+                    <li>Add custom mount path to RemoteDB: Edit _load_from_k8s_secrets() in code to check your path</li>
+                    <li>Test secret files: <code>cat /var/run/secrets/comserv/dbi/ency.json | jq .</code></li>
+                    <li>Check application logs: Look for debug messages showing which paths were checked</li>
+                    <li>Use HOME/.comserv/secrets for development: Create ~/.comserv/secrets/dbi/ locally to test</li>
+                </ol>
+
+                <h3>Configuration Not Found</h3>
+                <p>
+                    <strong>Symptom:</strong> <code>configuration_status = 'MISSING'</code>
+                </p>
+                <p>
+                    <strong>Solution:</strong>
+                </p>
+                <ol>
+                    <li>For Kubernetes: Create K8s Secret containing database configuration</li>
+                    <li>For Docker/Local: Set COMSERV_DB_* environment variables</li>
+                    <li>For Legacy: Create db_config.json in Comserv root (not recommended)</li>
+                </ol>
+
+                <h3>Connection Test Fails</h3>
+                <p>
+                    <strong>Symptom:</strong> <code>test_connection()</code> returns false
+                </p>
+                <p>
+                    <strong>Checks:</strong>
+                </p>
+                <ul>
+                    <li>Verify database host is reachable: <code>ping [host]</code></li>
+                    <li>Verify port is open: <code>telnet [host] [port]</code></li>
+                    <li>Check credentials: username, password match database server</li>
+                    <li>Verify database exists: <code>SHOW DATABASES;</code> on database server</li>
+                </ul>
+
+                <h3>Wrong Database Selected</h3>
+                <p>
+                    <strong>Symptom:</strong> Queries return unexpected results or "table not found"
+                </p>
+                <p>
+                    <strong>Debug:</strong>
+                </p>
+                <pre><code>
+my $info = $model->get_connection_info();
+warn "Current database: " . $info->{database};
+                </code></pre>
+
+                <h3>Schema Mismatch Warnings</h3>
+                <p>
+                    <strong>Symptom:</strong> Logs show schema differences between ency and forager
+                </p>
+                <p>
+                    <strong>Next Steps:</strong> Use <code>/admin/compare_schema</code> to review and sync differences
+                </p>
+            </section>
+
+            <div class="alert alert-info" style="margin-top: 20px;">
+                <strong>ℹ See Also:</strong>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><a href="/Documentation/models/Database">Database Documentation</a></li>
+                    <li><a href="/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY">K8s Migration Guide</a></li>
+                    <li><a href="/admin">Admin Tools - Database Setup</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

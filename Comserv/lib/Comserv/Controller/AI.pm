@@ -23,6 +23,7 @@ use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
+use Comserv::Model::Grok;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -57,15 +58,22 @@ Main AI interface page with interactive query form.
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'index', "Unauthorized access attempt to AI interface");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # If not logged in, create guest session for accessing the UI
+    unless ($username) {
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'index', "Guest user accessing AI interface: $username");
+    }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'index', "User accessing AI interface");
@@ -117,21 +125,34 @@ sub generate :Local :Args(0) {
     # Set response content type
     $c->response->content_type('application/json');
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'generate', "Unauthorized access attempt to AI generate");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        });
-        $c->response->body($error_response);
-        $c->response->status(401);
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $is_guest = 0;
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199) - created earlier
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'generate', "Guest user session created: $username (session: $guest_session_id)");
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'generate', "Authenticated user: $username");
+    }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Processing AI generate request");
@@ -140,11 +161,13 @@ sub generate :Local :Args(0) {
     my $prompt = '';
     my $format = '';
     my $system = '';
+    my $provider = 'ollama';  # Default provider: ollama, grok, or deepseek
     my $page_context = 'general';
     my $page_path = '';
     my $page_title = '';
     my $agent_id = 'general';
     my $agent_name = 'AI Assistant';
+    my $conversation_id = undef;  # For continuing existing conversations
     
     # Check if request body is JSON
     my $content_type = $c->request->content_type || '';
@@ -195,13 +218,15 @@ sub generate :Local :Args(0) {
             $prompt = $json_data->{prompt} || '';
             $format = $json_data->{format} || '';
             $system = $json_data->{system} || '';
+            $provider = $json_data->{provider} || 'ollama';
             $page_context = $json_data->{page_context} || 'general';
             $page_path = $json_data->{page_path} || '';
             $page_title = $json_data->{page_title} || '';
             $agent_id = $json_data->{agent_id} || 'general';
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
+            $conversation_id = $json_data->{conversation_id};  # May be undef if new conversation
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "'");
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'generate', "JSON parsing resulted in no data or invalid hash");
@@ -214,12 +239,27 @@ sub generate :Local :Args(0) {
         $prompt = $c->request->params->{prompt} || '';
         $format = $c->request->params->{format} || '';
         $system = $c->request->params->{system} || '';
+        $provider = $c->request->params->{provider} || 'ollama';
         $page_context = $c->request->params->{page_context} || 'general';
         $page_path = $c->request->params->{page_path} || '';
         $page_title = $c->request->params->{page_title} || '';
         $agent_id = $c->request->params->{agent_id} || 'general';
         $agent_name = $c->request->params->{agent_name} || 'AI Assistant';
+        $conversation_id = $c->request->params->{conversation_id};  # May be undef if new conversation
     }
+    
+    # Fall back to session-stored conversation_id if not provided in request
+    unless ($conversation_id) {
+        $conversation_id = $c->session->{current_conversation_id};
+        if ($conversation_id) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Using session-stored conversation_id: $conversation_id");
+        }
+    }
+    
+    # DEBUG: Log conversation_id status
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -246,93 +286,144 @@ sub generate :Local :Args(0) {
         'generate', "Request parameters - format: '$format', system: " . 
         (length($system) > 0 ? 'provided' : 'none'));
     
+    # Normalize agent_type to database enum values
+    # Map custom agent_id to standard enum: documentation|helpdesk|ency|beekeeping|hamradio|chat
+    my $normalized_agent_type = 'documentation';  # default
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat)$/i) {
+        $normalized_agent_type = lc($agent_id);
+    } elsif ($agent_id && $agent_id eq 'general') {
+        $normalized_agent_type = 'documentation';  # map general to documentation
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
+    
     my $response_data;
     my $ollama_started = 0;
+    my $model_used = 'unknown';
     
     try {
-        # Get Ollama model
-        my $ollama = $c->model('Ollama');
-        unless ($ollama) {
-            die "Failed to load Ollama model";
-        }
+        my $response;
         
-        # Configure with user's current settings
-        my $user_roles = $c->session->{roles} || [];
-        if (!ref($user_roles)) {
-            $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-        }
-        my $can_select_model = 0;
-        if (ref($user_roles) eq 'ARRAY') {
-            $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-        }
-        my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
-        
-        $ollama->host($current_host);
-        $ollama->port($current_port) if $current_port;
-        $ollama->model($current_model) if $current_model;
-        $ollama->clear_endpoint;
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'generate', "Ollama model configured (host: $current_host), checking connection...");
-        
-        # Check if server is connected, if not try to start it
-        unless ($ollama->check_connection()) {
-            # Only localhost can be auto-started
-            if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                    'generate', "Ollama not connected on $current_host, attempting to start server...");
-                
-                my $start_result = $ollama->start_server(method => 'command', async => 0);
-                if ($start_result && $start_result->{success}) {
-                    $ollama_started = 1;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                        'generate', "Ollama server started successfully for user '$username'");
-                } else {
-                    my $error = $start_result->{error} || 'Unknown error';
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                        'generate', "Failed to auto-start Ollama server for user '$username': $error");
-                }
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                    'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
+        # Route to the appropriate provider
+        if (lc($provider) eq 'grok') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Using Grok provider for query");
+            
+            my $grok = $c->model('Grok');
+            unless ($grok) {
+                die "Failed to load Grok model";
             }
-        }
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'generate', "Querying Ollama API with model: $current_model");
-        
-        # Query the API
-        my $response = $ollama->query(
-            prompt => $prompt,
-            format => $format eq 'json' ? 'json' : undef,
-            system => $system || undef
-        );
-        
-        unless ($response) {
-            my $error = $ollama->last_error || 'Unknown error';
-            die "Ollama query failed: $error";
+            
+            # Check if API key is configured
+            unless ($grok->api_key) {
+                die "Grok API key not configured. Set GROK_API_KEY environment variable or configure Kubernetes secret.";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Querying Grok API");
+            
+            $response = $grok->chat(
+                messages => [
+                    { role => 'system', content => $system || 'You are a helpful assistant.' },
+                    { role => 'user', content => $prompt }
+                ]
+            );
+            
+            unless ($response) {
+                my $error = $grok->last_error || 'Unknown error';
+                die "Grok query failed: $error";
+            }
+            
+            $model_used = $response->{model} || $grok->model;
+        } else {
+            # Default to Ollama
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Using Ollama provider for query");
+            
+            my $ollama = $c->model('Ollama');
+            unless ($ollama) {
+                die "Failed to load Ollama model";
+            }
+            
+            # Configure with user's current settings
+            my $user_roles = $c->session->{roles} || [];
+            if (!ref($user_roles)) {
+                $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+            }
+            my $can_select_model = 0;
+            if (ref($user_roles) eq 'ARRAY') {
+                $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+            }
+            my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
+            
+            $ollama->host($current_host);
+            $ollama->port($current_port) if $current_port;
+            $ollama->model($current_model) if $current_model;
+            $ollama->clear_endpoint;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Ollama model configured (host: $current_host), checking connection...");
+            
+            # Check if server is connected, if not try to start it
+            unless ($ollama->check_connection()) {
+                # Only localhost can be auto-started
+                if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                        'generate', "Ollama not connected on $current_host, attempting to start server...");
+                    
+                    my $start_result = $ollama->start_server(method => 'command', async => 0);
+                    if ($start_result && $start_result->{success}) {
+                        $ollama_started = 1;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                            'generate', "Ollama server started successfully for user '$username'");
+                    } else {
+                        my $error = $start_result->{error} || 'Unknown error';
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                            'generate', "Failed to auto-start Ollama server for user '$username': $error");
+                    }
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                        'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'generate', "Querying Ollama API with model: $current_model");
+            
+            # Query the API
+            $response = $ollama->query(
+                prompt => $prompt,
+                format => $format eq 'json' ? 'json' : undef,
+                system => $system || undef
+            );
+            
+            unless ($response) {
+                my $error = $ollama->last_error || 'Unknown error';
+                die "Ollama query failed: $error";
+            }
+            
+            $model_used = $response->{model} || $ollama->model;
         }
         
         # Log success metrics
         my $response_length = length($response->{response} || '');
-        my $model_used = $response->{model} || $ollama->model;
+        $model_used = $response->{model} || $model_used;
         my $ai_response = $response->{response} || '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
         
         # Save conversation and messages to database
-        my $conversation_id;
         try {
-            my $user_id = $c->session->{user_id};
-            
+            # user_id was already set above (either from session or as guest)
             unless ($user_id) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                    'generate', "CRITICAL: user_id not found in session. Session keys: " . join(', ', keys %{$c->session}));
+                    'generate', "CRITICAL: user_id not found. Session keys: " . join(', ', keys %{$c->session}));
                 die "USER_ID_NULL";
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "SAVE_CONV_START: user_id=$user_id");
+                'generate', "SAVE_CONV_START: user_id=$user_id, is_guest=$is_guest");
             
             my $schema = $c->model('DBEncy')->schema;
             unless ($schema) {
@@ -342,49 +433,74 @@ sub generate :Local :Args(0) {
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "PRE_CREATE: user_id=$user_id, schema_loaded=1, about to create conversation");
+                'generate', "PRE_CREATE: user_id=$user_id, schema_loaded=1, conversation_id=" . (defined($conversation_id) ? "'$conversation_id' (defined, len=" . length($conversation_id) . ")" : "UNDEF"));
             
-            # Create new conversation for generate endpoint (always new)
-            # Use first 80 chars of prompt as title
-            my $title = substr($prompt, 0, 80);
-            $title =~ s/\n/ /g;
-            $title = 'AI Query' if !$title || length($title) == 0;
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Creating new conversation with title: $title (page_context: $page_context, page_path: $page_path)");
-            
-            my $conversation_metadata = {
-                page_context => $page_context,
-                page_path => $page_path,
-                page_title => $page_title,
-                agent_id => $agent_id,
-                agent_name => $agent_name,
-                created_from_widget => 1,
-                widget_version => '2.0'
-            };
-            
-            my $conversation = $schema->resultset('AiConversation')->create({
-                user_id => $user_id,
-                title => $title,
-                status => 'active',
-                metadata => encode_json($conversation_metadata)
-            });
-            
-            unless ($conversation) {
-                die "CONVERSATION_CREATE_FAILED: create() returned undef/false";
+            # Debug: check if conversation_id looks valid
+            if ($conversation_id) {
+                if ($conversation_id =~ /^\d+$/) {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                        'generate', "conversation_id=$conversation_id is numeric - should reuse");
+                } else {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                        'generate', "conversation_id='$conversation_id' is NOT numeric - treating as invalid");
+                    $conversation_id = undef;
+                }
             }
             
-            $conversation_id = $conversation->id;
-            
+            # Create new conversation only if conversation_id not provided
             unless ($conversation_id) {
-                die "CONVERSATION_ID_NULL: conversation record created but id is null";
+                # Use first 80 chars of prompt as title
+                my $title = substr($prompt, 0, 80);
+                $title =~ s/\n/ /g;
+                $title = 'AI Query' if !$title || length($title) == 0;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Creating new conversation with title: $title (page_context: $page_context, page_path: $page_path)");
+                
+                my $conversation_metadata = {
+                    page_context => $page_context,
+                    page_path => $page_path,
+                    page_title => $page_title,
+                    agent_id => $agent_id,
+                    agent_name => $agent_name,
+                    created_from_widget => 1,
+                    widget_version => '2.0',
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                };
+                
+                my $conversation = $schema->resultset('AiConversation')->create({
+                    user_id => $user_id,
+                    title => $title,
+                    status => 'active',
+                    metadata => encode_json($conversation_metadata)
+                });
+                
+                unless ($conversation) {
+                    die "CONVERSATION_CREATE_FAILED: create() returned undef/false";
+                }
+                
+                $conversation_id = $conversation->id;
+                
+                unless ($conversation_id) {
+                    die "CONVERSATION_ID_NULL: conversation record created but id is null";
+                }
+                
+                # Store conversation_id in session for persistence across prompts
+                $c->session->{current_conversation_id} = $conversation_id;
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "POST_CREATE: conversation_id=$conversation_id successfully created and stored in session");
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Conversation created successfully with ID: $conversation_id");
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'generate', "Using existing conversation_id=$conversation_id (continuing conversation)");
+                
+                # Store conversation_id in session even when reusing (maintains persistence)
+                $c->session->{current_conversation_id} = $conversation_id;
             }
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "POST_CREATE: conversation_id=$conversation_id successfully created");
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Conversation created successfully with ID: $conversation_id");
             
             # Save user's message (the prompt)
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -406,10 +522,10 @@ sub generate :Local :Args(0) {
                 user_id => $user_id,
                 role => 'user',
                 content => $prompt,
-                agent_type => $agent_id,
+                agent_type => $normalized_agent_type,
                 model_used => $model_used,
                 metadata => encode_json($user_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -441,10 +557,10 @@ sub generate :Local :Args(0) {
                 user_id => $user_id,
                 role => 'assistant',
                 content => $ai_response,
-                agent_type => $agent_id,
+                agent_type => $normalized_agent_type,
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -465,7 +581,7 @@ sub generate :Local :Args(0) {
         } catch {
             my $db_error = $_;
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                'generate', "Failed to save conversation to database: $db_error (Conversation ID: $conversation_id, User ID: " . ($c->session->{user_id} || 'UNDEF') . ")");
+                'generate', "Failed to save conversation to database: $db_error (Conversation ID: $conversation_id, User ID: $user_id)");
         };
         
         # Build JSON response
@@ -767,21 +883,34 @@ sub chat :Local :Args(0) {
     # Set response content type
     $c->response->content_type('application/json');
     
-    # Check authentication
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'chat', "Unauthorized access attempt to AI chat");
-        
-        my $error_response = encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        });
-        $c->response->body($error_response);
-        $c->response->status(401);
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199)
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'chat', "Guest user session created: $username (session: $guest_session_id)");
+    } else {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'chat', "Authenticated user: $username");
+    }
     
     # Parse JSON body - try multiple methods to get the body content
     my $json_data = {};
@@ -943,13 +1072,12 @@ sub chat :Local :Args(0) {
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
         try {
-            my $user_id = $c->session->{user_id};
-            
+            # user_id was already set above (either from session or as guest)
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'chat', "SAVE_CONV_START: user_id=$user_id, provided_conv_id=$conversation_id");
+                'chat', "SAVE_CONV_START: user_id=$user_id, provided_conv_id=$conversation_id, is_guest=$is_guest");
             
             unless ($user_id) {
-                die "User ID not found in session";
+                die "User ID not found";
             }
             
             my $schema = $c->model('DBEncy')->schema;
@@ -970,10 +1098,16 @@ sub chat :Local :Args(0) {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     'chat', "Creating new conversation with title: $title");
                 
+                my $conversation_metadata = {
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                };
+                
                 my $conversation = $schema->resultset('AiConversation')->create({
                     user_id => $user_id,
                     title => $title,
-                    status => 'active'
+                    status => 'active',
+                    metadata => encode_json($conversation_metadata)
                 });
                 
                 unless ($conversation) {
@@ -1004,12 +1138,14 @@ sub chat :Local :Args(0) {
                 content => $prompt,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => {
+                metadata => encode_json({
                     system_prompt => '',
-                    format => 'text'
-                },
+                    format => 'text',
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                }),
                 ip_address => $c->request->remote_address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1026,12 +1162,14 @@ sub chat :Local :Args(0) {
                 content => $ai_response,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => {
+                metadata => encode_json({
                     total_duration => $response->{total_duration} || 0,
-                    eval_count => $response->{eval_count} || 0
-                },
+                    eval_count => $response->{eval_count} || 0,
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                }),
                 ip_address => $c->request->remote_address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1043,7 +1181,7 @@ sub chat :Local :Args(0) {
         } catch {
             my $db_error = $_;
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: " . ($c->session->{user_id} || 'UNDEF') . ")");
+                'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
         
         # Build JSON response
@@ -2098,15 +2236,31 @@ Display all saved conversations for the current user with optional filters.
 sub conversations :Local :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->session->{username}) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-            'conversations', "Unauthorized access attempt to conversations list");
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-    
+    # Determine if user is authenticated or guest
     my $username = $c->session->{username};
     my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    # If not logged in, create guest session
+    if (!$username) {
+        $is_guest = 1;
+        
+        # Create a unique guest session ID if not already present
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+        
+        # Use guest user (ID 199)
+        $user_id = 199;
+        $username = "Guest-" . substr($guest_session_id, 0, 8);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'conversations', "Guest user accessing conversations: $username");
+    }
     
     my $user_roles = $c->session->{roles} || [];
     if (!ref($user_roles)) {
@@ -2114,7 +2268,8 @@ sub conversations :Local :Args(0) {
     }
     my $is_admin = ref($user_roles) eq 'ARRAY' ? grep { $_ =~ /^admin$/i } @$user_roles : 0;
     
-    my $view_all = $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all') ? 1 : 0;
+    # Guests cannot view all conversations
+    my $view_all = (!$is_guest && $is_admin && ($c->req->params->{view_all} || $c->req->params->{view} eq 'all')) ? 1 : 0;
     
     my $page_title = $view_all ? 'All Conversations (Admin)' : 'My Conversations';
     
@@ -2156,6 +2311,27 @@ sub conversations :Local :Args(0) {
             try {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     'conversations', "Processing conversation ID=" . $conv->id);
+                
+                # For guests, only show conversations that belong to this guest session
+                if ($is_guest) {
+                    my $conv_metadata = {};
+                    if ($conv->metadata) {
+                        try {
+                            $conv_metadata = decode_json($conv->metadata);
+                        } catch {
+                            # Metadata parsing failed, skip this conversation
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                                'conversations', "Failed to parse conversation metadata for ID=" . $conv->id);
+                        };
+                    }
+                    
+                    # Check if this conversation belongs to this guest session
+                    unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                            'conversations', "Skipping conversation ID=" . $conv->id . " - not owned by this guest session");
+                        next;
+                    }
+                }
                 
                 my @messages = $conv->ai_messages->all;
                 my $message_count = scalar(@messages);
@@ -2204,9 +2380,16 @@ sub conversations :Local :Args(0) {
                 foreach my $msg (@messages) {
                     push @message_data, {
                         id => $msg->id,
+                        conversation_id => $msg->conversation_id,
+                        user_id => $msg->user_id,
                         role => $msg->role,
                         content => $msg->content,
-                        created_at => $msg->created_at
+                        created_at => $msg->created_at,
+                        agent_type => $msg->agent_type || 'chat',
+                        model_used => $msg->model_used || '',
+                        ip_address => $msg->ip_address || '',
+                        user_role => $msg->user_role || '',
+                        metadata => $msg->metadata || '{}'
                     };
                 }
                 
@@ -2266,8 +2449,27 @@ sub conversations :Local :Args(0) {
         total_conversations => $total_conversations,
         username => $username,
         is_admin => $is_admin,
-        view_all => $view_all
+        view_all => $view_all,
+        is_guest => $is_guest
     );
+}
+
+sub reset_conversation :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Clear the session-stored conversation_id to start a new conversation
+    delete $c->session->{current_conversation_id};
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'reset_conversation', "Conversation session cleared - next prompt will start a new conversation");
+    
+    my $response = encode_json({
+        success => JSON::true,
+        message => 'Conversation reset - next chat will start fresh'
+    });
+    
+    $c->response->content_type('application/json');
+    $c->response->body($response);
 }
 
 =head1 AUTHOR

@@ -8,6 +8,10 @@ __PACKAGE__->add_columns(
         data_type => 'integer',
         is_auto_increment => 1,
     },
+    site_id => {
+        data_type => 'integer',
+        is_nullable => 0,
+    },
     role => {
         data_type => 'varchar',
         size => 100,
@@ -79,7 +83,7 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['role', 'agent_type', 'model_name']);
+__PACKAGE__->add_unique_constraint(['site_id', 'role', 'agent_type', 'model_name']);
 
 # Helper methods
 sub is_enabled {

@@ -1,0 +1,324 @@
+[% META
+   title = "ProxyManager Controller Documentation"
+   description = "Comprehensive proxy, Docker, and infrastructure management controller for Comserv—Nginx Proxy Manager integration, Docker management, Kubernetes setup, and infrastructure orchestration"
+   roles = "admin,devops,network_admin,proxy_manager"
+   TemplateType = "Documentation"
+   category = "controllers,infrastructure,devops"
+   page_version = "1.03"
+   last_updated = "Thu Jan 09 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/ProxyManager.tt,v 1.03 2026/01/09 DocumentationSyncAgent Exp DocumentationSyncAgent - Jan 9 Update: Bug fixes (sub redefinition), Docker/Redis infrastructure consolidation, comprehensive proxy/K8s refactoring sync' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">ProxyManager Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-09 | 
+        Version: 1.03 | 
+        Author: DocumentationSyncAgent | 
+        Status: Active | 
+        Recent: Jan 9 sync - Bug fixes (subroutine redefinition), Docker/Redis infrastructure, comprehensive Proxy/K8s refactoring
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#docker" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Docker</a>
+                <a href="#proxy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proxy (NPM)</a>
+                <a href="#kubernetes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Kubernetes</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The ProxyManager controller handles comprehensive proxy, Docker, and infrastructure management for the Comserv application. It integrates with Nginx Proxy Manager (NPM) to manage reverse proxies, supports containerization, and provides installation and configuration support for Docker and Kubernetes environments.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Key Responsibility</strong>: Manage network infrastructure including proxy configurations, containerization, and orchestration setup.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <div class="row">
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Docker Management</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Installation Detection</strong>: Checks for Docker installation</li>
+                        <li><strong>OS-Specific Guides</strong>: Ubuntu, Debian, CentOS, Fedora, RHEL, Arch</li>
+                        <li><strong>API Integration</strong>: Container lifecycle management</li>
+                        <li><strong>System Info</strong>: OS, kernel, architecture display</li>
+                        <li><strong>Progress Tracking</strong>: AJAX-based installation updates</li>
+                    </ul>
+                </div>
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Proxy Management (NPM)</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>NPM API</strong>: Nginx Proxy Manager integration</li>
+                        <li><strong>Proxy Creation</strong>: Configure reverse proxy rules</li>
+                        <li><strong>Environment Config</strong>: Environment-specific setup</li>
+                        <li><strong>API Key Management</strong>: Secure credential handling</li>
+                        <li><strong>Infrastructure Setup</strong>: Complete proxy configuration</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Kubernetes Integration</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Cluster installation and setup</li>
+                        <li>Infrastructure validation</li>
+                        <li>Cluster configuration &amp; init</li>
+                    </ul>
+                </div>
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Access Control</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li>Role-based access (admin, proxy_manager, network_admin, devops)</li>
+                        <li>Session-based permissions</li>
+                        <li>Access request system</li>
+                    </ul>
+                </div>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">Controller Methods</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Base Routes</h3>
+            <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; color: var(--text-color);">Method</th>
+                    <th style="text-align: left; color: var(--text-color);">Path</th>
+                    <th style="text-align: left; color: var(--text-color);">Purpose</th>
+                </tr>
+                <tr>
+                    <td>base</td>
+                    <td>/proxymanager</td>
+                    <td>Chained action root - initializes logging</td>
+                </tr>
+                <tr>
+                    <td>direct_index</td>
+                    <td>/proxymanager</td>
+                    <td>Direct path to dashboard (backward compatibility)</td>
+                </tr>
+                <tr>
+                    <td>index</td>
+                    <td>/proxymanager/</td>
+                    <td>Main ProxyManager dashboard</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Installation Methods</h3>
+            <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; color: var(--text-color);">Method</th>
+                    <th style="text-align: left; color: var(--text-color);">Purpose</th>
+                </tr>
+                <tr>
+                    <td>install_docker</td>
+                    <td>Display Docker installation page with OS-specific instructions</td>
+                </tr>
+                <tr>
+                    <td>install_docker_api</td>
+                    <td>API endpoint for Docker installation operations</td>
+                </tr>
+                <tr>
+                    <td>install_kubernetes</td>
+                    <td>Kubernetes cluster installation and setup</td>
+                </tr>
+                <tr>
+                    <td>install_npm</td>
+                    <td>Nginx Proxy Manager installation</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Proxy Management Methods</h3>
+            <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; color: var(--text-color);">Method</th>
+                    <th style="text-align: left; color: var(--text-color);">Purpose</th>
+                </tr>
+                <tr>
+                    <td>create_proxy</td>
+                    <td>Create new reverse proxy configuration in NPM</td>
+                </tr>
+                <tr>
+                    <td>setup_infrastructure</td>
+                    <td>Configure complete proxy infrastructure</td>
+                </tr>
+                <tr>
+                    <td>setup_infrastructure_api</td>
+                    <td>API endpoint for infrastructure setup operations</td>
+                </tr>
+            </table>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Monitoring Methods</h3>
+            <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; color: var(--text-color);">Method</th>
+                    <th style="text-align: left; color: var(--text-color);">Purpose</th>
+                </tr>
+                <tr>
+                    <td>check_infrastructure_status</td>
+                    <td>Validate proxy, Docker, and K8s infrastructure status</td>
+                </tr>
+                <tr>
+                    <td>installation_progress</td>
+                    <td>Track installation progress with timestamp</td>
+                </tr>
+                <tr>
+                    <td>ajax_test_page</td>
+                    <td>AJAX endpoint for testing proxy functionality</td>
+                </tr>
+            </table>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DOCKER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="docker" style="color: var(--text-color); font-family: var(--header-font);">Docker Management</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The controller automatically detects Docker installation and provides OS-specific installation instructions. Supported: Ubuntu/Debian, CentOS/RHEL/Fedora, Arch Linux.</p>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Docker API Configuration</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Docker interaction uses <code>IPC::Run3</code> module with fallback when unavailable. Configuration loads from environment variables, config files, or hardcoded defaults.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PROXY SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="proxy" style="color: var(--text-color); font-family: var(--header-font);">Proxy Configuration (NPM)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <code>npm_api</code> attribute manages Nginx Proxy Manager connection with API URL, key management, and environment-aware scope.</p>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Configuration Sources</h3>
+            <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
+                <tr style="background-color: var(--light-color);">
+                    <th style="text-align: left; color: var(--text-color);">Source</th>
+                    <th style="text-align: left; color: var(--text-color);">Priority</th>
+                    <th style="text-align: left; color: var(--text-color);">Format</th>
+                </tr>
+                <tr>
+                    <td>Environment Variables</td>
+                    <td>High</td>
+                    <td>NPM_API_URL, NPM_API_KEY</td>
+                </tr>
+                <tr>
+                    <td>Config Files</td>
+                    <td>Medium</td>
+                    <td>config/npm-{environment}.conf</td>
+                </tr>
+                <tr>
+                    <td>Defaults</td>
+                    <td>Low</td>
+                    <td>Hardcoded for development</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KUBERNETES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="kubernetes" style="color: var(--text-color); font-family: var(--header-font);">Kubernetes Setup</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <code>install_kubernetes</code> method provides guided cluster setup, infrastructure validation, and cluster initialization with monitoring. Before K8s setup, the controller validates Docker installation, system resources, and network configuration.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #856404;">API Key Not Configured</h4>
+                <p style="color: var(--text-color);">Set environment variable NPM_API_KEY or configure in npm-{environment}.conf</p>
+            </div>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #856404;">Docker Not Found</h4>
+                <p style="color: var(--text-color);">Follow OS-specific installation instructions provided in installation_docker view</p>
+            </div>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #856404;">Permission Denied on Proxy Operations</h4>
+                <p style="color: var(--text-color);">Verify user role is in proxy_management_roles or request/grant access through access control methods</p>
+            </div>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #856404;">YAML Module Errors</h4>
+                <p style="color: var(--text-color);">Install at least one YAML module: <code>cpanm YAML::XS</code> or similar</p>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">All operations are logged via <code>Comserv::Util::Logging</code> with file name, line number references, and debug mode support.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RECENT CHANGES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes (v1.03)</h2>
+            <div style="background: #c8e6c9; border-left: 4px solid #4caf50; padding: 12px; margin: 15px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #388e3c;">January 9, 2026 (v1.03)</h4>
+                <ul style="color: var(--text-color);">
+                    <li><strong>Bug Fix Sync</strong>: Documented subroutine redefinition fix in controller</li>
+                    <li><strong>Infrastructure Update</strong>: Reflected Docker/Redis consolidation and comprehensive infrastructure changes</li>
+                    <li><strong>Proxy/K8s Refactoring</strong>: Synchronized documentation with latest Proxy Manager and Kubernetes integration improvements</li>
+                    <li><strong>Audit Compliance</strong>: Updated version metadata per DocumentationSyncAudit 2026-01-09</li>
+                </ul>
+            </div>
+            <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 12px; margin: 15px 0; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #1976d2;">January 6, 2026</h4>
+                <ul style="color: var(--text-color);">
+                    <li><strong>Template Compliance</strong>: Refactored to DocumentationTtTemplate.tt standards</li>
+                    <li><strong>META Block</strong>: Added complete metadata with required fields</li>
+                    <li><strong>Layout Update</strong>: Converted from WRAPPER to container/row/col grid</li>
+                    <li><strong>CSS Variables</strong>: Replaced inline colors with var(--*) theme variables</li>
+                    <li><strong>Status</strong>: Now compliant with documentation standards (v1.01)</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div class="success" style="background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin: 15px 0; border-radius: 4px;">
+                <h3 id="see-also" style="margin-top: 0; color: var(--text-color);">See Also</h3>
+                <ul style="color: var(--text-color);">
+                    <li><a href="/Documentation/AdminGit" style="color: var(--link-color);">Admin Git Controller</a></li>
+                    <li><a href="/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="color: var(--link-color);">Docker &amp; Kubernetes Migration Strategy</a></li>
+                    <li><a href="/Documentation/docker_port_configuration" style="color: var(--link-color);">Docker Port Configuration</a></li>
+                    <li><a href="/Documentation/K3S_QUICK_REFERENCE" style="color: var(--link-color);">Kubernetes Quick Reference</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>

@@ -17,3 +17,18 @@
     </div>
 </section>
 [% END %]
+
+<!-- AI Workflows & Team Training -->
+<section class="doc-section">
+    <h2 class="section-toggle">AI Workflows & Team Training</h2>
+    <p>Guides for using AI agents and daily workflows for team coordination and project management.</p>
+    <div class="section-content">
+        <!-- Daily Workflow Tutorial -->
+        <a href="/Documentation/DAILY_WORKFLOW_TUTORIAL" class="doc-card">
+            <h3>Daily Workflow Tutorial: 4-Agent System Guide</h3>
+            <p>Complete step-by-step tutorial for team members on how to execute the daily planning and coordination workflow using the 4-agent system (Daily Audit, DocumentationSync, Master Plan Updater, Daily Plans Generator). Includes agent descriptions, prompt templates, troubleshooting, and team role assignments.</p>
+            <span class="doc-badge">Team Training</span>
+            <span class="doc-badge">Workflows</span>
+        </a>
+    </div>
+</section>

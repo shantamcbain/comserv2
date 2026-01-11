@@ -1,18 +1,86 @@
 
 
-[% PageVersion = 'root/pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
+[% PageVersion = 'root/pagetop.tt,v 0.025.0 2025/01/08 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 [% SET roles = c.session.roles || [] %]
 [% SET is_admin = roles.grep('admin').size > 0 ? 1 : 0 %]
 
+<!-- Add Font Awesome for the paint brush icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Theme-aware stylesheet -->
+<style>
+.server-info {
+    background-color: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--text-color);
+}
+
+.k8s-migration-banner {
+    background-color: var(--schema-alert-warning-bg, #fff3cd);
+    border-bottom: 2px solid var(--accent-color);
+    padding: 12px 15px;
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+}
+
+.k8s-migration-banner a {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 8px 12px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 13px;
+    display: inline-block;
+}
+
+#css-edit-toggle {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--button-border);
+    border-radius: 3px;
+    padding: 2px 10px;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+#css-edit-toggle:hover {
+    background: var(--button-hover-bg);
+}
+
+#css-edit-toggle.edit-mode {
+    background: var(--warning-color);
+    color: white;
+    border: 1px solid var(--warning-color);
+}
+
+#css-edit-toggle.edit-mode:hover {
+    opacity: 0.9;
+}
+
+.css-edit-mode * {
+    outline: 2px solid rgba(52, 152, 219, 0.3) !important;
+    position: relative;
+}
+
+.css-edit-mode *:hover {
+    outline: 2px solid var(--warning-color) !important;
+    cursor: crosshair;
+}
+</style>
+
 <!-- CRITICAL: Debug Bar UI - DO NOT REMOVE (lines 7-22)
      This debug bar section displays server info (hostname, IP, database connections)
      to admins and users in debug mode. Removing this breaks diagnostic visibility
      and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
 [% IF is_admin || c.session.debug_mode == 1 %]
-<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; color: #495057;">
+<div class="server-info">
     [% IF is_admin || c.session.debug_mode == 1 %]
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
@@ -22,18 +90,18 @@
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %]
         [% IF c.session.debug_mode == 1 %] | [% END %] |
         [% IF is_admin %]
-        <button id="css-edit-toggle" style="background: #4a90e2; color: white; border: none; border-radius: 3px; padding: 2px 10px; margin-left: 10px; cursor: pointer; font-size: 12px;">
+        <button id="css-edit-toggle">
             <i class="fas fa-paint-brush"></i> Toggle CSS Edit
         </button>
         [% END %]
     </div>
+    [% END %]
 </div>
-[% END %]
 [% END %]
 
 <!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->
 [% IF k8s_migration_needed && is_admin %]
-<div class="k8s-migration-banner" style="background-color: #fff3cd; border-bottom: 2px solid #ff9800; padding: 12px 15px; color: #856404; font-family: Arial, sans-serif;">
+<div class="k8s-migration-banner">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
             <strong style="font-size: 14px;">⚠️ K8s Migration Ready</strong>
@@ -42,7 +110,7 @@
             </p>
         </div>
         <div style="margin-left: 15px;">
-            <a href="[% k8s_setup_url %]" style="background-color: #ff9800; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 13px; display: inline-block;">
+            <a href="[% k8s_setup_url %]">
                 Migrate to K8s Secrets
             </a>
         </div>
@@ -54,9 +122,6 @@
 [% IF c.session.debug_mode == 1 %]
 [% INCLUDE 'debug.tt' %]
 [% END %]
-
-<!-- Add Font Awesome for the paint brush icon -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <!-- Include Theme Editor JavaScript -->
 [% IF is_admin %]
@@ -71,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.classList.toggle('css-edit-mode');
             const isEditMode = document.body.classList.contains('css-edit-mode');
             this.innerHTML = isEditMode ? '<i class="fas fa-times"></i> Exit Edit Mode' : '<i class="fas fa-paint-brush"></i> Toggle CSS Edit';
-            this.style.backgroundColor = isEditMode ? '#e74c3c' : '#4a90e2';
+            this.classList.toggle('edit-mode', isEditMode);
             
             // Initialize theme editor if entering edit mode
             if (isEditMode && typeof ThemeEditor !== 'undefined') {
@@ -84,17 +149,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
-<style>
-.css-edit-mode * {
-    outline: 2px solid rgba(52, 152, 219, 0.3) !important;
-    position: relative;
-}
-.css-edit-mode *:hover {
-    outline: 2px solid #e74c3c !important;
-    cursor: crosshair;
-}
-</style>
 
 <header>
     <h1>

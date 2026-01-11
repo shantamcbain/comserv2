@@ -1,13 +1,13 @@
 [% META
         title = "Zencoder AI Assistant Guide"
-   description = "Comprehensive guide on using Zencoder AI agents, enforcement rules, blocking gates, workflows, and switching agents effectively in PyCharm for Comserv development. Includes architecture clarification, self-detection recovery, and troubleshooting enforcement gaps."
+   description = "Comprehensive guide on using Zencoder AI agents, enforcement rules, blocking gates, workflows, and switching agents effectively in PyCharm for Comserv development. Updated Dec 31: All references now point to central coding-standards.yaml (v1.0-STABLE). Updated Jan 2 with multi-file safety and compliance improvements. Lists all 8 active agents including Daily Plans Generator."
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "documentation,ai"
-   page_version = "0.02"
-   last_updated = "Sun Dec 14 18:27:23 UTC 2025"
+   page_version = "0.04"
+   last_updated = "Thu Jan 02 15:48:00 UTC 2026"
 %]
-[% PageVersion = 'root/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt,v 0.02 2025/12/14 shanta Exp - Comprehensive overhaul: added ask_questions enforcement, blocking gate explanation, dual logging system, agent vs rules distinction, keywords system, self-detection workflow, enforcement troubleshooting' %]
+[% PageVersion = 'root/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt,v 0.04 2026/01/02 15:48:00 zencoder Exp - Jan 2 Update: Multi-file safety protocol and agent compliance improvements documented' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -30,15 +30,23 @@
         <li><a href="#switching-agents">Switching Agents</a></li>
         <li><a href="#self-detection">Self-Detection Recovery</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#recent-changes">Recent Changes</a></li>
         <li><a href="#see-also">See Also</a></li>
     </ul>
 </nav>
 
 <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-    Last Updated: 2025-12-14 18:27 UTC |
-    Status: Comprehensive overhaul v2.0 - Includes enforcement clarifications, blocking gate explanation, dual logging system, agent vs rules distinction, self-detection workflow, troubleshooting |
+    Last Updated: 2026-01-02 15:48 UTC |
+    Status: Comprehensive overhaul v2.0 + Jan 2 Compliance Improvements - Includes enforcement clarifications, blocking gate explanation, dual logging system, multi-file safety protocol, agent compliance improvements |
     Maintained By: Development Team |
     <a href="#" style="color: var(--text-muted-color);">Report Issue</a> | <a href="#" style="color: var(--text-muted-color);">Edit This Page</a>
+</div>
+
+<div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+    <h3 style="margin-top: 0; color: #155724;">✅ Jan 2, 2026 - Agent Safety Improvements</h3>
+    <p style="margin: 5px 0; color: #155724;"><strong>Multi-File Operations Safety:</strong> Agents handling multiple file updates now use /updateprompt checkpoints BEFORE each file edit. Prevents token exhaustion during infrastructure work.</p>
+    <p style="margin: 5px 0; color: #155724;"><strong>Agent Compliance Enforcement:</strong> Main Agent and Cleanup Agent specs updated with MANDATORY compliance constraints. /updateprompt now required as FIRST action (not optional).</p>
+    <p style="margin: 5px 0; color: #155724;"><strong>Workflow Improvements:</strong> Agents now follow PATH A/B/C pattern explicitly, with automatic safety gates for multi-file operations.</p>
 </div>
 
 <div class="row">
@@ -75,7 +83,7 @@
             <li>Chat stays alive, history preserved</li>
         </ul>
         <h3 style="color: var(--text-color); font-family: var(--header-font);">Reference Documentation</h3>
-        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>For complete details, read:</strong> <a href="#see-also" style="color: var(--link-color);">/.zencoder/rules/ask_questions_enforcement.md</a> (this is the authoritative source)</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>For complete details, read:</strong> <a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (Rule 1: ask_questions())</a> (authoritative source for all Zencoder standards)</p>
         <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
     </div>
 </div>
@@ -100,14 +108,17 @@
             <li><strong>Usage</strong>: Source material when creating actual agents via IDE</li>
             <li><strong>Scope</strong>: Project-specific configuration</li>
         </ul>
-        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>In Practice:</strong> When you need an agent, check /.zencoder/rules/ for the specification, then use that to create the actual agent via PyCharm IDE interface.</p>
-        <h3 style="color: var(--text-color); font-family: var(--header-font);">Common Agents for Comserv</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>In Practice:</strong> Comserv uses 8 specialized agents coordinated through central coding-standards.yaml. Each agent has specific responsibilities in the daily workflow chain.</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Active Comserv Agents (8 Total)</h3>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
-            <li><strong>Cleanup Agent</strong>: Remove inconsistencies, consolidate files, enforce standards</li>
-            <li><strong>Docker Agent</strong>: Manage containers, handle deployment</li>
-            <li><strong>MainAgent</strong>: General development, complex tasks</li>
-            <li><strong>BugBuster</strong>: Debug and fix issues</li>
-            <li><strong>Documentation Agent</strong>: Create/maintain documentation</li>
+            <li><strong>Cleanup Agent</strong>: Remove inconsistencies, consolidate configuration files, enforce coding standards, maintain central YAML</li>
+            <li><strong>Docker Agent</strong>: Manage containers, handle deployment, troubleshoot container/K8s issues</li>
+            <li><strong>Daily Audit Agent</strong>: Review previous day's work, audit code changes, generate change summary for documentation sync</li>
+            <li><strong>DocumentationSyncAgent</strong>: Sync documentation with code changes, validate .tt template conformance, update version numbers</li>
+            <li><strong>Master Plan Updater</strong>: Review master plan, integrate audit results, update priorities, resolve blockers</li>
+            <li><strong>Daily Plan Automator</strong>: Generate weekly plans from master plan, distribute workload across 7 days</li>
+            <li><strong>Master Plan Manager</strong>: Coordinate long-term planning, track multi-week initiatives, manage dependencies</li>
+            <li><strong>Daily Plans Generator</strong>: Create 7-day daily task plans from master plan, generate daily checklist files <strong style="color: #FF6B6B;">(NEW Dec 31)</strong></li>
         </ul>
         <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
     </div>
@@ -115,19 +126,28 @@
 
 <div class="row">
     <div class="col-100">
-        <h2 id="startup-protocol" style="color: var(--text-color); font-family: var(--header-font);">Startup Protocol: File Reading Order</h2>
-        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>EVERY agent must read configuration files in this exact order:</strong></p>
+        <h2 id="startup-protocol" style="color: var(--text-color); font-family: var(--header-font);">Startup Protocol: Central Configuration (UPDATED)</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>EVERY agent MUST read the central configuration file FIRST:</strong></p>
+        <div style="background: var(--warning-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--danger-color);">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">✅ UPDATED Dec 31:</strong> All deprecated .md files have been removed. Configuration is now 100% centralized in <code>coding-standards.yaml</code> (v1.0-STABLE).</p>
+        </div>
         <ol style="color: var(--text-color); font-family: var(--body-font);">
-            <li><strong>HIGHEST PRIORITY</strong>: <code>/.zencoder/rules/ask_questions_enforcement.md</code> - <em>ask_questions() ONLY rule</em></li>
-            <li><strong>PRIMARY</strong>: <code>/.zencoder/rules/repo.md</code> - <em>Core directives, /updateprompt gate</em></li>
-            <li><strong>SECONDARY (if applicable)</strong>: <code>/.zencoder/rules/[agent-name]-role.md</code> - <em>Agent-specific duties</em></li>
-            <li><strong>SECONDARY (if applicable)</strong>: <code>/.zencoder/rules/[agent-name]-workflow.md</code> - <em>Agent-specific workflows</em></li>
-            <li><strong>REFERENCE</strong>: <code>/Comserv/root/comserv-ai-guidelines-consolidated.yaml</code> - <em>Project standards</em></li>
-            <li><strong>REFERENCE</strong>: <code>/.zencoder/rules/keywords-global.md</code> - <em>Global keywords</em></li>
-            <li><strong>REFERENCE</strong>: <code>/.zencoder/rules/keywords-execution-protocol.md</code> - <em>Keyword execution rules</em></li>
+            <li><strong>PRIMARY (ONLY SOURCE)</strong>: <code>/.zencoder/coding-standards.yaml</code> - <em>v1.0-STABLE - All rules, agents, keywords, workflows, standards in ONE file</em>
+                <ul style="margin-top: 8px; margin-bottom: 8px;">
+                    <li><strong>Rule 1:</strong> ask_questions() - ONLY method for user input</li>
+                    <li><strong>Rule 2:</strong> /updateprompt workflow and blocking gate system</li>
+                    <li><strong>Rule 3:</strong> /chathandoff and /sessionhandoff keywords</li>
+                    <li><strong>Rule 4:</strong> ask_questions() function syntax and execution</li>
+                    <li><strong>Rule 5:</strong> /validatett Template Toolkit validation</li>
+                    <li><strong>Agents 1-8:</strong> Complete specifications for all Comserv agents</li>
+                    <li><strong>IDE Ecosystem Separation:</strong> Zencoder vs Continue tool boundaries</li>
+                </ul>
+            </li>
+            <li><strong>REFERENCE (OPTIONAL)</strong>: <code>/.zencoder/rules/repo.md</code> - <em>Legacy reference (STARTUP PROTOCOL section points to coding-standards.yaml)</em></li>
+            <li><strong>REFERENCE (OPTIONAL)</strong>: <code>/.zencoder/rules/keywords-global.md</code> - <em>Legacy reference (all keywords in coding-standards.yaml)</em></li>
         </ol>
         <div style="background: var(--info-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--link-color);">
-            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>💡 Key Point:</strong> ask_questions_enforcement.md is read FIRST because it contains the single most important rule. This prevents chat stalls and lost history.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>💡 Best Practice:</strong> Read coding-standards.yaml FIRST to get all configuration. It replaces reading multiple .md files and is the authoritative source for all rules.</p>
         </div>
         <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
     </div>
@@ -172,7 +192,7 @@
 <div class="row">
     <div class="col-100">
         <h2 id="rules" style="color: var(--text-color); font-family: var(--header-font);">Rules &amp; Boundaries</h2>
-        <p style="color: var(--text-color); font-family: var(--body-font);">Rules govern agent behavior, defined in .zencoder/rules/repo.md and supplementary files. Key rules for effective use:</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);">Rules govern agent behavior, defined in <strong>/.zencoder/coding-standards.yaml (v1.0-STABLE)</strong>. Key rules for effective use:</p>
         <h3 style="color: var(--text-color); font-family: var(--header-font);">Tool Management Boundaries</h3>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
             <li><strong>Zencoder manages</strong>: /.zencoder/rules/*, /.zencoder/docs/, prompts_log.yaml, current_session.md</li>
@@ -352,46 +372,66 @@ Prompt 3: /updateprompt → Complete remaining work → "Prompt complete" [PATH 
 
 <div class="row">
     <div class="col-100">
+        <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes</h2>
+        <div class="alert alert-warning">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>v0.03 (Dec 31, 2025):</strong> Major documentation update for consolidation Phase 3 completion</p>
+        </div>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>✅ All references updated to coding-standards.yaml v1.0-STABLE</strong> - Central file now authoritative source for all rules, agents, keywords</li>
+            <li><strong>✅ Deprecated .md files removed from code base</strong> - ask_questions_enforcement.md, cleanup-agent-role.md, docker-agent-role.md, updateprompt-workflow.md, zencoder-role-specification.md, comserv-ai-guidelines-consolidated.yaml</li>
+            <li><strong>✅ Agent list updated</strong> - Now lists all 8 active Comserv agents including Daily Plans Generator (NEW Dec 31)</li>
+            <li><strong>✅ Startup Protocol section rewritten</strong> - Clarified centralization in coding-standards.yaml; removed references to scattered .md files</li>
+            <li><strong>✅ Broken documentation links fixed</strong> - Updated references to point to central YAML and working documentation files</li>
+            <li><strong>⚠️ See Also section needs update</strong> - References to removed files documented as deprecated (links will be updated as Continue team aligns standards)</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
         <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">See Also &amp; References</h2>
         <div class="alert alert-success">
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>🔴 CRITICAL (Read First):</strong></p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/ask_questions_enforcement.md</a> - <strong>THE most important rule</strong>; authoritative source for ask_questions() ONLY requirement</li>
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/repo.md</a> - Core Zencoder configuration; /updateprompt gate, startup protocol, tool boundaries</li>
+                <li><a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (Rule 1)</a> - <strong>THE most important rule</strong>; authoritative source for ask_questions() ONLY requirement</li>
+                <li><a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (GLOBAL RULES)</a> - Core Zencoder configuration; /updateprompt gate, startup protocol, tool boundaries</li>
+                <li><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">This File</a> - You're already reading the authoritative Comserv guide!</li>
             </ul>
         </div>
         <div class="alert alert-info">
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Zencoder Rules &amp; Configuration:</strong></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>✅ Consolidated Central Configuration:</strong></p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/AGENT_REGISTRY.md</a> - Central registry of all Zencoder agent specifications</li>
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/cleanup-agent-role.md</a> - Cleanup Agent specification</li>
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/docker-agent-role.md</a> - Docker Agent specification</li>
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/keywords-global.md</a> - Global keywords (e.g., /updateprompt, /chathandoff, /validatett)</li>
-                <li><a href="#" style="color: var(--link-color);">/.zencoder/rules/keywords-execution-protocol.md</a> - Keyword execution rules and best practices</li>
+                <li><strong>PRIMARY SOURCE:</strong> <a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (v1.0-STABLE)</a> - All 8 agents, all rules, all keywords in ONE file (UPDATED Dec 31)</li>
+                <li><strong>IDE ECOSYSTEM SEPARATION:</strong> Reference section in coding-standards.yaml explaining Zencoder vs Continue tool boundaries</li>
             </ul>
         </div>
         <div class="alert alert-info">
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Session Tracking &amp; Logging:</strong></p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/current_session.md</a> - Active session tracking; source for chat/prompt numbers</li>
-                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/prompts_log.yaml</a> - YAML audit trail of all agent activity (new system in transition)</li>
-                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md</a> - Audit report documenting configuration status, issues, resolutions</li>
+                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/prompts_log.yaml</a> - YAML audit trail of all agent activity</li>
+                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md</a> - Configuration audit documentation</li>
             </ul>
         </div>
         <div class="alert alert-info">
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Project Standards &amp; Guidelines:</strong></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Project Documentation:</strong></p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><a href="#" style="color: var(--link-color);">/Comserv/root/comserv-ai-guidelines-consolidated.yaml</a> - Authoritative source for Comserv AI development standards and practices</li>
-                <li><a href="/Documentation/system/documentation_editing_standards_v2">Documentation Editing Standards v2</a> - Standards for editing/creating Comserv documentation</li>
+                <li><a href="/Documentation/general/documentation_editor_guide">Documentation Editor Guide</a> - Standards for editing .tt documentation files</li>
+                <li><a href="/Documentation/">Documentation Index</a> - Access all Comserv documentation</li>
             </ul>
         </div>
-        <div class="alert alert-warning">
-            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ Status &amp; Known Issues:</strong></p>
+        <div class="alert alert-info">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ DEPRECATED FILES (Removed Dec 31 - For Reference Only):</strong></p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Enforcement Status (Chat 35-36):</strong> Rules deployed but enforcement gaps identified. See <a href="#troubleshooting" style="color: var(--link-color);">Troubleshooting section</a> above for details</li>
-                <li><strong>Logging Transition:</strong> Moving from Markdown (current_session.md) to YAML (prompts_log.yaml). Both systems active during transition period</li>
-                <li><strong>Agent Violations (Chat 36):</strong> Agents still asking text questions despite enforcement rules. Self-detection workflow documented above under <a href="#self-detection" style="color: var(--link-color);">Self-Detection &amp; Recovery</a></li>
+                <li><strong>ask_questions_enforcement.md</strong> - REMOVED (content in coding-standards.yaml Rule 1)</li>
+                <li><strong>cleanup-agent-role.md</strong> - REMOVED (content in coding-standards.yaml agents section)</li>
+                <li><strong>docker-agent-role.md</strong> - REMOVED (content in coding-standards.yaml agents section)</li>
+                <li><strong>updateprompt-workflow.md</strong> - REMOVED (content in coding-standards.yaml Rule 2)</li>
+                <li><strong>zencoder-role-specification.md</strong> - REMOVED (content consolidated to coding-standards.yaml)</li>
+                <li><strong>comserv-ai-guidelines-consolidated.yaml</strong> - REMOVED (project standards integrated into coding-standards.yaml)</li>
             </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><em>These files were consolidated into /.zencoder/coding-standards.yaml v1.0-STABLE as part of Phase 3 cleanup (Dec 31).</em></p>
         </div>
         <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
     </div>

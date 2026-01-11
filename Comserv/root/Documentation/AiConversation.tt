@@ -1,0 +1,190 @@
+[% META
+   title = "AI Conversation Model Documentation"
+   description = "Documentation for the AiConversation DBIx::Class model representing multi-turn AI conversation sessions with user associations, timestamps, status tracking, and metadata storage"
+   roles = "admin,developer,editor"
+   TemplateType = "model"
+   category = "models,ai,conversations,database"
+   page_version = "0.01"
+   last_updated = "2026-01-10"
+   site_specific = "false"
+%]
+
+[% PageVersion = 'Documentation/AiConversation.tt,v 0.01 2026/01/10 DocumentationSyncAgent Exp - Initial documentation for AiConversation model' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Conversation Model Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-10 | 
+        Version: 0.01 |
+        Author: DocumentationSyncAgent |
+        Status: Initial documentation
+    </div>
+
+    <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+    
+    <p style="color: var(--text-color); font-family: var(--body-font);">The <code style="background-color: var(--light-color); padding: 2px 4px;">AiConversation</code> model represents a single multi-turn conversation session between a user and an AI system. It serves as the parent record for storing conversation metadata, user associations, and status information, with child records stored in the <code style="background-color: var(--light-color); padding: 2px 4px;">AiMessage</code> model.</p>
+    
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Table:</strong> <code>ai_conversations</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Type:</strong> DBIx::Class ORM Model</p>
+
+    <h2 id="schema" style="color: var(--text-color); font-family: var(--header-font);">Database Schema</h2>
+    
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">Columns</h3>
+    
+    <table style="width: 100%; border-collapse: collapse; color: var(--text-color); font-family: var(--body-font);">
+        <thead style="background-color: var(--light-color);">
+            <tr>
+                <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Column Name</th>
+                <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Data Type</th>
+                <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Nullable</th>
+                <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>id</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">INTEGER</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Primary Key, Auto-increment)</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Unique conversation identifier</td>
+            </tr>
+            <tr style="background-color: var(--light-color);">
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>user_id</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">INTEGER</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Foreign Key)</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Reference to User model (who owns this conversation)</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>title</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">VARCHAR(255)</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">YES</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">User-defined conversation title (e.g., "Project Planning Discussion")</td>
+            </tr>
+            <tr style="background-color: var(--light-color);">
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>created_at</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">TIMESTAMP</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: CURRENT_TIMESTAMP)</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Conversation creation timestamp</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>updated_at</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">TIMESTAMP</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: CURRENT_TIMESTAMP ON UPDATE)</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Last modification timestamp (auto-updated on row change)</td>
+            </tr>
+            <tr style="background-color: var(--light-color);">
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>status</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">ENUM('active', 'archived')</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: 'active')</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Conversation state: 'active' (ongoing) or 'archived' (closed)</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>metadata</code></td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">LONGTEXT</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">YES</td>
+                <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">JSON or serialized data for extensible conversation properties</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="relationships" style="color: var(--text-color); font-family: var(--header-font);">Relationships</h2>
+    
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">belongs_to: user</h3>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Target Model:</strong> <code>Comserv::Model::Schema::Ency::Result::User</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Foreign Key:</strong> <code>user_id</code> → <code>User.id</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Associates each conversation with the user who initiated it.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Usage:</strong> <code>$conversation->user</code> returns the owning User object.</p>
+
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">has_many: ai_messages</h3>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Target Model:</strong> <code>Comserv::Model::Schema::Ency::Result::AiMessage</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Foreign Key:</strong> <code>AiMessage.conversation_id</code> → <code>id</code></p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cascade Delete:</strong> YES (deleting conversation removes all associated messages)</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Stores the multi-turn dialog history for this conversation.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Usage:</strong> <code>$conversation->ai_messages</code> returns related message records.</p>
+
+    <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">Helper Methods</h2>
+    
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">get_display_title()</h3>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> STRING</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Returns user-friendly conversation title with fallback.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logic:</strong> Returns <code>title</code> if set, else returns <code>'New Conversation'</code> as default.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Usage:</strong> <code>my $display = $conversation->get_display_title();</code></p>
+
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">get_message_count()</h3>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> INTEGER</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Returns total number of messages in this conversation.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logic:</strong> Calls <code>$self->ai_messages->count()</code> to get row count.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Usage:</strong> <code>my $count = $conversation->get_message_count();</code></p>
+
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">get_latest_message()</h3>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> AiMessage ResultSet Record (or undef)</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Retrieves the most recent message in conversation.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logic:</strong> Orders messages by <code>created_at DESC</code>, limits to 1 row, returns first result.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Usage:</strong> <code>my $latest = $conversation->get_latest_message(); if ($latest) { ... }</code></p>
+
+    <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">Usage Examples</h2>
+    
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">Creating a New Conversation</h3>
+    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my $schema = $c->model('Ency');
+my $conversation = $schema->resultset('AiConversation')->create({
+    user_id => $user_id,
+    title => 'My Project Discussion',
+    status => 'active',
+    metadata => '{"model": "ollama", "tags": ["project"]}'
+});
+</code></pre>
+
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">Fetching User's Conversations</h3>
+    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my @conversations = $schema->resultset('AiConversation')
+    ->search({ user_id => $user_id, status => 'active' })
+    ->all();
+
+foreach my $conv (@conversations) {
+    say $conv->get_display_title();
+    say "Messages: " . $conv->get_message_count();
+}
+</code></pre>
+
+    <h3 style="color: var(--text-color); font-family: var(--header-font);">Archiving a Conversation</h3>
+    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>$conversation->update({ status => 'archived' });
+</code></pre>
+
+    <h2 id="integration-points" style="color: var(--text-color); font-family: var(--header-font);">Integration Points</h2>
+    
+    <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0;">
+        <li style="margin: var(--spacing-small) 0;"><strong>AI Controller:</strong> Creates and retrieves conversations via <code>lib/Comserv/Controller/AI.pm</code></li>
+        <li style="margin: var(--spacing-small) 0;"><strong>AiMessage Model:</strong> Stores individual messages within each conversation</li>
+        <li style="margin: var(--spacing-small) 0;"><strong>User Model:</strong> Associates conversations with user accounts</li>
+        <li style="margin: var(--spacing-small) 0;"><strong>Database:</strong> Persisted in MariaDB <code>ai_conversations</code> table</li>
+    </ul>
+
+    <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
+    
+    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--warning-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+        <strong>⚠️ Common Issues</strong>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0 0 20px;">
+            <li><strong>Conversation not found:</strong> Verify <code>user_id</code> exists in User table (foreign key constraint)</li>
+            <li><strong>Cascade delete side effects:</strong> Deleting a conversation removes all associated messages. Ensure this is intended behavior.</li>
+            <li><strong>Timestamp not auto-updating:</strong> Ensure database column has <code>ON UPDATE CURRENT_TIMESTAMP</code> defined</li>
+        </ul>
+    </div>
+
+    <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">See Also</h2>
+    
+    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+        <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0; margin: 0;">
+            <li style="margin: var(--spacing-small) 0;"><a href="/Documentation/models/AiMessage.tt" style="color: var(--link-color);">AiMessage Model</a> - Individual messages within conversations</li>
+            <li style="margin: var(--spacing-small) 0;"><a href="/Documentation/controllers/AI.tt" style="color: var(--link-color);">AI Controller</a> - Web interface and API endpoints for conversations</li>
+            <li style="margin: var(--spacing-small) 0;"><a href="/Documentation/models/User.tt" style="color: var(--link-color);">User Model</a> - User account management</li>
+        </ul>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid var(--border-color); margin: var(--spacing-large) 0;">
+    <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+        Generated by DocumentationSyncAgent | Part of Comserv2 documentation suite
+    </p>
+</div>

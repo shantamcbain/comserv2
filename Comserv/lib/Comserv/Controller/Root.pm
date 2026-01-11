@@ -244,14 +244,20 @@ sub auto :Private {
 
         # CRITICAL: Capture debug parameter from URL query string
         # URL format: http://host/path?debug=1 activates debug mode
+        #             http://host/path?debug=0 deactivates debug mode
         my $debug_param = $c->req->params->{debug};
-        if (defined $debug_param && $debug_param eq '1') {
-            $c->session->{debug_mode} = 1;
-            $c->stash->{debug} = 1;
+        if (defined $debug_param) {
+            if ($debug_param eq '1') {
+                $c->session->{debug_mode} = 1;
+                $c->stash->{debug} = 1;
+            } elsif ($debug_param eq '0') {
+                $c->session->{debug_mode} = 0;
+                $c->stash->{debug} = 0;
+            }
         } else {
-            # Ensure debug mode is off if not explicitly enabled
+            # Ensure debug mode matches session or defaults to off
             $c->session->{debug_mode} = 0 unless defined $c->session->{debug_mode};
-            $c->stash->{debug} = 0;
+            $c->stash->{debug} = $c->session->{debug_mode};
         }
         
         # Set up site name with timeout protection

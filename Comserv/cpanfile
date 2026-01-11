@@ -82,6 +82,7 @@ requires 'Email::Sender::Simple';
 requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
+requires 'LWP::Protocol::https';
 requires 'HTTP::Request';
 requires 'WWW::Form::UrlEncoded';
 requires 'HTTP::Entity::Parser';
