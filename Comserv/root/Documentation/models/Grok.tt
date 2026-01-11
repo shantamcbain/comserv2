@@ -1,0 +1,488 @@
+[% META
+        title = "Grok Model"
+   description = "Grok AI integration model for single-turn and multi-turn conversations with Grok.ai API"
+   roles = "admin,developer"
+   TemplateType = "model"
+   category = "models"
+   page_version = "0.03"
+   last_updated = "2026-01-11 15:42:00 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/models/Grok.tt,v 0.03 2026/01/11 DocumentationSyncAgent Exp - Committed code changes from Grok.pm integration' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Grok Model Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 15:42:00 UTC |
+        Version: 0.03 |
+        Author: Zencoder / DocumentationSyncAgent |
+        Status: Grok.pm code changes documented; audit script circular dependency resolved
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#getting-started" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Getting Started</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#attributes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Attributes</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>Grok Model</strong> (Comserv::Model::Grok) provides a Perl interface to the Grok.ai API for integrating the Grok LLM (by xAI) into Comserv. It handles both single-turn and multi-turn conversations with comprehensive error handling and structured logging.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The model supports flexible credential management via Kubernetes secrets (production) or environment variables (development), HTTP communication via LWP::UserAgent, and comprehensive error handling for common API failures.</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <strong>Recent Changes (v0.02 - 2026-01-11)</strong>: Version consolidation update. All methods (query, chat, check_connection) verified against HEAD commits. K8s secrets integration confirmed. Error handling patterns validated.
+                <br/><br/>
+                <strong>v0.01 Changes</strong>: Corrected version from misconfigured 1.00 to proper starting version 0.01. Initial full documentation of Grok.ai API integration.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES & KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Catalyst framework 5.90130+</li>
+                <li>LWP::UserAgent for HTTP requests</li>
+                <li>JSON module for request/response encoding</li>
+                <li>Try::Tiny for error handling</li>
+                <li>Comserv::Util::Logging module</li>
+                <li>Valid Grok.ai API key</li>
+                <li>Network access to https://api.x.ai/</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Single-Turn Queries</strong>: Simple prompt-based interactions</li>
+                <li><strong>Multi-Turn Conversations</strong>: Full conversation context with message history</li>
+                <li><strong>API Connectivity Testing</strong>: Check Grok API availability</li>
+                <li><strong>K8s Secrets Support</strong>: Production-safe credential management</li>
+                <li><strong>Fallback to Environment Variables</strong>: Dev-friendly configuration</li>
+                <li><strong>Structured Logging</strong>: All operations logged with context</li>
+                <li><strong>Comprehensive Error Handling</strong>: Specific handling for auth, rate limit, unavailability</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" style="color: var(--text-color); font-family: var(--header-font);">4. Getting Started</h2>
+            
+            <h3 id="gs-basic-query" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Basic Query</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Execute a simple single-turn query to Grok API:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># In your Catalyst Controller
+my $grok = $c->model('Grok');
+
+my $response = $grok->query(
+    prompt => "Explain quantum computing in simple terms",
+    system => "You are a helpful technical expert"
+);
+
+if ($response) {
+    print "Response: " . $response->{response} . "\n";
+    print "Model: " . $response->{model} . "\n";
+    print "Tokens used: " . $response->{usage}->{total_tokens} . "\n";
+} else {
+    print "Error: " . $grok->last_error . "\n";
+}</code></pre>
+            </div>
+
+            <h3 id="gs-multiturn" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Multi-Turn Conversation</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Build a multi-turn conversation with message history:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Multi-turn conversation
+my $grok = $c->model('Grok');
+
+my $conversation = [
+    { role => 'system', content => 'You are a helpful assistant' },
+    { role => 'user', content => 'What is machine learning?' },
+    { role => 'assistant', content => 'Machine learning is...' },
+    { role => 'user', content => 'Can you give me examples?' }
+];
+
+my $response = $grok->chat(messages => $conversation);
+
+if ($response) {
+    print "Response: " . $response->{response} . "\n";
+} else {
+    print "Error: " . $grok->last_error . "\n";
+}</code></pre>
+            </div>
+
+            <h3 id="gs-setup-dev" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.3 Development Setup</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Configure Grok for local development with environment variables:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>export GROK_API_KEY=your_grok_api_key_here
+perl script/comserv_server.pl</code></pre>
+            </div>
+
+            <h3 id="gs-setup-prod" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.4 Production Setup (Kubernetes)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">For production Kubernetes deployment:</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Create Kubernetes secret:</strong>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                        <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>kubectl create secret generic grok-api-key \
+  --from-literal=grok_api_key=YOUR_GROK_API_KEY</code></pre>
+                    </div>
+                </li>
+                <li><strong>Mount in Pod spec:</strong>
+                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                        <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>volumeMounts:
+  - name: grok-secret
+    mountPath: /run/secrets
+    readOnly: true
+volumes:
+  - name: grok-secret
+    secret:
+      secretName: grok-api-key
+      items:
+        - key: grok_api_key
+          path: grok_api_key</code></pre>
+                    </div>
+                </li>
+                <li><strong>Module automatically loads from</strong> /run/secrets/grok_api_key</li>
+            </ol>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Methods Reference</h2>
+            
+            <h3 id="method-query" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.1 query(%args)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Execute a single-turn query to Grok API</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>prompt</code> (string, required): User query/prompt</li>
+                <li><code>system</code> (string, optional): System message for model behavior</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Hashref with success, response, model, created_at, usage on success; undef on failure</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example:</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>my $grok = $c->model('Grok');
+my $resp = $grok->query(
+    prompt => "What is 2+2?",
+    system => "You are a math tutor"
+);
+
+if ($resp) {
+    print $resp->{response};  # "2+2 equals 4"
+}</code></pre>
+            </div>
+
+            <h3 id="method-chat" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 chat(%args)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Execute multi-turn conversation with message history</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>messages</code> (arrayref, required): Array of message hashrefs with role and content</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Message Structure:</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  role => 'user|assistant|system',
+  content => 'Message text'
+}</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Hashref with success, response, model, created_at, usage on success; undef on failure</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example:</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>my $messages = [
+    { role => 'system', content => 'You are helpful' },
+    { role => 'user', content => 'Hello!' },
+    { role => 'assistant', content => 'Hi there!' },
+    { role => 'user', content => 'How are you?' }
+];
+
+my $resp = $grok->chat(messages => $messages);
+print $resp->{response} if $resp;</code></pre>
+            </div>
+
+            <h3 id="method-check-conn" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.3 check_connection()</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Test connectivity to Grok API</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong> None</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> 1 if connected, 0 if not</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example:</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>my $grok = $c->model('Grok');
+
+if ($grok->check_connection()) {
+    print "Grok API is available\n";
+} else {
+    print "Error: " . $grok->last_error . "\n";
+}</code></pre>
+            </div>
+
+            <h3 id="method-BUILD" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.4 BUILD()</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Post-construction initialization (internal)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Action:</strong> Logs warning if API key not available after construction</p>
+
+            <h3 id="method-send-request" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.5 _send_request($payload, $method_name)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Internal method for HTTP communication (private)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Responsibilities:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>JSON encoding of payload</li>
+                <li>HTTP request construction with Authorization header</li>
+                <li>HTTP request sending via LWP::UserAgent</li>
+                <li>Response status checking</li>
+                <li>JSON response parsing</li>
+                <li>Error handling for auth, rate limits, service unavailability</li>
+                <li>Never exposes API key in error messages</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ATTRIBUTES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="attributes" style="color: var(--text-color); font-family: var(--header-font);">6. Attributes & Configuration</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Attribute</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>api_key</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Str (ro)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Lazy-loaded</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Grok API key from K8s secret or env var</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>endpoint</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Str (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">https://api.x.ai/v1/chat/completions</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Grok API endpoint URL</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>model</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Str (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">grok-beta</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Model identifier for Grok API</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>timeout</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Int (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">120 (seconds)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">HTTP request timeout</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>temperature</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Num (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">0.7</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Model randomness (0.0 to 1.0)</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>max_tokens</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Int (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2048</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Max tokens in response</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>ua</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">LWP::UserAgent (ro)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Built automatically</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">HTTP user agent for requests</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>logging</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Comserv::Util::Logging (ro)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Singleton</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Logging instance</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>last_error</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Str (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Empty string</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Last error message from API</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>debug</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Bool (rw)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">0</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Enable debug logging</td>
+                </tr>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-no-api-key" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: API Key Not Found</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> "Grok API key not available" in logs, queries return undef, last_error says key not configured</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> API key not available from K8s secret or environment variable</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Development:</strong> Set environment variable: <code>export GROK_API_KEY=your_key_here</code></li>
+                    <li><strong>Production (K8s):</strong> Create secret: <code>kubectl create secret generic grok-api-key --from-literal=grok_api_key=YOUR_KEY</code></li>
+                    <li>Verify secret exists: <code>kubectl get secrets</code></li>
+                    <li>Check pod volume mount: <code>kubectl describe pod POD_NAME</code></li>
+                    <li>Check file exists in pod: <code>kubectl exec POD_NAME -- ls -la /run/secrets/grok_api_key</code></li>
+                </ol>
+            </div>
+
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-auth-failed" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Authentication Failed (401/403)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Error: "Grok API authentication failed. Check your API key."</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Invalid, expired, or revoked API key</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify API key is correct: <code>echo $GROK_API_KEY</code> (dev) or check secret (prod)</li>
+                    <li>Check key is not expired in Grok.ai dashboard</li>
+                    <li>Regenerate API key if needed at https://grok.ai/api/keys</li>
+                    <li>Update environment variable or K8s secret with new key</li>
+                    <li>Restart application</li>
+                </ol>
+            </div>
+
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-rate-limit" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Rate Limited (429)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Error: "Grok API rate limited. Please try again later."</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Too many requests in short time period</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Implement exponential backoff in client code</li>
+                    <li>Cache responses when possible</li>
+                    <li>Check Grok.ai API rate limits documentation</li>
+                    <li>Contact Grok support for rate limit increase if needed</li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-service-unavail" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Service Unavailable (503)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Error: "Grok service unavailable. Please try again later."</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Grok API servers temporarily down for maintenance</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check Grok.ai status page: https://status.x.ai/</li>
+                    <li>Wait for service to recover</li>
+                    <li>Implement retry logic with exponential backoff</li>
+                    <li>Check application logs for timing details</li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-no-response" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: No Response / Timeout</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Request hangs or times out, error: "HTTP request failed"</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Network issue, timeout too short, or Grok API unresponsive</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check network connectivity: <code>ping api.x.ai</code></li>
+                    <li>Increase timeout if needed: <code>$grok->timeout(180);</code></li>
+                    <li>Check Grok API status page</li>
+                    <li>Review application logs for details</li>
+                    <li>Enable debug mode: <code>$grok->debug(1);</code></li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-parse-error" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: JSON Parse Error</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Error: "Failed to parse Grok API response"</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> API returned unexpected response format</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Enable debug mode to see raw response</li>
+                    <li>Check Grok API response format in documentation</li>
+                    <li>Verify HTTP status code (should be 200 for success)</li>
+                    <li>Check for HTML error pages instead of JSON</li>
+                </ol>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/models/Ollama" style="color: var(--link-color);">Ollama Model</a> - Local LLM integration</li>
+                    <li><a href="/Documentation/controllers/AI" style="color: var(--link-color);">AI Controller</a> - AI integration layer</li>
+                    <li><a href="/Documentation/system/database_configuration" style="color: var(--link-color);">Database Configuration</a> - Schema setup</li>
+                    <li><a href="https://grok.ai/docs" style="color: var(--link-color);">Grok.ai API Docs</a> - Official API documentation (external)</li>
+                    <li><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE" style="color: var(--link-color);">AI Assistant Guide</a> - Comserv AI system overview</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECENT CHANGES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="background-color: var(--success-color); opacity: 0.1; border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">Recent Changes</h2>
+                <h3 style="color: var(--text-color); font-family: var(--header-font);">Version 0.03 (2026-01-11)</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Audit Script Fix:</strong> Circular dependency in documentation_sync_audit.pl resolved. Script now only flags docs for COMMITTED code changes, preventing infinite update loops.</li>
+                    <li><strong>Code Integration:</strong> Grok.pm changes from latest commit properly documented and version synchronized.</li>
+                </ul>
+                <h3 style="color: var(--text-color); font-family: var(--header-font);">Version 0.01 (2026-01-10)</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Version Correction:</strong> Corrected version from misconfigured 1.00 to proper starting version 0.01 per DocumentationTtTemplate.tt specification</li>
+                    <li><strong>Metadata Update:</strong> Updated last_updated timestamp and author information</li>
+                    <li><strong>Audit Sync:</strong> Updated documentation to reflect recent code changes in Grok model</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+</div>
+            </div>
+        </div>
+    </div>
+</div>
