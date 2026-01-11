@@ -1,0 +1,408 @@
+[% META
+        title = "DBSchemaManager Model"
+   description = "Database schema management model for initializing, synchronizing, and managing database tables with DBIx::Class integration"
+   roles = "admin,developer"
+   TemplateType = "model"
+   category = "models"
+   page_version = "0.01"
+   last_updated = "2026-01-11 16:00:00 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/models/DBSchemaManager.tt,v 0.01 2026/01/11 DocumentationSyncAgent Exp - New model documentation from DBSchemaManager.pm code' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">DBSchemaManager Model Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 16:00:00 UTC |
+        Version: 0.01 |
+        Author: Zencoder / DocumentationSyncAgent |
+        Status: New model documentation created from DBSchemaManager.pm code audit
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#getting-started" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Getting Started</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>DBSchemaManager Model</strong> (Comserv::Model::DBSchemaManager) provides comprehensive database schema management functionality for Comserv. It handles schema initialization, table creation, column metadata retrieval, schema synchronization with DBIx::Class Result classes, and dynamic table management across multiple databases (FORAGER and ENCY).</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This model is built on Catalyst's model system and integrates with DBIx::Class ORM, providing both programmatic and configuration-driven approaches to database schema management with comprehensive error handling and logging.</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of DBSchemaManager model with all schema management methods, table operations, and integration patterns.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Perl 5.20 or later</li>
+                <li>Catalyst web framework (v5.90130 or later)</li>
+                <li>Moose object system</li>
+                <li>DBIx::Class ORM with Result classes</li>
+                <li>DBI database interface</li>
+                <li>JSON module for configuration parsing</li>
+                <li>Database configuration file (db_config.json)</li>
+                <li>Configured database models (DBForager and/or DBEncy)</li>
+                <li>Logging system (Comserv::Util::Logging)</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Multi-Database Support</strong>: Manage schemas across FORAGER and ENCY databases simultaneously</li>
+                <li><strong>Dynamic Table Creation</strong>: Create tables from SQL scripts or field specifications</li>
+                <li><strong>Schema Synchronization</strong>: Synchronize database tables with DBIx::Class Result class definitions</li>
+                <li><strong>Metadata Retrieval</strong>: Fetch detailed column information (types, sizes, nullability)</li>
+                <li><strong>Configuration-Driven</strong>: Load schema definitions from JSON configuration files</li>
+                <li><strong>Type Conversion</strong>: Convert between DBIx::Class data types and MySQL data types</li>
+                <li><strong>Result File Parsing</strong>: Extract table and field definitions from DBIx::Class Result files</li>
+                <li><strong>Error Handling</strong>: Comprehensive error handling and logging for all operations</li>
+                <li><strong>AI Chat Tables</strong>: Special support for creating AI chat-related tables</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" style="color: var(--text-color); font-family: var(--header-font);">4. Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Accessing the Model</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">To use DBSchemaManager in a Catalyst controller or other component:</p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">use Comserv::Model::DBSchemaManager;
+
+# Access via Catalyst context
+my $schema_manager = $c->model('DBSchemaManager');
+
+# Perform schema operations
+$schema_manager->list_tables($c, 'ENCY');
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Configuration Requirements</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Ensure the following are configured before using DBSchemaManager:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>db_config.json exists in project root or Comserv directory with database credentials</li>
+                <li>Database models (DBForager and DBEncy) are defined in Comserv configuration</li>
+                <li>Target databases are accessible and properly configured</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Methods Reference</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.1 list_tables</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> List all tables in a specific database (FORAGER or ENCY).</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$tables = $schema_manager->list_tables($c, $database);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of table names. Dies on error.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.2 get_table_columns</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Fetch detailed column metadata for a specific table.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$columns = $schema_manager->get_table_columns($database, $table);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+                <li>$table: Table name (string)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of column hashes with keys: name, type, size, nullable.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.3 initialize_schema</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Initialize database schema based on configuration file definitions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$schema_manager->initialize_schema($database, $config_path);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+                <li>$config_path: Path to schema configuration file</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with initialization results.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.4 create_table_from_sql</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Create a table directly from SQL script.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $schema_manager->create_table_from_sql($database, $sql_script);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+                <li>$sql_script: SQL CREATE TABLE statement string or path to SQL file</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with execution results. Dies on SQL error.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.5 create_pages_table</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Create a standard pages table for documentation management.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $schema_manager->create_pages_table($database);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with table creation results.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.6 table_exists</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Check if a table exists in the database.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$exists = $schema_manager->table_exists($database, $table);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+                <li>$table: Table name (string)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Boolean (1 if table exists, 0 if not).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.7 create_table_from_fields</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Create a table programmatically from field specifications.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $schema_manager->create_table_from_fields($database, $table, $fields, $options);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name</li>
+                <li>$table: Table name to create</li>
+                <li>$fields: Array reference of field specifications (hashes with name, type, etc.)</li>
+                <li>$options: Hash reference with table options (optional)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with table creation results.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.8 sync_table_with_result_fields</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Synchronize a database table with DBIx::Class Result class field definitions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $schema_manager->sync_table_with_result_fields($database, $result_class);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name</li>
+                <li>$result_class: DBIx::Class Result class name</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with synchronization results and any schema differences.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.9 convert_dbic_to_mysql_type</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Convert DBIx::Class data type to MySQL/MariaDB data type.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$mysql_type = $schema_manager->convert_dbic_to_mysql_type($dbic_type);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$dbic_type: DBIx::Class data type string</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Corresponding MySQL data type string.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.10 parse_result_file_fields</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Parse field definitions from a DBIx::Class Result file.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$fields = $schema_manager->parse_result_file_fields($result_file_path);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$result_file_path: Path to the Result Perl file</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of parsed field definitions.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.11 create_ai_chat_tables_from_results</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Create AI chat-specific tables based on Result class definitions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $schema_manager->create_ai_chat_tables_from_results($database);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$database: Database name ('FORAGER' or 'ENCY')</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Status hash with tables created.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE EXAMPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">6. Usage Examples</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.1 List All Tables in Database</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema_manager = $c->model('DBSchemaManager');
+my $tables = $schema_manager->list_tables($c, 'ENCY');
+
+foreach my $table (@$tables) {
+    print "Table: $table\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.2 Check Table Existence and Get Columns</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema_manager = $c->model('DBSchemaManager');
+
+if ($schema_manager->table_exists('ENCY', 'users')) {
+    my $columns = $schema_manager->get_table_columns('ENCY', 'users');
+    
+    foreach my $col (@$columns) {
+        print "Column: $col->{name} Type: $col->{type} Size: $col->{size}\n";
+    }
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.3 Create Table from SQL Script</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema_manager = $c->model('DBSchemaManager');
+
+my $sql = q{
+    CREATE TABLE IF NOT EXISTS test_table (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+};
+
+my $result = $schema_manager->create_table_from_sql('ENCY', $sql);
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.4 Create Table from Field Specifications</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema_manager = $c->model('DBSchemaManager');
+
+my $fields = [
+    { name => 'id', type => 'INT', options => 'AUTO_INCREMENT PRIMARY KEY' },
+    { name => 'name', type => 'VARCHAR(255)', options => 'NOT NULL' },
+    { name => 'status', type => 'VARCHAR(50)', options => "DEFAULT 'active'" }
+];
+
+my $result = $schema_manager->create_table_from_fields('ENCY', 'products', $fields);
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.5 Synchronize Table with Result Class</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema_manager = $c->model('DBSchemaManager');
+
+# Sync 'users' table with DBIx::Class Users Result class
+my $result = $schema_manager->sync_table_with_result_fields('ENCY', 'Users');
+
+if ($result->{success}) {
+    print "Table synchronized successfully\n";
+    if ($result->{differences}) {
+        print "Schema differences found and corrected\n";
+    }
+}
+</pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.1 Configuration File Not Found</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> "Could not load db_config.json" error.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Verify db_config.json exists in project root or Comserv directory</li>
+                <li>Check file permissions (must be readable by Catalyst process)</li>
+                <li>Verify JSON syntax is valid (use JSON validator tool)</li>
+                <li>Ensure database credentials in file are correct</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.2 Database Connection Failed</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> "Failed to list tables" or connection timeout errors.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Verify database is running and accessible</li>
+                <li>Check database credentials in db_config.json are correct</li>
+                <li>Verify host, port, and database name are configured properly</li>
+                <li>Check network connectivity to database server</li>
+                <li>Ensure database user has necessary permissions</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.3 Table Creation Failed</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> SQL errors when creating tables ("table already exists", "syntax error", etc.).</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Use IF NOT EXISTS clause in CREATE TABLE statements to prevent errors</li>
+                <li>Check SQL syntax is valid MySQL/MariaDB syntax</li>
+                <li>Verify field types are compatible with target database</li>
+                <li>Check for reserved SQL keywords used as table or column names</li>
+                <li>Review application logs for detailed error messages</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.4 Result Class Not Found</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> Errors when syncing with Result class that doesn't exist.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Verify Result class exists in DBIx::Class schema</li>
+                <li>Check Result class name matches exactly (case-sensitive)</li>
+                <li>Ensure Result class is properly defined with columns and types</li>
+                <li>Load the Result class before attempting synchronization</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">8. See Also</h2>
+            <div style="background-color: var(--success-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/models/DBEncy" style="color: var(--link-color);">DBEncy Model</a> - ENCY database schema and operations</li>
+                    <li><a href="/Documentation/models/DBForager" style="color: var(--link-color);">DBForager Model</a> - FORAGER database schema and operations</li>
+                    <li><a href="/Documentation/system/DatabaseConfiguration" style="color: var(--link-color);">Database Configuration</a> - Setting up database connections</li>
+                    <li><a href="/Documentation/system/SchemaInitialization" style="color: var(--link-color);">Schema Initialization</a> - Database initialization procedures</li>
+                    <li>DBIx::Class Documentation - ORM framework reference</li>
+                    <li>MySQL/MariaDB Documentation - SQL syntax and data types</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row" style="margin-top: var(--spacing-xlarge); padding-top: var(--spacing-large); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+                Documentation for Comserv::Model::DBSchemaManager | Version 0.01 | Last Updated: 2026-01-11 16:00:00 UTC | Maintained by DocumentationSyncAgent
+            </p>
+        </div>
+    </div>
+</div>
