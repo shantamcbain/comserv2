@@ -1,8 +1,6 @@
-[% PageVersion = 'admin/schema_compare.tt,v 4.0 2024/12/19 shanta Exp shanta ' %]
-
-<head>
-    <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
-</head>
+[% PageVersion = 'admin/schema_compare.tt,v 4.1 2026/01/08 shanta Exp shanta ' %]
+<!-- Schema Comparison Page - CSS loaded by Header.tt wrapper -->
+<link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
 
 <div class="schema-compare-container">
     <header class="schema-compare-header">
@@ -75,25 +73,25 @@
             <li>Use "Create" buttons for missing Result files or tables</li>
         </ol>
         
-        <div class="legend" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+        <div class="legend">
             <strong>Legend:</strong>
-            <div style="display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <div style="width: 20px; height: 15px; background: #007bff; border-radius: 2px;"></div>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color legend-table-data"></div>
                     <span>Table Data</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <div style="width: 20px; height: 15px; background: #6f42c1; border-radius: 2px;"></div>
+                <div class="legend-item">
+                    <div class="legend-color legend-result-data"></div>
                     <span>Result File Data</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <div style="width: 20px; height: 15px; background: #ffecb3; border-radius: 2px; position: relative;">
-                        <span style="position: absolute; left: 2px; top: -2px; font-size: 10px;">⚠</span>
+                <div class="legend-item">
+                    <div class="legend-color legend-warning">
+                        <span class="legend-icon">⚠</span>
                     </div>
                     <span>Different Values</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <div style="width: 20px; height: 15px; background: #fff3cd; border-radius: 2px;"></div>
+                <div class="legend-item">
+                    <div class="legend-color legend-missing"></div>
                     <span>Missing Fields</span>
                 </div>
             </div>
@@ -548,7 +546,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
     
     // Add debug information only if debug mode is enabled
     if (debugMode) {
-        html += '<div class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">';
+        html += '<div class="debug-info field-debug-info">';
         html += '<strong>Debug Info:</strong><br>';
         html += 'Has Result File: ' + (comparison.has_result_file ? 'YES' : 'NO') + '<br>';
         html += 'Result File Path: ' + (comparison.result_file_path || 'NOT FOUND') + '<br>';
@@ -1017,7 +1015,7 @@ function createResultFromTable(tableName, database) {
     
     console.log('Sending request data:', requestData);
     
-    fetch('[% c.uri_for("/admin/create_result_from_table") %]', {
+    fetch('[% c.uri_for("/schema-comparison/create_result_from_table") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1061,7 +1059,7 @@ function syncTableToResult(tableName, database, fieldName) {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     button.disabled = true;
     
-    fetch('[% c.uri_for("/admin/sync_table_to_result") %]', {
+    fetch('[% c.uri_for("/schema-comparison/sync_table_to_result") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1104,7 +1102,7 @@ function syncResultToTable(tableName, database, fieldName) {
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     button.disabled = true;
     
-    fetch('[% c.uri_for("/admin/sync_result_to_table") %]', {
+    fetch('[% c.uri_for("/schema-comparison/sync_result_to_table") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

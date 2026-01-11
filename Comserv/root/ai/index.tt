@@ -6,7 +6,13 @@
 <div class="ai-chat-container">
     <div class="page-header-actions">
         <h1>AI Assistant Chat</h1>
-        <a href="/" class="return-to-menu-btn">← Return to Menu</a>
+        <div id="conversation-info" class="conversation-info" style="display: none; font-size: 12px; color: #666; margin-right: auto;">
+            Conversation #<span id="conversation-id-display">-</span>
+        </div>
+        <div class="header-buttons">
+            <a href="/ai/conversations" class="header-btn conversations-btn">📋 Conversations</a>
+            <a href="/" class="return-to-menu-btn">← Return to Menu</a>
+        </div>
     </div>
     
     <!-- Model Selector (Admin/Developer Only) -->
@@ -111,12 +117,34 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    gap: 15px;
 }
 
 .page-header-actions h1 {
     margin: 0;
     flex: 1;
     text-align: center;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.header-btn {
+    padding: 8px 16px;
+    background: #2196f3;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background 0.3s;
+    white-space: nowrap;
+}
+
+.header-btn:hover {
+    background: #1976d2;
 }
 
 .return-to-menu-btn {
@@ -591,6 +619,7 @@
 // Chat state management
 let conversationHistory = [];
 let isProcessing = false;
+let currentConversationId = null;
 
 // DOM elements
 const chatForm = document.getElementById('chat-form');
@@ -606,8 +635,9 @@ const startServerBtn = document.getElementById('start-server-btn');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Load conversation history from sessionStorage
+    // Load conversation history and conversation ID from sessionStorage
     loadConversationHistory();
+    loadConversationId();
     
     // Set up event listeners
     chatForm.addEventListener('submit', handleSubmit);
@@ -681,7 +711,15 @@ async function handleHostChange() {
             
             // Clear conversation history when switching hosts
             conversationHistory = [];
+            currentConversationId = null;
             saveConversationHistory();
+            try {
+                sessionStorage.removeItem('ai_current_conversation_id');
+            } catch (e) {
+                console.error('Failed to clear conversation ID:', e);
+            }
+            document.getElementById('conversation-info').style.display = 'none';
+            document.getElementById('conversation-id-display').textContent = '-';
             
         } else {
             // Show error
@@ -855,16 +893,29 @@ async function handleSubmit(e) {
     
     try {
         // Send request to server
+        const requestBody = {
+            prompt: prompt,
+            model: selectedModel,
+            history: conversationHistory.slice(-10) // Send last 10 messages for context
+        };
+        
+        // Include conversation ID if we're continuing an existing conversation
+        console.log('DEBUG: Before sending request - currentConversationId:', currentConversationId);
+        if (currentConversationId) {
+            requestBody.conversation_id = currentConversationId;
+            console.log('DEBUG: Adding conversation_id to request body:', currentConversationId);
+        } else {
+            console.log('DEBUG: No currentConversationId - will create NEW conversation');
+        }
+        console.log('DEBUG: Full request body:', requestBody);
+        
         const response = await fetch('/ai/chat', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                prompt: prompt,
-                model: selectedModel,
-                history: conversationHistory.slice(-10) // Send last 10 messages for context
-            })
+            body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
@@ -873,6 +924,14 @@ async function handleSubmit(e) {
         removeLoadingMessage(loadingId);
         
         if (data.success) {
+            // Update conversation ID if returned (first message in conversation)
+            if (data.conversation_id) {
+                currentConversationId = data.conversation_id;
+                saveConversationId();
+                document.getElementById('conversation-id-display').textContent = data.conversation_id;
+                document.getElementById('conversation-info').style.display = 'block';
+                showStatus('success', `Conversation #${data.conversation_id} saved`);
+            }
             // Add AI response to chat
             addMessage('assistant', data.response, data.model);
         } else {
@@ -992,7 +1051,15 @@ function updateSendButton(loading) {
 function clearChat() {
     if (confirm('Are you sure you want to clear the chat history?')) {
         conversationHistory = [];
+        currentConversationId = null;
         saveConversationHistory();
+        try {
+            sessionStorage.removeItem('ai_current_conversation_id');
+        } catch (e) {
+            console.error('Failed to clear conversation ID:', e);
+        }
+        document.getElementById('conversation-info').style.display = 'none';
+        document.getElementById('conversation-id-display').textContent = '-';
         renderMessages();
         showStatus('info', 'Chat history cleared');
     }
@@ -1017,6 +1084,42 @@ function loadConversationHistory() {
         }
     } catch (e) {
         console.error('Failed to load conversation history:', e);
+    }
+}
+
+// Save conversation ID to sessionStorage
+function saveConversationId() {
+    try {
+        if (currentConversationId) {
+            sessionStorage.setItem('ai_current_conversation_id', currentConversationId);
+            console.log('DEBUG: Saved conversationId to sessionStorage:', currentConversationId);
+        } else {
+            console.warn('DEBUG: Attempted saveConversationId but currentConversationId is:', currentConversationId);
+        }
+    } catch (e) {
+        console.error('Failed to save conversation ID:', e);
+    }
+}
+
+// Load conversation ID from sessionStorage
+function loadConversationId() {
+    try {
+        const saved = sessionStorage.getItem('ai_current_conversation_id');
+        console.log('DEBUG: loadConversationId() - saved value:', saved);
+        if (saved) {
+            currentConversationId = saved;
+            const displayEl = document.getElementById('conversation-id-display');
+            const infoEl = document.getElementById('conversation-info');
+            if (displayEl && infoEl) {
+                displayEl.textContent = currentConversationId;
+                infoEl.style.display = 'block';
+            }
+            console.log('DEBUG: Loaded conversationId from sessionStorage:', currentConversationId);
+        } else {
+            console.log('DEBUG: No conversation ID in sessionStorage - will create new conversation');
+        }
+    } catch (e) {
+        console.error('Failed to load conversation ID:', e);
     }
 }
 

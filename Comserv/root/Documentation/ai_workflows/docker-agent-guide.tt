@@ -1,14 +1,14 @@
 [% META
         title = "Docker Agent: Role & Configuration"
-   description = "Specification and usage guide for Zencoder Docker Agent"
+   description = "Specification and usage guide for Zencoder Docker Agent. Updated Jan 1, 2026: All agent specifications now consolidated in /.zencoder/coding-standards.yaml (v1.0-STABLE). This guide provides IDE setup and workflow examples. Read coding-standards.yaml for authoritative agent specifications."
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "ai-agents"
-   page_version = "1.00"
-   last_updated = "Fri Dec 13 00:52:00 UTC 2025"
+   page_version = "1.01"
+   last_updated = "Thu Jan 01 15:30:00 UTC 2026"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/ai_workflows/docker-agent-guide.tt,v 1.00 00:52:00 2025/12/13 Cleanup Exp - Docker Agent Role & Configuration Guide' %]
+[% PageVersion = 'Documentation/ai_workflows/docker-agent-guide.tt,v 1.01 15:30:00 2026/01/01 zencoder Exp - Updated references to central coding-standards.yaml (v1.0-STABLE); consolidated agent specs; deprecated .md files removed; added Recent Changes section' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -17,10 +17,11 @@
     <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker Agent: Role Specification & Configuration</h1>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-        Last Updated: 2025-12-13 | 
-        Version: 1.00 |
-        Type: Agent Specification |
-        Status: Active - Docker Agent available in Zencoder IDE
+        Last Updated: 2026-01-01 | 
+        Version: 1.01 |
+        Type: Agent Setup Guide |
+        Status: Active - Docker Agent specifications now in coding-standards.yaml v1.0-STABLE |
+        ⚠️ IMPORTANT: Read /.zencoder/coding-standards.yaml (agents:docker section) for authoritative specifications
     </div>
 
     <div id="toc" style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-medium) 0;">
@@ -33,6 +34,7 @@
             <li><a href="#use-cases" style="color: var(--link-color);">Common Use Cases</a></li>
             <li><a href="#tools" style="color: var(--link-color);">Tools & Commands</a></li>
             <li><a href="#success" style="color: var(--link-color);">Success Criteria</a></li>
+            <li><a href="#recent-changes" style="color: var(--link-color);">Recent Changes</a></li>
         </ul>
     </div>
 
@@ -325,9 +327,27 @@ kubectl get pods                    # Query Kubernetes resources (if K8s-ready)<
 
     <div class="row">
         <div class="col-100">
+            <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes</h2>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>v1.01 (Jan 1, 2026):</strong> Major consolidation update following Cleanup Agent Phase 3 completion</p>
+            </div>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>✅ Centralized Agent Specifications</strong> - Docker Agent specifications now consolidated in /.zencoder/coding-standards.yaml (agents:docker section) as v1.0-STABLE</li>
+                <li><strong>✅ Removed Deprecated References</strong> - Deprecated .md files (docker-agent-role.md, etc.) removed from codebase Dec 31, 2025</li>
+                <li><strong>✅ Updated Authority References</strong> - This guide now points to coding-standards.yaml as authoritative source for agent specifications</li>
+                <li><strong>✅ Added Startup Protocol Note</strong> - All agents now MUST read coding-standards.yaml FIRST per mandatory startup protocol (see /.zencoder/rules/repo.md STARTUP PROTOCOL section)</li>
+                <li><strong>⚠️ This File Purpose</strong> - Now serves as IDE setup guide and workflow examples only; technical specifications live in coding-standards.yaml</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
             <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
                 <p><strong>Version History:</strong></p>
                 <ul style="color: var(--text-muted-color);">
+                    <li><strong>1.01</strong> (2026-01-01): Consolidated references to central coding-standards.yaml (v1.0-STABLE); removed deprecated .md file references; added Recent Changes section; updated agent specifications authority</li>
                     <li><strong>1.00</strong> (2025-12-13): Initial documentation moved from /.zencoder/rules/docker-agent-role.md to Documentation format (.tt file) for human accessibility</li>
                 </ul>
                 <p>For technical support or questions about Docker Agent configuration, refer to the Zencoder documentation or contact the system administrator.</p>

@@ -26,17 +26,28 @@
     <div class="response-section">
         <h2>AI Response</h2>
         <div class="response-meta">
-            <span class="meta-item"><strong>Model:</strong> [% model %]</span>
+            <span class="meta-item"><strong>Model:</strong> [% response_metadata.model || 'Unknown' %]</span>
             <span class="meta-item"><strong>Generated:</strong> [% USE date; date.format(date.now, '%Y-%m-%d %H:%M:%S') %]</span>
+            [% IF conversation_id %]
+            <span class="meta-item"><strong>Conversation ID:</strong> <code>#[% conversation_id %]</code></span>
+            [% END %]
         </div>
         <div class="response-content">
             [% ai_response %]
         </div>
     </div>
+    
+    [% IF conversation_id %]
+    <div class="conversation-saved-notice">
+        <strong>✓ Conversation Saved</strong> 
+        <p>This conversation has been saved to your history with ID #[% conversation_id %]. You can review it later or use it as context for future searches.</p>
+    </div>
+    [% END %]
 
     <div class="action-buttons">
         <button type="button" id="copy-btn" class="button secondary">Copy Response</button>
         <a href="/ai/query_form" class="button">New Query</a>
+        <a href="/ai/conversations" class="button secondary">View Conversations</a>
         <a href="/ai" class="button primary">Back to AI Home</a>
         <a href="/" class="button return-menu">Return to Menu</a>
     </div>
@@ -183,6 +194,34 @@
 
 .button.return-menu:hover {
     background: #444;
+}
+
+.conversation-saved-notice {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-left: 4px solid #28a745;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 20px;
+    color: #155724;
+}
+
+.conversation-saved-notice strong {
+    color: #155724;
+    font-size: 16px;
+}
+
+.conversation-saved-notice p {
+    margin: 8px 0 0 0;
+    font-size: 14px;
+}
+
+.response-meta code {
+    background: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 13px;
 }
 </style>
 

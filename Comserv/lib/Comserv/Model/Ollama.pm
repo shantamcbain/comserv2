@@ -103,8 +103,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'llama3.1',
-    documentation => 'Ollama model to use (e.g., llama3.1, mistral, codellama)'
+    default => 'qwen2.5-coder:1.5b-base',
+    documentation => 'Ollama model to use (default: qwen2.5-coder:1.5b-base for low memory systems; alternatives: starcoder2:3b, qwen2.5-coder:7b, llama3.1:8b)'
 );
 
 has 'timeout' => (

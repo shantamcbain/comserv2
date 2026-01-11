@@ -1,0 +1,166 @@
+[% META 
+   title = "Daily Plan - January 6, 2026"
+   description = "Tuesday: A.3 Credentials Audit Execution Phase 1, B.1 Docker Secrets Phase 2 implementation, NEW: E.1 AI Chat System feature planning (Grok API, Conversation Resume, Grok.ai UI, Admin Controls)"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,infrastructure,security,bug-fixes,ai-systems"
+   page_version = "0.07"
+   last_updated = "Tue Jan 06 05:18:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/Daily_Plans-2026-01-06.tt,v 0.07 2026/01/06 05:18:00 zencoder Exp - Jan 6 Update: Updated AI Chat link to new Master Audit (comprehensive consolidation); Version bumped 0.06→0.07' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color);">Daily Plan: Tuesday, January 6, 2026 (A.3 Credentials Audit Phase 1 Execution + B.1 Phase 2)</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Context:</strong> Mid-week focus | 
+        <strong>Status:</strong> 3 Parallel Tasks | 
+        <strong>Last Updated:</strong> 2026-01-06
+    </div>
+
+    <div class="nav-dashboard" style="margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 4px;">
+        <strong>Quick Links:</strong>
+        <a href="/Documentation/MASTER_PLAN_COORDINATION" target="_blank" style="margin: 0 10px; color: #2196f3; text-decoration: none;">📋 Master Plan</a>
+        <a href="/Documentation/AI_Chat_System_Master_Audit" target="_blank" style="margin: 0 10px; color: #2196f3; text-decoration: none;">🤖 AI Chat System (Comprehensive Audit)</a>
+    </div>
+
+    <h2>🔴 Priority 1: A.3 Credentials Audit - Execution Phase 1 (3-4 hours)</h2>
+    
+    <p><strong>Execute audit per scope plan from Jan 5:</strong> Scan codebase for hardcoded credentials, classify findings, identify quick wins.</p>
+    <ol>
+        <li><strong>Scan Codebase for Hardcoded Credentials:</strong>
+            <ul>
+                <li>Search: grep/rg for patterns (password=, secret=, key=, token=, apikey)</li>
+                <li>Check: .env files in version control and git history</li>
+                <li>Review: db_config.json for exposed database credentials</li>
+                <li>Audit: API configuration files (Proxmox, Cloudflare, Ollama)</li>
+                <li>Document: All findings with file path, line number, risk level</li>
+            </ul>
+        </li>
+        <li><strong>Classify Findings:</strong>
+            <ul>
+                <li>Separate: Hardcoded vs env vars vs secrets manager vs insecure</li>
+                <li>Rate: Risk level (🔴 CRITICAL, 🟠 HIGH, 🟡 MEDIUM, 🟢 LOW)</li>
+                <li>Identify: Quick wins (can move immediately)</li>
+            </ul>
+        </li>
+        <li><strong>Create Interim Report:</strong>
+            <ul>
+                <li>File: /Documentation/A3_Audit_Execution_Phase1_Report.tt</li>
+                <li>Include: Findings summary, quick wins identified</li>
+            </ul>
+        </li>
+    </ol>
+    <p><strong>Expected Deliverable:</strong> Credentials findings list + interim audit report</p>
+
+    <h2>🟠 Priority 2: B.1 Docker Secrets - Phase 2 (2-3 hours)</h2>
+    
+    <p><strong>Support A.3 remediation:</strong> Implement Docker Secrets infrastructure for credentials identified in A.3 Phase 1 audit.</p>
+    <ol>
+        <li><strong>Complete Docker Secrets integration:</strong>
+            <ul>
+                <li>Create: docker-compose override with secrets for A.3 findings</li>
+                <li>Reference: secrets in service containers</li>
+                <li>Test: Multi-stage deployment (dev, staging, prod)</li>
+            </ul>
+        </li>
+        <li><strong>Assess documentation gaps:</strong>
+            <ul>
+                <li>Identify: Missing documentation for controllers (from earlier audit)</li>
+                <li>Flag: Broken links and outdated references</li>
+            </ul>
+        </li>
+        <li><strong>Create C.1 Audit Plan:</strong>
+            <ul>
+                <li>File: /Documentation/C1_Documentation_Audit_Plan.tt</li>
+                <li>Include: Gap assessment + remediation priority</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>🟡 Priority 3: B.3 Theme Refactoring - Phase 2 (2 hours)</h2>
+    
+    <ol>
+        <li><strong>Continue refactoring next 5-10 files:</strong>
+            <ul>
+                <li>Replace: More inline styles with CSS variables</li>
+                <li>Test: No visual regressions</li>
+            </ul>
+        </li>
+        <li><strong>Track progress:</strong>
+            <ul>
+                <li>Files refactored: 10-15 total</li>
+                <li>Estimated completion: Jan 7-8</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>🆕 E.1 AI Chat System - Phase Planning & Feature Definition (1-2 hours)</h2>
+    
+    <p><strong>Update AI Chat plan with 4 new high-priority features - Planning stage only (no implementation yet):</strong></p>
+    <ol>
+        <li><strong>📋 Feature Planning Complete - Now Queuing for Development:</strong>
+            <ul>
+                <li>✅ Updated AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt to v0.05</li>
+                <li>✅ Added 4 new feature requirements (FR-9 through FR-12)</li>
+                <li>✅ Updated Phase 2-4 deliverables with new features</li>
+                <li>✅ Extended timeline to 8-10 weeks total</li>
+            </ul>
+        </li>
+        <li><strong>🆕 New Features Added to Plan (Ready for Phase 2-4):</strong>
+            <ul>
+                <li><strong>Phase 2:</strong> LLMGrok service (Grok API integration) - Implements FR-12</li>
+                <li><strong>Phase 3:</strong> /ai/conversations page (search, filter, resume) - Implements FR-9; Grok.ai UI redesign - Implements FR-10</li>
+                <li><strong>Phase 4:</strong> Admin model/agent configuration UI (dynamic assignment) - Implements FR-11</li>
+            </ul>
+        </li>
+        <li><strong>📅 Next Steps (Schedule for Coming Weeks):</strong>
+            <ul>
+                <li>Week 1 (Jan 8-14): Begin Phase 2 - Implement LLMGrok service</li>
+                <li>Week 2-3 (Jan 15-28): Phase 3 - Build conversation resume page + Grok.ai UI</li>
+                <li>Week 4+ (Feb onwards): Phase 4 - Admin controls</li>
+            </ul>
+        </li>
+    </ol>
+
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="padding: 10px;">Task</th>
+            <th style="padding: 10px;">Duration</th>
+            <th style="padding: 10px;">Status</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">A.3 Credentials Audit Phase 1</td>
+            <td style="padding: 10px;">3-4 hours</td>
+            <td style="padding: 10px;">Execute</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">B.1 Docker Secrets Phase 2</td>
+            <td style="padding: 10px;">2-3 hours</td>
+            <td style="padding: 10px;">Main</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">B.3 Theme Refactoring Phase 2</td>
+            <td style="padding: 10px;">2 hours</td>
+            <td style="padding: 10px;">Continue</td>
+        </tr>
+        <tr style="background: #c8e6c9;">
+            <td style="padding: 10px;">🆕 E.1 AI Chat - Feature Planning (NEW)</td>
+            <td style="padding: 10px;">1-2 hours</td>
+            <td style="padding: 10px;">✅ Complete</td>
+        </tr>
+    </table>
+
+    <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0;">
+        <h3>Tomorrow's Plan (Jan 7 - Wednesday)</h3>
+        <p><strong>C.1 Continuation + B.3 Finish + E.1 Next Steps:</strong> Begin documentation gap remediation, complete B.3 theme refactoring, schedule Phase 2 implementation for E.1 AI Chat (LLMGrok service)</p>
+    </div>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px;">
+        <p><strong>Daily Plan v0.05 | Tuesday January 6, 2026 | Updated 2026-01-06 04:32 UTC | NEW: Added E.1 AI Chat feature planning section with 4 new features (Grok API, Conversation Resume, Grok.ai UI, Admin Controls)</strong></p>
+    </div>
+</div>

@@ -2,7 +2,7 @@ package Comserv::Model::Schema::Ency::Result::CodeSearchIndex;
 use base 'DBIx::Class::Core';
 use warnings FATAL => 'all';
 
-__PACKAGE__->table('code_search_index');
+__PACKAGE__->table('codesearchindex');
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',

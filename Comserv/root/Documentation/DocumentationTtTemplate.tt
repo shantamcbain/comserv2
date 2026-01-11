@@ -8,8 +8,7 @@
    last_updated = "Thu Dec 18 2025"
    site_specific = "false"
 %]
-# all linkd must be Documentatin/documentation_tt_template format
-[% INCLUDE 'documentation_header.tt' %]
+# all links must be Documentation/DocumentationTemplate format
 [% PageVersion = 'Documentation/documentation_tt_template.tt,v 0.05 2025/12/18 shanta Exp shanta - Added comprehensive TOC navigation system with section anchors' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]

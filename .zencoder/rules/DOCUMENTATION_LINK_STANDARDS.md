@@ -239,9 +239,9 @@ NEW: /Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN
 ## RELATED DOCUMENTATION STANDARDS
 
 See also:
-- `documentation-synchronization-agent.md` - General documentation rules and validation
+- `coding-standards.yaml` agents:DocumentationSyncAgent - General documentation rules and validation
 - `documentation_tt_template.tt` - Template structure and META requirements
-- `repo.md` - Repository-wide documentation guidelines (Zencoder rules)
+- `coding-standards.yaml` Rule 6 - Repository-wide documentation standards (Zencoder rules)
 
 ---
 

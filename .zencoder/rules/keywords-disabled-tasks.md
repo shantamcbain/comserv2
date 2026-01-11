@@ -108,7 +108,7 @@ alwaysApply: false
 
 **Restoration Timeline**: When Docker connectivity restored and application accessible again
 
-**Workaround Strategy**: Use file-based keywords only (`/chathandoff`, `/sessionhandoff`, `/validatett`, `/updateprompt`) until app restored
+**Workaround Strategy**: Use file-based keywords only (`/chathandoff`, `/newsession`, `/validatett`, `/updateprompt`) until app restored
 
 ---
 

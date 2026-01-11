@@ -2,7 +2,7 @@ package Comserv::Model::Schema::Ency::Result::DocumentationRoleAccess;
 use base 'DBIx::Class::Core';
 use warnings FATAL => 'all';
 
-__PACKAGE__->table('documentation_role_access');
+__PACKAGE__->table('documentationroleaccess');
 __PACKAGE__->add_columns(
     id => {
         data_type => 'integer',

@@ -1,0 +1,261 @@
+[% META
+   title = "Documentation Sync Audit Report - 2026-01-10"
+   description = "Automated audit of documentation files requiring updates based on code changes detected via git diff. Identifies primary documentation files that need version bumps or creation for recently modified code."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "audit,documentation,system"
+   page_version = "0.01"
+   last_updated = "Sat Jan 10 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'audit_reports/DocumentationSyncAudit2026-01-10.tt,v 0.01 2026/01/10 zencoder Exp - Documentation sync audit report (git range: HEAD~1..HEAD)' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Documentation Sync Audit Report</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Generated:</strong> 2026-01-10 | 
+        <strong>Version:</strong> 0.01 |
+        <strong>Git Range:</strong> HEAD~1..HEAD |
+        <strong>Status:</strong> Ready for DocumentationSyncAgent processing
+    </div>
+
+    <!-- QUICK SUMMARY SECTION -->
+    <div id="summary" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Audit Summary</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0;">
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Total Code Files Changed:</strong> 20</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Documentation Files Needing Update:</strong> 9</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">New Documentation Files Needed:</strong> 8</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Ready to Sync:</strong> Yes</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- FULL AUDIT REPORT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="audit-data" style="color: var(--text-color); font-family: var(--header-font);">Detailed Audit Report (JSON)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-style: italic;">This JSON data is the authoritative source for which documentation files need updates. Use DocumentationSyncAgent workflow to process each item.</p>
+            <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>{
+   "files_changed" : 20,
+   "audit_timestamp" : "2026-01-10T23:55:11Z",
+   "documentation_files_needing_update" : [
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : null,
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DocumentationMetadataIndex.tt",
+         "documentation_file" : "/Documentation/DocumentationMetadataIndex.tt"
+      },
+      {
+         "code_file" : "lib/Comserv/Controller/RemoteDB.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : null,
+         "documentation_file" : "/Documentation/controllers/RemoteDB.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/RemoteDB.tt",
+         "last_updated" : "Unknown",
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SchemaComparison.tt",
+         "documentation_file" : "/Documentation/controllers/SchemaComparison.tt",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "version" : "0.02",
+         "last_updated" : "Thu Jan 09 2026",
+         "code_file" : "lib/Comserv/Controller/Admin/SchemaComparison.pm",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "documentation_file" : "/Documentation/models/DBSchemaManager.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/DBSchemaManager.tt",
+         "last_updated" : "Unknown",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "version" : "0.01",
+         "code_file" : "lib/Comserv/Model/DBSchemaManager.pm",
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : null,
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm",
+         "last_updated" : "Unknown",
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "documentation_file" : "/Documentation/DocumentationRoleAccess.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DocumentationRoleAccess.tt"
+      },
+      {
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/utilities/RemoteDB.tt",
+         "documentation_file" : "/Documentation/utilities/RemoteDB.tt",
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "code_file" : "lib/Comserv/Util/RemoteDB.pm"
+      },
+      {
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/WebSearchResult.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/WebSearchResult.tt",
+         "last_updated" : "Fri Jan 10 2026",
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "version" : "0.01"
+      },
+      {
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/Grok.tt",
+         "documentation_file" : "/Documentation/models/Grok.tt",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Thu Jan 09 2025",
+         "code_file" : "lib/Comserv/Model/Grok.pm",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "version" : "0.01",
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AiModelConfig.tt",
+         "documentation_file" : "/Documentation/AiModelConfig.tt",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : null,
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm"
+      },
+      {
+         "documentation_file" : "/Documentation/AiConversation.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/AiConversation.tt",
+         "last_updated" : "Unknown",
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : null
+      },
+      {
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "code_file" : "lib/Comserv/Model/Ollama.pm",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "2026-01-10 14:42:00 UTC",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/Ollama.tt",
+         "documentation_file" : "/Documentation/models/Ollama.tt"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : 1,
+         "code_file" : "lib/Comserv/Controller/Root.pm",
+         "last_updated" : "Thu Jan 09 2026",
+         "version" : "0.02",
+         "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
+         "documentation_file" : "/Documentation/controllers/Root.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Root.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 1.12 to 1.13, add Recent Changes section",
+         "version" : "1.12",
+         "last_updated" : "2026-01-08 23:45:00 UTC",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Admin.tt",
+         "documentation_file" : "/Documentation/controllers/Admin.tt",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "code_file" : "lib/Comserv/Controller/Admin.pm"
+      },
+      {
+         "exists" : null,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm",
+         "last_updated" : "Unknown",
+         "version" : "0.01",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "documentation_file" : "/Documentation/CodeSearchIndex.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/CodeSearchIndex.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/controllers/AI.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/AI.tt",
+         "last_updated" : "2026-01-10 14:42:00 UTC",
+         "action" : "UPDATE - Bump version from 1.13 to 1.14, add Recent Changes section",
+         "version" : "1.13",
+         "code_file" : "lib/Comserv/Controller/AI.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : 1
+      },
+      {
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "code_file" : "lib/Comserv/Model/RemoteDB.pm",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/RemoteDB.tt",
+         "documentation_file" : "/Documentation/models/RemoteDB.tt"
+      },
+      {
+         "documentation_file" : "/Documentation/controllers/Chat.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Chat.tt",
+         "last_updated" : "Thu Jan 09 2025",
+         "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
+         "version" : "1.00",
+         "code_file" : "lib/Comserv/Controller/Chat.pm",
+         "exists" : 1,
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      }
+   ],
+   "git_range" : "HEAD~1..HEAD",
+   "summary" : {
+      "docs_missing" : 8,
+      "total_code_changes" : 20,
+      "ready_to_sync" : 1,
+      "docs_needing_update" : 17
+   }
+}
+</code></pre>
+        </div>
+    </div>
+
+    <!-- HOW TO USE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="how-to-use" style="color: var(--text-color); font-family: var(--header-font);">How to Use This Report</h2>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Review Audit Data:</strong> Examine the JSON above to see which documentation files need updating</li>
+                <li><strong>For Each Item:</strong>
+                    <ul>
+                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": true</code> → Update existing .tt file (bump version as shown in "action" field)</li>
+                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": null</code> → Create new documentation file using DocumentationTtTemplate.tt</li>
+                    </ul>
+                </li>
+                <li><strong>Version Numbering:</strong> Follow format from "action" field (e.g., bump 1.12 → 1.13)</li>
+                <li><strong>Add Recent Changes Section:</strong> Include code change summary in updated .tt files</li>
+                <li><strong>Update Metadata:</strong> Ensure last_updated field reflects current date (YYYY-MM-DD format)</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#summary" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Summary</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row" style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">
+                <strong>Generated by:</strong> documentation_sync_audit.pl (DocumentationSyncAgent workflow)<br/>
+                <strong>Source:</strong> RepositoryCodeAudit.json v2.0 (1:N code-to-documentation mapping)<br/>
+                <strong>Timestamp:</strong> 2026-01-10T23:55:11Z
+            </p>
+        </div>
+    </div>
+</div>

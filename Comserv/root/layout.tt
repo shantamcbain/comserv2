@@ -43,6 +43,7 @@
     
 
     
+    <script src="/static/js/local-chat.js"></script>
     <script>
         function smoothScroll(target, duration) {
             var start = window.scrollY;
