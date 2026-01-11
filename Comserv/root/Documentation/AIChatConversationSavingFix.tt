@@ -1,0 +1,287 @@
+[%
+   title = "AI Chat Conversation Saving Fix - December 27, 2025 (Updated Jan 2)"
+   description = "Fixed the /ai/chat endpoint to save conversations to the database. Enables conversation persistence and history in the new chat interface. Updated Jan 2 with metadata column schema fix."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "ai-systems,database-schema,fixes,chat"
+   page_version = "0.02"
+   last_updated = "Thu Jan 02 15:43:00 UTC 2026"
+%]
+[% PageVersion = 'root/Documentation/AI_Chat_Conversation_Saving_Fix.tt,v 0.02 2026/01/02 15:43:00 zencoder Exp - Jan 2 Update: Metadata column schema fix applied to ai_conversations' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>AI Chat Conversation Saving Fix</h1>
+    <h2>December 27, 2025</h2>
+
+    <div class="last-updated">
+        <strong>Created:</strong> 2025-12-27 01:20 UTC |
+        <strong>Updated:</strong> 2026-01-02 15:43 UTC |
+        <strong>Status:</strong> ✅ IMPLEMENTED & SCHEMA FIXED |
+        <strong>Related:</strong> <a href="/Documentation/AI_Chat_System_Fixes_Dec26">Schema Fix Dec 26</a> | <a href="/Documentation/Daily_Plans-2025-12-27">Daily Plan Dec 27</a>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="background-color: var(--warning-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; opacity: 0.1;"></div>
+            <h2 id="update" style="color: var(--text-color); font-family: var(--header-font);">📋 Update: Jan 2, 2026 - Metadata Column Schema Fix</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Regression Fixed:</strong> On Dec 27-30, conversations were created but messages failed to save. Root cause: Missing metadata column in ai_conversations table.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Fix Applied:</strong> ALTER TABLE ai_conversations ADD COLUMN metadata longtext NULL. Production database updated 2026-01-02 at 15:05 UTC.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Impact:</strong> This fix enables the conversation saving functionality described in this document to work correctly. Future message creation will now persist metadata properly.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">✅ Chat Endpoint Now Saves Conversations</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Issue Fixed:</strong> The /ai/chat endpoint (used by the new chat interface) was NOT saving conversations to the database, even though the form-based /ai/result endpoint did.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Impact:</strong> Users could chat with AI but conversations disappeared after page reload and weren't visible in the Conversations list.</p>
+        </div>
+    </div>
+
+    <div class="content-section">
+        <h2>Problem Description</h2>
+        
+        <h3>What Was Happening</h3>
+        <ul>
+            <li>User navigates to /ai (new chat interface)</li>
+            <li>User sends a prompt via JavaScript AJAX call to /ai/chat</li>
+            <li>Server returns AI response from Ollama model</li>
+            <li>Client displays response in chat</li>
+            <li>BUT: Conversation is NOT saved to database</li>
+            <li>Page reload loses all chat history</li>
+            <li>/ai/conversations page shows no chat messages from the new interface</li>
+        </ul>
+
+        <h3>Root Cause</h3>
+        <p>The <code>/ai/chat</code> endpoint (added for the modern chat interface) was designed to return JSON responses quickly, but it was missing the database save logic. The older <code>/ai/result</code> endpoint (form-based) did include database saving, but the new endpoint did not.</p>
+
+        <h3>Comparison</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+            <thead>
+                <tr style="background-color: #f5f5f5;">
+                    <th style="padding: 10px; border: 1px solid #ddd;">Feature</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/result (Form)</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/chat (New) - BEFORE</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/chat (New) - AFTER</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves Conversation</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves User Message</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves AI Response</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Returns conversation_id</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ In stash</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">❌ Not available</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ In JSON</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <h2 id="fix" style="color: var(--text-color); font-family: var(--header-font);">Fix Applied</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">File Modified</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>/Comserv/lib/Comserv/Controller/AI.pm</code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Method</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace;"><code>sub chat :Local :Args(0)  # Lines 492-731 (after fix)</code></pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Changes</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Added database conversation saving logic after successful Ollama response (lines 636-700):</p>
+
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; color: var(--text-color); font-family: monospace; margin: var(--spacing-small) 0;"><code># Save conversation to database
+my $conversation_id;
+try {
+    my $user_id = $c->session->{user_id};
+    my $schema = $c->model('DBEncy')->schema;
+    
+    # Generate title from first prompt
+    my $title = substr($prompt, 0, 80) || 'Chat Conversation';
+    
+    # Create conversation
+    my $conversation = $schema->resultset('AiConversation')->create({
+        user_id => $user_id,
+        title => $title,
+        status => 'active'
+    });
+    
+    $conversation_id = $conversation->id;
+    
+    # Save user message
+    $schema->resultset('AiMessage')->create({
+        conversation_id => $conversation_id,
+        user_id => $user_id,
+        role => 'user',
+        content => $prompt,
+        # ... additional fields ...
+    });
+    
+    # Save AI response message
+    $schema->resultset('AiMessage')->create({
+        conversation_id => $conversation_id,
+        user_id => $user_id,
+        role => 'assistant',
+        content => $ai_response,
+        # ... additional fields ...
+    });
+} catch {
+    # Log error but don't fail the response
+};</code></pre>
+        </div>
+
+        <h3>Key Features of Fix</h3>
+        <ul>
+            <li><strong>Automatic Conversation Creation:</strong> Creates a new AiConversation record for each chat prompt</li>
+            <li><strong>Dual Message Saving:</strong> Saves both user message and AI response to AiMessage table</li>
+            <li><strong>Graceful Error Handling:</strong> If database save fails, response still returns to user (doesn't break UX)</li>
+            <li><strong>Metadata Preservation:</strong> Stores model name, tokens, duration, and other metadata</li>
+            <li><strong>Conversation ID in Response:</strong> Returns conversation_id in JSON so client can track it if needed</li>
+            <li><strong>Title Generation:</strong> Uses first 80 chars of prompt as conversation title (cleaned of newlines)</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2>Data Saved Per Chat Message</h2>
+
+        <h3>AiConversation Record</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+            <tr style="background-color: #f5f5f5;">
+                <th style="padding: 8px; border: 1px solid #ddd;">Field</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">Value</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>user_id</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Current user's ID from session</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>title</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">First 80 chars of user prompt</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>status</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">'active'</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>created_at</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">CURRENT_TIMESTAMP (automatic)</td>
+            </tr>
+        </table>
+
+        <h3>AiMessage Records (2 created per chat)</h3>
+        <p><strong>User Message:</strong></p>
+        <ul>
+            <li>role: 'user'</li>
+            <li>content: User's prompt</li>
+            <li>model_used: Model name</li>
+            <li>agent_type: 'documentation'</li>
+        </ul>
+
+        <p><strong>Assistant Message:</strong></p>
+        <ul>
+            <li>role: 'assistant'</li>
+            <li>content: AI response from Ollama</li>
+            <li>model_used: Model name</li>
+            <li>agent_type: 'documentation'</li>
+            <li>metadata: {total_duration, eval_count}</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2>Testing the Fix</h2>
+
+        <h3>Verification Steps</h3>
+        <ol>
+            <li><strong>Navigate to AI Chat:</strong> Go to /ai in your browser</li>
+            <li><strong>Send a Message:</strong> Type a prompt and click Send</li>
+            <li><strong>Verify Response:</strong> AI should respond normally</li>
+            <li><strong>Check Conversations:</strong> Navigate to /ai/conversations</li>
+            <li><strong>Verify Persistence:</strong> Your chat should appear in the list</li>
+            <li><strong>Click View:</strong> Click on the conversation to see both messages</li>
+            <li><strong>Check Page Reload:</strong> Refresh the page - conversation should still be there</li>
+        </ol>
+
+        <h3>Expected Results</h3>
+        <ul>
+            <li>✅ New conversation appears in /ai/conversations list</li>
+            <li>✅ Conversation title shows first part of your prompt</li>
+            <li>✅ Message count shows "2" (user + assistant)</li>
+            <li>✅ Clicking "View" shows both the user prompt and AI response</li>
+            <li>✅ Conversation persists after page reload/logout/login</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2>Database Impact</h2>
+
+        <h3>Tables Modified</h3>
+        <ul>
+            <li><strong>ai_conversations:</strong> 1 new row per chat message</li>
+            <li><strong>ai_messages:</strong> 2 new rows per chat message (user + assistant)</li>
+        </ul>
+
+        <h3>Query Example</h3>
+        <pre><code>-- Find conversations created via /ai/chat interface
+SELECT c.id, c.user_id, c.title, COUNT(m.id) as message_count
+FROM ai_conversations c
+LEFT JOIN ai_messages m ON c.id = m.conversation_id
+WHERE c.user_id = 1
+GROUP BY c.id
+ORDER BY c.created_at DESC;</code></pre>
+    </div>
+
+    <div class="content-section">
+        <h2>JSON Response Example</h2>
+
+        <h3>Success Response</h3>
+        <pre><code>{
+  "success": true,
+  "response": "Hello! This is an AI response...",
+  "model": "qwen2.5-coder:1.5b-base",
+  "conversation_id": 42,
+  "created_at": "2025-12-27T01:20:00Z",
+  "total_duration": 2450,
+  "eval_count": 256
+}</code></pre>
+    </div>
+
+    <div class="content-section">
+        <h2>Related Changes</h2>
+        <ul>
+            <li><strong>Dec 26:</strong> Fixed DBSchemaManager to auto-create AiConversation and AiMessage tables on startup</li>
+            <li><strong>Dec 27 (this):</strong> Added conversation saving to /ai/chat endpoint</li>
+            <li><strong>Next:</strong> Update client-side JavaScript to track conversation_id in session storage</li>
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h2>Future Improvements</h2>
+        <ul>
+            <li><strong>Client-side Conversation Tracking:</strong> Store conversation_id in sessionStorage to support multi-turn conversations in same session</li>
+            <li><strong>Reuse Existing Conversations:</strong> Add option to continue existing conversations rather than creating new ones for each prompt</li>
+            <li><strong>Batch Saving:</strong> Optimize database writes by batching multiple messages before save</li>
+            <li><strong>User Feedback:</strong> Show "Conversation saved" notification after successful save</li>
+        </ul>
+    </div>
+
+</div>

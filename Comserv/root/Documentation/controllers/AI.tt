@@ -1,0 +1,708 @@
+[% META
+        title = "AI Controller Documentation"
+   description = "Comprehensive documentation for AI controller providing Ollama LLM integration, interactive web forms, JSON API endpoints, multi-turn conversations, model management, server control with guest session support, and database conversation persistence"
+   roles = "admin,developer,editor"
+   TemplateType = "controller"
+   category = "controllers,ai,ollama,api"
+   page_version = "0.04"
+   last_updated = "2026-01-11 15:35:00 UTC"
+   site_specific = ""
+%]
+
+[% PageVersion = 'Documentation/controllers/AI.tt,v 0.04 2026/01/11 DocumentationSyncAgent Exp - Added audit trail fix documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 15:35:00 UTC | 
+        Version: 0.04 |
+        Author: DocumentationSyncAgent |
+        Status: Audit script circular dependency fixed, documentation sync workflow verified
+    </div>
+
+<h2>Overview</h2>
+
+<p>The AI controller (`Comserv/lib/Comserv/Controller/AI.pm`) is the main interface for interacting with Ollama LLM (Large Language Model) servers within Comserv. It provides both interactive web forms and JSON API endpoints for AI query processing, model management, and server control. Supports guest sessions for unauthenticated access to the AI interface.</p>
+
+<p><strong>File Size:</strong> 2,486 lines | <strong>Methods:</strong> 16+ major methods | <strong>Type:</strong> Dual interface (Web + JSON API)</p>
+
+<div style="background-color: #f0f8ff; padding: 10px; border-left: 4px solid #4CAF50; margin: 10px 0;">
+  <strong>📝 Recent Changes (v0.04 - Jan 11, 2026):</strong>
+  <ul style="margin: 5px 0 0 20px; font-size: 0.9em;">
+    <li><strong>v0.04 (2026-01-11):</strong> Audit script circular dependency fixed. Documentation sync workflow verified - code changes no longer trigger repeated version bump requests. All API endpoints and conversation persistence features remain unchanged.</li>
+    <li><strong>v0.03 (2026-01-11):</strong> Version consolidation from v1.13 to v0.03 (corrected starting version). Code changes integrated per git HEAD~1..HEAD audit. Maintained all existing features and documentation.</li>
+    <li><strong>v1.13 (2026-01-10) - Consolidated:</strong> Enhanced JSON body reading with priority-based method fallback: $c->req->content → $c->req->body (with seeking) → form parameters. Added diagnostic logging showing body length, first 200 chars, and parsed JSON keys. Improved error handling with Try::Tiny exception catching.</li>
+    <li><strong>Earlier Features:</strong> Database conversation persistence, page context tracking, agent identification, model management, server control endpoints</li>
+  </ul>
+</div>
+
+<h2>Authentication &amp; Session Management</h2>
+
+<h3>Guest Session Support</h3>
+
+<p>The AI controller allows unauthenticated guests to access the AI interface by creating temporary guest sessions:</p>
+
+<ul>
+<li>Guests generate a unique guest_session_id using UUID</li>
+<li>Guest username formatted as: `Guest-[first 8 chars of UUID]`</li>
+<li>Guest sessions allow interactive queries without login</li>
+<li>Logged in users get full access with their username</li>
+</ul>
+
+<h3>Authentication on Endpoints</h3>
+
+<p>While guest access is allowed for the main interface, certain operations may require authentication:</p>
+
+<ul>
+<li>Model management (pull, remove) may require admin roles</li>
+<li>Server control operations logged with user identification</li>
+<li>All actions logged via Comserv::Util::Logging</li>
+</ul>
+
+<h2>Main Interface &amp; Interactive Forms</h2>
+
+<h3>AI Index (Main Interface)</h3>
+
+<p><strong>Route:</strong> `/ai/` (GET)</p>
+
+<p><strong>Method:</strong> `index :Path :Args(0)`</p>
+
+<p>The main AI interface providing interactive web forms for querying LLM models. Features:</p>
+
+<ul>
+<li>Interactive query form with AJAX submission</li>
+<li>Real-time Ollama server status display</li>
+<li>Model selection dropdown (populated from available models)</li>
+<li>System prompt customization input</li>
+<li>Response format selection</li>
+<li>Guest and authenticated user support</li>
+<li>Comprehensive logging of all interactions</li>
+</ul>
+
+<p><strong>Session Handling:</strong> Creates guest_session_id for unauthenticated users; uses existing session for authenticated users</p>
+
+<h3>Query Form</h3>
+
+<p><strong>Route:</strong> `/ai/query_form` (GET)</p>
+
+<p><strong>Method:</strong> `query_form :Local :Args(0)`</p>
+
+<p>Returns the query form HTML/template for dynamic loading in the main interface.</p>
+
+<h3>Result Display</h3>
+
+<p><strong>Route:</strong> `/ai/result` (GET)</p>
+
+<p><strong>Method:</strong> `result :Local :Args(0)`</p>
+
+<p>Displays results from AI queries with formatting and syntax highlighting support.</p>
+
+<h2>JSON API Endpoints</h2>
+
+<h3>Generate (Main API Endpoint) - UPDATED v1.11</h3>
+
+<p><strong>Route:</strong> `/ai/generate` (POST)</p>
+
+<p><strong>Method:</strong> `generate :Local :Args(0)`</p>
+
+<p>Primary JSON API endpoint for AI query processing. <strong>NEW (v1.11):</strong> Multi-method request body handling with automatic fallback from JSON to form parameters.</p>
+
+<h4>Request Formats (v1.11 Enhanced)</h4>
+
+<p><strong>Option 1: JSON Body (Recommended)</strong></p>
+<pre>
+POST /ai/generate
+Content-Type: application/json
+
+{
+  "prompt": "user query text",
+  "format": "json|text|markdown",
+  "system": "optional system context",
+  "page_context": "documentation",
+  "page_path": "/Documentation/AI",
+  "page_title": "AI Documentation",
+  "agent_id": "MainAgent",
+  "agent_name": "AI Assistant"
+}
+</pre>
+
+<p><strong>Option 2: Form Parameters (Fallback)</strong></p>
+<pre>
+POST /ai/generate
+Content-Type: application/x-www-form-urlencoded
+
+prompt=user+query&format=text&system=context&page_context=documentation
+</pre>
+
+<p><strong>Response:</strong> JSON object with generated text and metadata</p>
+
+<p><strong>Features (v1.11 Enhanced):</strong></p>
+
+<ul>
+<li><strong>NEW:</strong> Intelligent body reading - tries JSON then form parameters</li>
+<li><strong>NEW:</strong> Multi-method fallback (content, body with seeking, form params)</li>
+<li><strong>NEW:</strong> Page context tracking (page_context, page_path, page_title)</li>
+<li><strong>NEW:</strong> Agent identification (agent_id, agent_name)</li>
+<li><strong>NEW:</strong> Enhanced logging at each parsing step</li>
+<li>Validates model availability</li>
+<li>Handles system prompt customization</li>
+<li>Supports multiple response formats (JSON, text, markdown)</li>
+<li>Database conversation persistence</li>
+<li>Error handling with Try::Tiny</li>
+<li>Comprehensive logging of all API calls</li>
+</ul>
+
+<h4>JSON Body Reading Implementation (v1.11)</h4>
+
+<p><strong>Method Priority:</strong></p>
+<ol>
+<li><code>$c->req->content</code> - Direct content method (most reliable)</li>
+<li><code>$c->req->body</code> - File handle with seeking support (fallback)</li>
+<li>Form/Query parameters - Last resort if body unavailable</li>
+</ol>
+
+<p><strong>Logging Details:</strong> Each step logs which method was used, body length, parsed JSON keys, and extracted parameters for debugging.</p>
+
+<h3>Chat API</h3>
+
+<p><strong>Route:</strong> `/ai/chat` (POST)</p>
+
+<p><strong>Method:</strong> `chat :Local :Args(0)`</p>
+
+<p>Multi-turn conversation API endpoint supporting persistent conversations. Accepts JSON:</p>
+
+<pre>
+{
+  "conversation_id": "optional-id",
+  "message": "user message",
+  "model": "model-name",
+  "system_prompt": "conversation context"
+}
+</pre>
+
+<p><strong>Features:</strong></p>
+
+<ul>
+<li>Creates new conversation or continues existing</li>
+<li>Tracks conversation history in database</li>
+<li>Multi-turn context preservation</li>
+<li>User/guest conversation isolation</li>
+<li>Timestamps on each message</li>
+<li>Database persistence</li>
+</ul>
+
+<h2>Model Management</h2>
+
+<h3>Models List</h3>
+
+<p><strong>Route:</strong> `/ai/models` (GET)</p>
+
+<p><strong>Method:</strong> `models :Local :Args(0)`</p>
+
+<p>Retrieves list of available Ollama models with metadata:</p>
+
+<ul>
+<li>Model names</li>
+<li>Model sizes</li>
+<li>Last modified timestamps</li>
+<li>Memory requirements</li>
+<li>Availability status</li>
+</ul>
+
+<p><strong>Response Format:</strong> JSON array of model objects</p>
+
+<h3>Pull Model</h3>
+
+<p><strong>Route:</strong> `/ai/pull_model` (POST)</p>
+
+<p><strong>Method:</strong> `pull_model :Local :Args(0)`</p>
+
+<p>Downloads and installs a new Ollama model. Accepts JSON:</p>
+
+<pre>
+{
+  "model_name": "model-identifier"
+}
+</pre>
+
+<p><strong>Features:</strong></p>
+
+<ul>
+<li>Async model pulling (shows progress)</li>
+<li>Validates model name against Ollama registry</li>
+<li>Tracks download progress</li>
+<li>Handles pull failures with error messages</li>
+<li>Logging of all model pulls</li>
+</ul>
+
+<h3>Test Model</h3>
+
+<p><strong>Route:</strong> `/ai/test_model` (POST)</p>
+
+<p><strong>Method:</strong> `test_model :Local :Args(0)`</p>
+
+<p>Tests a model with a sample query to verify functionality. Accepts JSON:</p>
+
+<pre>
+{
+  "model": "model-name",
+  "test_prompt": "What is 2+2?"
+}
+</pre>
+
+<p><strong>Returns:</strong> Model response with execution time and status</p>
+
+<h3>Remove Model</h3>
+
+<p><strong>Route:</strong> `/ai/remove_model` (POST)</p>
+
+<p><strong>Method:</strong> `remove_model :Local :Args(0)`</p>
+
+<p>Removes an installed model from the Ollama server. Accepts JSON:</p>
+
+<pre>
+{
+  "model_name": "model-identifier"
+}
+</pre>
+
+<p><strong>Features:</strong></p>
+
+<ul>
+<li>Validates model exists before removal</li>
+<li>Requires confirmation (typically from UI)</li>
+<li>Frees disk space after removal</li>
+<li>Logs all removals for auditing</li>
+</ul>
+
+<h2>Server Management</h2>
+
+<h3>Check Status</h3>
+
+<p><strong>Route:</strong> `/ai/check_status` (GET)</p>
+
+<p><strong>Method:</strong> `check_status :Local :Args(0)`</p>
+
+<p>Polls Ollama server for current status including:</p>
+
+<ul>
+<li>Server running status</li>
+<li>Available models list</li>
+<li>Current model in use (if any)</li>
+<li>Server version</li>
+<li>Memory usage</li>
+<li>Response latency</li>
+</ul>
+
+<p><strong>Response:</strong> JSON status object</p>
+
+<h3>Server Status (Detailed)</h3>
+
+<p><strong>Route:</strong> `/ai/server_status` (GET)</p>
+
+<p><strong>Method:</strong> `server_status :Local`</p>
+
+<p>Extended status endpoint with detailed diagnostics:</p>
+
+<ul>
+<li>Hardware utilization (CPU, GPU, memory)</li>
+<li>Loaded models in memory</li>
+<li>Active processing tasks</li>
+<li>Error conditions (if any)</li>
+<li>Configuration status</li>
+</ul>
+
+<h3>Start Server</h3>
+
+<p><strong>Route:</strong> `/ai/start_server` (POST)</p>
+
+<p><strong>Method:</strong> `start_server :Local :Args(0)`</p>
+
+<p>Starts the Ollama server. Features:</p>
+
+<ul>
+<li>Validates server not already running</li>
+<li>Detects running process and logs status</li>
+<li>Returns confirmation with process details</li>
+<li>Waits for server readiness (timeout after 30 seconds)</li>
+<li>Logs all start attempts</li>
+</ul>
+
+<h3>Set Host</h3>
+
+<p><strong>Route:</strong> `/ai/set_host` (POST)</p>
+
+<p><strong>Method:</strong> `set_host :Local :Args(0)`</p>
+
+<p>Changes Ollama server connection details. Accepts JSON:</p>
+
+<pre>
+{
+  "host": "hostname-or-ip",
+  "port": 11434
+}
+</pre>
+
+<p><strong>Features:</strong></p>
+
+<ul>
+<li>Updates connection configuration</li>
+<li>Validates connection to new host</li>
+<li>Persists settings to config file</li>
+<li>Provides fallback on validation failure</li>
+<li>Logs all host changes</li>
+</ul>
+
+<h2>Conversation Management</h2>
+
+<h3>Conversations List</h3>
+
+<p><strong>Route:</strong> `/ai/conversations` (GET)</p>
+
+<p><strong>Method:</strong> `conversations :Local :Args(0)`</p>
+
+<p>Lists all conversations for the current user with metadata:</p>
+
+<ul>
+<li>Conversation ID</li>
+<li>Title/topic</li>
+<li>Creation timestamp</li>
+<li>Last message timestamp</li>
+<li>Message count</li>
+<li>Model used</li>
+</ul>
+
+<p><strong>Filters:</strong> Can be filtered by user, date range, or model</p>
+
+<h3>Reset Conversation</h3>
+
+<p><strong>Route:</strong> `/ai/reset_conversation` (POST)</p>
+
+<p><strong>Method:</strong> `reset_conversation :Local :Args(0)`</p>
+
+<p>Clears conversation history to start fresh. Accepts JSON:</p>
+
+<pre>
+{
+  "conversation_id": "id-to-reset"
+}
+</pre>
+
+<p><strong>Features:</strong></p>
+
+<ul>
+<li>Clears message history while keeping conversation ID</li>
+<li>Resets context for multi-turn conversations</li>
+<li>Allows user to continue with same conversation ID</li>
+<li>Logs reset action</li>
+</ul>
+
+<h2>Internal Helper Methods</h2>
+
+<h3>Get Current Ollama Config</h3>
+
+<p><strong>Method:</strong> `_get_current_ollama_config()` (Private)</p>
+
+<p>Retrieves current Ollama server configuration from config file or environment:</p>
+
+<ul>
+<li>Server host</li>
+<li>Server port</li>
+<li>API endpoint</li>
+<li>Model directory path</li>
+<li>Environment overrides</li>
+</ul>
+
+<h2>Complete Methods Reference</h2>
+
+<table border="1">
+<tr>
+<th>Method Name</th>
+<th>Route</th>
+<th>HTTP Method</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>/ai/</td>
+<td>GET</td>
+<td>Action</td>
+<td>Main AI interface with interactive form</td>
+</tr>
+<tr>
+<td><code>generate</code></td>
+<td>/ai/generate</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Primary query processing endpoint</td>
+</tr>
+<tr>
+<td><code>query_form</code></td>
+<td>/ai/query_form</td>
+<td>GET</td>
+<td>Action</td>
+<td>Return form HTML for dynamic loading</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>/ai/result</td>
+<td>GET</td>
+<td>Action</td>
+<td>Display formatted query results</td>
+</tr>
+<tr>
+<td><code>chat</code></td>
+<td>/ai/chat</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Multi-turn conversation endpoint</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td>/ai/models</td>
+<td>GET</td>
+<td>JSON API</td>
+<td>List available models</td>
+</tr>
+<tr>
+<td><code>pull_model</code></td>
+<td>/ai/pull_model</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Download and install model</td>
+</tr>
+<tr>
+<td><code>test_model</code></td>
+<td>/ai/test_model</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Test model with sample query</td>
+</tr>
+<tr>
+<td><code>remove_model</code></td>
+<td>/ai/remove_model</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Remove installed model</td>
+</tr>
+<tr>
+<td><code>check_status</code></td>
+<td>/ai/check_status</td>
+<td>GET</td>
+<td>JSON API</td>
+<td>Poll server status</td>
+</tr>
+<tr>
+<td><code>set_host</code></td>
+<td>/ai/set_host</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Change server connection</td>
+</tr>
+<tr>
+<td><code>start_server</code></td>
+<td>/ai/start_server</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Start Ollama server process</td>
+</tr>
+<tr>
+<td><code>conversations</code></td>
+<td>/ai/conversations</td>
+<td>GET</td>
+<td>JSON API</td>
+<td>List user conversations</td>
+</tr>
+<tr>
+<td><code>reset_conversation</code></td>
+<td>/ai/reset_conversation</td>
+<td>POST</td>
+<td>JSON API</td>
+<td>Clear conversation history</td>
+</tr>
+<tr>
+<td><code>server_status</code></td>
+<td>/ai/server_status</td>
+<td>GET</td>
+<td>JSON API</td>
+<td>Detailed server diagnostics</td>
+</tr>
+<tr>
+<td><code>_get_current_ollama_config</code></td>
+<td>—</td>
+<td>—</td>
+<td>Private Helper</td>
+<td>Retrieve server configuration</td>
+</tr>
+</table>
+
+<h2>JSON Request/Response Formats</h2>
+
+<h3>Generate Request</h3>
+
+<pre>
+{
+  "model": "llama2",
+  "prompt": "Explain quantum computing",
+  "system_prompt": "You are a physics expert",
+  "format": "markdown",
+  "temperature": 0.7,
+  "top_k": 40,
+  "top_p": 0.9
+}
+</pre>
+
+<h3>Generate Response</h3>
+
+<pre>
+{
+  "response": "Generated text from model...",
+  "model": "llama2",
+  "created_at": "2026-01-05T22:00:00Z",
+  "done": true,
+  "context": [array of context tokens],
+  "total_duration": 1234567890,
+  "load_duration": 123456789,
+  "prompt_eval_count": 45,
+  "prompt_eval_duration": 123456789,
+  "eval_count": 100,
+  "eval_duration": 987654321
+}
+</pre>
+
+<h3>Chat Request</h3>
+
+<pre>
+{
+  "conversation_id": "unique-id",
+  "message": "Hello, how are you?",
+  "model": "llama2",
+  "system_prompt": "Be helpful and friendly"
+}
+</pre>
+
+<h3>Chat Response</h3>
+
+<pre>
+{
+  "conversation_id": "unique-id",
+  "message": "Generated response...",
+  "model": "llama2",
+  "timestamp": "2026-01-05T22:00:00Z",
+  "complete": true,
+  "message_count": 5
+}
+</pre>
+
+<h2>Database Integration</h2>
+
+<h3>Conversation Storage</h3>
+
+<p>Conversations are persisted in the Comserv database using DBIx::Class models:</p>
+
+<ul>
+<li><strong>Table:</strong> Conversations</li>
+<li><strong>Fields:</strong> conversation_id (PK), user_id, model, created_at, updated_at</li>
+<li>One conversation contains many messages</li>
+<li>Messages include: message_id, conversation_id, role (user/assistant), content, timestamp</li>
+</ul>
+
+<h2>Error Handling</h2>
+
+<p>Error handling uses Try::Tiny exception handling:</p>
+
+<ul>
+<li>JSON endpoints return error responses with HTTP 400/500 status codes</li>
+<li>Web endpoints flash error messages and redirect</li>
+<li>All errors logged with full context (file, line, user)</li>
+<li>Validation errors include helpful user messages</li>
+<li>Ollama connection failures handled gracefully with retry logic</li>
+</ul>
+
+<h2>Logging &amp; Monitoring</h2>
+
+<p>All actions logged via Comserv::Util::Logging with:</p>
+
+<ul>
+<li>Timestamp</li>
+<li>Username (or guest ID)</li>
+<li>Action method name</li>
+<li>Source file and line number</li>
+<li>Log level (debug, info, warn, error)</li>
+<li>Additional context (query parameters, response status)</li>
+</ul>
+
+<p><strong>Logging instance:</strong> `$self->logging` (lazy-loaded attribute)</p>
+
+<h2>Dependencies &amp; Utilities</h2>
+
+<h3>Perl Modules Used</h3>
+
+<ul>
+<li><strong>Moose</strong> - Object system with attributes</li>
+<li><strong>namespace::autoclean</strong> - Namespace cleanup</li>
+<li><strong>Try::Tiny</strong> - Exception handling</li>
+<li><strong>JSON</strong> - JSON parsing and serialization</li>
+<li><strong>Comserv::Util::Logging</strong> - Centralized logging</li>
+<li><strong>Comserv::Model::Ollama</strong> - Ollama model interaction</li>
+<li><strong>Data::UUID</strong> - UUID generation for guest sessions</li>
+</ul>
+
+<h3>External Services</h3>
+
+<ul>
+<li><strong>Ollama Server:</strong> External LLM server (configurable host/port)</li>
+<li><strong>Ollama Registry:</strong> Model catalog for pulling models</li>
+<li><strong>Database:</strong> Conversation persistence via DBIx::Class</li>
+</ul>
+
+<h2>Configuration</h2>
+
+<p>Configuration stored in config file and environment variables:</p>
+
+<ul>
+<li><strong>OLLAMA_HOST:</strong> Server hostname (default: localhost)</li>
+<li><strong>OLLAMA_PORT:</strong> Server port (default: 11434)</li>
+<li><strong>OLLAMA_API_BASE:</strong> API endpoint path</li>
+<li><strong>OLLAMA_MODELS_DIR:</strong> Local model cache directory</li>
+</ul>
+
+<h2>Best Practices for Integration</h2>
+
+<ul>
+<li>Always validate model names against available models before querying</li>
+<li>Handle Ollama connection timeouts gracefully (server may be starting)</li>
+<li>Stream responses for long-running queries to provide user feedback</li>
+<li>Preserve conversation context across multiple API calls</li>
+<li>Log all user queries for audit and debugging purposes</li>
+<li>Rate limit model pulls to prevent resource exhaustion</li>
+<li>Validate JSON input thoroughly before passing to Ollama</li>
+</ul>
+
+<h2>Known Issues &amp; Workarounds</h2>
+
+<h3>Database Blocker Issue (Known)</h3>
+
+<p>Long multi-turn conversations may experience database persistence issues due to concurrent access patterns. Workaround: Reset conversation occasionally or use smaller context windows.</p>
+
+<h3>GPU Memory Management</h3>
+
+<p>Switching between large models requires manual memory clearing. Check server status before pulling very large models.</p>
+
+<h2>Integration Points</h2>
+
+<ul>
+<li><strong>Ollama Model:</strong> Comserv::Model::Ollama handles Ollama communication</li>
+<li><strong>Logging System:</strong> All actions logged via Logging utility</li>
+<li><strong>Authentication:</strong> User session management and guest sessions</li>
+<li><strong>Database:</strong> Conversation persistence and message history</li>
+<li><strong>Configuration:</strong> External Ollama server connection settings</li>
+</ul>
+
+    </div>
+</div>

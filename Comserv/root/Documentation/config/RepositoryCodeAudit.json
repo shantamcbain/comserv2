@@ -1,0 +1,1276 @@
+{
+   "audit_timestamp" : "2026-01-10T15:42:47Z",
+   "code_files" : {
+      "Comserv/lib/Comserv/Controller/3d.pm" : {
+         "basename" : "3d",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/3d.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/3d.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/AI.pm" : {
+         "basename" : "AI",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/AI.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/AI.tt",
+         "methods" : 16
+      },
+      "Comserv/lib/Comserv/Controller/Admin.pm" : {
+         "basename" : "Admin",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/Admin.tt",
+         "methods" : 71
+      },
+      "Comserv/lib/Comserv/Controller/Admin/Backup.pm" : {
+         "basename" : "Backup",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/Backup.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Backup.tt",
+         "methods" : 12
+      },
+      "Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm" : {
+         "basename" : "EnvironmentVariables",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/EnvironmentVariables.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Controller/Admin/Git.pm" : {
+         "basename" : "Git",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/Git.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Git.tt",
+         "methods" : 31
+      },
+      "Comserv/lib/Comserv/Controller/Admin/NetworkDevices.pm" : {
+         "basename" : "NetworkDevices",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/NetworkDevices.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/NetworkDevices.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm" : {
+         "basename" : "NetworkDiagnostics",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/NetworkDiagnostics.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/NetworkDiagnostics.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/Admin/NetworkMap.pm" : {
+         "basename" : "NetworkMap",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/NetworkMap.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/NetworkMap.tt",
+         "methods" : 13
+      },
+      "Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm" : {
+         "basename" : "SchemaComparison",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/SchemaComparison.tt",
+         "methods" : 17
+      },
+      "Comserv/lib/Comserv/Controller/Admin/Theme.pm" : {
+         "basename" : "Theme",
+         "category" : "Admin Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Admin/Theme.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Theme.tt",
+         "methods" : 11
+      },
+      "Comserv/lib/Comserv/Controller/ApiCredentials.pm" : {
+         "basename" : "ApiCredentials",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ApiCredentials.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ApiCredentials.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Controller/Apiary.pm" : {
+         "basename" : "Apiary",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Apiary.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Apiary.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/BMaster.pm" : {
+         "basename" : "BMaster",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/BMaster.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/BMaster.tt",
+         "methods" : 12
+      },
+      "Comserv/lib/Comserv/Controller/Base.pm" : {
+         "basename" : "Base",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Base.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Base.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/CSC.pm" : {
+         "basename" : "CSC",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/CSC.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/CSC.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Controller/Chat.pm" : {
+         "basename" : "Chat",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Chat.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/Chat.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Controller/CloudflareAPI.pm" : {
+         "basename" : "CloudflareAPI",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/CloudflareAPI.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/CloudflareAPI.tt",
+         "methods" : 17
+      },
+      "Comserv/lib/Comserv/Controller/Documentation.pm" : {
+         "basename" : "Documentation",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Documentation.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Documentation.tt",
+         "methods" : 33
+      },
+      "Comserv/lib/Comserv/Controller/Documentation/Config.pm" : {
+         "basename" : "Config",
+         "category" : "Documentation Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Documentation/Config.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Config.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm" : {
+         "basename" : "ConfigBased",
+         "category" : "Documentation Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Documentation/ConfigBased.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ConfigBased.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm" : {
+         "basename" : "ScanMethods",
+         "category" : "Documentation Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Documentation/ScanMethods.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ScanMethods.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Controller/ENCY.pm" : {
+         "basename" : "ENCY",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ENCY.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ENCY.tt",
+         "methods" : 11
+      },
+      "Comserv/lib/Comserv/Controller/FAQ.pm" : {
+         "basename" : "FAQ",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/FAQ.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/FAQ.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Controller/File.pm" : {
+         "basename" : "File",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/File.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/File.tt",
+         "methods" : 6
+      },
+      "Comserv/lib/Comserv/Controller/Forager.pm" : {
+         "basename" : "Forager",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Forager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Forager.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/Health.pm" : {
+         "basename" : "Health",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Health.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Health.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Controller/HelpDesk.pm" : {
+         "basename" : "HelpDesk",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/HelpDesk.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/HelpDesk.tt",
+         "methods" : 11
+      },
+      "Comserv/lib/Comserv/Controller/Hosting.pm" : {
+         "basename" : "Hosting",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Hosting.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Hosting.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Controller/HostingSignup.pm" : {
+         "basename" : "HostingSignup",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/HostingSignup.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/HostingSignup.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/IT.pm" : {
+         "basename" : "IT",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/IT.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/IT.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/Log.pm" : {
+         "basename" : "Log",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Log.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Log.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/MCoop.pm" : {
+         "basename" : "MCoop",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/MCoop.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/MCoop.tt",
+         "methods" : 11
+      },
+      "Comserv/lib/Comserv/Controller/Mail.pm" : {
+         "basename" : "Mail",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Mail.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Mail.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Controller/NPM.pm" : {
+         "basename" : "NPM",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/NPM.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/NPM.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Controller/Navigation.pm" : {
+         "basename" : "Navigation",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Navigation.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Navigation.tt",
+         "methods" : 25
+      },
+      "Comserv/lib/Comserv/Controller/NetworkMap.pm" : {
+         "basename" : "NetworkMap",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/NetworkMap.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/NetworkMap.tt",
+         "methods" : 14
+      },
+      "Comserv/lib/Comserv/Controller/Project.pm" : {
+         "basename" : "Project",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Project.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Project.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Controller/Proxmox.pm" : {
+         "basename" : "Proxmox",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Proxmox.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Proxmox.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Controller/ProxmoxServers.pm" : {
+         "basename" : "ProxmoxServers",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ProxmoxServers.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ProxmoxServers.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Controller/ProxyManager.pm" : {
+         "basename" : "ProxyManager",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ProxyManager.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/ProxyManager.tt",
+         "methods" : 19
+      },
+      "Comserv/lib/Comserv/Controller/RemoteDB.pm" : {
+         "basename" : "RemoteDB",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/RemoteDB.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/RemoteDB.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Controller/RemoteDBExample.pm" : {
+         "basename" : "RemoteDBExample",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/RemoteDBExample.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/RemoteDBExample.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/ResourceTracking.pm" : {
+         "basename" : "ResourceTracking",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ResourceTracking.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ResourceTracking.tt",
+         "methods" : 17
+      },
+      "Comserv/lib/Comserv/Controller/Root.pm" : {
+         "basename" : "Root",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Root.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/Root.tt",
+         "methods" : 25
+      },
+      "Comserv/lib/Comserv/Controller/Setup.pm" : {
+         "basename" : "Setup",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Setup.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Setup.tt",
+         "methods" : 9
+      },
+      "Comserv/lib/Comserv/Controller/Shanta.pm" : {
+         "basename" : "Shanta",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Shanta.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Shanta.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Controller/Site.pm" : {
+         "basename" : "Site",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Site.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Site.tt",
+         "methods" : 12
+      },
+      "Comserv/lib/Comserv/Controller/ThemeAdmin.pm" : {
+         "basename" : "ThemeAdmin",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ThemeAdmin.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ThemeAdmin.tt",
+         "methods" : 11
+      },
+      "Comserv/lib/Comserv/Controller/ThemeAdmin/update_theme_with_variables.pm" : {
+         "basename" : "update_theme_with_variables",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ThemeAdmin/update_theme_with_variables.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/update_theme_with_variables.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/ThemeEditor.pm" : {
+         "basename" : "ThemeEditor",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ThemeEditor.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ThemeEditor.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Controller/ThemeTest.pm" : {
+         "basename" : "ThemeTest",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/ThemeTest.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/ThemeTest.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Controller/Todo.pm" : {
+         "basename" : "Todo",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Todo.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/Todo.tt",
+         "methods" : 18
+      },
+      "Comserv/lib/Comserv/Controller/USBM.pm" : {
+         "basename" : "USBM",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/USBM.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/USBM.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Controller/User.pm" : {
+         "basename" : "User",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/User.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/User.tt",
+         "methods" : 17
+      },
+      "Comserv/lib/Comserv/Controller/Ve7tit.pm" : {
+         "basename" : "Ve7tit",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Ve7tit.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/controllers/Ve7tit.tt",
+         "methods" : 9
+      },
+      "Comserv/lib/Comserv/Controller/Voip.pm" : {
+         "basename" : "Voip",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/Voip.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/Voip.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Controller/WeaverBeck.pm" : {
+         "basename" : "WeaverBeck",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/WeaverBeck.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/WeaverBeck.tt",
+         "methods" : 6
+      },
+      "Comserv/lib/Comserv/Controller/WorkShop.pm" : {
+         "basename" : "WorkShop",
+         "category" : "Controllers",
+         "code_file" : "Comserv/lib/Comserv/Controller/WorkShop.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/controllers/WorkShop.tt",
+         "methods" : 6
+      },
+      "Comserv/lib/Comserv/Model/ApiaryModel.pm" : {
+         "basename" : "ApiaryModel",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/ApiaryModel.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/ApiaryModel.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/BMaster.pm" : {
+         "basename" : "BMaster",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/BMaster.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/BMaster.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Model/BMasterModel.pm" : {
+         "basename" : "BMasterModel",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/BMasterModel.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/BMasterModel.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Calendar.pm" : {
+         "basename" : "Calendar",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Calendar.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Calendar.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/Model/DBEncy.pm" : {
+         "basename" : "DBEncy",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/DBEncy.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/DBEncy.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Model/DBForager.pm" : {
+         "basename" : "DBForager",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/DBForager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/DBForager.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Model/DBSchemaManager.pm" : {
+         "basename" : "DBSchemaManager",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/DBSchemaManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/DBSchemaManager.tt",
+         "methods" : 14
+      },
+      "Comserv/lib/Comserv/Model/ENCYModel.pm" : {
+         "basename" : "ENCYModel",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/ENCYModel.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/ENCYModel.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Model/File.pm" : {
+         "basename" : "File",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/File.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/File.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Model/Grok.pm" : {
+         "basename" : "Grok",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Grok.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/Grok.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Model/Log.pm" : {
+         "basename" : "Log",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Log.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Log.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/Mail.pm" : {
+         "basename" : "Mail",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Mail.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Mail.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/Ollama.pm" : {
+         "basename" : "Ollama",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Ollama.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/Ollama.tt",
+         "methods" : 23
+      },
+      "Comserv/lib/Comserv/Model/Project.pm" : {
+         "basename" : "Project",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Project.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/Project.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Proxmox.pm" : {
+         "basename" : "Proxmox",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Proxmox.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Proxmox.tt",
+         "methods" : 13
+      },
+      "Comserv/lib/Comserv/Model/RemoteDB.pm" : {
+         "basename" : "RemoteDB",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/RemoteDB.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/RemoteDB.tt",
+         "methods" : 27
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency.pm" : {
+         "basename" : "Ency",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Ency.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm" : {
+         "basename" : "AiConversation",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/AiConversation.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm" : {
+         "basename" : "AiMessage",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/AiMessage.tt",
+         "methods" : 6
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm" : {
+         "basename" : "AiModelConfig",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/AiModelConfig.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Category.pm" : {
+         "basename" : "Category",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Category.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Category.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm" : {
+         "basename" : "CodeSearchIndex",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/CodeSearchIndex.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Content.pm" : {
+         "basename" : "Content",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Content.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Content.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Documentation.pm" : {
+         "basename" : "Documentation",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Documentation.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/Documentation.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm" : {
+         "basename" : "DocumentationMetadataIndex",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/DocumentationMetadataIndex.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm" : {
+         "basename" : "DocumentationRoleAccess",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/DocumentationRoleAccess.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariable.pm" : {
+         "basename" : "EnvVariable",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariable.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/EnvVariable.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariableAuditLog.pm" : {
+         "basename" : "EnvVariableAuditLog",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/EnvVariableAuditLog.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/EnvVariableAuditLog.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Event.pm" : {
+         "basename" : "Event",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Event.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Event.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/File.pm" : {
+         "basename" : "File",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/File.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/File.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Group.pm" : {
+         "basename" : "Group",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Group.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Group.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/InternalLinksTb.pm" : {
+         "basename" : "InternalLinksTb",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/InternalLinksTb.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/InternalLinksTb.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Log.pm" : {
+         "basename" : "Log",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Log.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Log.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/MailDomain.pm" : {
+         "basename" : "MailDomain",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/MailDomain.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/MailDomain.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Media.pm" : {
+         "basename" : "Media",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Media.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Media.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Menu.pm" : {
+         "basename" : "Menu",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Menu.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Menu.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/MenuItem.pm" : {
+         "basename" : "MenuItem",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/MenuItem.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/MenuItem.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Navigation.pm" : {
+         "basename" : "Navigation",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Navigation.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Navigation.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/NetworkDevice.pm" : {
+         "basename" : "NetworkDevice",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/NetworkDevice.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/NetworkDevice.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Page.pm" : {
+         "basename" : "Page",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Page.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Page.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/PageTb.pm" : {
+         "basename" : "PageTb",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/PageTb.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/PageTb.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Pallet.pm" : {
+         "basename" : "Pallet",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Pallet.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Pallet.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Participant.pm" : {
+         "basename" : "Participant",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Participant.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Participant.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Project.pm" : {
+         "basename" : "Project",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Project.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Project.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/ProjectSite.pm" : {
+         "basename" : "ProjectSite",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/ProjectSite.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/ProjectSite.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Queen.pm" : {
+         "basename" : "Queen",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Queen.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Queen.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Reference.pm" : {
+         "basename" : "Reference",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Reference.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Reference.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Site.pm" : {
+         "basename" : "Site",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Site.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Site.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteConfig.pm" : {
+         "basename" : "SiteConfig",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteConfig.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/SiteConfig.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteDomain.pm" : {
+         "basename" : "SiteDomain",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteDomain.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/SiteDomain.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteTheme.pm" : {
+         "basename" : "SiteTheme",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteTheme.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/SiteTheme.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteWorkshop.pm" : {
+         "basename" : "SiteWorkshop",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/SiteWorkshop.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/SiteWorkshop.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/System/Site.pm" : {
+         "basename" : "Site",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/System/Site.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Site.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/System/SiteUser.pm" : {
+         "basename" : "SiteUser",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/System/SiteUser.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/SiteUser.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Theme.pm" : {
+         "basename" : "Theme",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Theme.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Theme.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/ThemeVariable.pm" : {
+         "basename" : "ThemeVariable",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/ThemeVariable.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/ThemeVariable.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm" : {
+         "basename" : "Todo",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/Todo.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/User.pm" : {
+         "basename" : "User",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/User.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/User.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/User/User.pm" : {
+         "basename" : "User",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/User/User.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/User.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/User/UserGroup.pm" : {
+         "basename" : "UserGroup",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/User/UserGroup.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/UserGroup.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/UserGroup.pm" : {
+         "basename" : "UserGroup",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/UserGroup.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/UserGroup.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/UserSite.pm" : {
+         "basename" : "UserSite",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/UserSite.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/UserSite.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm" : {
+         "basename" : "WebSearchResult",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/WebSearchResult.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/WorkShop.pm" : {
+         "basename" : "WorkShop",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/WorkShop.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/WorkShop.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Ency/Result/Yard.pm" : {
+         "basename" : "Yard",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Ency/Result/Yard.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Yard.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Forager.pm" : {
+         "basename" : "Forager",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Forager.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/Forager.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Forager/Result/Herb.pm" : {
+         "basename" : "Herb",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Forager/Result/Herb.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Herb.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Schema/Forager/Result/Page.pm" : {
+         "basename" : "Page",
+         "category" : "Database Schema",
+         "code_file" : "Comserv/lib/Comserv/Model/Schema/Forager/Result/Page.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Page.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Model/Site.pm" : {
+         "basename" : "Site",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Site.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/Site.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Model/Sitename.pm" : {
+         "basename" : "Sitename",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Sitename.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Sitename.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/Theme.pm" : {
+         "basename" : "Theme",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Theme.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/Theme.tt",
+         "methods" : 12
+      },
+      "Comserv/lib/Comserv/Model/ThemeConfig.pm" : {
+         "basename" : "ThemeConfig",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/ThemeConfig.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/ThemeConfig.tt",
+         "methods" : 8
+      },
+      "Comserv/lib/Comserv/Model/Todo.pm" : {
+         "basename" : "Todo",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/Todo.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/Todo.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/Model/User.pm" : {
+         "basename" : "User",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/User.pm",
+         "doc_exists" : true,
+         "documentation_path" : "Documentation/models/User.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Model/WorkShop.pm" : {
+         "basename" : "WorkShop",
+         "category" : "Models",
+         "code_file" : "Comserv/lib/Comserv/Model/WorkShop.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/models/WorkShop.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/Util/AdminAuth.pm" : {
+         "basename" : "AdminAuth",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/AdminAuth.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/AdminAuth.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Util/BackupManager.pm" : {
+         "basename" : "BackupManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/BackupManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/BackupManager.tt",
+         "methods" : 13
+      },
+      "Comserv/lib/Comserv/Util/CloudflareManager.pm" : {
+         "basename" : "CloudflareManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/CloudflareManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/CloudflareManager.tt",
+         "methods" : 21
+      },
+      "Comserv/lib/Comserv/Util/ConfigDatabaseInit.pm" : {
+         "basename" : "ConfigDatabaseInit",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/ConfigDatabaseInit.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/ConfigDatabaseInit.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Util/DockerManager.pm" : {
+         "basename" : "DockerManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/DockerManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/DockerManager.tt",
+         "methods" : 14
+      },
+      "Comserv/lib/Comserv/Util/DocumentationConfig.pm" : {
+         "basename" : "DocumentationConfig",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/DocumentationConfig.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/DocumentationConfig.tt",
+         "methods" : 13
+      },
+      "Comserv/lib/Comserv/Util/Encryption.pm" : {
+         "basename" : "Encryption",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/Encryption.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/Encryption.tt",
+         "methods" : 7
+      },
+      "Comserv/lib/Comserv/Util/EnvFileManager.pm" : {
+         "basename" : "EnvFileManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/EnvFileManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/EnvFileManager.tt",
+         "methods" : 10
+      },
+      "Comserv/lib/Comserv/Util/Logging.pm" : {
+         "basename" : "Logging",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/Logging.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/Logging.tt",
+         "methods" : 14
+      },
+      "Comserv/lib/Comserv/Util/NetworkMap.pm" : {
+         "basename" : "NetworkMap",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/NetworkMap.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/NetworkMap.tt",
+         "methods" : 20
+      },
+      "Comserv/lib/Comserv/Util/ProxmoxCredentials.pm" : {
+         "basename" : "ProxmoxCredentials",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/ProxmoxCredentials.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/ProxmoxCredentials.tt",
+         "methods" : 5
+      },
+      "Comserv/lib/Comserv/Util/RemoteDB.pm" : {
+         "basename" : "RemoteDB",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/RemoteDB.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/RemoteDB.tt",
+         "methods" : 9
+      },
+      "Comserv/lib/Comserv/Util/SchemaSyncManager.pm" : {
+         "basename" : "SchemaSyncManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/SchemaSyncManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/SchemaSyncManager.tt",
+         "methods" : 0
+      },
+      "Comserv/lib/Comserv/Util/SiteHelper.pm" : {
+         "basename" : "SiteHelper",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/SiteHelper.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/SiteHelper.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/Util/StarmanDiagnostics.pm" : {
+         "basename" : "StarmanDiagnostics",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/StarmanDiagnostics.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/StarmanDiagnostics.tt",
+         "methods" : 12
+      },
+      "Comserv/lib/Comserv/Util/StarmanServiceManager.pm" : {
+         "basename" : "StarmanServiceManager",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/StarmanServiceManager.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/StarmanServiceManager.tt",
+         "methods" : 9
+      },
+      "Comserv/lib/Comserv/Util/SystemInfo.pm" : {
+         "basename" : "SystemInfo",
+         "category" : "Utilities",
+         "code_file" : "Comserv/lib/Comserv/Util/SystemInfo.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/utilities/SystemInfo.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/View/AutoCRUD/JSON.pm" : {
+         "basename" : "JSON",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/AutoCRUD/JSON.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/JSON.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/View/Email.pm" : {
+         "basename" : "Email",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/Email.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Email.tt",
+         "methods" : 3
+      },
+      "Comserv/lib/Comserv/View/Email/Template.pm" : {
+         "basename" : "Template",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/Email/Template.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Template.tt",
+         "methods" : 2
+      },
+      "Comserv/lib/Comserv/View/Helper/Database.pm" : {
+         "basename" : "Database",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/Helper/Database.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/Database.tt",
+         "methods" : 4
+      },
+      "Comserv/lib/Comserv/View/JSON.pm" : {
+         "basename" : "JSON",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/JSON.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/JSON.tt",
+         "methods" : 1
+      },
+      "Comserv/lib/Comserv/View/TT.pm" : {
+         "basename" : "TT",
+         "category" : "Other",
+         "code_file" : "Comserv/lib/Comserv/View/TT.pm",
+         "doc_exists" : false,
+         "documentation_path" : "Documentation/TT.tt",
+         "methods" : 0
+      }
+   },
+   "scan_scope" : "Full Repository",
+   "summary" : {
+      "by_category" : {
+         "Admin Controllers" : 8,
+         "Controllers" : 48,
+         "Database Schema" : 52,
+         "Documentation Controllers" : 3,
+         "Models" : 23,
+         "Other" : 6,
+         "Utilities" : 17
+      },
+      "docs_exist" : 26,
+      "docs_missing" : 131,
+      "total_files" : 157
+   }
+}

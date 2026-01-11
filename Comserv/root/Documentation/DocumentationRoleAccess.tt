@@ -1,0 +1,235 @@
+[% META
+   title = "Documentation Role Access Model"
+   description = "Documentation for the DocumentationRoleAccess DBIx::Class result class used for role-based access control to documentation sections"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "models"
+   page_version = "0.01"
+   last_updated = "2026-01-10"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/DocumentationRoleAccess.tt,v 0.01 2026/01/10 zencoder Exp - Initial documentation for DocumentationRoleAccess model' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Documentation Role Access Model</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-10 | 
+        Version: 0.01 |
+        Author: Zencoder | 
+        Status: New Documentation
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#getting-started" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Getting Started</a>
+                <a href="#advanced" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Advanced Usage</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#config-ref" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema Reference</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The DocumentationRoleAccess model represents a DBIx::Class result class for the 'documentationroleaccess' table. It implements role-based access control for documentation sections, allowing fine-grained control over which user roles can access specific documentation patterns or sections.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES & KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>DBIx::Class schema setup</li>
+                <li>MariaDB/MySQL database with 'documentationroleaccess' table</li>
+                <li>User authentication and role system</li>
+                <li>Documentation system integration</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Pattern-Based Access</strong>: Wildcard pattern matching for doc sections</li>
+                <li><strong>Role Management</strong>: Granular role-based permissions</li>
+                <li><strong>Access Control</strong>: Allow/deny rules for documentation access</li>
+                <li><strong>Path Matching</strong>: Regex-based document path evaluation</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" style="color: var(--text-color); font-family: var(--header-font);">4. Getting Started</h2>
+            
+            <h3 id="gs-step1" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Basic Usage</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Check if a user role can access specific documentation:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+my $access_rule = $c->model('DBEncy::DocumentationRoleAccess')->find({
+    role => 'developer',
+    doc_section_pattern => '/Documentation/controllers/*'
+});
+
+if ($access_rule && $access_rule->grants_access()) {
+    # Allow access to controller documentation
+}
+                </code></pre>
+            </div>
+
+            <h3 id="gs-step2" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Pattern Matching</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Use wildcard patterns to control access to groups of documentation:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>/Documentation/controllers/*</code> - All controller docs</li>
+                <li><code>/Documentation/admin/*</code> - Admin-only documentation</li>
+                <li><code>/Documentation/*</code> - All documentation (global access)</li>
+            </ul>
+
+            <h3 id="gs-step3" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.3 Access Verification</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Verify access permissions before displaying documentation:</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ADVANCED USAGE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="advanced" style="color: var(--text-color); font-family: var(--header-font);">5. Advanced Usage</h2>
+            
+            <h3 id="adv-feature1" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.1 Complex Pattern Matching</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The matches_doc_path method converts wildcard patterns to regex for flexible matching:</p>
+
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+my $rule = $c->model('DBEncy::DocumentationRoleAccess')->find(...);
+if ($rule->matches_doc_path('/Documentation/controllers/Admin.tt')) {
+    # Path matches the pattern
+}
+                </code></pre>
+            </div>
+
+            <h3 id="adv-integration" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Role-Based Security</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Integrate with user authentication to enforce documentation access controls throughout the application.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">6. Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue1" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Access Denied Incorrectly</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Users cannot access documentation they should be able to see</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Check pattern matching logic and ensure can_access is set to true for the role/pattern combination</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue2" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Pattern Not Matching</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Wildcard patterns don't match expected document paths</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Verify pattern format (use * for wildcards) and ensure paths start with /Documentation/</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SCHEMA REFERENCE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="config-ref" style="color: var(--text-color); font-family: var(--header-font);">7. Schema Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Column</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Type</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Nullable</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">id</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">integer</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Primary key, auto-increment</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">role</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">varchar(100)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">User role (admin, developer, user, etc.)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">doc_section_pattern</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">varchar(255)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Pattern for matching document paths (supports wildcards)</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">can_access</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Whether the role can access matching documents (default: true)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">created_at</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">timestamp</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">When the access rule was created</td>
+                </tr>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/Models" style="color: var(--link-color);">Models Documentation</a></li>
+                    <li><a href="/Documentation/DocumentationMetadataIndex" style="color: var(--link-color);">Documentation Metadata Index</a></li>
+                    <li><a href="/admin/documentation" style="color: var(--link-color);">Documentation Management Interface</a></li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this model, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
