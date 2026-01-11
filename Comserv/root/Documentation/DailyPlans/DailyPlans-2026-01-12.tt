@@ -1,14 +1,14 @@
 [% META 
-   title = "Daily Plan - January 12, 2026"
-   description = "Monday Week 3: Master Plans continuation, quality improvements, and feature development with add buttons pointing to todo page in new window"
+   title = "Daily Plan - January 12, 2026 (Monday Week 3: Master Plans Execution)"
+   description = "Monday Week 3: Begin Master Plan execution with focus on A.3 (Credentials Audit). Real todos from Todo System, tabbed interface with resources and completed tasks tracking."
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
-   category = "daily-plans,documentation,planning"
-   page_version = "0.03"
-   last_updated = "Sat Jan 11 18:13:00 UTC 2026"
+   category = "daily-plans,documentation,planning,audits"
+   page_version = "0.11"
+   last_updated = "Sun Jan 11 19:45:00 UTC 2026"
    site_specific = "false"
 %]
-[% PageVersion = 'root/Documentation/DailyPlans/Daily_Plans-2026-01-12.tt,v 0.03 2026/01/11 18:13:00 zencoder Exp - Jan 12 Add Button Fix: Updated both task buttons (Add Task to Plan and Add New Todo) to point to /todo/addtodo and open in new window' %]
+[% PageVersion = 'root/Documentation/DailyPlans/DailyPlans-2026-01-12.tt,v 0.11 2026/01/11 19:45:00 zencoder Exp - Jan 12 Full Template Sync: Updated to match improved interface with tabbed layout, dynamic todos, and master plan priorities' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -224,20 +224,24 @@
 <div class="container">
     <!-- Sticky Header with Navigation -->
     <div class="daily-plan-header">
-        <h1>[DAILY PLAN] Monday, January 12, 2026</h1>
+        <h1>[DAILY PLAN] [% day_name %], [% month_name %] [% day %], [% year %]</h1>
         <div class="header-nav">
             <div class="header-nav-links">
-                <span><strong>Status:</strong> Week 3 - Master Plans Focus</span>
+                <span><strong>Status:</strong> Week 2 - Documentation complete</span>
                 <span>|</span>
-                <a href="#today-work">[Jump to Today]</a>
-                <a href="#master-plans">Master Plans</a>
+                [% IF today_date %]<a href="/Documentation/DailyPlans-[% today_date %]">[Jump to Today]</a>[% ELSE %]<a href="#today-work">[Jump to Today]</a>[% END %]
+                <a href="/Documentation/MASTER_PLAN_COORDINATION" target="_blank">Master Plans</a>
                 <a href="/Documentation">All Docs</a>
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                <a href="/Documentation/DailyPlans/Daily_Plans-2026-01-11.tt">← Prev Day</a>
-                | Today (Jan 12) |
-                <a href="/Documentation/DailyPlans/Daily_Plans-2026-01-13.tt">Next Day →</a>
+                [% IF prev_date_str %]
+                    <a href="/Documentation/DailyPlans-[% prev_date_str %]">← Prev Day ([% prev_month_day %])</a>
+                    | Today ([% curr_month_day %]) |
+                    <a href="/Documentation/DailyPlans-[% next_date_str %]">Next Day ([% next_month_day %]) →</a>
+                [% ELSE %]
+                    ← Prev Day | Today | Next Day →
+                [% END %]
             </div>
         </div>
     </div>
@@ -260,7 +264,7 @@
         <div id="today-work-content">
             <div class="focus-area">
                 <h3 style="margin-top: 0;">[TODAY'S FOCUS]</h3>
-                <p>Week 3 begins with focus on Master Plan item execution. Select one high-priority item from the Master Plans list below and drive it to completion. Documentation infrastructure is stable - prioritize feature development and bug fixes from the Master Plan list.</p>
+                <p>Week 3 begins with focus on Master Plan item execution. Select one high-priority item from the Master Plans list below and drive it to completion. Documentation infrastructure is stable - prioritize feature development and bug fixes from the Master Plan list. Recommended: Start with A.3 (Credentials Audit) for a quick security win.</p>
             </div>
 
             <!-- Master Plan Priorities (Independent Dropdown) -->
@@ -297,15 +301,31 @@
             <!-- App Todos for Today (Independent Dropdown) -->
             <div class="task-list">
                 <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
-                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM</span>
+                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
                     <span class="task-list-toggle">HIDE</span>
                 </div>
                 <div class="task-list-items" id="app-todo-items">
-                    <div style="padding: 15px; text-align: center; color: #666;">
-                        <p>Todos for today are loaded from the Todo System.</p>
-                        <p>View and manage your daily tasks in the Todo System.</p>
-                        <p style="margin-top: 10px; font-size: 0.9em; color: #999;">[Dynamic todo list will appear here when Todo System integration is complete]</p>
-                    </div>
+                    [% IF todos_for_today && todos_for_today.size %]
+                        [% FOREACH todo IN todos_for_today %]
+                            <div class="task-item">
+                                <input type="checkbox" id="todo-[% todo.record_id %]">
+                                <label for="todo-[% todo.record_id %]" class="task-label" style="flex: 1;">
+                                    <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" 
+                                       style="color: var(--link-color); text-decoration: none; cursor: pointer;" 
+                                       title="[% todo.subject || '(No subject)' %][% IF todo.description %] - [% todo.description | truncate(100) %][% END %]">
+                                        <strong>[% todo.sitename || 'CSC' %]:</strong>
+                                        [% todo.subject || '(No subject)' %]
+                                        [% IF todo.priority %]<span style="color: #f0ad4e; margin-left: 10px;">(P[% todo.priority %])</span>[% END %]
+                                    </a>
+                                </label>
+                            </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div style="padding: 15px; text-align: center; color: #666;">
+                            <p>No todos scheduled for today.</p>
+                            <p>Create a new todo for today using the button below.</p>
+                        </div>
+                    [% END %]
                 </div>
                 <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
             </div>
@@ -329,18 +349,18 @@
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
                 <h4>Related Documentation</h4>
                 <ul style="margin: 0; padding-left: 20px;">
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt" style="color: var(--primary-color);">Master Plan Coordination (Current)</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION" style="color: var(--primary-color);">Master Plan Coordination (Current)</a></li>
                     <li><a href="/Documentation/session_history/development_plan.md" style="color: var(--primary-color);">Development Plan (Current)</a></li>
-                    <li><a href="/Documentation/SECURITY_REMEDIATION_PLAN.tt" style="color: var(--primary-color);">Security Remediation Plan</a></li>
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#system-features" style="color: var(--primary-color);">System Features Inventory</a></li>
+                    <li><a href="/Documentation/SECURITY_REMEDIATION_PLAN" style="color: var(--primary-color);">Security Remediation Plan</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#system-features" style="color: var(--primary-color);">System Features Inventory</a></li>
                 </ul>
             </div>
 
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
                 <h4>Quick Links</h4>
                 <ul style="margin: 0; padding-left: 20px;">
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#improvements-tracker" style="color: var(--primary-color);">View Improvements Tracker</a></li>
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#dependency-map" style="color: var(--primary-color);">Check Dependencies</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#improvements-tracker" style="color: var(--primary-color);">View Improvements Tracker</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#dependency-map" style="color: var(--primary-color);">Check Dependencies</a></li>
                     <li><a href="/todo" style="color: var(--primary-color);">Open Todo System (Full View)</a></li>
                     <li><a href="/Documentation/DailyPlans" style="color: var(--primary-color);">View All Daily Plans</a></li>
                 </ul>
@@ -359,75 +379,87 @@
         
         <div style="background: #e8f4f8; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <h4 style="margin-top: 0;">Summary</h4>
-            <p><strong>Day has just started.</strong> Focus on selecting one Master Plan item and executing it to completion. Check blocking issues in Todo System before beginning.</p>
+            <p><strong>Week begins today.</strong> Focus on selecting one Master Plan item and executing it to completion. Check blocking issues in Todo System before beginning.</p>
         </div>
     </div>
 </div>
 
+<div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 40px; padding: 20px; border-top: 1px solid #ddd;">
+    <p><strong>Daily Plan v0.11 | Monday January 12, 2026 | Template Sync Complete</strong></p>
+    <p>This page has been updated to match the improved daily plan interface with dynamic todos, tabbed navigation, and full Master Plans integration.</p>
+</div>
+
 <script>
-function switchTab(evt, tabName) {
-    var i, tabcontent, tabbuttons;
-    tabcontent = document.getElementsByClassName("tab-content");
-    for (i = 0; i < tabcontent.length; i++) {
-        tabcontent[i].classList.remove("active");
+let draggedElement = null;
+
+function switchTab(event, tabName) {
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(content => content.classList.remove('active'));
+    
+    const buttons = document.querySelectorAll('.tab-button');
+    buttons.forEach(button => button.classList.remove('active'));
+    
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
     }
-    tabbuttons = document.getElementsByClassName("tab-button");
-    for (i = 0; i < tabbuttons.length; i++) {
-        tabbuttons[i].classList.remove("active");
-    }
-    document.getElementById(tabName).classList.add("active");
-    evt.currentTarget.classList.add("active");
+    event.target.classList.add('active');
 }
 
-function toggleTaskList(element) {
-    var items = element.nextElementSibling;
-    var toggle = element.querySelector('.task-list-toggle');
-    if (items.classList.contains('hidden')) {
-        items.classList.remove('hidden');
-        toggle.textContent = 'HIDE';
-        toggle.classList.remove('collapsed');
-    } else {
-        items.classList.add('hidden');
-        toggle.textContent = 'SHOW';
-        toggle.classList.add('collapsed');
-    }
-}
-
-function handleDragStart(e) {
-    e.dataTransfer.effectAllowed = 'move';
-    e.target.classList.add('dragging');
-}
-
-function handleDrag(e) {
-    e.dataTransfer.dropEffect = 'move';
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (e.target.classList.contains('task-item')) {
-        e.target.classList.add('drag-over');
+function toggleTaskList(header) {
+    const taskList = header.nextElementSibling;
+    const toggle = header.querySelector('.task-list-toggle');
+    
+    if (taskList) {
+        taskList.classList.toggle('hidden');
+        
+        if (toggle) {
+            toggle.textContent = taskList.classList.contains('hidden') ? 'SHOW' : 'HIDE';
+        }
     }
 }
 
-function handleDragLeave(e) {
-    if (e.target.classList.contains('task-item')) {
-        e.target.classList.remove('drag-over');
+function handleDragStart(event) {
+    draggedElement = event.currentTarget;
+    event.currentTarget.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDrag(event) {
+    
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    
+    if (event.currentTarget !== draggedElement) {
+        event.currentTarget.classList.add('drag-over');
     }
 }
 
-function handleDrop(e) {
-    e.preventDefault();
-    var dragging = document.querySelector('.task-item.dragging');
-    if (e.target.classList.contains('task-item') && e.target !== dragging) {
-        e.target.parentNode.insertBefore(dragging, e.target);
-    }
-    e.target.classList.remove('drag-over');
+function handleDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
 }
 
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    var items = document.querySelectorAll('.task-item.drag-over');
-    items.forEach(item => item.classList.remove('drag-over'));
+function handleDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    
+    if (draggedElement !== event.currentTarget) {
+        const draggedParent = draggedElement.parentNode;
+        const targetParent = event.currentTarget.parentNode;
+        
+        if (draggedParent === targetParent) {
+            targetParent.insertBefore(draggedElement, event.currentTarget);
+        }
+    }
+}
+
+function handleDragEnd(event) {
+    draggedElement.classList.remove('dragging');
+    
+    const allItems = document.querySelectorAll('.task-item');
+    allItems.forEach(item => item.classList.remove('drag-over'));
 }
 </script>

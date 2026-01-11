@@ -340,6 +340,9 @@ sub _ensure_scanned {
 sub index :Path('/Documentation') :Args(0) {
     my ($self, $c) = @_;
 
+    # Set proper charset for UTF-8 content (fixes arrow character rendering)
+    $c->response->content_type('text/html; charset=utf-8');
+
     # Log the action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing documentation index");
     
@@ -589,6 +592,9 @@ sub index :Path('/Documentation') :Args(0) {
 sub view :Path('/Documentation') :Args(1) {
     my ($self, $c, $page) = @_;
 
+    # Set proper charset for UTF-8 content (fixes arrow character rendering)
+    $c->response->content_type('text/html; charset=utf-8');
+
     # Log the action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Accessing documentation page: $page");
     
@@ -738,13 +744,77 @@ sub view :Path('/Documentation') :Args(1) {
             }
             elsif ($path =~ /\.tt$/i) {
                 # Handle template files
-                $c->stash(
+                my $stash_data = {
                     page_name => $page,
                     page_title => $metadata->{title} || $self->_format_title($page),
                     user_role => $user_role,
                     site_name => $site_name,
                     template => $path
-                );
+                };
+                
+                # Special handling for DailyPlans pages - fetch todos for that day
+                if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
+                    my $plan_date = "$1-$2-$3";
+                    my ($year, $month, $day) = ($1, $2, $3);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                        "Fetching todos for DailyPlan date: $plan_date");
+                    
+                    # Calculate date info using Time::Piece
+                    eval {
+                        use Time::Piece;
+                        my $tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d");
+                        my $prev_tp = $tp - (24 * 60 * 60);  # subtract 1 day
+                        my $next_tp = $tp + (24 * 60 * 60);  # add 1 day
+                        
+                        # Get current date for "today" link
+                        my $now = localtime;
+                        my $today_date = $now->strftime('%Y-%m-%d');
+                        
+                        $stash_data->{plan_date} = $plan_date;
+                        $stash_data->{day} = $day;
+                        $stash_data->{month} = $month;
+                        $stash_data->{year} = $year;
+                        $stash_data->{plan_date_year} = $year;
+                        $stash_data->{plan_date_month} = $month;
+                        $stash_data->{plan_date_day} = $day;
+                        $stash_data->{day_name} = $tp->strftime('%A');
+                        $stash_data->{month_name} = $tp->strftime('%B');
+                        $stash_data->{curr_month_day} = $tp->strftime('%b %d');
+                        $stash_data->{prev_date_str} = $prev_tp->strftime('%Y-%m-%d');
+                        $stash_data->{next_date_str} = $next_tp->strftime('%Y-%m-%d');
+                        $stash_data->{prev_month_day} = $prev_tp->strftime('%b %d');
+                        $stash_data->{next_month_day} = $next_tp->strftime('%b %d');
+                        $stash_data->{today_date} = $today_date;
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                            "Error calculating dates for daily plan: $@");
+                    }
+                    
+                    # Fetch todos for the specific date from the database
+                    eval {
+                        my $todo_rs = $c->model('DBEncy::Todo')->search(
+                            [
+                                { start_date => $plan_date },
+                                { due_date => $plan_date },
+                            ],
+                            {
+                                order_by => { -asc => 'priority' }
+                            }
+                        );
+                        my @todos_for_day = $todo_rs->all;
+                        $stash_data->{todos_for_today} = \@todos_for_day;
+                        
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                            "Found " . scalar(@todos_for_day) . " todos for $plan_date");
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                            "Error fetching todos for daily plan: $@");
+                    }
+                }
+                
+                $c->stash(%$stash_data);
                 return;
             }
             else {
@@ -832,13 +902,77 @@ sub view :Path('/Documentation') :Args(1) {
         }
 
         # Handle template files
-        $c->stash(
+        my $stash_data = {
             page_name => $page,
             page_title => $self->_format_title($page),
             user_role => $user_role,
             site_name => $site_name,
             template => $tt_path
-        );
+        };
+        
+        # Special handling for DailyPlans pages - fetch todos for that day
+        if ($page =~ /DailyPlans-(\d{4})-(\d{2})-(\d{2})/) {
+            my $plan_date = "$1-$2-$3";
+            my ($year, $month, $day) = ($1, $2, $3);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                "Fetching todos for unregistered DailyPlan date: $plan_date");
+            
+            # Calculate date info using Time::Piece
+            eval {
+                use Time::Piece;
+                my $tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d");
+                my $prev_tp = $tp - (24 * 60 * 60);  # subtract 1 day
+                my $next_tp = $tp + (24 * 60 * 60);  # add 1 day
+                
+                # Get current date for "today" link
+                my $now = localtime;
+                my $today_date = $now->strftime('%Y-%m-%d');
+                
+                $stash_data->{plan_date} = $plan_date;
+                $stash_data->{day} = $day;
+                $stash_data->{month} = $month;
+                $stash_data->{year} = $year;
+                $stash_data->{plan_date_year} = $year;
+                $stash_data->{plan_date_month} = $month;
+                $stash_data->{plan_date_day} = $day;
+                $stash_data->{day_name} = $tp->strftime('%A');
+                $stash_data->{month_name} = $tp->strftime('%B');
+                $stash_data->{curr_month_day} = $tp->strftime('%b %d');
+                $stash_data->{prev_date_str} = $prev_tp->strftime('%Y-%m-%d');
+                $stash_data->{next_date_str} = $next_tp->strftime('%Y-%m-%d');
+                $stash_data->{prev_month_day} = $prev_tp->strftime('%b %d');
+                $stash_data->{next_month_day} = $next_tp->strftime('%b %d');
+                $stash_data->{today_date} = $today_date;
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                    "Error calculating dates for daily plan: $@");
+            }
+            
+            # Fetch todos for the specific date from the database
+            eval {
+                my $todo_rs = $c->model('DBEncy::Todo')->search(
+                    [
+                        { start_date => $plan_date },
+                        { due_date => $plan_date },
+                    ],
+                    {
+                        order_by => { -asc => 'priority' }
+                    }
+                );
+                my @todos_for_day = $todo_rs->all;
+                $stash_data->{todos_for_today} = \@todos_for_day;
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+                    "Found " . scalar(@todos_for_day) . " todos for $plan_date");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                    "Error fetching todos for daily plan: $@");
+            }
+        }
+        
+        $c->stash(%$stash_data);
         return;
     }
 

@@ -9,7 +9,8 @@ __PACKAGE__->config(
     WRAPPER => 'layout.tt',
     PLUGIN_BASE => 'Template::Plugin',
     PLUGINS     => { DateTime => {} },
- );
+    ENCODING => 'UTF-8',
+);
 # Register the format_time filter
 $Template::Stash::SCALAR_OPS->{format_time} = sub {
     my $seconds = shift;

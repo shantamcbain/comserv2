@@ -224,20 +224,24 @@
 <div class="container">
     <!-- Sticky Header with Navigation -->
     <div class="daily-plan-header">
-        <h1>[DAILY PLAN] Saturday, January 11, 2026</h1>
+        <h1>[DAILY PLAN] [% day_name %], [% month_name %] [% day %], [% year %]</h1>
         <div class="header-nav">
             <div class="header-nav-links">
                 <span><strong>Status:</strong> Week 2 - Documentation complete</span>
                 <span>|</span>
-                <a href="#today-work">[Jump to Today]</a>
-                <a href="#master-plans">Master Plans</a>
+                [% IF today_date %]<a href="/Documentation/DailyPlans-[% today_date %]">[Jump to Today]</a>[% ELSE %]<a href="#today-work">[Jump to Today]</a>[% END %]
+                <a href="/Documentation/MASTER_PLAN_COORDINATION" target="_blank">Master Plans</a>
                 <a href="/Documentation">All Docs</a>
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                <a href="/Documentation/DailyPlans/Daily_Plans-2026-01-10.tt">← Prev Day</a>
-                | Today (Jan 11) |
-                <a href="/Documentation/DailyPlans/Daily_Plans-2026-01-12.tt">Next Day →</a>
+                [% IF prev_date_str %]
+                    <a href="/Documentation/DailyPlans-[% prev_date_str %]">← Prev Day ([% prev_month_day %])</a>
+                    | Today ([% curr_month_day %]) |
+                    <a href="/Documentation/DailyPlans-[% next_date_str %]">Next Day ([% next_month_day %]) →</a>
+                [% ELSE %]
+                    ← Prev Day | Today | Next Day →
+                [% END %]
             </div>
         </div>
     </div>
@@ -297,15 +301,31 @@
             <!-- App Todos for Today (Independent Dropdown) -->
             <div class="task-list">
                 <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
-                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM</span>
+                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
                     <span class="task-list-toggle">HIDE</span>
                 </div>
                 <div class="task-list-items" id="app-todo-items">
-                    <div style="padding: 15px; text-align: center; color: #666;">
-                        <p>Todos for today are loaded from the Todo System.</p>
-                        <p>View and manage your daily tasks in the Todo System.</p>
-                        <p style="margin-top: 10px; font-size: 0.9em; color: #999;">[Dynamic todo list will appear here when Todo System integration is complete]</p>
-                    </div>
+                    [% IF todos_for_today && todos_for_today.size %]
+                        [% FOREACH todo IN todos_for_today %]
+                            <div class="task-item">
+                                <input type="checkbox" id="todo-[% todo.record_id %]">
+                                <label for="todo-[% todo.record_id %]" class="task-label" style="flex: 1;">
+                                    <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" 
+                                       style="color: var(--link-color); text-decoration: none; cursor: pointer;" 
+                                       title="[% todo.subject || '(No subject)' %][% IF todo.description %] - [% todo.description | truncate(100) %][% END %]">
+                                        <strong>[% todo.sitename || 'CSC' %]:</strong>
+                                        [% todo.subject || '(No subject)' %]
+                                        [% IF todo.priority %]<span style="color: #f0ad4e; margin-left: 10px;">(P[% todo.priority %])</span>[% END %]
+                                    </a>
+                                </label>
+                            </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div style="padding: 15px; text-align: center; color: #666;">
+                            <p>No todos scheduled for today.</p>
+                            <p>Create a new todo for today using the button below.</p>
+                        </div>
+                    [% END %]
                 </div>
                 <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
             </div>
@@ -329,18 +349,18 @@
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
                 <h4>Related Documentation</h4>
                 <ul style="margin: 0; padding-left: 20px;">
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt" style="color: var(--primary-color);">Master Plan Coordination (v0.27)</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION" style="color: var(--primary-color);">Master Plan Coordination (v0.27)</a></li>
                     <li><a href="/Documentation/session_history/development_plan.md" style="color: var(--primary-color);">Development Plan (Current)</a></li>
-                    <li><a href="/Documentation/SECURITY_REMEDIATION_PLAN.tt" style="color: var(--primary-color);">Security Remediation Plan</a></li>
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#system-features" style="color: var(--primary-color);">System Features Inventory</a></li>
+                    <li><a href="/Documentation/SECURITY_REMEDIATION_PLAN" style="color: var(--primary-color);">Security Remediation Plan</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#system-features" style="color: var(--primary-color);">System Features Inventory</a></li>
                 </ul>
             </div>
 
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
                 <h4>Quick Links</h4>
                 <ul style="margin: 0; padding-left: 20px;">
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#improvements-tracker" style="color: var(--primary-color);">View Improvements Tracker</a> (5 issues)</li>
-                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#dependency-map" style="color: var(--primary-color);">Check Dependencies</a></li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#improvements-tracker" style="color: var(--primary-color);">View Improvements Tracker</a> (5 issues)</li>
+                    <li><a href="/Documentation/MASTER_PLAN_COORDINATION#dependency-map" style="color: var(--primary-color);">Check Dependencies</a></li>
                     <li><a href="/todo" style="color: var(--primary-color);">Open Todo System (Full View)</a></li>
                     <li><a href="/Documentation/DAILY_PLAN_LAYOUT_REDESIGN.md" style="color: var(--primary-color);">Daily Plan Design Notes</a> (NEW)</li>
                 </ul>
@@ -414,7 +434,7 @@
                     <li><strong>#5 Port Conflict (LOW):</strong> Port 3000 - kill stale process</li>
                 </ul>
             </div>
-            <p><a href="/Documentation/MASTER_PLAN_COORDINATION.tt#improvements-tracker" style="color: var(--primary-color);">View full details in Improvements Tracker</a></p>
+            <p><a href="/Documentation/MASTER_PLAN_COORDINATION#improvements-tracker" style="color: var(--primary-color);">View full details in Improvements Tracker</a></p>
         </div>
     </div>
 </div>
