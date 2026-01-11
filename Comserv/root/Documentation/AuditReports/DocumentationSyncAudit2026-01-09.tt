@@ -402,101 +402,101 @@
          "version" : "0.05"
       },
       {
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2025-12-29.tt",
          "version" : "1.00",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2025-12-29.tt",
          "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "exists" : 1,
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-29.tt",
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2025-12-29.tt",
          "last_updated" : "Unknown"
       },
       {
          "exists" : 1,
          "last_updated" : "Unknown",
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2025-12-30.tt",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-30.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2025-12-30.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2025-12-30.tt",
          "version" : "1.00"
       },
       {
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "action" : "UPDATE - Bump version from 1.00 to 1.01, add Recent Changes section",
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt",
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2025-12-31.tt",
          "last_updated" : "Unknown",
          "exists" : 1,
          "version" : "1.00",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2025-12-31.tt"
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2025-12-31.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2025-12-31.tt"
       },
       {
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt",
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2026-01-02.tt",
          "last_updated" : "Thu Jan 02 16:52:00 UTC 2026",
          "exists" : 1,
          "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2026-01-02.tt",
          "version" : "0.02",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-02.tt"
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2026-01-02.tt"
       },
       {
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2026-01-03.tt",
          "version" : "0.02",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2026-01-03.tt",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
          "exists" : 1,
          "last_updated" : "Thu Jan 02 17:13:00 UTC 2026",
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-03.tt"
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2026-01-03.tt"
       },
       {
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2026-01-04.tt",
          "version" : "0.02",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt",
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2026-01-04.tt",
          "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "exists" : 1,
          "last_updated" : "Thu Jan 02 17:13:00 UTC 2026",
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-04.tt"
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2026-01-04.tt"
       },
       {
          "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "exists" : 1,
          "last_updated" : "Sat Jan 04 17:45:00 UTC 2026",
-         "documentation_file" : "/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt",
+         "documentation_file" : "/Documentation/DailyPlans/DailyPlans-2026-01-05.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans/DailyPlans-2026-01-05.tt",
          "version" : "0.03",
-         "code_file" : "root/Documentation/DailyPlans/Daily_Plans-2026-01-05.tt"
+         "code_file" : "root/Documentation/DailyPlans/DailyPlans-2026-01-05.tt"
       },
       {
          "version" : "1.00",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-25.tt",
-         "code_file" : "root/Documentation/Daily_Plans-2025-12-25.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans-2025-12-25.tt",
+         "code_file" : "root/Documentation/DailyPlans-2025-12-25.tt",
          "action" : "CREATE - New documentation file needed (controller recently added)",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "last_updated" : "Unknown",
-         "documentation_file" : "/Documentation/Daily_Plans-2025-12-25.tt",
+         "documentation_file" : "/Documentation/DailyPlans-2025-12-25.tt",
          "exists" : null
       },
       {
          "version" : "1.00",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-26.tt",
-         "code_file" : "root/Documentation/Daily_Plans-2025-12-26.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans-2025-12-26.tt",
+         "code_file" : "root/Documentation/DailyPlans-2025-12-26.tt",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "action" : "CREATE - New documentation file needed (controller recently added)",
-         "documentation_file" : "/Documentation/Daily_Plans-2025-12-26.tt",
+         "documentation_file" : "/Documentation/DailyPlans-2025-12-26.tt",
          "last_updated" : "Unknown",
          "exists" : null
       },
       {
-         "code_file" : "root/Documentation/Daily_Plans-2025-12-27.tt",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/Daily_Plans-2025-12-27.tt",
+         "code_file" : "root/Documentation/DailyPlans-2025-12-27.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/DailyPlans-2025-12-27.tt",
          "version" : "1.00",
          "exists" : null,
-         "documentation_file" : "/Documentation/Daily_Plans-2025-12-27.tt",
+         "documentation_file" : "/Documentation/DailyPlans-2025-12-27.tt",
          "last_updated" : "Unknown",
          "action" : "CREATE - New documentation file needed (controller recently added)",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)"

@@ -558,7 +558,7 @@ Run the Daily Plans Generator Agent workflow...
             <li>✅ Audit files created (audit_2026-01-02.md and .json)</li>
             <li>✅ Documentation updated (2 files, 230 lines)</li>
             <li>✅ Master plan updated to v0.14</li>
-            <li>✅ 7 daily plans generated (Daily_Plans-2026-01-03.tt through Daily_Plans-2026-01-09.tt)</li>
+            <li>✅ 7 daily plans generated (DailyPlans-2026-01-03.tt through DailyPlans-2026-01-09.tt)</li>
             <li>✅ Team ready with fresh daily plans</li>
         </ul>
 

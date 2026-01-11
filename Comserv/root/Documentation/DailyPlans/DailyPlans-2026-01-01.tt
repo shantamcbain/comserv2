@@ -156,7 +156,7 @@
 <li>Calculated date range: Jan 2-8, 2026 (7-day scope)</li>
 <li>Mapped master plan to daily work across all 7 days with task breakdown, time estimates, dependencies</li>
 <li>Distributed workload: 2-5 hours per day, no overload, proper sequencing</li>
-<li>Created 7 new Daily_Plans files (Jan 2-8): Daily_Plans-2026-01-02.tt through Daily_Plans-2026-01-08.tt</li>
+<li>Created 7 new Daily_Plans files (Jan 2-8): DailyPlans-2026-01-02.tt through DailyPlans-2026-01-08.tt</li>
 <li>Each plan includes: META block, overview, priority tasks, time estimates, deliverables, success criteria</li>
 <li>Updated MASTER_PLAN_COORDINATION.tt navigation link with "Week 1: Jan 2-8 Plans Ready" note</li>
 <li>Verified all files created successfully with proper syntax</li>
@@ -187,7 +187,7 @@
 <li><strong>Holiday Schedule:</strong> Light work day; full acceleration resumes Jan 2</li>
 <li><strong>A.2 Priority:</strong> K8s Readiness marked URGENT BLOCKER - this becomes primary focus Jan 2+ (Plans created: Jan 2-4)</li>
 <li><strong>E.1 Validation:</strong> If database recording broken, this becomes Jan 2 diagnostic blocker</li>
-<li><strong>Next Daily Plan:</strong> Jan 2 (Friday) will begin A.2 Readiness sprint (see Daily_Plans-2026-01-02.tt)</li>
+<li><strong>Next Daily Plan:</strong> Jan 2 (Friday) will begin A.2 Readiness sprint (see DailyPlans-2026-01-02.tt)</li>
 <li><strong>Plan Updates:</strong> This plan was updated 2026-01-01 16:25 UTC to reflect Daily Plans Generator completion. Daily plans will be updated each day with this summary section showing what was accomplished vs. planned.</li>
 <li><strong>Optional Early Start:</strong> If time allows, begin reading A.2 Kubernetes architecture docs for Jan 2 launch</li>
 </ul>
