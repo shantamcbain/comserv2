@@ -1,4 +1,13 @@
-[% PageVersion  = 'ai/result.tt,v 0.1 2025/10/08 Shanta Exp Shanta' %]
+[% META
+   title = "AI Query Result"
+   description = "Detailed AI response view"
+   roles = "user,admin,developer"
+   category = "AI Module"
+   page_version = "0.06"
+   last_updated = "Fri Jan 23 15:00:00 UTC 2026"
+%]
+
+[% PageVersion = 'ai/result.tt,v 0.06 2026/01/23 15:00:00 CleanupAgent Exp - Implemented CSS isolation and imported ai-common.js'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -32,8 +41,8 @@
             <span class="meta-item"><strong>Conversation ID:</strong> <code>#[% conversation_id %]</code></span>
             [% END %]
         </div>
-        <div class="response-content">
-            [% ai_response %]
+        <div class="response-content" id="ai-response-content">
+            [% ai_response | html %]
         </div>
     </div>
     
@@ -55,6 +64,8 @@
     [% END %]
 </div>
 
+<script src="/static/js/ai-common.js"></script>
+
 <style>
 .ai-result-container {
     max-width: 1000px;
@@ -63,20 +74,21 @@
 }
 
 .error-box {
-    background: #ffebee;
-    border: 1px solid #ef5350;
+    background-color: var(--warning-color);
+    opacity: 0.9;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
     margin: 20px 0;
 }
 
 .error-box h2 {
-    color: #c62828;
+    color: var(--text-color);
     margin-top: 0;
 }
 
 .error-box p {
-    color: #d32f2f;
+    color: var(--text-color);
     margin: 15px 0;
 }
 
@@ -86,26 +98,29 @@
 
 .query-section,
 .response-section {
-    background: #fff;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--dropdown-shadow);
 }
 
 .query-section h2,
 .response-section h2 {
     margin-top: 0;
-    color: #333;
-    border-bottom: 2px solid #4caf50;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--success-color);
     padding-bottom: 10px;
 }
 
 .query-content {
-    background: #f5f5f5;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
     padding: 15px;
     border-radius: 4px;
-    border-left: 4px solid #4caf50;
+    border-left: 4px solid var(--success-color);
     white-space: pre-wrap;
     font-family: 'Courier New', monospace;
     font-size: 14px;
@@ -113,7 +128,7 @@
 }
 
 .response-meta {
-    background: #f9f9f9;
+    background-color: var(--secondary-color);
     padding: 10px 15px;
     border-radius: 4px;
     margin-bottom: 15px;
@@ -123,21 +138,37 @@
 }
 
 .meta-item {
-    color: #666;
+    color: var(--text-color);
+    opacity: 0.8;
     font-size: 14px;
 }
 
 .response-content {
-    background: #fafafa;
+    background-color: var(--background-color);
     padding: 20px;
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
     white-space: pre-wrap;
-    font-family: 'Courier New', monospace;
+    font-family: inherit;
     font-size: 14px;
     line-height: 1.8;
     max-height: 600px;
     overflow-y: auto;
+}
+
+.code-block {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    margin: 10px 0;
+    overflow-x: auto;
+    white-space: pre;
+    display: block;
 }
 
 .action-buttons {
@@ -149,7 +180,7 @@
 
 .button {
     padding: 12px 24px;
-    border: none;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: pointer;
     font-size: 16px;
@@ -157,57 +188,60 @@
     display: inline-block;
     transition: all 0.3s;
     text-align: center;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
 }
 
 .button.primary {
-    background: #4caf50;
-    color: white;
+    background-color: var(--success-color);
+    color: var(--text-color);
+    border: none;
 }
 
 .button.primary:hover {
-    background: #45a049;
+    opacity: 0.8;
 }
 
 .button.secondary {
-    background: #f5f5f5;
-    color: #333;
-    border: 1px solid #ddd;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
 }
 
 .button.secondary:hover {
-    background: #e0e0e0;
+    background-color: var(--background-color);
 }
 
 .button:not(.primary):not(.secondary) {
-    background: #2196f3;
-    color: white;
+    background-color: var(--link-color);
+    color: var(--text-color);
 }
 
 .button:not(.primary):not(.secondary):hover {
-    background: #1976d2;
+    opacity: 0.8;
 }
 
 .button.return-menu {
-    background: #666;
-    color: white;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
 }
 
 .button.return-menu:hover {
-    background: #444;
+    background-color: var(--background-color);
 }
 
 .conversation-saved-notice {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    border-left: 4px solid #28a745;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--success-color);
     border-radius: 4px;
     padding: 15px;
     margin-top: 20px;
-    color: #155724;
+    color: var(--text-color);
 }
 
 .conversation-saved-notice strong {
-    color: #155724;
+    color: var(--text-color);
     font-size: 16px;
 }
 
@@ -217,7 +251,8 @@
 }
 
 .response-meta code {
-    background: #f5f5f5;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: monospace;
@@ -231,14 +266,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (copyBtn) {
         copyBtn.addEventListener('click', function() {
-            const responseContent = document.querySelector('.response-content');
+            const responseContent = document.getElementById('ai-response-content');
             if (responseContent) {
-                const text = responseContent.textContent;
+                const text = responseContent.getAttribute('data-raw-content') || responseContent.textContent;
                 navigator.clipboard.writeText(text).then(function() {
                     const originalText = copyBtn.textContent;
                     copyBtn.textContent = 'Copied!';
-                    copyBtn.style.background = '#4caf50';
-                    copyBtn.style.color = 'white';
+                    copyBtn.style.background = 'var(--success-color)';
+                    copyBtn.style.color = 'var(--text-color)';
                     
                     setTimeout(function() {
                         copyBtn.textContent = originalText;
@@ -250,6 +285,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    }
+
+    // Format message content on load
+    const responseEl = document.getElementById('ai-response-content');
+    if (responseEl) {
+        const rawContent = responseEl.textContent.trim();
+        responseEl.setAttribute('data-raw-content', rawContent);
+        responseEl.innerHTML = AIUtils.formatMessageContent(rawContent);
     }
 });
 </script>

@@ -26,7 +26,7 @@
         <ul>
             <li><strong>Daily Plan Status:</strong> IN PROGRESS - 3 parallel tasks executing</li>
             <li><strong>Phase 1 Completion:</strong> Daily Plan Automator role activated; bilateral logging completed</li>
-            <li><strong>Master Plan Sync:</strong> MASTER_PLAN_COORDINATION.tt v0.23 reviewed; current state documented</li>
+            <li><strong>Master Plan Sync:</strong> MasterPlanCoordination.tt v0.23 reviewed; current state documented</li>
             <li><strong>Documentation Status:</strong> All reference files (master plan, daily plan, coding standards) accessible and current</li>
         </ul>
     </div>
@@ -40,7 +40,7 @@
             <li>✅ <strong>Phase 1:</strong> /updateprompt.pl bilateral logging completed - action logged to prompts_log.yaml</li>
             <li>✅ <strong>Phase 2:</strong> Reference files read and analyzed:
                 <ul>
-                    <li>MASTER_PLAN_COORDINATION.tt (v0.23, 2326 lines)</li>
+                    <li>MasterPlanCoordination.tt (v0.23, 2326 lines)</li>
                     <li>DailyPlans-2026-01-06.tt (v0.07, 167 lines)</li>
                     <li>master_plan.md (v1.0, 430 lines)</li>
                 </ul>
@@ -109,7 +109,7 @@
                 <td style="padding: 10px; border: 1px solid #ddd;">Last Updated: 2026-01-05; 16 plans tracked</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>MASTER_PLAN_COORDINATION.tt</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>MasterPlanCoordination.tt</strong></td>
                 <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">0.23</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Last Updated: 2026-01-06 05:18:00 UTC</td>
             </tr>
@@ -173,7 +173,7 @@
     
     <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">✅ Daily Automator Achievement</h3>
-        <p><strong>Today's Objective:</strong> Design and initiate Daily Plan Automator workflow for automated daily plan generation synchronized with MASTER_PLAN_COORDINATION.tt and current date.</p>
+        <p><strong>Today's Objective:</strong> Design and initiate Daily Plan Automator workflow for automated daily plan generation synchronized with MasterPlanCoordination.tt and current date.</p>
         <p><strong>Completion Status:</strong></p>
         <ul>
             <li>✅ <strong>Criterion 1:</strong> Daily Plan Automator role activated and workflow phases initiated</li>

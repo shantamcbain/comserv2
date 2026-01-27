@@ -247,7 +247,7 @@ Feature implementations and role-based access guides:
                 <li><strong>Documentation/ency/ENCY.tt</strong> - ENCY module overview</li>
                 <li><strong>Documentation/proxmox/api.tt</strong> - Proxmox API documentation</li>
                 <li><strong>Documentation/proxmox/index.tt</strong> - Proxmox integration overview</li>
-                <li><strong>Documentation/roles/developer/Documentation_Controller.tt</strong> - Developer documentation controller guide</li>
+                <li><strong>Documentation/roles/developer/Documentation.tt</strong> - Developer documentation controller guide</li>
                 <li><strong>Documentation/roles/normal/account_management.tt</strong> - User account management guide</li>
                 <li><strong>Documentation/roles/normal/Documentation_System.tt</strong> - Documentation system user guide</li>
                 <li><strong>Documentation/roles/normal/getting_started.tt</strong> - User getting started guide</li>

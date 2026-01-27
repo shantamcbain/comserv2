@@ -157,16 +157,16 @@ filename_enforcement:
     
     continue: |
       Recommended: Same enforcement as Zencoder for consistency
-      Check: /Comserv/root/.continue/rules/CONTINUE.md (external tool - owner: Continue)
+        # Zencoder does NOT manage external tool settings (Continue, Cursor)
     
     other_tools: |
       Coordinate with teams using Cursor, Ollama, or other AI tools
-      See: /.zencoder/rules/keywords-global.md for cross-tool standards
+      See: /.zencoder/coding-standards.yaml for cross-tool standards
   
   repository_metadata:
-    rules_file: "/.zencoder/rules/FILENAME_CONVENTIONS.md (supplementary reference)"
-    tracking_file: "/Comserv/root/Documentation/session_history/filename_migration_log.md (audit trail)"
-    contact: "See Cleanup Agent responsibilities in /.zencoder/rules/cleanup-agent-role.md"
+    rules_file: "/.zencoder/coding-standards.yaml (Central source of truth)"
+    tracking_file: "/Comserv/root/Documentation/session_history/prompts_log.yaml (Audit trail)"
+    contact: "See Cleanup Agent responsibilities in /.zencoder/coding-standards.yaml"
 
 example_migrations:
   existing_to_new:
@@ -748,12 +748,10 @@ security:
 consolidation_issues:
   [ISSUE_1_DUPLICATION]:
     category: "Duplication"
-    description: "Testing guidelines appear in both guidelines.tt and comserv-ai-guidelines-consolidated.yaml"
-    source_a: "guidelines.tt lines 34-41"
-    source_b: "comserv-ai-guidelines-consolidated.yaml (testing section)"
-    impact: "Developers must check both files; updates might be missed in one"
-    resolution_status: "🔴 PENDING - Consolidation complete but issue remains"
-    action_required: "Remove duplicates from one source (recommend removing from consolidated YAML, keeping only here)"
+    description: "Testing guidelines were duplicated across legacy files"
+    source: "guidelines.tt lines 34-41"
+    impact: "Resolved by consolidation into this YAML"
+    resolution_status: "✅ RESOLVED"
   
   [ISSUE_2_CONTRADICTION]:
     category: "Contradiction"
@@ -828,12 +826,11 @@ implementation_roadmap:
     timeline: "2025-12-07 to 2025-12-20"
   
   phase_3_resolve_duplications:
-    status: "🔴 NOT STARTED"
+    status: "✅ COMPLETE"
     actions:
-      - "Remove duplicates from comserv-ai-guidelines-consolidated.yaml"
-      - "Update consolidated YAML to reference this file for coding standards"
-      - "Keep AI-specific guidelines in consolidated YAML (not duplicated here)"
-    timeline: "2025-12-21 after deprecation period ends"
+      - "Removed comserv-ai-guidelines-consolidated.yaml"
+      - "Centralized all Zencoder rules in /.zencoder/coding-standards.yaml"
+    timeline: "2026-01-16"
   
   phase_4_verify_and_enforce:
     status: "🔴 NOT STARTED"

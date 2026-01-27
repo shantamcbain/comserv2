@@ -46,34 +46,34 @@
         </ul>
     </div>
 
-    <div class="alert alert-info">
+    <div class="alert alert-info" id="phase-1b-tokens">
         <h3>🟡 PHASE 1B: Token Usage Implementation (IN PROGRESS)</h3>
         <ul>
             <li><strong>Files Created</strong>:
                 <ul>
-                    <li>✅ <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm</code> – Token schema with hashed storage, expiration, revocation</li>
-                    <li>✅ <code>Comserv/lib/Comserv/Controller/Api.pm</code> – Token management endpoints (generate, list, revoke)</li>
+                    <li>✅ <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm</code> – <a href="/Documentation/models/ApiToken.tt">Token schema</a> with hashed storage, expiration, revocation</li>
+                    <li>✅ <code>Comserv/lib/Comserv/Controller/Api.pm</code> – <a href="/Documentation/controllers/Api.tt">Token management endpoints</a> (generate, list, revoke)</li>
                 </ul>
             </li>
             <li><strong>Files Modified</strong>:
                 <ul>
-                    <li>✅ <code>Comserv/lib/Comserv/Controller/Todo.pm</code> – Added REST API endpoints + token validation (~380 lines)</li>
+                    <li>✅ <code>Comserv/lib/Comserv/Controller/Todo.pm</code> – <a href="/Documentation/controllers/Todo.tt#api-endpoints">Added REST API endpoints</a> + token validation (~380 lines)</li>
                 </ul>
             </li>
             <li><strong>API Endpoints Implemented</strong>:
                 <ul>
-                    <li>✅ <code>POST /api/todo/create</code> – Token auth required, dev-only</li>
-                    <li>✅ <code>GET /api/todo/{id}</code> – Token auth required</li>
-                    <li>✅ <code>PUT /api/todo/{id}</code> – Token auth required, partial update</li>
-                    <li>✅ <code>GET /api/project/{id}</code> – Token auth required</li>
-                    <li>✅ <code>POST /api/generate-token</code> – Admin generates tokens</li>
-                    <li>✅ <code>GET /api/tokens</code> – List user tokens</li>
-                    <li>✅ <code>DELETE /api/tokens/{id}</code> – Revoke tokens</li>
+                    <li>✅ <code>POST /api/todo/create</code> – <a href="/api/doc/todo-create">Documentation</a> (Token auth required, dev-only)</li>
+                    <li>✅ <code>GET /api/todo/{id}</code> – <a href="/api/doc/todo-get">Documentation</a> (Token auth required)</li>
+                    <li>✅ <code>PUT /api/todo/{id}</code> – <a href="/api/doc/todo-update">Documentation</a> (Token auth required, partial update)</li>
+                    <li>✅ <code>GET /api/project/{id}</code> – <a href="/api/doc/project-get">Documentation</a> (Token auth required)</li>
+                    <li>✅ <code>POST /api/generate-token</code> – <a href="/api/doc/token-generate">Documentation</a> (Admin generates tokens)</li>
+                    <li>✅ <code>GET /api/tokens</code> – <a href="/api/doc/tokens-list">Documentation</a> (List user tokens)</li>
+                    <li>✅ <code>DELETE /api/tokens/{id}</code> – <a href="/api/doc/token-revoke">Documentation</a> (Revoke tokens)</li>
                 </ul>
             </li>
             <li><strong>Token Validation Implementation (IN PROGRESS)</strong>:
                 <ul>
-                    <li>✅ Created <code>ApiTokenValidator.pm</code> utility for consistent token validation</li>
+                    <li>✅ Created <code>ApiTokenValidator.pm</code> utility for consistent token validation – <a href="/Documentation/utils/ApiTokenValidator.tt">View Utility Docs</a></li>
                     <li>✅ Validate Bearer token in Authorization header</li>
                     <li>✅ Check token_hash against database (SHA-256 comparison)</li>
                     <li>✅ Verify token is active (is_active = 1)</li>
@@ -82,6 +82,7 @@
                     <li>✅ Return clear error codes: 401 (invalid), 403 (revoked/expired), 400 (malformed)</li>
                     <li>✅ Update last_used_at timestamp on successful validation</li>
                     <li>✅ Applied validator to all /api/todo/* endpoints in <code>Todo.pm</code></li>
+                    <li>📖 <strong>Documentation</strong>: Created <a href="/Documentation/ApiTokenReferenceGuide" target="_blank">ApiTokenReferenceGuide.tt</a> with usage instructions.</li>
                 </ul>
             </li>
             <li><strong>Schema Requirement (IMPORTANT)</strong>:
@@ -112,7 +113,7 @@
         </ul>
     </div>
 
-    <div class="alert alert-warning">
+    <div class="alert alert-warning" id="phase-2-schema-blocker">
         <h3>⚠️ BLOCKER: Phase 2 Schema Migration (Schema Comparison Bug)</h3>
         <p><strong>Issue</strong>: Schema comparison system fails to create <code>project_documentation_mapping</code> table from DBIx::Class Result definition.</p>
         <p><strong>Root Cause</strong>: Unknown – need to debug how the schema migration pipeline processes Result classes and generates DDL.</p>
@@ -210,7 +211,7 @@
 
     <hr style="margin: 30px 0;" />
 
-    <h2>Phase 2: Master Plan as Database Query View + Documentation Mapping — 🔴 BLOCKED</h2>
+    <h2 id="phase-2-master-plan">Phase 2: Master Plan as Database Query View + Documentation Mapping — 🔴 BLOCKED</h2>
 
     <h3>⚠️ DEBUGGING REQUIRED: Schema Comparison System</h3>
     
@@ -287,7 +288,7 @@ project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
 
     <hr style="margin: 30px 0;" />
 
-    <h2>Phase 3: DailyPlan Flagging Mechanism</h2>
+    <h2 id="phase-3-dailyplan-flagging">Phase 3: DailyPlan Flagging Mechanism</h2>
     
     <h3>3.1 Flag Format in DailyPlan.tt</h3>
     
@@ -319,7 +320,7 @@ project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
 
     <hr style="margin: 30px 0;" />
 
-    <h2>Phase 4: IDE Agent Integration — 🔵 PENDING (Phase 2)</h2>
+    <h2 id="phase-4-ide-agent">Phase 4: IDE Agent Integration — 🔵 PENDING (Phase 2)</h2>
     
     <h3>4.1 Zencoder Agent Workflow</h3>
     
@@ -361,7 +362,7 @@ if ($response->is_success) {
 
     <hr style="margin: 30px 0;" />
 
-    <h2>Phase 5: Implementation Timeline</h2>
+    <h2 id="phase-5-timeline">Phase 5: Implementation Timeline</h2>
     
     <h3>Week 1 (Jan 14-20)</h3>
     <ul>
@@ -377,6 +378,14 @@ if ($response->is_success) {
     <ul>
         <li>[ ] Refactor Master Plan to query database instead of static text</li>
         <li>[ ] Add JS handler for DailyPlan "Add to Todo" buttons</li>
+        <li id="priority-format-update">[🟡] <strong>NEW</strong>: Update Priority Todo format and content (See Todo #3 in PriorityTodos.tt):
+            <ul>
+                <li>✅ Define new HTML/TT structure with grid layout.</li>
+                <li>[ ] Update all 15 priority items to the new format.</li>
+                <li>[ ] Integrate Project (from database/plan), Plan Name, and Plan Link fields</li>
+                <li>[ ] Map keyfields from <code>Todo.pm</code> (record_id, status, priority, dates) for consistency</li>
+            </ul>
+        </li>
         <li>[ ] Test Master Plan auto-sync as todos are created</li>
     </ul>
 
@@ -396,7 +405,7 @@ if ($response->is_success) {
 
     <hr style="margin: 30px 0;" />
 
-    <h2>Implementation Validation Checklist</h2>
+    <h2 id="validation-checklist">Implementation Validation Checklist</h2>
     
     <ul>
         <li>[✅] <code>/api/todo/create</code> responds with JSON</li>

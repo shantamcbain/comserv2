@@ -1,5 +1,9 @@
-[% META title = 'AI Model Configuration' %]
-[% PageVersion = 'admin/AiConfiguration.tt,v 0.01 2026/01/07 shanta Exp shanta' %]
+[% META 
+   title = 'AI Model Configuration'
+   page_version = "0.05"
+   last_updated = "Fri Jan 23 15:00:00 UTC 2026"
+%]
+[% PageVersion = 'admin/AiConfiguration.tt,v 0.05 2026/01/23 15:00:00 CleanupAgent Exp - Theme compliance and Bootstrap override cleanup'; %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -255,26 +259,42 @@
         margin-bottom: 20px;
     }
     
+    .card-header.bg-primary {
+        background-color: var(--primary-color) !important;
+        color: var(--text-color) !important;
+    }
+    
+    .card-header.bg-info {
+        background-color: var(--link-color) !important;
+        color: var(--text-color) !important;
+    }
+    
+    .card-header.bg-secondary {
+        background-color: var(--secondary-color) !important;
+        color: var(--text-color) !important;
+    }
+    
     .card {
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: var(--dropdown-shadow);
         margin-bottom: 20px;
     }
     
     .form-label {
         font-weight: 500;
-        color: #333;
+        color: var(--text-color);
     }
     
     .text-danger {
-        color: #dc3545 !important;
+        color: var(--warning-color) !important;
     }
     
     .badge {
         padding: 0.4em 0.6em;
+        color: var(--text-color);
     }
     
     .table-hover tbody tr:hover {
-        background-color: #f9f9f9;
+        background-color: var(--secondary-color);
     }
 </style>
 

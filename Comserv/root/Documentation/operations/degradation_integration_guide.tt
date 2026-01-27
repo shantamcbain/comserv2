@@ -200,9 +200,9 @@ sub print_status_header {
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Session directory structure
 /Comserv/root/Documentation/session_history/
-├── audit_log.json          # JSON-formatted audit entries
+├── audit_log.json          # JSON-formatted audit entries (legacy)
+├── prompts_log.yaml        # YAML-formatted audit trail (Primary)
 ├── .prompt_counter         # YAML state file (auto-created)
-├── current_session.md      # Session tracking documentation
 └── [other session files]   # Additional session data
 
 # Create if needed

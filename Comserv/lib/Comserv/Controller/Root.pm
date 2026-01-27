@@ -667,12 +667,12 @@ sub auto :Private {
         $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
         
         # CRITICAL: Before setting stash, log the exact value being set
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: About to set server_hostname='$display_hostname' into stash");
         $c->stash->{server_hostname} = $display_hostname;
         
         # Verify stash was actually set
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: Verified stash server_hostname='" . $c->stash->{server_hostname} . "'");
         
         # Set server_ip to the actual server's network IP (Docker container IP for Catalyst)
@@ -682,12 +682,12 @@ sub auto :Private {
         $display_ip = 'Unknown' if !$display_ip || $display_ip eq '';
         
         # CRITICAL: Before setting stash, log the exact value being set
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
         $c->stash->{server_ip} = $display_ip;
         
         # Verify stash was actually set
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
             "CRITICAL DEBUG: Verified stash server_ip='" . $c->stash->{server_ip} . "'");
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 

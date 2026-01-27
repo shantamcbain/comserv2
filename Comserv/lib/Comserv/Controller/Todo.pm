@@ -3,7 +3,9 @@ use Moose;
 use namespace::autoclean;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
+use JSON::MaybeXS;
 use Comserv::Util::Logging; # Import the logging utility
+use Comserv::Util::ApiTokenValidator;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -1113,4 +1115,283 @@ sub month :Path('/todo/month') :Args {
 
     $c->forward($c->view('TT'));
 }
+
+# REST API Endpoints (Dev-only: comserv_server.pl, NOT Starman production)
+# All API methods return JSON and require admin/developer roles
+
+sub _api_dev_only_check {
+    my ($self, $c) = @_;
+    
+    unless ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'development') {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => 0,
+            error => 'API endpoints are development-only (comserv_server.pl). Not available in production.',
+            code => 'api_dev_only'
+        }));
+        $c->detach();
+    }
+}
+
+sub _api_validate_token {
+    my ($self, $c) = @_;
+    
+    my $result = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+    
+    unless ($result->{valid}) {
+        $self->_api_error($c, $result->{error}, 'invalid_token', $result->{code});
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $api_token = $schema->resultset('ApiToken')->find($result->{api_token_id});
+    my $user = $api_token->user if $api_token;
+    
+    $c->stash->{api_user} = $user;
+    $c->stash->{api_user_id} = $result->{user_id};
+    $c->stash->{api_token} = $api_token;
+    
+    return 1;
+}
+
+sub _api_error {
+    my ($self, $c, $error, $code, $status) = @_;
+    $status //= 400;
+    
+    $c->res->status($status);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 0,
+        error => $error,
+        code => $code
+    }));
+    $c->detach();
+}
+
+sub _api_success {
+    my ($self, $c, $message, $data) = @_;
+    
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    my $response = {
+        success => 1,
+        message => $message,
+    };
+    $response = { %$response, %$data } if $data;
+    $c->res->body(encode_json($response));
+    $c->detach();
+}
+
+=head2 api_todo_create
+
+POST /api/todo/create - Create a new todo via API
+
+Required JSON fields: subject, start_date, due_date, priority, status
+Optional JSON fields: description, project_id, assigned_to
+
+Dev-only: comserv_server.pl only, requires admin/developer role
+=cut
+
+sub api_todo_create :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $current_user = $c->stash->{api_user}->username || 'system';
+    
+    my @required = qw(subject start_date due_date priority status);
+    my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
+    if (@missing) {
+        $self->_api_error($c, "Missing required fields: " . join(', ', @missing), 'validation_error');
+    }
+    
+    my $start_date = $params->{start_date};
+    my $due_date = $params->{due_date};
+    if ($start_date gt $due_date) {
+        $self->_api_error($c, "Start date cannot be after due date", 'date_validation_error');
+    }
+    
+    my $project_id = $params->{project_id} || 1;
+    eval {
+        my $project = $schema->resultset('Project')->find($project_id);
+        unless ($project) {
+            die "Project $project_id not found";
+        }
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid project_id: $@", 'invalid_project');
+    }
+    
+    my $sitename = $c->session->{SiteName} || 'default';
+    
+    my $todo = $schema->resultset('Todo')->create({
+        subject => $params->{subject},
+        description => $params->{description} || '',
+        project_id => $project_id,
+        start_date => $start_date,
+        due_date => $due_date,
+        priority => $params->{priority},
+        status => $params->{status},
+        assigned_to => $params->{assigned_to} || $current_user,
+        sitename => $sitename,
+        date_time_posted => DateTime->now,
+        posted_by => $current_user,
+    });
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
+        "Todo created via API: ID=$todo->id, Subject=$params->{subject}, Project=$project_id");
+    
+    $self->_api_success($c, 'Todo created successfully', {
+        todo_id => $todo->id,
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_read
+
+GET /api/todo/:id - Retrieve a single todo by ID
+=cut
+
+sub api_todo_read :Local :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
+    }
+    
+    $self->_api_success($c, 'Todo retrieved', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_update
+
+PUT /api/todo/:id - Update a todo (partial update allowed)
+=cut
+
+sub api_todo_update :Path('/api/todo/update') :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
+    }
+    
+    my $update_data = {};
+    my %allowed_fields = map { $_ => 1 } qw(status priority description assigned_to);
+    
+    foreach my $field (keys %$params) {
+        if ($allowed_fields{$field}) {
+            $update_data->{$field} = $params->{$field};
+        }
+    }
+    
+    if (keys %$update_data) {
+        $todo->update($update_data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
+            "Todo updated via API: ID=$todo_id, Fields=" . join(',', keys %$update_data));
+    }
+    
+    $self->_api_success($c, 'Todo updated successfully', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_project_read
+
+GET /api/project/:id - Retrieve a project by ID
+=cut
+
+sub api_project_read :Path('/api/project') :Args(1) {
+    my ($self, $c, $project_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+    
+    unless ($project) {
+        $self->_api_error($c, "Project not found: $project_id", 'not_found', 404);
+    }
+    
+    $self->_api_success($c, 'Project retrieved', {
+        project => $self->_project_to_hash($project)
+    });
+}
+
+=head2 Helper: _todo_to_hash
+
+Convert Todo DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _todo_to_hash {
+    my ($self, $todo) = @_;
+    
+    return {
+        id => $todo->id,
+        subject => $todo->subject,
+        description => $todo->description,
+        project_id => $todo->project_id,
+        start_date => $todo->start_date,
+        due_date => $todo->due_date,
+        priority => $todo->priority,
+        status => $todo->status,
+        assigned_to => $todo->assigned_to,
+        sitename => $todo->sitename,
+        date_time_posted => $todo->date_time_posted ? $todo->date_time_posted->iso8601 : undef,
+        posted_by => $todo->posted_by,
+        accumulative_time => $todo->accumulative_time || 0,
+    };
+}
+
+=head2 Helper: _project_to_hash
+
+Convert Project DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _project_to_hash {
+    my ($self, $project) = @_;
+    
+    return {
+        id => $project->id,
+        name => $project->name,
+        project_code => $project->project_code,
+        description => $project->description,
+        sitename => $project->sitename,
+        status => $project->status,
+    };
+}
+
 1;

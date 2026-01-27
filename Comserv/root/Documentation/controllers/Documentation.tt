@@ -3,12 +3,12 @@
     description = "Documentation for the Comserv Documentation Controller system - manages documentation routing, access control, and organization by category and role"
     roles = "all"
     category = "controllers"
-    page_version = "0.02"
-    last_updated = "Tue Jan 06 2026 15:17:55 UTC"
+    page_version = "0.04"
+    last_updated = "2026-01-13"
     site_specific = "false"
 %]
 
-[% PageVersion = 'Documentation/controllers/Documentation_Controller.tt,v 0.02 2026/01/06 shanta Exp shanta - Complete template refactor' %]
+[% PageVersion = 'Documentation/controllers/Documentation_Controller.tt,v 0.04 2026/01/13 zencoder-audit Exp - Jan 13 Created views directory and TT.tt documentation' %]
 
 <div class="container">
     <div class="row">
@@ -29,6 +29,18 @@
                     <li><a href="#related-documentation" style="color: var(--link-color); text-decoration: none;">Related Documentation</a></li>
                     <li><a href="#last-updated" style="color: var(--link-color); text-decoration: none;">Last Updated</a></li>
                 </ul>
+            </div>
+
+            <div id="recent-changes" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
+                <h3 style="margin-top: 0; color: var(--primary-color);">📝 Recent Changes (v0.04 - Jan 13, 2026)</h3>
+                <ul style="color: var(--text-color); margin: 10px 0 0 20px;">
+                    <li><strong>Documentation Structure:</strong> Created /Documentation/views/ directory to organize View documentation parallel to controllers/ and models/ directories</li>
+                    <li><strong>TT View Documentation:</strong> Created Documentation/views/TT.tt (v0.02) documenting Comserv::View::TT configuration, UTF-8 encoding support, and Template Toolkit settings</li>
+                    <li><strong>UTF-8 Encoding Enhanced:</strong> Added charset=utf-8 to HTTP Content-Type headers in Documentation controller (lines 343-344, 592-593) for proper character rendering</li>
+                    <li><strong>Date Calculation Refactor:</strong> Moved all date calculations from Template Toolkit to backend Perl (Time::Piece) for Daily Plans rendering, +142 lines of date handling logic</li>
+                    <li><strong>Variable Stash Updates:</strong> Backend now passes pre-calculated variables (day_name, month_name, curr_month_day, prev_date_str, next_date_str) to templates, enabling complex Daily Plans functionality</li>
+                </ul>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-muted-color);">Audit Summary: Documentation sync completed for Views (TT.pm). UTF-8 encoding and date calculation infrastructure production-ready. Views directory structure now consistent with project organization standards.</p>
             </div>
 
             <div id="overview" style="margin-bottom: var(--spacing-large);">

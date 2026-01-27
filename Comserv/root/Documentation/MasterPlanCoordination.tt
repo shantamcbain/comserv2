@@ -1,57 +1,65 @@
 [% META 
    title = "Master Plan Coordination Dashboard"
-   description = "Complete audit and coordination of all 16 Comserv plans (including AI Chat System, Master Plan IDE Integration, and Documentation Audit & Tutorial Integration) with System Features Inventory, dependency mapping, timeline sequencing, priority matrix, parallelization opportunities, resource allocation framework, daily/weekly milestones, IDE-based project management integration, and A.3 Credentials Audit findings"
+   description = "Complete audit and coordination of all 26 Comserv plans (including AI Chat System, Master Plan IDE Integration, and Documentation Audit & Tutorial Integration) with System Features Inventory, dependency mapping, timeline sequencing, priority matrix, parallelization opportunities, resource allocation framework, daily/weekly milestones, IDE-based project management integration, and A.3 Credentials Audit findings"
    roles = "admin,developer,devops"
    TemplateType = "Documentation"
    category = "planning,infrastructure,development,coordination,ai-systems,security"
-   page_version = "0.29"
-   last_updated = "Mon Jan 12 18:57:00 UTC 2026"
+   page_version = "0.35"
+   last_updated = "2026-01-25"
 %]
-[% PageVersion = 'root/Documentation/MASTER_PLAN_COORDINATION.tt,v 0.29 2026/01/12 18:57:00 zencoder-audit Exp - Jan 12 Master Plan Update: Workflow complete, reflecting actual state (Grok integration complete, Chat system enhanced, AI documentation updated). Version bumped 0.28→0.29. All 4-agent Daily Plan Automator pipeline validated and production-ready. Bilateral audit trail comprehensive (validation_step0.pl, updateprompt.pl, ask_questions, 138+ prompts logged). See daily_audit_log.md Jan 12, current_session.md Chat 57 Prompts 138-current, prompts_log.yaml for full audit trail.' %]
+[% PageVersion = 'root/Documentation/MASTER_PLAN_COORDINATION.tt, v 0.35 2026/01/25 18:45:00 Added #2, #14, Plan A.2, and Plan A.3 to completed list. Updated active task count and metadata.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
+<!-- AI EDITABLE: See /admin/documentation/DailyPlan.tt for daily priority work items organized by day with collapsible sections. Updated daily by Documentation Agent during audit workflow. -->
+
 <div class="app-container">
     <h1>Master Plan Coordination Dashboard</h1>
     
-    <div class="last-updated">
-        <strong>Created:</strong> 2025-12-24 | 
-        <strong>Version:</strong> 0.29 (Jan 12 18:57 - ✅ MASTER PLAN UPDATED - REFLECTING ACTUAL STATE) | 
-        <strong>Status:</strong> 📋 Active - ✅ DAILY PLAN AUTOMATOR 4-AGENT WORKFLOW COMPLETE (Chat 57 Prompts 138+) | Audit Window: Jan 11 16:30 UTC → Jan 12 18:16 UTC (25.7 hours). Code Changes: 39 files modified, 7304 insertions, 5892 deletions (2 commits). Issues Resolved: 5 (UTF-8 rendering, button routing, naming consistency, agent fragmentation, documentation consolidation). Major Completions: Grok integration (Model/Grok.pm complete), Chat system enhanced (multi-turn support), AI documentation updated (AI.tt current). Workflow Status: Daily Audit ✅ | Documentation Sync ✅ | Master Plan Update ✅ (this session) | Daily Plans Generation (next step). Bilateral Audit Trail: 138+ prompts logged, validation_step0.pl passed, updateprompt.pl --phase before executed. | 
-        <strong>Last Updated:</strong> 2026-01-12 18:57:00 UTC (Master Plan Updater Agent - Session Prompt 6. Reflecting completed infrastructure: Grok model integration, Chat controller enhancements, AI documentation synced. All 4-agent Daily Plan Automator pipeline production-ready for daily execution. See daily_audit_log.md 2026-01-12, current_session.md Chat 57, prompts_log.yaml Prompts 138+ for complete audit trail.)
-    </div>
+    <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0; padding: 0;">
+        <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+            📊 Master Status Metadata (Session Info & Audit Trail) - Click to Expand
+        </summary>
+        <div style="padding: 15px;">
+            <p><strong>Created:</strong> 2025-12-24 | <strong>Version:</strong> 0.35 (Jan 25 18:45 - ✅ COMPLETED: #1, #2, #13, #14, #15, A.2, A.3 | MOVED: Completed Tasks to admin/documentation/CompletedTasks.tt)</p>
+            <p><strong>Status:</strong> 📋 Active - ✅ COMPLETED: #1 SCHEMA DEBUG | #2 TOKEN AUTH | #13 PLANNING AGENT | #14 CHAT SYNC | #15 API KEYS | A.2 K8S READY | A.3 CRED AUDIT | ✅ REFACTORED: Completed Tasks Tab</p>
+            <p><strong>Infrastructure:</strong> 4-agent Daily Plan Automator pipeline validated, Grok integration operational, Chat system enhanced, AI documentation current.</p>
+            <p><strong>Today's Workflow (2026-01-25)</strong> 📌 <strong>NEXT PRIORITY:</strong> Select a critical item from Master Plan Priorities (A.1, B.1, or #16) for focus.</p>
+            <p><strong>Workflow Status:</strong> Daily Audit ✅ | Documentation Sync ✅ | Master Plan Update ✅ (Chat 110) | Priority Todos: 13 active items, ordered by blocking dependencies | Next Priority: See /Documentation/PriorityTodos for detailed blocking map</p>
+            <p><strong>Last Updated:</strong> 2026-01-25 18:45:00 UTC (Added #2, #14, Plan A.2, and Plan A.3 to completed list. Updated active task count and metadata.)</p>
+        </div>
+    </details>
+    
     <div class="nav-dashboard">
         <h2>Navigation Dashboard</h2>
         <div class="nav-links">
-            <!-- ⚠️ REMINDER: Update the daily plan link below each time Daily Plan Automator runs (typically at start of day) -->
-            <!-- Format: /Documentation/DailyPlans-YYYY-MM-DD where YYYY-MM-DD is today's date -->
-            <!-- Last updated: 2026-01-12 by DailyPlansGeneratorAgent - Daily Plan Automator workflow COMPLETE (Chat 57), 4-agent pipeline production-ready, audit infrastructure validated -->
-            <a href="/Documentation/DailyPlans-2026-01-12" target="_blank" class="nav-btn nav-btn-highlight">📌 TODAY'S DAILY PLAN (Jan 12) | Daily Audit COMPLETE + Documentation Sync COMPLETE + Infrastructure Consolidated + Ready for Next Phase</a>
-            <a href="/Documentation/B3ThemeHandlingAuditReport" class="nav-btn nav-btn-highlight">📋 B.3 AUDIT REPORT (NEW)</a>
-            <a href="/Documentation/DAILY_WORKFLOW_TUTORIAL" target="_blank" class="nav-btn nav-btn-highlight">📚 DAILY WORKFLOW TUTORIAL (NEW)</a>
-            <a href="/Documentation/AI_Chat_System_Master_Audit" target="_blank" class="nav-btn nav-btn-highlight">🤖 AI CHAT SYSTEM (Master Audit - Current Status & Plan)</a>
-            <a href="#system-features" class="nav-btn">System Features & Controllers</a>
-            <a href="#utilities-inventory" class="nav-btn">Utilities (16)</a>
-            <a href="#models-inventory" class="nav-btn">Models (70+)</a>
-            <a href="#executive-summary" class="nav-btn">Executive Summary</a>
-            <a href="#all-plans-inventory" class="nav-btn">All Plans Inventory</a>
-            <a href="#priority-matrix" class="nav-btn">Priority Matrix</a>
-            <a href="/Documentation/SECURITY_REMEDIATION_PLAN" class="nav-btn nav-btn-highlight">🔐 SECURITY REMEDIATION PLAN (NEW)</a>
-            <a href="#improvements-tracker" class="nav-btn">Improvements Tracker</a>
-            <a href="#dependency-map" class="nav-btn">Dependency Map</a>
-            <a href="#phase-timeline" class="nav-btn">Phase Timeline</a>
-            <a href="#parallelization" class="nav-btn">Parallel Work</a>
-            <a href="#overlapping-work" class="nav-btn">Overlapping Work</a>
-            <a href="#resource-allocation" class="nav-btn">Resources</a>
-            <a href="#update-process" class="nav-btn">Update Process</a>
-            <a href="#master-plan-architecture" class="nav-btn">Master Plan Architecture & Monitoring</a>
+            <a href="/Documentation/DailyPlan" target="_blank" class="nav-btn nav-btn-highlight" title="[% display_date %]Daily Plan for 2026-01-25: Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for focus.">📌 Daily Plan (Today 01-25)</a>
+            <a href="/Documentation/B3ThemeHandlingAuditReport" class="nav-btn nav-btn-highlight" title="B.3 Theme handling audit report findings">📋 Audit Report</a>
+            <a href="/Documentation/DailyWorkflowTutorial" target="_blank" class="nav-btn nav-btn-highlight" title="Tutorial for daily workflow processes and procedures">📚 Workflow Tutorial</a>
+            <a href="/Documentation/AiChatSystemMasterAudit" target="_blank" class="nav-btn nav-btn-highlight" title="Master audit of AI Chat System with current status">🤖 AI Chat Audit</a>
+            <a href="#system-features" class="nav-btn" title="View all system features and controllers inventory">Features</a>
+            <a href="#utilities-inventory" class="nav-btn" title="View all utility modules and helpers">Utilities</a>
+            <a href="#models-inventory" class="nav-btn" title="View database models and schema">Models</a>
+            <a href="#executive-summary" class="nav-btn" title="Executive summary of all plans and status">Summary</a>
+            <a href="#systems-container" class="nav-btn" title="Containerized list of all systems with project mappings">Systems</a>
+            <a href="#all-plans-inventory" class="nav-btn" title="Complete inventory of all 26 plans with status">Plans</a>
+            <a href="#priority-matrix" class="nav-btn" title="Priority matrix showing plan urgency and impact">Priority</a>
+            <a href="/Documentation/SecurityRemediationPlan" class="nav-btn nav-btn-highlight" title="Security remediation plan and findings">🔐 Security</a>
+            <a href="#improvements-tracker" class="nav-btn" title="Track improvements and bug fixes across projects">Improvements</a>
+            <a href="#dependency-map" class="nav-btn" title="Map dependencies between plans">Dependencies</a>
+            <a href="#phase-timeline" class="nav-btn" title="Timeline of project phases and milestones">Timeline</a>
+            <a href="#parallelization" class="nav-btn" title="Plans that can run in parallel">Parallel</a>
+            <a href="#overlapping-work" class="nav-btn" title="Plans with overlapping work scope">Overlapping</a>
+            <a href="#resource-allocation" class="nav-btn" title="Resource allocation and team assignments">Resources</a>
+            <a href="#update-process" class="nav-btn" title="How to update this master plan document">Updates</a>
+            <a href="#master-plan-architecture" class="nav-btn" title="Master plan architecture and monitoring rules">Architecture</a>
         </div>
     </div>
 
     <div class="alert alert-warning">
         <h3>🔴 MASTER COORDINATION DOCUMENT</h3>
-        <p><strong>Purpose:</strong> This is your single source of truth for ALL 14 plans (including AI Chat System). Use this to:</p>
+        <p><strong>Purpose:</strong> This is your single source of truth for ALL 26 plans (including AI Chat System). Use this to:</p>
         <ul>
             <li>Identify dependencies between plans (Plan X blocks Plan Y)</li>
             <li>Find parallelizable work (Plans that can run simultaneously)</li>
@@ -70,7 +78,7 @@
         <div class="alert alert-warning">
             <h3>🏗️ Coordination Architecture Principle</h3>
             <p><strong>Master Plan = Coordinator Only</strong> | Detailed content = Individual Plan Files</p>
-            <p>This MASTER_PLAN_COORDINATION.tt is the <strong>single source of truth for high-level overview and priorities</strong>. It does NOT contain detailed task lists, implementation specifics, or extended documentation. All detailed work for each plan is maintained in individual .tt files (one per plan). This architecture keeps the master plan lean, readable, and maintainable.</p>
+            <p>This MasterPlanCoordination.tt is the <strong>single source of truth for high-level overview and priorities</strong>. It does NOT contain detailed task lists, implementation specifics, or extended documentation. All detailed work for each plan is maintained in individual .tt files (one per plan). This architecture keeps the master plan lean, readable, and maintainable.</p>
         </div>
 
         <h3>Architecture Rules</h3>
@@ -86,17 +94,17 @@
                 <tr style="background: #fafafa;">
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Master Plan = Links</strong></td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Master plan references each plan with 1-2 sentence summary + link to dedicated plan file</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><code>&lt;a href="/Documentation/Plans/A1_Configuration_Infrastructure"&gt;A.1: Configuration Infrastructure&lt;/a&gt;</code> Status: ✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>&lt;a href="/Documentation/Plans/A1ConfigurationInfrastructure"&gt;A.1: Configuration Infrastructure&lt;/a&gt;</code> Status: ✅ COMPLETE</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Individual Plan Files</strong></td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Each plan has dedicated .tt file containing: full description, task list, timeline, resources, status, dependencies, notes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">/Documentation/Plans/A1_Configuration_Infrastructure.tt (v1.00) = detailed plan document</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">/Documentation/Plans/A1ConfigurationInfrastructure.tt (v1.00) = detailed plan document</td>
                 </tr>
                 <tr style="background: #fafafa;">
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>No Duplication</strong></td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Detailed content appears ONLY in individual plan files, never in master plan</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Task breakdown (10+ items) = belongs in A1_Configuration_Infrastructure.tt, not in MASTER_PLAN_COORDINATION.tt</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Task breakdown (10+ items) = belongs in A1ConfigurationInfrastructure.tt, not in MasterPlanCoordination.tt</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Master Plan Size</strong></td>
@@ -118,7 +126,7 @@
                 <strong>✅ Plan Count Sync</strong>
                 <ul style="margin: 10px 0 0 0; padding-left: 20px;">
                     <li>Count all plans in "All Plans Inventory" (source of truth)</li>
-                    <li>Verify every section references same count (currently 16 plans)</li>
+                    <li>Verify every section references same count (currently 26 plans)</li>
                     <li>Look for: "X of Y plans", plan lists, plan counts</li>
                     <li>Alert: Log divergence to prompts_log.yaml</li>
                 </ul>
@@ -157,22 +165,21 @@
             <p><strong>⚠️ TERMINOLOGY CONFUSION DISCOVERED (Chat 33)</strong></p>
             <p>Agents frequently confuse these two critical operations:</p>
             <ul style="margin: 10px 0; padding-left: 20px;">
-                <li><strong>/chathandoff</strong> (Rule 5 keyword): Move to NEXT CHAT within SAME SESSION
+                <li><strong>/chathandoff</strong> (Rule 3 keyword): Move to NEXT CHAT within SAME SESSION
                     <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.95em;">
-                        <li>Updates current_session.md with new Chat entry</li>
-                        <li>Increments chat counter (Chat 32 → Chat 33)</li>
+                        <li>Logs <code>/chathandoff</code> entry to <code>prompts_log.yaml</code></li>
+                        <li>Increments chat counter in <code>prompts_log.yaml</code> (Chat 32 → Chat 33)</li>
                         <li>Maintains same session context</li>
                         <li>Agent continues in same session focus</li>
                         <li><strong>Example</strong>: After Chat 33, execute /chathandoff to create Chat 34 WITHIN same session</li>
                     </ul>
                 </li>
-                <li><strong>/sessionhandoff</strong> (Rule 5 keyword): Archive ENTIRE SESSION, start fresh
+                <li><strong>/sessionhandoff</strong> (Rule 3 keyword): Archive ENTIRE SESSION, start fresh
                     <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.95em;">
-                        <li>Copies current_session.md to archive file (YYYY-MM-DD_session_handoff.md)</li>
-                        <li>Resets current_session.md to blank template</li>
-                        <li>Resets chat counter to 1</li>
+                        <li>Finalizes audit logs in <code>prompts_log.yaml</code></li>
+                        <li>Resets prompt counter to 1</li>
                         <li>Clears all accumulated session state</li>
-                        <li><strong>Example</strong>: After 18+ chats with degraded memory, execute /sessionhandoff to archive and start Chat 1 of new session</li>
+                        <li><strong>Example</strong>: After 18+ prompts with degraded memory, execute /sessionhandoff to archive and start Chat 1 of new session</li>
                     </ul>
                 </li>
             </ul>
@@ -181,7 +188,7 @@
         </div>
 
         <h3>Individual Plan File Structure Template</h3>
-        <p>When creating a new plan file (e.g., Plans/A1_Configuration_Infrastructure.tt), follow this structure:</p>
+        <p>When creating a new plan file (e.g., Plans/A1ConfigurationInfrastructure.tt), follow this structure:</p>
         <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0; overflow-x: auto; font-size: 12px;"><code>[% META
    title = "Plan A.1: Configuration Infrastructure"
    description = "Configuration management, Zencoder setup, IDE integration, agent specifications"
@@ -213,7 +220,7 @@
 - Team members, hours, tools
 
 ## Related Master Plan Links
-- See MASTER_PLAN_COORDINATION.tt for plan overview
+- See MasterPlanCoordination.tt for plan overview
 - See related plan [X] for dependencies
 </code></pre>
     </div>
@@ -244,7 +251,7 @@
                     <td><strong>AI Chat System</strong></td>
                     <td>Real-time AI-assisted documentation search, code search, and query system. Phase 1 complete with 6 result tables (AiMessage, DocumentationIndex, CodeSearchIndex, WebSearchResult, ModelConfig, RoleAccess). Enables instant context-aware assistance.</td>
                     <td><code>AI</code> Controller, Models: <code>AiMessage</code>, <code>AiConversation</code>, <code>AiModelConfig</code>, <code>DocumentationIndex</code>, <code>CodeSearchIndex</code>, <code>WebSearchResult</code></td>
-                    <td><a href="Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" class="doc-link">Feature Spec</a> | <a href="Documentation/AI_Chat_Schema_Documentation" class="doc-link">Schema</a> | <a href="Documentation/models/AiMessage.tt" class="doc-link">📄 AiMessage.tt</a> | <a href="Documentation/models/AiConversation.tt" class="doc-link">📄 AiConversation.tt</a></td>
+                    <td><a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" class="doc-link">Feature Spec</a> | <a href="/Documentation/AI_Chat_Schema_Documentation" class="doc-link">Schema</a> | <a href="/Documentation/AiConversation" class="doc-link">✅ AiConversation.tt</a> | <a href="/Documentation/AiModelConfig" class="doc-link">✅ AiModelConfig.tt</a> | <a href="/Documentation/CodeSearchIndex" class="doc-link">✅ CodeSearchIndex.tt</a> | <a href="/Documentation/WebSearchResult" class="doc-link">✅ WebSearchResult.tt</a> | <a href="/Documentation/models/AiMessage.tt" class="doc-link">📄 AiMessage</a></td>
                 </tr>
                 <tr>
                     <td><strong>Todo System</strong></td>
@@ -256,7 +263,7 @@
                     <td><strong>Documentation System</strong></td>
                     <td>In-application wiki with role-specific, site-specific, and module-specific documentation. Template Toolkit (.tt) based with visibility rules, metadata tracking, and changelog support. 314+ documentation files organized by domain.</td>
                     <td><code>Documentation</code> Controller, Models: <code>Documentation</code>, <code>Page</code>, <code>PageTb</code>, <code>Menu</code>, <code>MenuItem</code>, <code>Navigation</code>, <code>DocumentationRoleAccess</code>, <code>DocumentationMetadataIndex</code></td>
-                    <td><a href="Documentation/ComservSystems" class="doc-link">System Overview</a> | <a href="Documentation/Documentation_Workflow" class="doc-link">Workflow</a> | <a href="Documentation/models/Documentation.tt" class="doc-link">📄 Documentation.tt</a> | <a href="Documentation/models/Page.tt" class="doc-link">📄 Page.tt</a></td>
+                    <td><a href="/Documentation/ComservSystems" class="doc-link">System Overview</a> | <a href="/Documentation/Documentation_Workflow" class="doc-link">Workflow</a> | <a href="/Documentation/Documentation" class="doc-link">✅ Documentation.tt</a> | <a href="/Documentation/controllers/Documentation_Controller" class="doc-link">Controller</a> | <a href="/Documentation/models/Page.tt" class="doc-link">📄 Page.tt</a></td>
                 </tr>
                 <tr>
                     <td><strong>WorkShop (Training & Workshops)</strong></td>
@@ -290,8 +297,8 @@
                 <tr>
                     <td><strong>Database Schema Management</strong></td>
                     <td>Dynamic database schema creation, comparison, and migration. DBIx::Class Result class-based approach with auto-table creation from Result files. Supports multiple database schemas (ENCY, BMaster, etc.).</td>
-                    <td><code>Admin</code>, <code>Setup</code> Controllers, ConfigDatabaseInit Utility</td>
-                    <td><a href="Documentation/AI_Chat_Schema_Documentation" class="doc-link">Schema</a> | <a href="Documentation/models/model_list" class="doc-link">Model List</a> | <a href="Documentation/developer/db_config_loading" class="doc-link">✅ Config</a></td>
+                    <td><code>Admin</code>, <code>Setup</code> Controllers, ConfigDatabaseInit, DBSchemaManager Utilities</td>
+                    <td><a href="/Documentation/AI_Chat_Schema_Documentation" class="doc-link">Schema</a> | <a href="/Documentation/models/model_list" class="doc-link">Model List</a> | <a href="/Documentation/developer/db_config_loading" class="doc-link">✅ Config</a> | <a href="/Documentation/DBSchemaManager" class="doc-link">✅ DBSchemaManager.tt</a></td>
                 </tr>
 
                 <!-- Domain-Specific Systems -->
@@ -658,7 +665,7 @@
                 <tr>
                     <td><strong>RemoteDB</strong></td>
                     <td>Remote database connection management. Multi-database configuration, connection pooling, database switching, and schema management.</td>
-                    <td><a href="/Documentation/controllers/RemoteDB.tt" class="doc-link">📄 MISSING DOCS</a> | Controller: <code>RemoteDB.pm</code></td>
+                    <td><a href="/Documentation/RemoteDB" class="doc-link">✅ RemoteDB.tt</a> | Controller: <code>RemoteDB.pm</code></td>
                 </tr>
                 <tr>
                     <td><strong>RemoteDBExample</strong></td>
@@ -858,7 +865,12 @@
                 <tr>
                     <td><strong>RemoteDB</strong></td>
                     <td>Remote database connection management and pooling. Multi-database configuration, connection switching, remote schema access.</td>
-                    <td><a href="Documentation/utils/RemoteDB.tt" class="doc-link">📄 MISSING DOCS</a></td>
+                    <td><a href="/Documentation/RemoteDB" class="doc-link">✅ RemoteDB.tt</a></td>
+                </tr>
+                <tr>
+                    <td><strong>DBSchemaManager</strong></td>
+                    <td>Database schema management and migration utilities. Schema comparison, migration execution, table/column management, schema versioning.</td>
+                    <td><a href="/Documentation/DBSchemaManager" class="doc-link">✅ DBSchemaManager.tt</a></td>
                 </tr>
                 <tr>
                     <td><strong>SiteHelper</strong></td>
@@ -887,11 +899,11 @@
         <table class="status-table">
             <tr>
                 <td>✅ Documented:</td>
-                <td>8 utilities (BackupManager, ConfigDatabaseInit, DocumentationConfig, EnvFileManager, Logging, NetworkMap, StarmanDiagnostics, StarmanServiceManager, SystemInfo)</td>
+                <td>10 utilities (BackupManager, ConfigDatabaseInit, DBSchemaManager, DocumentationConfig, EnvFileManager, Logging, NetworkMap, RemoteDB, StarmanDiagnostics, StarmanServiceManager, SystemInfo)</td>
             </tr>
             <tr>
                 <td>📄 Missing Docs:</td>
-                <td>8 utilities (AdminAuth, CloudflareManager, DockerManager, Encryption, ProxmoxCredentials, RemoteDB, SiteHelper)</td>
+                <td>6 utilities (AdminAuth, CloudflareManager, DockerManager, Encryption, ProxmoxCredentials, SiteHelper)</td>
             </tr>
         </table>
     </div>
@@ -920,7 +932,7 @@
                     <td><strong>🤖 AI Chat System</strong></td>
                     <td>AiMessage, AiConversation, AiModelConfig, DocumentationIndex, CodeSearchIndex, WebSearchResult</td>
                     <td>Conversation storage, message threading, model configuration, searchable indexes for documentation and code.</td>
-                    <td><a href="Documentation/models/AiMessage.tt" class="doc-link">📄 MISSING</a></td>
+                    <td><a href="/Documentation/AiConversation" class="doc-link">✅ AiConversation.tt</a> | <a href="/Documentation/AiModelConfig" class="doc-link">✅ AiModelConfig.tt</a> | <a href="/Documentation/CodeSearchIndex" class="doc-link">✅ CodeSearchIndex.tt</a> | <a href="/Documentation/WebSearchResult" class="doc-link">✅ WebSearchResult.tt</a> | <a href="/Documentation/models/AiMessage.tt" class="doc-link">📄 AiMessage</a></td>
                 </tr>
                 <tr style="background-color: #fff3e0;">
                     <td><strong>📋 Task Management</strong></td>
@@ -932,7 +944,7 @@
                     <td><strong>📖 Documentation</strong></td>
                     <td>Documentation, Page/PageTb, Menu/MenuItem, Navigation, DocumentationRoleAccess, DocumentationMetadataIndex</td>
                     <td>Page content, dynamic pages, navigation menus, role-based access control, metadata indexing.</td>
-                    <td><a href="Documentation/models/Documentation.tt" class="doc-link">📄 MISSING</a></td>
+                    <td><a href="/Documentation/Documentation" class="doc-link">✅ Documentation.tt</a> | <a href="/Documentation/models/Page.tt" class="doc-link">📄 Page</a> | <a href="/Documentation/models/Menu.tt" class="doc-link">📄 Menu</a></td>
                 </tr>
                 <tr style="background-color: #e8f5e9;">
                     <td><strong>👥 User Management</strong></td>
@@ -1007,16 +1019,16 @@
         <table class="status-table">
             <tr>
                 <td>✅ Documented:</td>
-                <td>3 models (Todo, User, Site)</td>
+                <td>7 models (Todo, User, Site, AiConversation, AiModelConfig, CodeSearchIndex, WebSearchResult)</td>
             </tr>
             <tr>
                 <td>📄 Missing Documentation:</td>
-                <td>67+ models - <strong>PRIORITY:</strong> 8 AI Chat models (AiMessage, AiConversation, AiModelConfig, DocumentationIndex, CodeSearchIndex, WebSearchResult, DocumentationRoleAccess, DocumentationMetadataIndex)</td>
+                <td>63+ models - <strong>PRIORITY:</strong> 4 AI Chat models (AiMessage, DocumentationIndex, DocumentationRoleAccess, DocumentationMetadataIndex)</td>
             </tr>
         </table>
 
         <h3>Complete Models List (70+ Total)</h3>
-        <p><strong>Alphabetical Index:</strong> AiConversation • AiMessage • AiModelConfig • Calendar • Category • CodeSearchIndex • Content • Documentation • DocumentationIndex • DocumentationMetadataIndex • DocumentationRoleAccess • EnvVariable • EnvVariableAuditLog • Event • File • Forager • Group • Herb • InternalLinksTb • Log • Mail • MailDomain • Media • Menu • MenuItem • Navigation • NetworkDevice • Ollama • Page • PageTb • Pallet • Participant • Project • ProjectSite • Queen • Reference • Site • SiteConfig • SiteDomain • SiteTheme • SiteUser • SiteWorkshop • Theme • ThemeVariable • Todo • User • UserGroup • UserSite • WebSearchResult • WorkShop • Yard</p>
+        <p><strong>Alphabetical Index (70+ Models):</strong> <a href="/Documentation/AiConversation" class="doc-link">✅ AiConversation</a> • AiMessage • <a href="/Documentation/AiModelConfig" class="doc-link">✅ AiModelConfig</a> • Calendar • Category • <a href="/Documentation/CodeSearchIndex" class="doc-link">✅ CodeSearchIndex</a> • Content • Documentation • DocumentationIndex • DocumentationMetadataIndex • DocumentationRoleAccess • EnvVariable • EnvVariableAuditLog • Event • File • Forager • Group • Herb • InternalLinksTb • Log • Mail • MailDomain • Media • Menu • MenuItem • Navigation • NetworkDevice • Ollama • Page • PageTb • Pallet • Participant • Project • ProjectSite • Queen • Reference • Site • SiteConfig • SiteDomain • SiteTheme • SiteUser • SiteWorkshop • Theme • ThemeVariable • Todo • User • UserGroup • UserSite • <a href="/Documentation/WebSearchResult" class="doc-link">✅ WebSearchResult</a> • WorkShop • Yard</p>
     </div>
 
     <div class="content-section">
@@ -1088,13 +1100,25 @@
     </div>
 
     <div class="content-section">
+        <h2 id="systems-container">2.5. Systems & Projects Container</h2>
+        <details>
+            <summary style="cursor: pointer; font-size: 1.1em; padding: 10px; background: #f5f5f5; border-radius: 4px; border-left: 4px solid #2196f3;">
+                <strong>📦 Click to expand: All Systems with Project Mappings</strong>
+            </summary>
+            <div style="padding: 20px; margin-top: 10px;">
+                [% INCLUDE 'Documentation/SystemsMaster.tt' %]
+            </div>
+        </details>
+    </div>
+
+    <div class="content-section">
         <h2 id="all-plans-inventory">3. Complete Plans Inventory (15 Total - NEW: AI Chat System & IDE Master Plan Integration)</h2>
         <p>Detailed breakdown of every plan with status, dependencies, and key details. Click plan titles to open in new tabs. <strong>NEW in this version:</strong> Plan E.1 (AI Chat System) with detailed daily/weekly milestones for developers. <strong>ADDED:</strong> Plan F.1 (IDE-Based Master Plan Integration using System Features Inventory as active ToDo system).</p>
 
-        <h3 class="category-header">🔴 Category A: Infrastructure & Kubernetes Migration (3 Plans - CRITICAL)</h3>
+        <h3 id="category-a" class="category-header">🔴 Category A: Infrastructure & Kubernetes Migration (3 Plans - CRITICAL)</h3>
 
         <div class="plan-card plan-card-critical">
-            <h4 class="plan-title">
+            <h4 id="plan-a1" class="plan-title">
                 Plan A.1: <a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt" target="_blank" class="doc-link">PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</a>
             </h4>
             <table class="plan-table">
@@ -1139,17 +1163,17 @@
         </div>
 
         <div class="plan-card plan-card-warning">
-            <h4 class="plan-title">
-                Plan A.2: <a href="/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt" target="_blank" class="doc-link">PHASE_0_KUBERNETES_READINESS_PLAN.tt</a>
+            <h4 id="plan-a2" class="plan-title">
+                Plan A.2: <a href="/Documentation/system/Phase0KubernetesReadinessPlan.tt" target="_blank" class="doc-link">Phase0KubernetesReadinessPlan.tt</a>
             </h4>
             <table class="plan-table">
                 <tr>
                     <td class="plan-label"><strong>File Location:</strong></td>
-                    <td><code>system/PHASE_0_KUBERNETES_READINESS_PLAN.tt</code></td>
+                    <td><code>system/Phase0KubernetesReadinessPlan.tt</code></td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Status:</strong></td>
-                    <td>📋 DRAFT - Awaiting Approval (Infrastructure Updated)</td>
+                    <td>✅ COMPLETED (Jan 13, 2026)</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Version:</strong></td>
@@ -1161,30 +1185,30 @@
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>Make Comserv application K8s-ready without breaking Docker/local deployments. Leverage db_config.json authority and RemoteDB.pm configuration system</td>
+                    <td>Make Comserv application K8s-ready without breaking Docker/local deployments. Leverage db_config.json authority and RemoteDB.pm configuration system - COMPLETED</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Complexity:</strong></td>
-                    <td>🟠 High - Code modifications needed, but isolated to config system</td>
+                    <td>🟠 High - Code modifications completed, isolated to config system</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Blocks:</strong></td>
-                    <td>A.1 (DB K8s Migration) - BLOCKING</td>
+                    <td>A.1 (DB K8s Migration) - Ready to proceed</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Depends On:</strong></td>
-                    <td>A.3 (Credentials Audit) - informational, not blocking</td>
+                    <td>A.3 (Credentials Audit) - COMPLETED Jan 13</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Timeline Est.:</strong></td>
-                    <td>1 week (URGENT - this week)</td>
+                    <td>COMPLETED Jan 13, 2026</td>
                 </tr>
             </table>
-            <p class="plan-note alert alert-warning"><strong>⚠️ URGENT:</strong> This plan is waiting for approval. It has infrastructure details added. BLOCKING A.1. Needs sign-off ASAP.</p>
+            <p class="plan-note alert alert-success"><strong>✅ COMPLETED:</strong> A.2 K8s Readiness plan finished Jan 13, 2026. Infrastructure details finalized. Ready to unblock A.1.</p>
         </div>
 
         <div class="plan-card plan-card-info">
-            <h4 class="plan-title">
+            <h4 id="plan-a3" class="plan-title">
                 Plan A.3: <a href="/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN.tt" target="_blank" class="doc-link">CREDENTIALS_AUDIT_AND_PLAN.tt</a>
             </h4>
             <table class="plan-table">
@@ -1194,7 +1218,7 @@
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Status:</strong></td>
-                    <td>📋 Planning</td>
+                    <td>✅ COMPLETED (Jan 13, 2026)</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Priority:</strong></td>
@@ -1202,11 +1226,11 @@
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>Audit all credentials (DB passwords, API keys, secrets) and plan secure storage strategy for Docker/K8s</td>
+                    <td>Audit all credentials (DB passwords, API keys, secrets) and plan secure storage strategy for Docker/K8s - AUDIT COMPLETED: docker-compose files use K8s Secrets pattern, .env files properly gitignored</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Complexity:</strong></td>
-                    <td>🟠 High - Security-critical work</td>
+                    <td>🟠 High - Security-critical work (Audit phase complete)</td>
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Supports:</strong></td>
@@ -1214,15 +1238,15 @@
                 </tr>
                 <tr>
                     <td class="plan-label"><strong>Timeline Est.:</strong></td>
-                    <td>1 week (parallel to A.2 review)</td>
+                    <td>COMPLETED - Audit finished Jan 13 (implementation phases ongoing)</td>
                 </tr>
             </table>
         </div>
 
-        <h3 class="category-header">🔴 Category B: Security & Bug Fixes (3 Plans - CRITICAL)</h3>
+        <h3 id="category-b" class="category-header">🔴 Category B: Security & Bug Fixes (3 Plans - CRITICAL)</h3>
 
         <div class="plan-card plan-card-critical">
-            <h4 class="plan-title">
+            <h4 id="plan-b1" class="plan-title">
                 Plan B.1: <a href="/Documentation/docker_secrets_fallback_debugging_plan.tt" target="_blank" class="doc-link">docker_secrets_fallback_debugging_plan.tt</a>
             </h4>
             <table class="plan-table">
@@ -1259,7 +1283,7 @@
         </div>
 
         <div class="plan-card plan-card-warning">
-            <h4 class="plan-title">
+            <h4 id="plan-b2" class="plan-title">
                 Plan B.2: <a href="/Documentation/authentication_evolution_plan.tt" target="_blank" class="doc-link">authentication_evolution_plan.tt</a>
             </h4>
             <table class="plan-table">
@@ -1296,7 +1320,7 @@
         </div>
 
         <div class="plan-card plan-card-info">
-            <h4 class="plan-title">
+            <h4 id="plan-b3" class="plan-title">
                 Plan B.3: <a href="/Documentation/ai_workflows/zencoder_reset_plan.tt" target="_blank" class="doc-link">zencoder_reset_plan.tt</a>
             </h4>
             <table class="plan-table">
@@ -1319,10 +1343,10 @@
             </table>
         </div>
 
-        <h3 class="category-header">🟠 Category C: Documentation System (2 Plans - FOUNDATIONAL)</h3>
+        <h3 id="category-c" class="category-header">🟠 Category C: Documentation System (2 Plans - FOUNDATIONAL)</h3>
 
         <div class="plan-card plan-card-warning">
-            <h4 class="plan-title">
+            <h4 id="plan-c1" class="plan-title">
                 Plan C.1: <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt" target="_blank" class="doc-link">DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</a>
             </h4>
             <table class="plan-table">
@@ -1360,1029 +1384,7 @@
                 </tr>
             </table>
             <p class="plan-note"><strong>📌 Coordination Note:</strong> This is foundational. Its findings will inform documentation changes across all other plans. Can run in parallel with infrastructure plans.</p>
-            <p class="plan-note alert alert-info"><strong>⚠️ Phase 3 ADD: CSS Theme Compliance Refactoring:</strong> Across 17 documentation .tt files, there are 1,527 inline style="..." attributes that need refactoring to use CSS variables (--text-color, --spacing-medium, etc.). This improves maintainability and enables future theme changes. Target: Complete this phase after Code controller audit (Phase 2). Estimated: 1-2 weeks for full refactoring + testing. <strong>See:</strong> <a href="/Documentation/B3ThemeHandlingAuditReport" target="_blank" class="doc-link">B3ThemeHandlingAuditReport</a> for detailed audit findings (1,936 inline styles found across 56 files).</p>
-        </div>
-
-        <div class="plan-card plan-card-info">
-            <h4 class="plan-title">
-                Plan C.2: <a href="/Documentation/Documentation_Workflow.tt" target="_blank" class="doc-link">Documentation_Workflow.tt</a>
-            </h4>
-            <table class="plan-table">
-                <tr>
-                    <td class="plan-label"><strong>File Location:</strong></td>
-                    <td><code>Documentation_Workflow.tt</code></td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Status:</strong></td>
-                    <td>⚠️ REVIEW - Workflow implementation needed</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Priority:</strong></td>
-                    <td>🟠 HIGH (2 of 2) - Enables documentation creation</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>Define workflow for creating, editing, validating documentation files in proper .tt format</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Supports:</strong></td>
-                    <td>C.1 (Documentation audit work)</td>
-                </tr>
-            </table>
-        </div>
-
-        <h3 class="category-header">🔵 Category E: AI Infrastructure (1 Plan - FOUNDATIONAL FOR ALL SYSTEMS)</h3>
-
-        <div class="plan-card plan-card-critical">
-            <h4 class="plan-title">
-                Plan E.1: <a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt" target="_blank" class="doc-link">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</a>
-            </h4>
-            <table class="plan-table">
-                <tr>
-                    <td class="plan-label"><strong>File Location:</strong></td>
-                    <td><code>AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</code></td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Status:</strong></td>
-                    <td>✅ Phase 1 COMPLETE (Database Layer) → Phase 2-4 EXPANDED with NEW FEATURES: Grok API, Conversation Resume, Grok.ai UI, Admin Controls</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Version:</strong></td>
-                    <td>0.05 (Jan 6 Feature Expansion - Grok API, Conversation Resume, Admin Controls)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Priority:</strong></td>
-                    <td>🔴 CRITICAL (Supports ALL development & documentation work)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>AI Chat widget integrated into Comserv application with documentation search, role-based access, multi-model support (Ollama + XAI + 🆕Grok API), code search (dev/admin), web search integration, comprehensive audit logging, 🆕conversation resume page (/ai/conversations), 🆕Grok.ai-style UI design, and 🆕admin controls for dynamic model/agent configuration. 6 core database tables: AiMessage, AiConversation, DocumentationMetadataIndex, CodeSearchIndex, WebSearchResult, AiModelConfig</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Current Implementation:</strong></td>
-                    <td>✅ Phase 1 Complete: Database schema initialized on app startup. 6 tables created (AiMessage, AiConversation, DocumentationMetadataIndex, CodeSearchIndex, WebSearchResult, AiModelConfig). 🆕 NEW Phase 2-4: Grok API service, conversation resume page at /ai/conversations with search/filter, Grok.ai UI redesign, admin model/agent configuration UI</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Complexity:</strong></td>
-                    <td>🟠 High - Spans database, model layer, controller endpoints, and frontend widget</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Enables:</strong></td>
-                    <td>D.1-D.5 (Development features), C.1 (Documentation audit - AI assists with documentation management), B.2 (Auth system can leverage AI for help), ALL future features (AI assistance throughout app)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Parallel Execution:</strong></td>
-                    <td>✅ YES - Runs in parallel with infrastructure, security, and documentation plans. No blocking dependencies.</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
-                    <td>8-10 weeks total (Phase 1: ✅ DONE, Phase 2: 2-3 weeks, Phase 3: 2-3 weeks + Grok.ai UI redesign, Phase 4: 2-3 weeks + admin controls, Phase 5: 1-2 weeks integration & testing)</td>
-                </tr>
-            </table>
-            <p class="plan-note alert alert-success"><strong>📌 MAJOR MILESTONE ACHIEVED (Jan 6):</strong> Phase 1 database layer COMPLETE. 🆕 NEW Jan 6 Update: Added 4 critical Phase 2-4 features: (1) Grok API integration for llama.ai Grok model support, (2) Conversation resume page at /ai/conversations with search/filter/context preservation, (3) Grok.ai-style UI redesign (dark theme, modern typography), (4) Admin model/agent configuration UI for dynamic switching. See <a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" class="doc-link">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt v0.05</a> for complete details and updated phase timeline.</p>
-            
-            <div class="alert alert-warning">
-                <h4>🟡 PHASE 3 BLOCKERS & IMMEDIATE ACTION ITEMS (Jan 7 - IN PROGRESS)</h4>
-                <p><strong>Status:</strong> F3 IMPLEMENTED. Remaining: F1 (Menu Link), F2 (App Startup Init), F4 (Health Banner)</p>
-                <p><strong>Note:</strong> AI configuration code being consolidated from Admin.pm to AI.pm controller (separation of concerns). Config management (add/edit/delete) will move to dedicated AI controller to reduce Admin.pm complexity.</p>
-                <ul>
-                    <li>✅ <code>ai_model_config</code> - Error handler in place</li>
-                    <li>✅ <code>documentation_metadata_index</code> - Covered by F3 error handling</li>
-                    <li>✅ <code>code_search_index</code> - Covered by F3 error handling</li>
-                    <li>✅ <code>web_search_results</code> - Covered by F3 error handling</li>
-                    <li>✅ <code>documentation_role_access</code> - Covered by F3 error handling</li>
-                </ul>
-                
-                <h5>🔧 FIXES REQUIRED:</h5>
-                <ol>
-                    <li><strong>F1: Add Admin Menu Link to AI Configuration</strong>
-                        <ul>
-                            <li>File: <code>root/layout.tt</code> or <code>root/admin/index.tt</code></li>
-                            <li>Action: Add link to <code>/admin/ai/configure</code> in admin top navigation menu</li>
-                            <li>Label: "🤖 AI Configuration" or "API Key Management"</li>
-                            <li>Visibility: Admin-only role check</li>
-                            <li>Status: ⏳ PENDING</li>
-                        </ul>
-                    </li>
-                    <li><strong>F2: Fix Schema Auto-Creation on App Startup</strong>
-                        <ul>
-                            <li>File: <code>lib/Comserv.pm</code> method <code>_initialize_ai_chat_schema()</code> (lines 303-342)</li>
-                            <li>Issue: Tables logged as "not found" but not auto-created</li>
-                            <li>Solution: Call existing DBSchemaManager->create_table_from_fields() for each AI Result file</li>
-                            <li>Status: ⏳ PENDING</li>
-                        </ul>
-                    </li>
-                    <li><strong>F3: Add Error Handlers with Redirect to Schema Fix</strong>
-                        <ul>
-                            <li>File: <code>lib/Comserv/Controller/Admin.pm</code> - <code>ai_configure()</code> method (lines 2118-2191)</li>
-                            <li>Implementation: Wrapped DB queries in try-catch. On table-missing error, attempts auto-creation via DBSchemaManager. Falls back to schema-comparison link if creation fails.</li>
-                            <li>Status: ✅ COMPLETE (Chat 36, Prompt 12)</li>
-                        </ul>
-                    </li>
-                    <li><strong>F4: Update /admin/ai/configure to Check Database Health</strong>
-                        <ul>
-                            <li>On page load: Verify all 5 AI Chat tables exist</li>
-                            <li>If missing: Show warning banner with links to fix (F2, F3 above)</li>
-                            <li>Don't block form display, but warn user about missing backend</li>
-                            <li>Status: ⏳ PENDING</li>
-                        </ul>
-                    </li>
-                </ol>
-                
-                <h5>📋 Related Documents & References:</h5>
-                <ul>
-                    <li><a href="/Documentation/E1_Grok_AI_Integration_Plan" class="doc-link">E1_Grok_AI_Integration_Plan.tt</a> - Phase 3 admin interface (COMPLETE, needs schema fixes)</li>
-                    <li><a href="/admin/compare_schema" class="doc-link">Admin Schema Compare Tool</a> - Existing tool to sync tables</li>
-                    <li><a href="/admin/schema_manager" class="doc-link">Admin Schema Manager</a> (if available) - Auto-create from Result classes</li>
-                </ul>
-            </div>
-        </div>
-
-        <h4 class="subsection-header">📅 AI Chat System: NEXT STEPS (Daily/Weekly Milestones for Developers)</h4>
-        
-        <div class="plan-detail">
-            <h5>🔴 THIS WEEK (Days 1-5): Phase 1 Completion - Database Model Classes</h5>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
-                <p><strong>Daily Objectives:</strong></p>
-                <ol>
-                    <li><strong>Day 1:</strong> Verify database schema initialization works
-                        <ul>
-                            <li>Start app, check application logs for: "ai_chat_schema - AI Chat schema check complete"</li>
-                            <li>Verify no critical errors in startup logs (warnings about table creation are expected/normal)</li>
-                            <li>Reference: <code>Comserv.pm:_initialize_ai_chat_schema()</code> lines 303-342</li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 2:</strong> Create DBIx::Class Result classes for 5 tables
-                        <ul>
-                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm</code></li>
-                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm</code></li>
-                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/WebSearchResults.pm</code></li>
-                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</code></li>
-                            <li>Create: <code>lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm</code></li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 3:</strong> Write relationship mappings between Result classes
-                        <ul>
-                            <li>Add relationships in Result classes (has_many, belongs_to, many_to_many)</li>
-                            <li>Test: <code>carton exec prove -lv t/model_AIChat.t</code></li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 4:</strong> Create helper repository class for AI Chat queries
-                        <ul>
-                            <li>Create: <code>lib/Comserv/Util/AIChatRepository.pm</code></li>
-                            <li>Methods: search_documentation(), search_code(), log_conversation(), get_role_access()</li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 5:</strong> Document Phase 1 completion in AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt
-                        <ul>
-                            <li>Update version to 0.03</li>
-                            <li>Mark Phase 1 as COMPLETE in status</li>
-                            <li>Add Phase 2 start date</li>
-                        </ul>
-                    </li>
-                </ol>
-            </div>
-
-            <h5>🟠 NEXT 2-3 WEEKS (Phase 2): API Endpoints & Controller Integration</h5>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
-                <p><strong>Weekly Milestones:</strong></p>
-                <ul>
-                    <li><strong>Week 2:</strong>
-                        <ul>
-                            <li>Create <code>lib/Comserv/Controller/AIChat.pm</code> with endpoints:
-                                <ul>
-                                    <li><code>POST /ai/chat/query</code> - Submit question</li>
-                                    <li><code>GET /ai/chat/history</code> - Get conversation history</li>
-                                    <li><code>GET /ai/chat/search/docs</code> - Search documentation</li>
-                                    <li><code>GET /ai/chat/search/code</code> - Search code (dev/admin only)</li>
-                                </ul>
-                            </li>
-                            <li>Implement role-based access checks</li>
-                            <li>Write unit tests for all endpoints</li>
-                        </ul>
-                    </li>
-                    <li><strong>Week 3:</strong>
-                        <ul>
-                            <li>Integrate Ollama API calls in AIChatRepository</li>
-                            <li>Implement documentation metadata indexing (scan /Documentation/ folder on startup)</li>
-                            <li>Test with actual Ollama instance</li>
-                        </ul>
-                    </li>
-                    <li><strong>Week 4 (early):</strong>
-                        <ul>
-                            <li>Add web search integration (if configured)</li>
-                            <li>Implement audit logging to database</li>
-                            <li>Phase 2 complete & tested</li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-
-            <h5>🟡 WEEKS 4-6: Phase 3 - Frontend Widget & Full Integration</h5>
-            <div style="background: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px;">
-                <ul>
-                    <li>Build chat widget component (JavaScript/CSS)</li>
-                    <li>Integrate into <code>root/layout.tt</code> (visible on all pages)</li>
-                    <li>Complete feature testing & documentation</li>
-                    <li>Release as Phase 1 Feature (basic chat + doc search)</li>
-                </ul>
-            </div>
-
-            <h5>🚨 CRITICAL FINDING: Agent Compliance & Workflow Enforcement Architecture (Jan 3, 2026)</h5>
-            <div style="background: #ffebee; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 5px; border-left: 4px solid #c62828;">
-                <p><strong>Issue Identified in Chat 14:</strong> AI agents read the coding-standards.yaml rules but don't consistently follow them. Protocol compliance degrades within 3-4 prompts despite mandatory enforcement language.</p>
-                
-                <p><strong>Root Cause:</strong> Agents treat rules as guidelines, not absolute gates. Judgment calls about "helpful explanations" override mandatory workflow sequences (Work → /updateprompt.pl → ask_questions() → Act → End).</p>
-                
-                <p><strong>Proposed Solutions for Future Implementation:</strong></p>
-                <ol>
-                    <li><strong>System-Level Role Override</strong>
-                        <ul>
-                            <li>Embed enforcement role at system prompt level (not just in YAML rules)</li>
-                            <li>Make rules absolute law, not guidelines</li>
-                            <li>Prevents agent judgment calls from overriding workflow</li>
-                        </ul>
-                    </li>
-                    <li><strong>Execution-First Gating Architecture</strong>
-                        <ul>
-                            <li>Lock workflow so agent cannot output text until mandatory sequence completes</li>
-                            <li>Block analysis/explanation until: /updateprompt.pl executed → ask_questions() called → answer received → acted upon</li>
-                            <li>No suggestions, no preamble, no explanations allowed before sequence completes</li>
-                        </ul>
-                    </li>
-                    <li><strong>Strict Sequencing Enforcement Pattern</strong>
-                        <ul>
-                            <li>Agent states at prompt start: "Executing mandatory sequence: [Step 1] → [Step 2] → [Step 3] → [Step 4] → [Step 5]"</li>
-                            <li>Only output allowed is execution state updates and /updateprompt results</li>
-                            <li>Becomes the only allowed output structure</li>
-                        </ul>
-                    </li>
-                    <li><strong>Validation Wrapper / Compliance Gate</strong>
-                        <ul>
-                            <li>Script that runs after every agent output</li>
-                            <li>Detects violations: text before /updateprompt, missing ask_questions, etc.</li>
-                            <li>Auto-executes /chathandoff + closes session if violation detected</li>
-                            <li>Forces next chat to start fresh without accumulated state degradation</li>
-                        </ul>
-                    </li>
-                    <li><strong>Session State Persistence</strong>
-                        <ul>
-                            <li>Maintain agent compliance state across prompts (not reset each prompt)</li>
-                            <li>Track: violations-per-prompt, compliance degradation pattern, cumulative issues</li>
-                            <li>Auto-trigger /newsession when compliance drops below threshold</li>
-                        </ul>
-                    </li>
-                </ol>
-                
-                <p><strong>Recommendation:</strong> Implement combinations of solutions 2 + 4 for maximum effect. Solution 2 prevents violations at source. Solution 4 catches failures. Together they create defense-in-depth compliance enforcement.</p>
-                
-                <p><strong>Impact on E.1 AI Chat System:</strong> These architectural patterns should be integrated into Phase 3 frontend widget as meta-patterns for how the AI assistant interacts with users. The compliance issues discovered in Chat 14 are design flaws, not implementation bugs—they require architectural fixes before full system deployment.</p>
-            </div>
-
-            <h5>🔗 INTEGRATION WITH OTHER PLANS</h5>
-            <table class="plan-table">
-                <tr>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #ccc; background: #f0f0f0;"><strong>How AI Chat Supports Other Plans</strong></th>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ccc;">
-                        <strong>Plan C.1 (Documentation Audit):</strong> Developers can use AI Chat to quickly find documentation topics, identify gaps, and search for related content across 300+ files.<br/>
-                        <strong>Plan D.1-D.5 (Features):</strong> Developers ask "How do I implement X?" and AI searches code examples + documentation.<br/>
-                        <strong>Plan B.2 (Authentication):</strong> AI can explain auth system, find auth-related code, answer user questions about login flow.<br/>
-                        <strong>Plan A.1-A.3 (Infrastructure):</strong> Admins can ask about K8s migration, credentials, configuration without digging through docs.
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-        <h3 class="category-header">🟡 Category D: Development & Features (5 Plans - ENHANCEMENT)</h3>
-
-        <div class="plan-card plan-card-warning">
-            <h4 class="plan-title">
-                Plan D.1: <a href="/Documentation/development_plans.tt" target="_blank" class="doc-link">development_plans.tt</a>
-            </h4>
-            <table class="plan-table">
-                <tr>
-                    <td class="plan-label"><strong>File Location:</strong></td>
-                    <td><code>development_plans.tt</code></td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Status:</strong></td>
-                    <td>📋 Master index of development initiatives</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Priority:</strong></td>
-                    <td>🟡 MEDIUM (Overview/tracking)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Contents:</strong></td>
-                    <td>Index of 3 in-progress/planned initiatives: Controller Routing Standardization, Software Management System, Theme Handling Improvements</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Includes Completed:</strong></td>
-                    <td>MCoop Controller Fix</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="plan-card plan-card-info">
-            <h4 class="plan-title">Plans D.2 - D.5: Individual Development Plans</h4>
-            <p><strong>Based on development_plans.tt, these are the detailed plans to be created:</strong></p>
-            <ul>
-                <li><strong>D.2: Controller Routing Standardization</strong> - Update CSC, USBM, BMaster, others. (In Progress pilot with MCoop)</li>
-                <li><strong>D.3: Software Management System Enhancements</strong> - Error handling, backups, rollback, CI/CD integration</li>
-                <li><strong>D.4: Theme Handling Improvements</strong> - Audit theme system, update theme_mappings.json, centralize logic</li>
-                <li><strong>D.5: (Additional Development Plans)</strong> - To be identified as work progresses</li>
-            </ul>
-            <p class="plan-note"><strong>📌 Coordination Note:</strong> These are feature enhancements. Can run in parallel but MUST occur after infrastructure stabilization (Phase B fixes).</p>
-        </div>
-
-        <h3 class="category-header">🎯 Category F: IDE-Based Planning & Coordination (2 Plans - ENABLING)</h3>
-
-        <div class="plan-card plan-card-info">
-            <h4 class="plan-title">
-                Plan F.1: <a href="#system-features" class="doc-link">IDE Master Plan Integration: System Features Inventory as Active ToDo System</a>
-            </h4>
-            <table class="plan-table">
-                <tr>
-                    <td class="plan-label"><strong>File Location:</strong></td>
-                    <td>Section 1 of MASTER_PLAN_COORDINATION.tt (System Features Inventory & Controllers)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Status:</strong></td>
-                    <td>🔧 In Progress - Daily Audit Agent Architecture Designed (Dec 28)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Priority:</strong></td>
-                    <td>🟠 HIGH (1 of 1) - Enables active management of Master Plan from IDE</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>Incorporate System Features Inventory & Controllers (18 Features + 47 Controllers) into Master Plan as live, actionable ToDo system for IDE-based project management. Link features to plans, track implementation status, manage feature completion workflow.</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Why This Matters:</strong></td>
-                    <td>The Master Plan coordinates 16 plans affecting 18 system features. System Features Inventory shows WHAT exists, but features need to be actively managed alongside plans. This integration allows developers to: (1) Understand which plans affect which features, (2) Mark features complete as plans finish, (3) Track feature-to-plan dependencies, (4) Manage Master Plan from IDE as a living document</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Core Components:</strong></td>
-                    <td><strong>Already Completed:</strong> Section 1 (18 Features + 47 Controllers inventory with status). <strong>To Add:</strong> Feature-to-Plan mapping table, Feature completion checklist, Controller status tracking, Integration with daily plan workflow</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Complexity:</strong></td>
-                    <td>🟡 Medium - Structural integration work, no code changes required</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Supports:</strong></td>
-                    <td>ALL plans (A.1-D.5, E.1) - Provides framework for tracking feature delivery across all initiatives</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
-                    <td>1-2 weeks (structural integration + documentation mapping)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Key Deliverables:</strong></td>
-                    <td>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            <li>Feature-to-Plan dependency matrix (which plans deliver/affect which features)</li>
-                            <li>Feature completion checklist linked to plan phases</li>
-                            <li>Controller status tracking (all 47 controllers mapped to features & plans)</li>
-                            <li>Daily/Weekly feature progress dashboard</li>
-                            <li>Integration guide: How to use System Features Inventory as active ToDo from IDE</li>
-                        </ul>
-                    </td>
-                </tr>
-            </table>
-            <p class="plan-note alert alert-success"><strong>🎯 MILESTONE ACHIEVED (Dec 28):</strong> Daily Audit Architecture designed with three-agent lightweight chain: Daily Audit Agent → DocumentationSyncAgent → Master Plan Updater Agent. Prevents IDE crashes while maintaining comprehensive daily tracking. First audit cycle (Dec 26-28) generated 3 comprehensive reports (145+176+252 lines) documenting 24 chats, 60+ code changes, critical fixes. Ready for daily execution starting Dec 29.</p>
-            <p class="plan-note"><strong>📌 Integration Framework:</strong> Unlike other plans that deliver code/infrastructure, F.1 delivers organizational structure and tracking capability. Three-agent architecture ensures sustainable daily audit workflow without context overload. Audit reports become source of truth for master plan updates.</p>
-        </div>
-
-        <div class="plan-card plan-card-info">
-            <h4 class="plan-title">
-                Plan F.4: <a href="/Documentation/DAILY_WORKFLOW_TUTORIAL" class="doc-link">Documentation Audit & Tutorial Link Integration - Master Plan Update System Training</a>
-            </h4>
-            <table class="plan-table">
-                <tr>
-                    <td class="plan-label"><strong>File Location:</strong></td>
-                    <td><a href="/Documentation/DAILY_WORKFLOW_TUTORIAL">DAILY_WORKFLOW_TUTORIAL.tt</a> (v0.01) - 4-Agent System Guide</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Status:</strong></td>
-                    <td>✅ Complete - Tutorial created with full workflow documentation; Integration pending (add to main Documentation navigation)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Priority:</strong></td>
-                    <td>🟡 MEDIUM (Support Task) - Enables team adoption of 4-agent daily workflow</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Scope:</strong></td>
-                    <td>Create discoverable documentation link for DAILY_WORKFLOW_TUTORIAL.tt so team members can find and follow the 4-agent daily planning workflow. Includes agent descriptions, prompt templates, troubleshooting, and team role assignments. Scan documentation for broken links to deprecated configurations and ensure all references point to current master plan system.</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Why This Matters:</strong></td>
-                    <td>The 4-agent daily workflow (Daily Audit → DocumentationSync → Master Plan Updater → Daily Plans Generator) is the operational backbone for keeping master plan synchronized with development reality. Without discoverable training documentation, adoption delays and workflow errors increase. Tutorial bridges gap between technical agents and team understanding.</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Core Components:</strong></td>
-                    <td>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            <li>✅ DAILY_WORKFLOW_TUTORIAL.tt - Complete step-by-step tutorial (618 lines) with agent descriptions, prompt templates, troubleshooting</li>
-                            <li>⏳ Main Documentation Navigation Link - Add to Tutorials.tt index for discoverability</li>
-                            <li>⏳ Documentation Audit - Scan for broken references to deprecated agent .md files (now deleted)</li>
-                            <li>⏳ Link Validation - Ensure all references in master plan point to current system</li>
-                        </ul>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Complexity:</strong></td>
-                    <td>🟢 Low - Documentation linking task; no code changes</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Supports:</strong></td>
-                    <td>F.1 (Master Plan IDE Integration) - Provides team training on operational workflow</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Timeline Est.:</strong></td>
-                    <td>2-3 hours (add navigation links, audit documentation, validate references)</td>
-                </tr>
-                <tr>
-                    <td class="plan-label"><strong>Key Deliverables:</strong></td>
-                    <td>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            <li>Tutorial discoverable from main Documentation section</li>
-                            <li>Audit report of documentation audit (broken links to deprecated files removed)</li>
-                            <li>All master plan references validated and current</li>
-                            <li>Team ready to execute daily 4-agent workflow with documented procedures</li>
-                        </ul>
-                    </td>
-                </tr>
-            </table>
-            <p class="plan-note alert alert-info"><strong>📌 Current Status (Jan 1, 2026):</strong> Tutorial file created and fully documented (618 lines, v0.01). Documentation is in place but not yet discoverable from main navigation. F.4 task: Add navigation links so team can easily find training material for daily workflow execution.</p>
+            <p class="plan-note alert alert-info"><strong>⚠️ Phase 3 ADD: CSS Theme Compliance Refactoring:</strong> Across 17 documentation .tt files, there are 1,527 inline style="..." attributes that need refactoring to use CSS variables (--text-color, --spacing-medium, etc.). This improves maintainability and enables future theme changes. Target: Complete this phase after Code controller audit (Phase 2). Estimated: 1-2 weeks for full refactoring + testing. <strong>See:</strong> <a href="/Documentation/B3ThemeHandlingAuditReport" target="_blank" class="doc-link">B3ThemeHandlingAuditReport</a> for details.</strong></p>
         </div>
     </div>
-
-    <h3 class="category-header">🔐 Category G: Security Hardening (6 Plans - CRITICAL)</h3>
-
-    <div class="plan-card" style="background: #ffebee; border-left: 4px solid #c62828; margin: 20px 0; padding: 15px;">
-        <h4 class="plan-title">
-            Plan G.1-G.6: <a href="/Documentation/SECURITY_REMEDIATION_PLAN" target="_blank" class="doc-link">SECURITY_REMEDIATION_PLAN.tt</a>
-        </h4>
-        <table class="plan-table" style="width: 100%; margin: 15px 0; border-collapse: collapse;">
-            <tr style="background: #f5f5f5;">
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 30%;"><strong>Status:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">📋 Planning Phase - Security Audit Complete (Jan 5, 2026)</td>
-            </tr>
-            <tr>
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Priority:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (Ranks 1-3 in Master Top 10)</td>
-            </tr>
-            <tr style="background: #f5f5f5;">
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Vulnerabilities Found:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>13 Total:</strong> 3 CRITICAL (SQL Injection CVSS 9.8, Command Injection CVSS 9.8, Weak Password Hashing CVSS 8.1), 5 HIGH (Session Security, CSRF, Encryption, Admin Bypass, Logging), 5 MEDIUM (Input Validation, Security Headers, Key Storage, File Permissions, Auth Logging)</td>
-            </tr>
-            <tr>
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Individual Plans:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">
-                    <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li><strong>G.1: SQL Injection Fixes</strong> (Admin.pm:330,348) - 3-4 hrs | CRITICAL</li>
-                        <li><strong>G.2: Command Injection Prevention</strong> (IPC::Run) - 4-5 hrs | CRITICAL</li>
-                        <li><strong>G.3: Password Hashing (Argon2)</strong> (SHA-256→Argon2) - 6-8 hrs | CRITICAL</li>
-                        <li><strong>G.4: Session & CSRF Security</strong> (Tokens, Cookies) - 5-6 hrs | HIGH</li>
-                        <li><strong>G.5: Encryption Hardening</strong> (PBKDF2, Key Mgmt) - 5-6 hrs | HIGH</li>
-                        <li><strong>G.6: Input Validation & Headers</strong> (Validate, HSTS) - 4-5 hrs | MEDIUM</li>
-                    </ul>
-                </td>
-            </tr>
-            <tr style="background: #f5f5f5;">
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Timeline:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Week 1 (Jan 6-12):</strong> G.1-G.4 | <strong>Week 2 (Jan 13-19):</strong> G.5-G.6</td>
-            </tr>
-            <tr>
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Execution Path:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sequential:</strong> G.1 → G.2 → G.3 | <strong>Parallel:</strong> G.4, G.5, G.6</td>
-            </tr>
-            <tr style="background: #f5f5f5;">
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Blocks:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">K8s Production Deployment (A.1/A.2) - Cannot proceed to production without CRITICAL vulnerabilities fixed</td>
-            </tr>
-            <tr>
-                <td class="plan-label" style="padding: 10px; border: 1px solid #ddd; font-weight: bold;"><strong>Note on db_config.json:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">✅ <strong>NOT A GIT RISK:</strong> File is gitignored (not tracked). Scheduled for removal after K8s verification. No remediation action needed.</td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="content-section">
-        <h2 id="priority-matrix">4. Priority Matrix - Importance vs. Effort</h2>
-        <p><strong>Strategic Planning Tool:</strong> This matrix shows all 14 plans positioned by importance (vertical axis) and effort/complexity (horizontal axis). Use this to identify quick wins, strategic initiatives, and resource bottlenecks.</p>
-
-        <div class="alert alert-info">
-            <h4>📊 Matrix Quadrants Explained</h4>
-            <ul>
-                <li><strong>🔴 Quick Wins (High Importance, Low Effort):</strong> Do immediately - maximum value for minimal effort</li>
-                <li><strong>🟢 Strategic Initiatives (High Importance, High Effort):</strong> Plan carefully - critical but resource-intensive</li>
-                <li><strong>🟡 Fill-ins (Low Importance, Low Effort):</strong> Do when time allows - good for team morale</li>
-                <li><strong>⏸️ Reconsider (Low Importance, High Effort):</strong> Deprioritize unless context changes</li>
-            </ul>
-        </div>
-
-        <table class="priority-matrix-table" style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-            <thead>
-                <tr style="background: #f5f5f5;">
-                    <th style="width: 20%; padding: 10px; border: 1px solid #ddd;">Plan</th>
-                    <th style="width: 15%; padding: 10px; border: 1px solid #ddd;">Category</th>
-                    <th style="width: 15%; padding: 10px; border: 1px solid #ddd;">Importance</th>
-                    <th style="width: 15%; padding: 10px; border: 1px solid #ddd;">Effort</th>
-                    <th style="width: 20%; padding: 10px; border: 1px solid #ddd;">Quadrant</th>
-                    <th style="width: 15%; padding: 10px; border: 1px solid #ddd;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- CRITICAL INFRASTRUCTURE - Strategic Initiatives (High/High) -->
-                <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.1: K8s Migration</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 Very High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (Do it, plan carefully)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Implementation</td>
-                </tr>
-                <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.2: K8s Readiness</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (URGENT)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">DRAFT - Awaiting</td>
-                </tr>
-                <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>E.1: AI Chat System</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (Phase 1 active)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">In Progress</td>
-                </tr>
-
-                <!-- HIGH IMPORTANCE - Strategic or Quick Wins -->
-                <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.3: Credentials Audit</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 <strong>Quick Win</strong> (Do first)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.1: Docker Secrets</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Bug Fixes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.2: Authentication</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Bug Fixes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.3: Theme Handling</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Bug Fixes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🔴 <strong>Quick Win</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-
-                <!-- MEDIUM IMPORTANCE - Foundation & Audits -->
-                <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>C.1: Documentation Audit</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Foundation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>C.2: Model Audit</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Foundation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>C.3: Utilities Audit</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Foundation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-                <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>C.4: Code Generation</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Foundation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 <strong>Fill-in</strong> (When time allows)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-
-                <!-- MEDIUM/ENHANCEMENT - Development Plans -->
-                <tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>D.1: Development Overview</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Enhancement</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 Low</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 <strong>Fill-in</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Index ready</td>
-                </tr>
-                <tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>D.2: Controller Routing</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Enhancement</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (Parallel)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Pilot (MCoop)</td>
-                </tr>
-                <tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>D.3: Software Management</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Enhancement</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (Parallel)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">To plan</td>
-                </tr>
-                <tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>D.4: Theme Handling</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Enhancement</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 <strong>Fill-in</strong> (After B.3)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">To plan</td>
-                </tr>
-                <tr style="background: #f8f9fa; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>D.5: Future Enhancements</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Enhancement</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 LOW</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">TBD</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">⏸️ <strong>Reconsider</strong> (As needed)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">To identify</td>
-                </tr>
-
-                <!-- IDE PLANNING & COORDINATION - Strategic Initiative (High/Medium) -->
-                <tr style="background: #cce5ff; border-bottom: 1px solid #ddd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>F.1: Master Plan IDE Integration</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Coordination</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong> (Parallel)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Planning</td>
-                </tr>
-            <!-- SECURITY HARDENING - Quick Wins & Strategic (CRITICAL/HIGH) -->
-            <tr style="background: #ffebee; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.1: SQL Injection</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 <strong>Quick Win</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            <tr style="background: #ffebee; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.2: Command Injection</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 <strong>Quick Win</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            <tr style="background: #ffebee; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.3: Password Hashing</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 High</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            <tr style="background: #ffe0b2; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.4: Session/CSRF</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            <tr style="background: #ffe0b2; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.5: Encryption</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟢 <strong>Strategic</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            <tr style="background: #fff9c4; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.6: Headers/Validation</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 Medium</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 <strong>Quick Win</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PLANNING</td>
-            </tr>
-            </tbody>
-        </table>
-
-        <h3>📊 Quadrant Summary & Recommendations</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-            <!-- Quick Wins -->
-            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
-                <h4>🔴 Quick Wins (Do First)</h4>
-                <p><strong>High Importance, Low Effort</strong></p>
-                <ul>
-                    <li>A.3: Credentials Audit - ~1 week, unblocks other work</li>
-                    <li>B.3: Theme Handling - Medium effort, fixes frontend issues</li>
-                </ul>
-                <p><strong>Recommendation:</strong> Start with A.3 immediately to unblock infrastructure work.</p>
-            </div>
-
-            <!-- Strategic Initiatives -->
-            <div style="background: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
-                <h4>🟢 Strategic Initiatives (Plan Carefully)</h4>
-                <p><strong>High Importance, High-to-Medium Effort</strong></p>
-                <ul>
-                    <li>A.1: K8s Migration - 2-3 weeks, critical foundation</li>
-                    <li>A.2: K8s Readiness - 1 week, URGENT BLOCKER</li>
-                    <li>B.1/B.2: Bug Fixes - Foundation for features</li>
-                    <li>C.1-C.3: Audits - Data-driven planning</li>
-                    <li>E.1: AI Chat - Active, enables all other work</li>
-                    <li>F.1: Master Plan IDE Integration - Medium effort, multiplies effectiveness of all other plans</li>
-                </ul>
-                <p><strong>Recommendation:</strong> Sequence: A.2 (urgent) → A.3 (quick) → Run A.1 + B.1/B.2/E.1/F.1 in parallel. F.1 can run alongside all plans as it's organizational work.</p>
-            </div>
-
-            <!-- Fill-ins -->
-            <div style="background: #e8f4f8; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
-                <h4>🟡 Fill-ins (When Time Allows)</h4>
-                <p><strong>Low Importance, Low Effort</strong></p>
-                <ul>
-                    <li>C.4: Code Generation - Nice-to-have optimization</li>
-                    <li>D.1: Development Overview - Index work</li>
-                    <li>D.4: Theme Handling (part 2) - Polish after B.3</li>
-                </ul>
-                <p><strong>Recommendation:</strong> Schedule after critical path cleared (week 2+).</p>
-            </div>
-
-            <!-- Reconsider -->
-            <div style="background: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
-                <h4>⏸️ Reconsider (Deprioritize Unless Context Changes)</h4>
-                <p><strong>Low Importance, High Effort</strong></p>
-                <ul>
-                    <li>D.5: Future Enhancements - Not yet defined</li>
-                </ul>
-                <p><strong>Recommendation:</strong> Identify specifics before scheduling. May become Quick Wins once scoped.</p>
-            </div>
-        </div>
-
-        <h3>📅 Recommended Execution Sequence</h3>
-        <div style="background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px;">
-            <h4>Phase 1: Critical Path & Coordination (Weeks 1-2)</h4>
-            <ol>
-                <li><strong>A.2: K8s Readiness Plan</strong> (URGENT - this week) → Unblocks everything else</li>
-                <li><strong>A.3: Credentials Audit</strong> (parallel, 1 week) → Enables infrastructure work</li>
-                <li><strong>E.1: AI Chat Phase 1</strong> (parallel) → Active development, unblocks teams</li>
-                <li><strong>F.1: Master Plan IDE Integration</strong> (parallel) → Framework for tracking all plan progress; can start immediately</li>
-            </ol>
-            
-            <h4>Phase 2: Strategic Work (Weeks 2-4)</h4>
-            <ol>
-                <li><strong>A.1: K8s Migration</strong> (2-3 weeks) → Core infrastructure</li>
-                <li><strong>B.1: Docker Secrets</strong> (parallel) → Foundation for features</li>
-                <li><strong>B.2: Authentication</strong> (parallel after B.1) → Security foundation</li>
-                <li><strong>C.1-C.3: Audits</strong> (parallel) → Data for planning</li>
-                <li><strong>F.1 continues: Feature Mapping & Dashboard</strong> (ongoing) → Track progress of all concurrent work</li>
-            </ol>
-
-            <h4>Phase 3: Feature Development (Weeks 4+)</h4>
-            <ol>
-                <li><strong>D.2-D.4: Development Plans</strong> (after infrastructure stable) → Feature enhancements</li>
-                <li><strong>C.4: Code Generation</strong> (as needed) → Optimization</li>
-                <li><strong>F.1 completes: Full IDE integration</strong> → Master Plan actively managed from IDE with feature tracking</li>
-            </ol>
-        </div>
-
-        <div class="alert alert-warning">
-            <h4>⚠️ Critical Dependencies to Track</h4>
-            <ul style="margin: 0;">
-                <li><strong>A.2 blocks A.1:</strong> K8s Readiness MUST complete before K8s Migration</li>
-                <li><strong>A.3 unblocks B.1/B.2:</strong> Credentials must be audited before Docker/Auth work</li>
-                <li><strong>B.1/B.2 prerequisite for D.2-D.5:</strong> Foundation work first, features second</li>
-                <li><strong>E.1 supports all plans:</strong> AI Chat available for developers to ask questions during all phases</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="content-section">
-        <h2 id="improvements-tracker">5. Improvements & Missing Components Tracker</h2>
-        <p><strong>Dynamic Inventory:</strong> Issues, gaps, and improvements discovered during plan execution. This tracker helps ensure nothing falls through the cracks and allows quick-win improvements to be marked as complete and removed from backlog.</p>
-
-        <div class="alert alert-info">
-            <h4>📝 How This Section Works</h4>
-            <ul>
-                <li><strong>During Execution:</strong> When working on any plan, if you discover missing components, gaps, or improvement opportunities, document them here</li>
-                <li><strong>Status Tracking:</strong> Mark items as FOUND, PLANNING, IN-PROGRESS, or COMPLETE</li>
-                <li><strong>Removal from Backlog:</strong> Once a simple improvement is completed, it can be removed from the todo list (marked as COMPLETE)</li>
-                <li><strong>Priority Reassessment:</strong> Large improvements might become new plans or sub-tasks</li>
-            </ul>
-        </div>
-
-        <h3>Current Improvements & Missing Components (Dec 26 onwards)</h3>
-        <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-            <thead>
-                <tr style="background: #f5f5f5;">
-                    <th style="width: 25%; padding: 10px; border: 1px solid #ddd;">Discovery Context</th>
-                    <th style="width: 25%; padding: 10px; border: 1px solid #ddd;">Component/Issue Found</th>
-                    <th style="width: 20%; padding: 10px; border: 1px solid #ddd;">Status</th>
-                    <th style="width: 20%; padding: 10px; border: 1px solid #ddd;">Plan Reference</th>
-                    <th style="width: 10%; padding: 10px; border: 1px solid #ddd;">Effort</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr style="background: #e8f4f8;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 26 - E.1 AI Chat Phase 2</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Placeholder - To be populated during execution</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #fff3cd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">PENDING</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">E.1 Phase 2</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">TBD</td>
-                </tr>
-                <tr style="background: #d1e7dd;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 26 - Quick Win A.3</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>✅ COMPLETE - Credentials Audit & Fix</strong><br/><strong>Corrected Finding (1 issue found & fixed):</strong><br/>• <code>docker-compose.dev.yml</code>: Hardcoded password <code>UA=nPF8*m+T#</code> in GIT (lines 18, 23)<br/><strong>Fix Applied:</strong> Replaced hardcoded values with env var references: <code>${COMSERV_DB_PRODUCTION_SERVER_PASSWORD}</code><br/><strong>Other files secure:</strong> <code>.env</code> (gitignored), <code>.env.development</code> (placeholder only, safe), prod/staging (env refs). See CREDENTIALS_AUDIT_AND_PLAN.tt Section 2.1a for audit details.</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #d1e7dd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">✅ COMPLETE</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">A.3 (Fixed)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2 hrs ✅</td>
-                </tr>
-                <tr style="background: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 26 - Quick Win B.3</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Theme system: Verify CSS variables work across sites</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #fff3cd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">FOUND</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">B.3 (Audit Phase)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">1.5 hrs</td>
-                </tr>
-                <tr style="background: #cce5ff;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 26 - New Plan F.1</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Master Plan IDE Integration: Add System Features Inventory as active ToDo system with feature-to-plan mapping and completion tracking</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #fff3cd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">PLANNING</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">F.1 (Planning Phase)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Medium</td>
-                </tr>
-                <tr style="background: #ffebee;">
-                <tr style="background: #ffebee;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Jan 5 - Security Audit Complete</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔴 13 VULNERABILITIES IDENTIFIED - Category G: Security Hardening (NEW)</strong><br/><strong>CRITICAL (3):</strong> SQL Injection (CVSS 9.8) Admin.pm:330,348, Command Injection (CVSS 9.8) Admin.pm backticks, Weak Password Hashing (CVSS 8.1) User.pm:279<br/><strong>HIGH (5):</strong> Session Security (7.5), CSRF (7.5), Encryption (7.5), Admin Bypass (8.8), Logging (5.3)<br/><strong>MEDIUM (5):</strong> Input Validation (5.3), Security Headers (3.7), Key Storage (5.3), File Permissions (5.5), Auth Logging (4.2)<br/><strong>Status:</strong> Full audit complete. Master Plan Top 10 updated. G.1-G.6 remediation plans created. Week 1-2 timeline established.<br/><strong>db_config.json NOTE:</strong> Not tracked in git (gitignored), scheduled for removal after K8s - not a risk.<br/><strong>Reference:</strong> SECURITY_REMEDIATION_PLAN.tt (v1.00)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #fff3cd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">PLANNING</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">G.1-G.6 (Security)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">High</td>
-                </tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Jan 2 - Chat 2 Analysis</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔴 CRITICAL - Agent Compliance Degradation</strong><br/>Finding: Despite MANDATORY enforcement language and constraint-based rules, agent compliance regresses within 3-4 prompts. Agents read and acknowledge rules correctly at prompt start but systematically violate rules by prompt 5+. Root Cause: Agent state/memory between prompts is optional, not persistent. Rules re-read fresh each prompt but compliance is treated as optional.<br/><strong>Evidence:</strong> Cleanup Agent Chat 2 Prompt 9 (16:56 UTC) showed all violations documented in audit.<br/><strong>Required Fix:</strong> Architectural change needed - not configuration cleanup. Requires persistent state tracking or system-level reinforcement.</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #ffebee; padding: 3px 8px; border-radius: 3px; font-size: 12px;">FOUND (Architecture Review Required)</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">A.1, Infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Complex (Architecture)</td>
-                </tr>
-                <tr style="background: #f8f9fa;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Jan 11 - Application Log Audit</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>🟠 5 ISSUES FOUND IN LOGS:</strong><br/>1. <strong>Missing CPAN Modules (HIGH):</strong> <code>Catalyst::View::Email</code> and <code>Catalyst::View::Email::Template</code> not installed. Fallback to minimal implementation active (server.log lines 12-17). Affects email functionality.<br/>2. <strong>Unrecognized Escape Sequence (MEDIUM):</strong> <code>\d</code> in <code>Admin/SchemaComparison.pm:1690</code> - Perl warning. Should use <code>\\d</code> for literal backslash-d pattern.<br/>3. <strong>Missing DB Table (MEDIUM):</strong> <code>documentation_role_access</code> table not found in ENCY database. Will be created on first admin request (application.log line 3). Schema initialization may be incomplete.<br/>4. <strong>Orphan Docker Container (LOW):</strong> <code>comserv-database</code> service found in old compose (build.log line 1). Can be cleaned with <code>--remove-orphans</code> flag.<br/>5. <strong>Port Conflict (LOW):</strong> Port 3000 already in use (server.log line 19). Stale process. Kill with <code>pkill -f "listen.*3000"</code> or use alternate port.</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #fff3cd; padding: 3px 8px; border-radius: 3px; font-size: 12px;">FOUND</span></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">B.1 (Dependencies/Setup)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Medium</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h3>Legend & Definitions</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
-            <div style="background: #d4edda; padding: 10px; border-radius: 3px;">
-                <strong>FOUND:</strong> Issue discovered and documented
-            </div>
-            <div style="background: #fff3cd; padding: 10px; border-radius: 3px;">
-                <strong>PLANNING:</strong> Analysis/planning phase in progress
-            </div>
-            <div style="background: #cce5ff; padding: 10px; border-radius: 3px;">
-                <strong>IN-PROGRESS:</strong> Actively being fixed/implemented
-            </div>
-            <div style="background: #d1e7dd; padding: 10px; border-radius: 3px;">
-                <strong>COMPLETE:</strong> Fixed and can be removed from todo list
-            </div>
-        </div>
-
-        <h3>Quick Addition Template</h3>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0; overflow-x: auto;"><code>When you find something, add a row:
----
-Discovery Context: [When/what plan you were working on]
-Component/Issue: [What you found - be specific]
-Status: FOUND (new items start here)
-Plan Reference: [A.1, E.1, etc.]
-Effort: [Quick (< 1hr), Easy (1-2hrs), Medium (2-4hrs), Hard (> 4hrs)]
----
-</code></pre>
-    </div>
-
-    <div class="content-section">
-        <h2 id="dec-26-29-progress">🚀 Dec 26-29 Progress Summary (Four-Day Sprint)</h2>
-        <div class="alert alert-success">
-            <h4>✅ Major Achievements</h4>
-            <ul>
-                <li><strong>Plan A.3 Credentials Audit COMPLETE:</strong> Identified 5 files with hardcoded plaintext passwords (docker-compose.dev.yml, .env, .env.development); documented critical findings and remediation pathway</li>
-                <li><strong>Plan E.1 AI Chat Phase 2 COMPLETE:</strong> Critical message persistence bug FIXED (metadata JSON encoding in both endpoints); JSON body parsing enhanced with fallback methods; concurrency analysis completed</li>
-                <li><strong>Plan F.1 Daily Audit Infrastructure DESIGNED:</strong> Three-agent lightweight architecture (Daily Audit Agent → DocumentationSyncAgent → Master Plan Updater Agent) prevents IDE context crashes while maintaining comprehensive daily tracking</li>
-                <li><strong>Filename Standards ESTABLISHED:</strong> PascalCase convention documented in coding-standards-comserv.yaml; enforcement rules created; phased migration plan (Phase 1: new files immediately)</li>
-                <li><strong>Comprehensive Audit Trail GENERATED:</strong> Three detailed audit reports documenting all work from Chats 1-24 across Dec 26-28</li>
-            </ul>
-        </div>
-        <h4>📊 Work Summary by Date</h4>
-        <table class="summary-table" style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-            <thead style="background: #f5f5f5;">
-                <tr>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Date</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Chats</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Focus</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Audit Report</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 26</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Chats 1-11</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Master plan infrastructure; Features &amp; Controllers inventory (18 features, 47 controllers); A.3 Credentials Audit completion</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><a href="/Documentation/session_history/audit_logs/audit_2025-12-26.md">audit_2025-12-26.md</a> (145 lines)</td>
-                </tr>
-                <tr style="background: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 27</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Chats 12-16</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">AI Chat persistence investigation; UI compact layout refactor (70-80% space reduction); icon rendering fixes; message display implementation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><a href="/Documentation/session_history/audit_logs/audit_2025-12-27.md">audit_2025-12-27.md</a> (176 lines)</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 28</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Chats 17-24</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Critical message persistence FIX (metadata JSON encoding); JSON body parsing enhancements; three-agent architecture design; daily audit system restructuring; PascalCase filename standards</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><a href="/Documentation/session_history/audit_logs/audit_2025-12-28.md">audit_2025-12-28.md</a> (252 lines)</td>
-                </tr>
-                <tr style="background: #f0f8ff;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Dec 29</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Chats 25-27</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Daily Plan Automator workflow execution (8 steps); Master plan update v0.11→v0.12; Daily plans generation &amp; verification (10 total); session archival; sustainable workflow infrastructure</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><a href="/Documentation/session_history/audit_logs/audit_2025-12-29.md">audit_2025-12-29.md</a> (150 lines)</td>
-                </tr>
-                <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Jan 2</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Chats 1-3</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Week 1 Execution: Chat 1 AI Message schema fix (metadata column added to ai_conversations table); Chat 2 Cleanup Agent lockup analysis + 3 prevention fixes (Main Agent spec, AGENT_REGISTRY.md, Cleanup Agent safety protocol); Chat 3 DocumentationSync Agent updated 8 files with audit findings</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><a href="/Documentation/session_history/DAILY_AUDIT_2026-01-02.md">DAILY_AUDIT_2026-01-02.md</a> (412 lines)</td>
-                </tr>
-            </tbody>
-        </table>
-        <h4>🔧 Technical Changes (60+ Code Changes)</h4>
-        <ul>
-            <li><strong>Message Persistence Root Cause:</strong> Metadata field passed as Perl hashref instead of JSON-encoded string. Fixed in both `/ai/result` and `/ai/generate` endpoints (60+ lines of metadata JSON encoding + logging)</li>
-            <li><strong>JSON Body Parsing:</strong> Enhanced conditional parsing for JSON vs. form-encoded data with fallback methods and comprehensive debug logging (120+ lines with 15+ debug statements)</li>
-            <li><strong>Credentials Fix:</strong> Added `credentials: 'include'` to both widget and `/ai` page fetch requests (2 lines, major functionality improvement)</li>
-            <li><strong>UI Improvements:</strong> Conversations list compact layout (110+ lines, 70-80% space reduction), icon rendering fixes (ASCII-based system for universal compatibility)</li>
-            <li><strong>Documentation Enhancements:</strong> Comprehensive audit logging system, filename convention documentation, enforcement rules</li>
-        </ul>
-    </div>
-
-    <div class="content-section">
-        <h2 id="document-status">📌 Document Structure Progress</h2>
-        <p>This is <strong>Version 0.16 - Jan 2 Daily Audit Update & Week 1 Execution Progress</strong>. Sections completed and in progress:</p>
-        <ul>
-            <li>✅ <strong>Section 1: System Features Inventory & Controllers</strong> - COMPLETE (18 Features + 47 Controllers documented with status; ready for active ToDo integration)</li>
-            <li>✅ <strong>Section 2: All Plans Inventory</strong> - COMPLETE (16 plans documented with links; Plans E.1 AI Chat System, F.1 Master Plan IDE Integration, and F.4 Documentation Audit & Tutorial Links with daily/weekly milestones)</li>
-            <li>✅ <strong>New: AI Chat Daily/Weekly Milestones</strong> - COMPLETE (Phase 1 completion checklist for developers)</li>
-            <li>✅ <strong>New: Master Plan IDE Integration (F.1)</strong> - PLANNING (Framework for incorporating System Features Inventory as active ToDo system; enables IDE-based Master Plan management)</li>
-            <li>✅ <strong>Section 3: Priority Matrix</strong> - COMPLETE (16 plans prioritized by importance vs effort; quadrant analysis; recommended execution sequence with F.1 as Strategic Initiative; F.4 as Support Task)</li>
-            <li>✅ <strong>Section 4: Improvements & Missing Components Tracker</strong> - COMPLETE (Dynamic inventory for discoveries during execution; allows quick-wins to be tracked and removed from backlog)</li>
-            <li>⏳ <strong>Section 5: Dependency Map</strong> - To be added (blocking relationships - updated to show AI Chat + Master Plan IDE Integration dependencies)</li>
-            <li>⏳ <strong>Section 6: Phase Timeline</strong> - To be added (execution sequence including AI Chat + F.1 parallel track)</li>
-            <li>⏳ <strong>Section 7: Parallelization Opportunities</strong> - To be added (simultaneous execution - E.1 + F.1 support all parallel work)</li>
-            <li>⏳ <strong>Section 8: Overlapping Work</strong> - To be added (duplicate/shared code areas - AI integration points + Feature tracking)</li>
-            <li>⏳ <strong>Section 9: Resource Allocation</strong> - To be added (who/what/when framework; F.1 enables real-time progress visibility)</li>
-            <li>⏳ <strong>Section 10: Update Process</strong> - To be added (how to keep this document current; F.1 makes updates from IDE)</li>
-        </ul>
-        <h3>Recent Additions Summary (Jan 2 - Daily Audit Update)</h3>
-        <ul>
-            <li>✅ <strong>PLAN B.1 BUG FIX COMPLETE (2026-01-02 Chat 1):</strong> AI Message schema regression fixed - Production database missing metadata column that Result class defined. Applied ALTER TABLE ai_conversations ADD COLUMN metadata longtext NULL. 17 existing conversations lost message data during regression; historical data loss acknowledged; future operations should succeed</li>
-            <li>✅ <strong>PLAN A.1 LOCKUP PREVENTION PROTOCOL (2026-01-02 Chat 2):</strong> Cleanup Agent lockup root cause analyzed: multi-file updates without /updateprompt checkpoints between files. FIX 1: Main Agent spec enforces /updateprompt as FIRST action + PATH A/B/C pattern. FIX 2: AGENT_REGISTRY.md v2.0→v2.2 consolidated. FIX 3: Cleanup Agent safety protocol requires record→edit→record per file</li>
-            <li>🔴 <strong>CRITICAL FINDING: AGENT COMPLIANCE DEGRADATION (2026-01-02 Chat 2):</strong> Despite MANDATORY enforcement language, agent compliance regresses within 3-4 prompts. Agents read rules correctly but systematically violate them by prompt 5+. Root cause: Agent state/memory between prompts is optional, not persistent. Requires architectural change - not configuration cleanup. Evidence: Cleanup Agent Chat 2 Prompt 9 documented all violations. Recommendation: Escalate to agent architecture review</li>
-            <li>✅ <strong>PLAN F.4 DOCUMENTATION SYNC (2026-01-02 Chat 3):</strong> DocumentationSync Agent updated 8 documentation files with Jan 2 audit findings. Files: ai_chat_system_audit.tt, AIChatConversationSavingFix.tt, AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt, database_configuration.tt, DAILY_WORKFLOW_TUTORIAL.tt, zencoder_reset_plan.tt, ZENCODER_AI_ASSISTANT_GUIDE.tt, AIIntegrationComprehensiveAudit.tt. All files versioned consistently (vX.YZ→vX.(YZ+1)), timestamped (Thu Jan 02 15:42-15:48 UTC), documented with Recent Changes sections</li>
-            <li>📋 <strong>PLAN A.1 CONFIGURATION FIX FOLLOW-UP:</strong> Discovered and fixed 5 configuration files instructing automatic /sessionhandoff triggers (should be manual-only). Updated: daily-plan-automator-role.md, AGENT_REGISTRY.md, keywords-global.md, cleanup-agent-workflow.md, keywords.md. /sessionhandoff now correctly requires explicit user execution</li>
-            <li>🎯 <strong>WEEK 1 EXECUTION ON TRACK:</strong> Jan 2 work completed: B.1 bug fix (AI Message schema), A.1 lockups prevented (3 fixes applied), critical agent compliance issue identified and escalated, documentation synchronized with audit findings. All Jan 2 priorities from Master Plan v0.15 addressed</li>
-        </ul>
-        <p><strong>Next Steps (Jan 3+):</strong> Continue Week 1 daily plans (Jan 3-8); Test AI Message creation fix with fresh conversation; Monitor agent compliance pattern; Escalate architecture review for persistent state tracking; Continue parallel bug fix sprint (B.2/B.3); Execute feature work plans as infrastructure stabilizes</p>
-        <p><strong>How to Use Updated Master Plan (v0.16):</strong> This version reflects Jan 2 daily audit completion. DAILY_AUDIT_2026-01-02.md (412 lines) now source of truth for this period. Three major accomplishments: B.1 schema regression fixed, A.1 lockup prevention established, critical agent compliance degradation identified for architecture review. Agent compliance finding marked CRITICAL in Improvements Tracker - requires architectural intervention beyond configuration changes. 4-agent workflow continues to operate successfully with improved safety protocols and documentation accuracy.</p>
-    </div>
-
 </div>

@@ -869,7 +869,7 @@ docker logs comserv-web-dev      # Check if MySQL connection succeeds</pre>
 
                 <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: #2e7d32; font-family: var(--header-font);">✅ GOOD NEWS: RemoteDB.pm Configuration System is PRODUCTION-READY</h3>
-                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status (December 2025)</strong>: Code review confirms RemoteDB.pm already implements the complete K8s-ready configuration cascade. See <a href="/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN">PHASE_0_KUBERNETES_READINESS_PLAN.tt</a> for detailed findings.</p>
+                    <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status (December 2025)</strong>: Code review confirms RemoteDB.pm already implements the complete K8s-ready configuration cascade. See <a href="/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN">Phase0KubernetesReadinessPlan.tt</a> for detailed findings.</p>
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>What Works</strong>:</p>
                     <ul style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;">
                         <li>K8s Secrets loading (lines 91-151)</li>

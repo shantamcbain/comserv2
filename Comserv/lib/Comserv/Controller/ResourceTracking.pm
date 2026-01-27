@@ -68,6 +68,12 @@ has 'commands_log' => (
     documentation => 'Commands execution log'
 );
 
+has 'prompts_log' => (
+    is => 'ro',
+    default => '/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/session_history/prompts_log.yaml',
+    documentation => 'Audit trail log (YAML)'
+);
+
 =head2 index - Main Dashboard
 
 Displays real-time resource usage dashboard with current session status,
@@ -270,32 +276,57 @@ Reads live .prompt_counter file and returns current session status.
 sub _get_current_status {
     my ($self, $c) = @_;
     
-    return {} unless -f $self->counter_file;
+    my $session_file = $self->prompts_log;
+    return {} unless -f $session_file;
     
-    my $data = {};
+    my $current_chat = 0;
+    my $current_prompt = 0;
+    my $last_timestamp = '';
+    my $last_action = '';
+    
     try {
-        my $yaml = YAML::Tiny->read($self->counter_file);
-        $data = $yaml->[0] if $yaml && ref $yaml eq 'ARRAY' && $yaml->[0];
+        my $yaml = YAML::Tiny->read($session_file);
+        if ($yaml && @$yaml) {
+            # Find the latest entry
+            my $latest = $yaml->[-1];
+            $current_chat = $latest->{chat} || 0;
+            $current_prompt = $latest->{prompt} || 0;
+            $last_timestamp = $latest->{timestamp} || '';
+            $last_action = $latest->{action} || $latest->{user_action} || '';
+        }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            '_get_current_status', "Error reading counter file: $_");
+            '_get_current_status', "Error reading prompts log: $_");
     };
     
     # Calculate derived metrics
-    my $current_prompt = $data->{prompt_tracking}->{current_prompt} || 0;
-    my $total_limit = $data->{prompt_tracking}->{total_prompts_limit} || 19;
+    my $total_limit = 19; # Standard Zencoder limit
     my $percent_used = $total_limit > 0 ? ($current_prompt / $total_limit) * 100 : 0;
     
+    # Determine status level based on prompt count
+    my ($status_level, $status_emoji);
+    if ($percent_used >= 100) {
+        $status_level = 'CRITICAL';
+        $status_emoji = '🚨';
+    } elsif ($percent_used >= 85) {
+        $status_level = 'WARNING';
+        $status_emoji = '⚠️';
+    } elsif ($percent_used >= 70) {
+        $status_level = 'CAUTION';
+        $status_emoji = '⚡';
+    } else {
+        $status_level = 'NORMAL';
+        $status_emoji = '✅';
+    }
+    
     return {
+        current_chat => $current_chat,
         current_prompt => $current_prompt,
         total_prompts_limit => $total_limit,
-        status_level => $data->{current_status}->{status_level} || 'UNKNOWN',
-        status_emoji => $data->{current_status}->{status_emoji} || '❓',
-        command_count => $data->{command_tracking}->{command_count} || 0,
-        last_update => $data->{command_tracking}->{last_update} 
-            ? DateTime->from_epoch(epoch => $data->{command_tracking}->{last_update})->iso8601 
-            : 'N/A',
-        caution_reasons => $data->{current_status}->{caution_reasons} || [],
+        status_level => $status_level,
+        status_emoji => $status_emoji,
+        last_update => $last_timestamp,
+        last_action => $last_action,
         handoff_ready => ($current_prompt >= $total_limit) ? 1 : 0,
         percent_used => sprintf('%.2f', $percent_used),
         estimated_remaining_prompts => $total_limit - $current_prompt,
@@ -361,42 +392,52 @@ sub _get_sessions_summary {
 
 =head2 _parse_session_history
 
-Reads current_session.md and returns parsed session data.
+Reads prompts_log.yaml and returns parsed session data grouped by chat.
 
 =cut
 
 sub _parse_session_history {
     my ($self, $c, $opts) = @_;
     
-    my $session_file = $self->session_dir . '/current_session.md';
+    my $session_file = $self->prompts_log;
     return [] unless -f $session_file;
     
-    my @sessions;
+    my $sessions_map = {};
     try {
-        open my $fh, '<:utf8', $session_file or return [];
-        my @lines = <$fh>;
-        close $fh;
+        my $yaml = YAML::Tiny->read($session_file);
+        return [] unless $yaml;
         
-        my $session = {};
-        foreach my $line (@lines) {
-            chomp $line;
+        foreach my $entry (@$yaml) {
+            next unless $entry && ref $entry eq 'HASH' && $entry->{chat};
             
-            if ($line =~ /\*\*Current Prompt Number\*\*:\s*(\d+)/) {
-                $session->{current_prompt} = $1;
-            }
-            if ($line =~ /\*\*Session Start\*\*:\s*(.+)/) {
-                $session->{session_start} = $1;
-            }
-            if ($line =~ /\*\*Session Focus\*\*:\s*(.+)/) {
-                $session->{focus} = $1;
+            my $chat_id = $entry->{chat};
+            
+            # If we haven't seen this chat, or this prompt is newer than what we have
+            if (!$sessions_map->{$chat_id} || 
+                ($entry->{prompt} && $entry->{prompt} > $sessions_map->{$chat_id}->{current_prompt})) {
+                
+                $sessions_map->{$chat_id} = {
+                    chat_id => $chat_id,
+                    current_prompt => $entry->{prompt} || 0,
+                    session_start => $entry->{timestamp},
+                    focus => $entry->{action} || $entry->{user_action} || 'Unknown Action',
+                    agent => $entry->{agent_name} || 'Unknown',
+                    success => $entry->{success} ? 1 : 0,
+                };
             }
         }
-        
-        push @sessions, $session if keys %$session;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            '_parse_session_history', "Error parsing session file: $_");
+            '_parse_session_history', "Error parsing prompts log: $_");
     };
+    
+    # Sort by chat ID descending (latest first)
+    my @sessions = sort { $b->{chat_id} <=> $a->{chat_id} } values %$sessions_map;
+    
+    # Apply limit if provided
+    if ($opts->{limit} && @sessions > $opts->{limit}) {
+        @sessions = @sessions[0 .. ($opts->{limit} - 1)];
+    }
     
     return \@sessions;
 }

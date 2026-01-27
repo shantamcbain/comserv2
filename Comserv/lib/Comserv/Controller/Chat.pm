@@ -64,9 +64,11 @@ sub send_message :Path('send_message') :Args(0) {
     my $domain = $c->req->uri->host || 'unknown';
     my $site_name = $c->session->{SiteName} || 'unknown';
     my $conversation_id = $c->req->params->{conversation_id};
+    my $agent_type = $c->req->params->{agent_type} || 'chat';
+    my $title = $c->req->params->{title};
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_message',
-        "Processing message from user_id=$user_id (username=$username) on domain=$domain");
+        "Processing message from user_id=$user_id (username=$username) on domain=$domain, agent_type=$agent_type, title=" . ($title || 'N/A'));
     
     # Validate message
     unless ($message && length($message) > 0) {
@@ -95,7 +97,7 @@ sub send_message :Path('send_message') :Args(0) {
             
             my $conversation = $schema->resultset('AiConversation')->create({
                 user_id => $user_id,
-                title => 'Chat Conversation',
+                title => $title || 'Chat Conversation',
                 status => 'active',
                 metadata => encode_json($conv_metadata)
             });
@@ -119,12 +121,14 @@ sub send_message :Path('send_message') :Args(0) {
             role => 'user',
             content => $message,
             metadata => encode_json($msg_metadata),
-            agent_type => 'chat',
+            agent_type => $agent_type,
             user_role => $c->session->{roles} || 'user'
         });
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_message',
             "Message stored - message_id=" . $ai_message->id . ", conversation_id=$conversation_id, user_id=$user_id");
+        
+        $ai_message->discard_changes;
         
         # Return success response
         $c->response->content_type('application/json');
@@ -393,6 +397,8 @@ sub respond :Path('respond') :Args(0) {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'respond',
             "Admin response stored - message_id=" . $response_msg->id . ", conversation_id=$conversation_id, admin_id=$admin_user_id");
+        
+        $response_msg->discard_changes;
         
         # Return success response
         $c->response->content_type('application/json');

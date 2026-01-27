@@ -692,14 +692,14 @@
          "last_updated" : "Unknown"
       },
       {
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MASTER_PLAN_COORDINATION.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/MasterPlanCoordination.tt",
          "version" : "0.26",
-         "code_file" : "root/Documentation/MASTER_PLAN_COORDINATION.tt",
+         "code_file" : "root/Documentation/MasterPlanCoordination.tt",
          "reason" : "Code changed in git diff (HEAD~10..HEAD)",
          "action" : "UPDATE - Bump version from 0.26 to 0.27, add Recent Changes section",
          "exists" : 1,
          "last_updated" : "Wed Jan 08 20:10:00 UTC 2026",
-         "documentation_file" : "/Documentation/MASTER_PLAN_COORDINATION.tt"
+         "documentation_file" : "/Documentation/MasterPlanCoordination.tt"
       },
       {
          "action" : "CREATE - New documentation file needed (controller recently added)",
@@ -1232,10 +1232,10 @@
          "reason" : "Code changed in git diff (HEAD~10..HEAD)"
       },
       {
-         "code_file" : "root/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt",
+         "code_file" : "root/Documentation/system/Phase0KubernetesReadinessPlan.tt",
          "version" : "0.02",
-         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt",
-         "documentation_file" : "/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/system/Phase0KubernetesReadinessPlan.tt",
+         "documentation_file" : "/Documentation/system/Phase0KubernetesReadinessPlan.tt",
          "last_updated" : "Tue Dec 23 17:12:00 UTC 2025",
          "exists" : 1,
          "action" : "UPDATE - Bump version from 0.02 to 0.03, add Recent Changes section",

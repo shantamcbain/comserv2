@@ -59,7 +59,7 @@
 <ul>
 <li>Open IDE chat interface</li>
 <li>Type: <code>/daily-audit</code> command</li>
-<li>Agent should read current_session.md (Chat 25 work from today). As we move to a session handoff at the end of a day we may have to look into the current_session history files as well</li>
+<li>Agent should read current_session.md.archivenotused (Chat 25 work from today). As we move to a session handoff at the end of a day we may have to look into the current_session history files as well</li>
 </ul>
 </li>
 <li><strong>Verify Audit Output:</strong>
@@ -134,7 +134,7 @@
 <li>Include: Timing (morning: audit previous day, afternoon: generate next day's plan), handoff protocol, expected output</li>
 </ul>
 </li>
-<li><strong>Update current_session.md:</strong>
+<li><strong>Update current_session.md.archivenotused:</strong>
 <ul>
 <li>Add Chat 25 entry (this work) in reverse chronological order</li>
 <li>Record execution of first daily audit workflow</li>

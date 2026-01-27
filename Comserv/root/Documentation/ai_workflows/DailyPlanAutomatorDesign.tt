@@ -23,7 +23,7 @@
 
     <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #4caf50;">
         <h2 style="margin-top: 0;">✅ Executive Summary</h2>
-        <p><strong>Purpose:</strong> The Daily Plan Automator is the orchestration system that manages a 4-agent pipeline to automatically update project state, documentation, and generate daily plans from MASTER_PLAN_COORDINATION.tt priorities.</p>
+        <p><strong>Purpose:</strong> The Daily Plan Automator is the orchestration system that manages a 4-agent pipeline to automatically update project state, documentation, and generate daily plans from MasterPlanCoordination.tt priorities.</p>
         <p><strong>Scope:</strong> System design for the automator that coordinates Agent 1-4 (Daily Audit → DocumentationSync → MasterPlanUpdater → DailyPlansGenerator).</p>
         <p><strong>Success Criteria:</strong> Workflow design documented with automation triggers, data flows, integration points, and implementation roadmap complete.</p>
     </div>
@@ -39,7 +39,7 @@
 └────────────┬────────────────────────────────────────────────────┘
              │
              ├─→ [Chat 1] Daily Audit Agent (15-20 min)
-             │   ├─ Input: current_session.md (previous chat history)
+             │   ├─ Input: prompts_log.yaml (previous chat history)
              │   ├─ Process: Analyze yesterday's work, extract changes
              │   ├─ Output: audit_YYYY-MM-DD.md, audit_YYYY-MM-DD.json
              │   └─ Exit: /chathandoff to Chat 2
@@ -52,12 +52,12 @@
              │
              ├─→ [Chat 3] Master Plan Updater Agent (10-15 min)
              │   ├─ Input: Updated documentation + audit (Agents 1-2)
-             │   ├─ Process: Update MASTER_PLAN_COORDINATION.tt
-             │   ├─ Output: MASTER_PLAN_COORDINATION.tt vX.XX
+             │   ├─ Process: Update MasterPlanCoordination.tt
+             │   ├─ Output: MasterPlanCoordination.tt vX.XX
              │   └─ Exit: /chathandoff to Chat 4
              │
              └─→ [Chat 4] Daily Plans Generator Agent (15-20 min)
-                 ├─ Input: MASTER_PLAN_COORDINATION.tt vX.XX
+                 ├─ Input: MasterPlanCoordination.tt vX.XX
                  ├─ Process: Generate 7-day daily plans from master plan
                  ├─ Output: 7× Daily_Plans-YYYY-MM-DD.tt files
                  └─ Exit: Session complete, /sessionhandoff to new session
@@ -79,7 +79,7 @@
         <tbody>
             <tr style="background: #fef5e7;">
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔴 Agent 1: Audit</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">current_session.md<br/>Chat history logs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">prompts_log.yaml<br/>Chat history logs</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Parse yesterday's work<br/>Extract code diffs<br/>Summarize changes</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">audit_YYYY-MM-DD.md<br/>audit_YYYY-MM-DD.json<br/>code diffs</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">→ Agent 2</td>
@@ -93,14 +93,14 @@
             </tr>
             <tr style="background: #e8f5e9;">
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>🟢 Agent 3: MasterPlan</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">MASTER_PLAN_COORDINATION.tt<br/>Audit summary</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Audit summary</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Update status sections<br/>Increment version<br/>Update timestamps</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">MASTER_PLAN_COORDINATION.tt<br/>vX.XX (bumped)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>vX.XX (bumped)</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">→ Agent 4</td>
             </tr>
             <tr style="background: #e3f2fd;">
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔵 Agent 4: Daily Plans</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">MASTER_PLAN_COORDINATION.tt vX.XX<br/>Current date</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt vX.XX<br/>Current date</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Extract priorities<br/>Sequence tasks<br/>Generate 7 plans</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">7× Daily_Plans-YYYY-MM-DD.tt<br/>Format: .tt files</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">✅ Complete</td>
@@ -133,7 +133,7 @@
             <tbody>
                 <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Before Agent 1</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Check: current_session.md exists?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: prompts_log.yaml exists?</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">If NO → Create template; If YES → Proceed</td>
                 </tr>
                 <tr style="background: #fafafa;">
@@ -166,7 +166,7 @@
     <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 15px 0;">
         <ol>
             <li>Execute <code>validation_step0.pl</code> - Verify previous chat compliance</li>
-            <li>Check <code>current_session.md</code> - Confirm audit trail accessible</li>
+            <li>Check <code>prompts_log.yaml</code> - Confirm audit trail accessible</li>
             <li>Determine today's date and create audit file path (audit_YYYY-MM-DD.tt)</li>
             <li>Log startup: <code>/updateprompt --phase before --action "Daily Plan Automator: Start pipeline for [DATE]"</code></li>
             <li>Ready for Phase 1</li>
@@ -234,7 +234,7 @@
                 <td style="padding: 10px; border: 1px solid #ddd;">When agent fails, ask user to continue or skip</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>current_session.md</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>prompts_log.yaml</strong></td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Chat history source for Agent 1</td>
                 <td style="padding: 10px; border: 1px solid #ddd;">Must exist; tracks all chats in session</td>
             </tr>
@@ -281,7 +281,7 @@
     <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0;">
         <h3 style="margin-top: 0;">🎯 Daily Plan Generation Algorithm (Agent 4)</h3>
         <ol style="line-height: 2;">
-            <li><strong>Input:</strong> MASTER_PLAN_COORDINATION.tt vX.XX (updated by Agent 3)</li>
+            <li><strong>Input:</strong> MasterPlanCoordination.tt vX.XX (updated by Agent 3)</li>
             <li><strong>Extract:</strong> Priority matrix from master plan (Top 10 Priorities table)</li>
             <li><strong>Filter:</strong> Tasks marked "In Progress" or "Ready" (skip "Planned" or "Completed")</li>
             <li><strong>Sequence:</strong> Sort by (Severity DESC, Priority ASC, Timeline ASC)</li>
@@ -321,7 +321,7 @@
                         <strong>Master Plan → Daily Plans</strong>
                         <br/><span style="font-size: 0.9em;">(Downstream)</span>
                     </td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">MASTER_PLAN_COORDINATION.tt<br/>Priority Matrix + Status</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Priority Matrix + Status</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Daily_Plans-YYYY-MM-DD.tt<br/>(7 files, next 7 days)</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Every morning (Agent 4 phase)</td>
                 </tr>
@@ -331,7 +331,7 @@
                         <br/><span style="font-size: 0.9em;">(Upstream, next cycle)</span>
                     </td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Completed daily plans<br/>from yesterday's work</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">MASTER_PLAN_COORDINATION.tt<br/>Status updates</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Status updates</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">Next morning (Agent 3 phase)</td>
                 </tr>
             </tbody>
@@ -397,7 +397,7 @@
         <ul>
             <li><strong>Zencoder Scripts:</strong> validation_step0.pl, /updateprompt.pl (must be functional)</li>
             <li><strong>Agent Roles:</strong> Daily Audit, DocumentationSync, Master Plan Updater, Daily Plans Generator (must be defined)</li>
-            <li><strong>Documentation System:</strong> MASTER_PLAN_COORDINATION.tt, Daily_Plans template structure (must be stable)</li>
+            <li><strong>Documentation System:</strong> MasterPlanCoordination.tt, Daily_Plans template structure (must be stable)</li>
             <li><strong>Chat Infrastructure:</strong> /chathandoff, /sessionhandoff keywords (must be implemented)</li>
             <li><strong>File System:</strong> All documentation paths must be stable (no moves/deletions during pipeline)</li>
         </ul>
@@ -409,7 +409,7 @@
             <li><strong>Daily Only:</strong> Pipeline designed to run once per day (morning UTC)</li>
             <li><strong>Sequential Execution:</strong> Agents must run in order (1→2→3→4); no parallelization</li>
             <li><strong>Single Session Assumption:</strong> All 4 agents in same Zencoder session (use /chathandoff, not /sessionhandoff between agents)</li>
-            <li><strong>File Locks:</strong> No concurrent edits to MASTER_PLAN_COORDINATION.tt during pipeline</li>
+            <li><strong>File Locks:</strong> No concurrent edits to MasterPlanCoordination.tt during pipeline</li>
             <li><strong>Audit Trail Required:</strong> All changes logged via /updateprompt and prompts_log.yaml</li>
         </ul>
     </div>
