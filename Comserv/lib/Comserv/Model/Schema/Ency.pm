@@ -24,6 +24,8 @@ __PACKAGE__->register_class('User', 'Comserv::Model::Schema::Ency::Result::User'
 # Register AI conversation system classes
 __PACKAGE__->register_class('AiConversation', 'Comserv::Model::Schema::Ency::Result::AiConversation');
 __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::AiMessage');
+__PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
+__PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

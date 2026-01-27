@@ -120,7 +120,7 @@
         <h2>📅 Week 2 (Jan 9-15) Priorities</h2>
         <ol>
             <li><strong>Documentation Sync Continuation (Chat 45+)</strong> - Complete 45+ UPDATE + 30+ CREATE files from backlog</li>
-            <li><strong>Master Plan Update (Chat 44-45)</strong> - Update MASTER_PLAN_COORDINATION.tt v0.25 → v0.26 with Week 1 closure</li>
+            <li><strong>Master Plan Update (Chat 44-45)</strong> - Update MasterPlanCoordination.tt v0.25 → v0.26 with Week 1 closure</li>
             <li><strong>Daily Plans Generation (Chat 44-45)</strong> - Create daily plans for Jan 9, 10, 11, 12</li>
             <li><strong>E.1 Schema Fixes (Week 2)</strong> - Fix 4 AI Chat blockers (menu link, auto-create tables, error handlers, health check)</li>
             <li><strong>A.3 Credentials Audit Implementation (Week 2)</strong> - Implement audit findings in production deployment config</li>
@@ -173,7 +173,7 @@
                 </tr>
             </tbody>
         </table>
-        <p><strong>See Also:</strong> <a href="/Documentation/MASTER_PLAN_COORDINATION">MASTER_PLAN_COORDINATION.tt</a> (v0.25) for complete 16-plan overview and dependency mapping</p>
+        <p><strong>See Also:</strong> <a href="/Documentation/MASTER_PLAN_COORDINATION">MasterPlanCoordination.tt</a> (v0.25) for complete 16-plan overview and dependency mapping</p>
     </div>
 
     <!-- TEAM WORKFLOW METRICS -->
@@ -193,7 +193,7 @@
         <h2>Immediate Next Steps (Chat 44-45)</h2>
         <ol>
             <li><strong>Generate Daily Plans for Jan 9-12</strong> (4 files) using audit backlog as priority input</li>
-            <li><strong>Update MASTER_PLAN_COORDINATION.tt</strong> to v0.26 with Week 1 completion summary</li>
+            <li><strong>Update MasterPlanCoordination.tt</strong> to v0.26 with Week 1 completion summary</li>
             <li><strong>Handoff to Chat 45</strong> with fresh token budget for Week 2 work (documentation sync continuation)</li>
         </ol>
         <p><strong>Token Budget Management:</strong> This chat approaching token limit (~/110k of 200k). Recommend /chathandoff after master plan docs created.</p>

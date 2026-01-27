@@ -59,6 +59,6 @@
 
 <ul>
 <li><strong>Widget Testing:</strong> Verify credentials: 'include' fix allows cookies to be sent; test in browser DevTools</li>
-<li><strong>Audit Review:</strong> If three-agent workflow had issues, document in current_session.md for improvement</li>
+<li><strong>Audit Review:</strong> If three-agent workflow had issues, document in current_session.md.archivenotused for improvement</li>
 <li><strong>Post-Holiday Planning:</strong> Jan 1 is New Year's Day (no work expected); plan resumes Jan 2</li>
 </ul>

@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::AiConversation;
 use base 'DBIx::Class::Core';
+__PACKAGE__->load_components("InflateColumn::DateTime");
 use warnings FATAL => 'all';
 
 __PACKAGE__->table('ai_conversations');

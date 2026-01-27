@@ -1,4 +1,13 @@
-[% PageVersion = 'index.tt,v 0.1 2025/10/06 13:35 ai_assistant Exp ai_assistant' %]
+[% META
+   title = "AI Chat"
+   description = "Interactive AI chat interface"
+   roles = "user,admin,developer"
+   category = "AI Module"
+   page_version = "0.11"
+   last_updated = "Fri Jan 23 15:00:00 UTC 2026"
+%]
+
+[% PageVersion = 'ai/index.tt,v 0.11 2026/01/23 15:00:00 CleanupAgent Exp - Consolidated message formatting and theme cleanup'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -6,7 +15,7 @@
 <div class="ai-chat-container">
     <div class="page-header-actions">
         <h1>AI Assistant Chat</h1>
-        <div id="conversation-info" class="conversation-info" style="display: none; font-size: 12px; color: #666; margin-right: auto;">
+        <div id="conversation-info" class="conversation-info" style="display: none; font-size: 12px; color: var(--schema-text-muted); margin-right: auto;">
             Conversation #<span id="conversation-id-display">-</span>
         </div>
         <div class="header-buttons">
@@ -105,11 +114,12 @@
 <style>
 .ai-chat-container {
     max-width: 1200px;
-    margin: 20px auto;
-    padding: 20px;
+    margin: 10px auto;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 160px);
+    min-height: 500px;
 }
 
 .page-header-actions {
@@ -134,8 +144,8 @@
 
 .header-btn {
     padding: 8px 16px;
-    background: #2196f3;
-    color: white;
+    background-color: var(--link-color);
+    color: var(--text-color);
     text-decoration: none;
     border-radius: 4px;
     font-size: 14px;
@@ -144,13 +154,13 @@
 }
 
 .header-btn:hover {
-    background: #1976d2;
+    opacity: 0.8;
 }
 
 .return-to-menu-btn {
     padding: 10px 20px;
-    background: #666;
-    color: white;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
     text-decoration: none;
     border-radius: 4px;
     font-size: 14px;
@@ -159,18 +169,18 @@
 }
 
 .return-to-menu-btn:hover {
-    background: #444;
+    background-color: var(--background-color);
 }
 
 .ai-chat-container h1 {
     margin: 0 0 20px 0;
-    color: #333;
+    color: var(--text-color);
     text-align: center;
 }
 
 /* Model Selector Styles */
 .model-selector-section {
-    background: #f5f5f5;
+    background-color: var(--secondary-color);
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -178,27 +188,29 @@
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+    border: 1px solid var(--border-color);
 }
 
 .model-selector-section label {
     font-weight: bold;
-    color: #555;
+    color: var(--text-color);
 }
 
 .model-dropdown {
     flex: 1;
     min-width: 200px;
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 14px;
-    background: white;
+    background-color: var(--background-color);
+    color: var(--text-color);
 }
 
 .manage-models-link {
     padding: 8px 16px;
-    background: #2196f3;
-    color: white;
+    background-color: var(--link-color);
+    color: var(--text-color);
     text-decoration: none;
     border-radius: 4px;
     font-size: 14px;
@@ -206,25 +218,25 @@
 }
 
 .manage-models-link:hover {
-    background: #1976d2;
+    opacity: 0.8;
 }
 
 .current-model-display {
-    background: #e3f2fd;
+    background-color: var(--secondary-color);
     padding: 12px 15px;
     border-radius: 8px;
     margin-bottom: 20px;
-    border-left: 4px solid #2196f3;
+    border-left: 4px solid var(--link-color);
 }
 
 .model-label {
     font-weight: bold;
-    color: #555;
+    color: var(--text-color);
     margin-right: 8px;
 }
 
 .model-name {
-    color: #1976d2;
+    color: var(--link-color);
     font-family: monospace;
     font-size: 14px;
 }
@@ -233,38 +245,40 @@
 .host-selector-section {
     margin: 15px 0;
     padding: 15px;
-    background-color: #f8f9fa;
+    background-color: var(--secondary-color);
     border-radius: 8px;
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+    border: 1px solid var(--border-color);
 }
 
 .host-selector-section label {
     font-weight: 600;
-    color: #495057;
+    color: var(--text-color);
     margin-right: 5px;
 }
 
 .host-dropdown {
     padding: 8px 12px;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 14px;
-    background-color: white;
+    background-color: var(--background-color);
+    color: var(--text-color);
     cursor: pointer;
     min-width: 200px;
 }
 
 .host-dropdown:hover {
-    border-color: #80bdff;
+    border-color: var(--link-color);
 }
 
 .host-dropdown:focus {
     outline: none;
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    border-color: var(--link-color);
+    box-shadow: 0 0 0 0.2rem var(--nav-hover-bg);
 }
 
 .connection-status {
@@ -272,26 +286,27 @@
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background-color: white;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 13px;
-    color: #495057;
+    color: var(--text-color);
 }
 
 .status-indicator {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #28a745;
+    background-color: var(--success-color);
     animation: pulse 2s infinite;
 }
 
 .status-indicator.connecting {
-    background-color: #ffc107;
+    background-color: var(--warning-color);
 }
 
 .status-indicator.error {
-    background-color: #dc3545;
+    background-color: var(--warning-color);
     animation: none;
 }
 
@@ -306,8 +321,8 @@
 
 .start-server-button {
     padding: 8px 16px;
-    background-color: #ff9800;
-    color: white;
+    background-color: var(--accent-color);
+    color: var(--button-text);
     border: none;
     border-radius: 4px;
     font-size: 14px;
@@ -318,7 +333,8 @@
 }
 
 .start-server-button:hover {
-    background-color: #f57c00;
+    background-color: var(--accent-color);
+    opacity: 0.9;
     transform: translateY(-2px);
 }
 
@@ -327,7 +343,7 @@
 }
 
 .start-server-button:disabled {
-    background-color: #ccc;
+    background-color: var(--border-color);
     cursor: not-allowed;
     transform: none;
 }
@@ -340,19 +356,19 @@
 .current-host-display {
     margin: 10px 0;
     padding: 10px;
-    background-color: #e9ecef;
+    background-color: var(--secondary-color);
     border-radius: 4px;
     font-size: 14px;
 }
 
 .current-host-display .host-label {
     font-weight: 600;
-    color: #495057;
+    color: var(--schema-text-muted);
     margin-right: 8px;
 }
 
 .current-host-display .host-name {
-    color: #212529;
+    color: var(--text-color);
     font-family: monospace;
 }
 
@@ -360,8 +376,8 @@
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    background: white;
-    border: 1px solid #ddd;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -372,12 +388,13 @@
 
 .welcome-message {
     text-align: center;
-    color: #666;
+    color: var(--text-color);
+    opacity: 0.7;
     padding: 40px 20px;
 }
 
 .welcome-message h2 {
-    color: #4caf50;
+    color: var(--success-color);
     margin-bottom: 10px;
 }
 
@@ -413,7 +430,8 @@
     gap: 8px;
     margin-bottom: 5px;
     font-size: 12px;
-    color: #666;
+    color: var(--text-color);
+    opacity: 0.8;
 }
 
 .message-role {
@@ -421,16 +439,35 @@
 }
 
 .message-role.user {
-    color: #2196f3;
+    color: var(--link-color);
 }
 
 .message-role.assistant {
-    color: #4caf50;
+    color: var(--success-color);
 }
 
 .message-timestamp {
     font-size: 11px;
-    color: #999;
+    color: var(--text-color);
+    opacity: 0.6;
+}
+
+.copy-message-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 5px;
+    margin-left: auto;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    border-radius: 3px;
+    color: var(--text-color);
+}
+
+.copy-message-btn:hover {
+    opacity: 1;
+    background-color: var(--secondary-color);
 }
 
 .message-content {
@@ -442,15 +479,15 @@
 }
 
 .chat-message.user .message-content {
-    background: #2196f3;
-    color: white;
+    background-color: var(--link-color);
+    color: var(--text-color);
     border-bottom-right-radius: 4px;
 }
 
 .chat-message.assistant .message-content {
-    background: #f5f5f5;
-    color: #333;
-    border: 1px solid #e0e0e0;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
     border-bottom-left-radius: 4px;
 }
 
@@ -459,10 +496,11 @@
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    background: #f5f5f5;
+    background-color: var(--secondary-color);
     border-radius: 12px;
     border-bottom-left-radius: 4px;
-    color: #666;
+    color: var(--text-color);
+    opacity: 0.8;
     font-style: italic;
 }
 
@@ -477,8 +515,8 @@
 
 /* Chat Input Styles */
 .chat-input-container {
-    background: white;
-    border: 1px solid #ddd;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 15px;
 }
@@ -492,18 +530,40 @@
 .chat-input {
     width: 100%;
     padding: 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 14px;
     font-family: inherit;
+    background-color: var(--background-color);
+    color: var(--text-color);
     resize: vertical;
     min-height: 60px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.code-block {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    margin: 10px 0;
+    overflow-x: auto;
+    white-space: pre;
+    display: block;
+}
+
+.chat-message.assistant .code-block {
+    background-color: var(--secondary-color);
 }
 
 .chat-input:focus {
     outline: none;
-    border-color: #4caf50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+    border-color: var(--success-color);
+    box-shadow: 0 0 0 2px var(--nav-hover-bg);
 }
 
 .chat-controls {
@@ -514,7 +574,7 @@
 
 .button {
     padding: 10px 20px;
-    border: none;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
@@ -523,30 +583,34 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
 }
 
 .button.primary {
-    background: #4caf50;
-    color: white;
+    background-color: var(--success-color);
+    color: var(--text-color);
+    border: none;
 }
 
 .button.primary:hover:not(:disabled) {
-    background: #45a049;
+    opacity: 0.8;
 }
 
 .button.primary:disabled {
-    background: #ccc;
+    background-color: var(--secondary-color);
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 .button.secondary {
-    background: #f5f5f5;
-    color: #333;
-    border: 1px solid #ddd;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
 }
 
 .button.secondary:hover {
-    background: #e0e0e0;
+    background-color: var(--background-color);
 }
 
 /* Status Messages */
@@ -562,26 +626,26 @@
     padding: 15px;
     margin-bottom: 10px;
     border-radius: 5px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: var(--dropdown-shadow);
     animation: slideIn 0.3s ease;
 }
 
 .status-message.success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--success-color);
+    color: var(--text-color);
 }
 
 .status-message.error {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--warning-color);
+    color: var(--text-color);
 }
 
 .status-message.info {
-    background: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--link-color);
+    color: var(--text-color);
 }
 
 @keyframes slideIn {
@@ -601,20 +665,22 @@
 }
 
 .chat-messages::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background-color: var(--secondary-color);
     border-radius: 4px;
 }
 
 .chat-messages::-webkit-scrollbar-thumb {
-    background: #888;
+    background-color: var(--border-color);
     border-radius: 4px;
 }
 
 .chat-messages::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background-color: var(--text-color);
+    opacity: 0.5;
 }
 </style>
 
+<script src="/static/js/ai-common.js"></script>
 <script>
 // Chat state management
 let conversationHistory = [];
@@ -999,8 +1065,9 @@ function createMessageElement(message) {
             </span>
             <span class="message-timestamp">${timestamp}</span>
             ${message.model ? `<span class="message-model">(${message.model})</span>` : ''}
+            ${message.role === 'assistant' ? `<button class="copy-message-btn" onclick="copyMessageText(this)" title="Copy message content">📋</button>` : ''}
         </div>
-        <div class="message-content">${escapeHtml(message.content)}</div>
+        <div class="message-content" data-raw-content="${AIUtils.escapeHtml(message.content)}">${AIUtils.formatMessageContent(message.content)}</div>
     `;
     
     return messageDiv;
@@ -1048,8 +1115,15 @@ function updateSendButton(loading) {
 }
 
 // Clear chat
-function clearChat() {
+async function clearChat() {
     if (confirm('Are you sure you want to clear the chat history?')) {
+        // Clear server session
+        try {
+            await fetch('/ai/reset_conversation', { method: 'POST' });
+        } catch (e) {
+            console.error('Failed to reset conversation on server:', e);
+        }
+
         conversationHistory = [];
         currentConversationId = null;
         saveConversationHistory();
@@ -1128,6 +1202,38 @@ function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// Copy message text
+function copyMessageText(btn) {
+    const messageDiv = btn.closest('.chat-message');
+    const contentDiv = messageDiv.querySelector('.message-content');
+    
+    // Find the message in history or extract from textContent
+    // Using textContent might be slightly off if formatted, better to find in history
+    // But since history is global, we can use it.
+    
+    // Find which index this is
+    const messages = Array.from(chatMessages.querySelectorAll('.chat-message'));
+    const index = messages.indexOf(messageDiv);
+    
+    let textToCopy = '';
+    if (index !== -1 && conversationHistory[index]) {
+        textToCopy = conversationHistory[index].content;
+    } else {
+        textToCopy = contentDiv.textContent;
+    }
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = '✅';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy text: ', err);
+        showStatus('error', 'Failed to copy text');
+    });
+}
+
 // Show status message
 function showStatus(type, message) {
     const statusContainer = document.getElementById('status-container');
@@ -1141,12 +1247,5 @@ function showStatus(type, message) {
         statusDiv.style.opacity = '0';
         setTimeout(() => statusDiv.remove(), 300);
     }, 5000);
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 </script>

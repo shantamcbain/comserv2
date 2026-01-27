@@ -1,5 +1,6 @@
 package Comserv::Model::Schema::Ency::Result::AiMessage;
 use base 'DBIx::Class::Core';
+__PACKAGE__->load_components("InflateColumn::DateTime");
 use warnings FATAL => 'all';
 
 __PACKAGE__->table('ai_messages');
@@ -36,7 +37,7 @@ __PACKAGE__->add_columns(
     },
     agent_type => {
         data_type => 'enum',
-        extra => { list => ['documentation', 'helpdesk', 'ency', 'beekeeping', 'hamradio'] },
+        extra => { list => ['documentation', 'helpdesk', 'ency', 'beekeeping', 'hamradio', 'chat', 'cleanup-agent', 'daily-audit', 'documentation-sync', 'master-plan', 'daily-plans', 'prompt-logging', 'MainAgent'] },
         default_value => 'documentation',
         is_nullable => 1,
     },

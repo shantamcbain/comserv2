@@ -74,8 +74,8 @@
 <li><strong>Archive Dec 31 Session:</strong>
 <ul>
 <li>Execute final `/sessionhandoff` of 2025</li>
-<li>Archive current_session.md → [TIMESTAMP]_session_archive.md</li>
-<li>Reset current_session.md for Jan 2 work</li>
+<li>Archive current_session.md.archivenotused → [TIMESTAMP]_session_archive.md</li>
+<li>Reset current_session.md.archivenotused for Jan 2 work</li>
 <li>Preserve all Dec 26-31 chat history in archive</li>
 </ul>
 </li>

@@ -3,13 +3,14 @@
     title = "AI Models Management"
     category = "AI"
     roles = "admin,developer,user"
+    page_version = "1.05"
+    last_updated = "Fri Jan 23 15:00:00 UTC 2026"
     description = "Manage Ollama models across servers, including pull/test/remove and start buttons."
     keywords = "Ollama, models, pull, test, remove"
     author = "Comserv Team"
-    date = "Fri Oct 18 14:30:00 PDT 2024"
 %]
 
-[% PageVersion ="$Id: models.tt 1.01 Fri Oct 18 14:30:00 PDT 2024 $" %]
+[% PageVersion = 'ai/models.tt,v 1.05 2026/01/23 15:00:00 CleanupAgent Exp - Theme compliance and card style standardization'; %]
 
 [% IF c.debug %]
     <div class="debug-info">
@@ -17,7 +18,111 @@
     </div>
 [% END %]
 
-<div class="container" data-page-date="2024-10-18">
+<style>
+.models-container {
+    padding: 20px;
+}
+
+.debug-info {
+    background-color: var(--secondary-color);
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 20px;
+    font-size: 0.9em;
+}
+
+.toc-section {
+    background-color: var(--secondary-color);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.card {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: var(--dropdown-shadow);
+}
+
+.card-header {
+    background-color: var(--primary-color);
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h5 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.card-body {
+    padding: 20px;
+    color: var(--text-color);
+}
+
+.server-message {
+    min-height: 20px;
+    font-size: 0.9em;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.badge-success { background-color: var(--success-color); }
+.badge-danger { background-color: var(--warning-color); }
+.badge-info { background-color: var(--link-color); }
+
+.list-group-item {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    padding: 10px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+
+.footer {
+    margin-top: 40px;
+    padding: 20px;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    text-align: center;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.alert-warning-custom {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--warning-color);
+    color: var(--text-color);
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+</style>
+
+<div class="container models-container" data-page-date="2024-10-18">
     <div class="row">
         <div class="col-12">
             <div class="metadata" style="display: none;">
@@ -53,10 +158,10 @@
             <div class="row">
                 [% FOREACH server IN servers %]
                 <div class="col-md-6 mb-4">
-                    <div class="card" id="server-[% loop.index %]" style="background: var(--panel-bg, #f8f9fa); border: 1px solid var(--border-color, #dee2e6); box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <div class="card-header" style="background: var(--header-bg, #e9ecef); color: var(--text-color, #212529);">
+                    <div class="card" id="server-[% loop.index %]">
+                        <div class="card-header">
                             <h5>[% server.name %] ([% server.location %])</h5>
-                            <div class="status-indicator" style="float: right; margin-top: -35px;">
+                            <div class="status-indicator">
                                 [% IF server.connected %]
                                 <span class="badge badge-success">Connected</span>
                                 [% ELSE %]
@@ -64,32 +169,31 @@
                                 [% END %]
                             </div>
                         </div>
-                        <div class="card-body" style="color: var(--text-color, #212529);">
+                        <div class="card-body">
                             [% IF server.error %]
-                            <div class="alert alert-warning" role="alert" style="background: var(--warning-bg, #fff3cd); border-color: var(--warning-border, #ffeaa7); color: var(--warning-text, #856404);">
+                            <div class="alert-warning-custom">
                                 [% server.error %]
                             </div>
                             [% END %]
 
                             [% IF can_select_model %]
-                            <button class="btn btn-primary mb-2" onclick="startServer([% loop.index %], '[% server.host %]', [% server.port %])"
-                                    style="background: var(--primary-color, #007bff); border-color: var(--primary-color, #007bff); width: 100%;">
+                            <button class="btn btn-primary mb-2 btn-full" onclick="startServer([% loop.index %], '[% server.host %]', [% server.port %])">
                                 [% IF NOT server.connected %]Start Server[% ELSE %]Restart[% END %]
                             </button>
-                            <div id="message-[% loop.index %]" class="server-message mb-3" style="min-height: 20px; font-size: 0.9em; color: var(--text-color, #6c757d);"></div>
+                            <div id="message-[% loop.index %]" class="server-message mb-3"></div>
                             [% ELSE %]
                             <div class="alert alert-info mb-3" role="alert" style="font-size: 0.85em;">
                                 <small>Management requires admin/developer role.</small>
                             </div>
                             [% END %]
 
-                            <h6 style="color: var(--header-color, #495057);">Installed Models:</h6>
+                            <h6 class="header-text">Installed Models:</h6>
                             <ul class="list-group list-group-flush">
                                 [% IF server.installed_models.size %]
                                 [% FOREACH model IN server.installed_models %]
-                                <li class="list-group-item d-flex justify-content-between align-items-center" style="border: none; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color, #dee2e6);">
-                                    <span style="color: var(--text-color, #212529);">[% model.name %]</span>
-                                    <span class="badge badge-info" style="background: var(--info-color, #17a2b8);">[% model.size %]</span>
+                                <li class="list-group-item">
+                                    <span class="model-name">[% model.name %]</span>
+                                    <span class="badge badge-info">[% model.size %]</span>
                                     [% IF can_select_model %]
                                     <div class="btn-group btn-group-sm ms-2">
                                         <button class="btn btn-outline-success" onclick="testModel('[% model.name %]', '[% server.host %]', [% server.port %])" style="font-size: 0.75em;">
@@ -103,19 +207,19 @@
                                 </li>
                                 [% END %]
                                 [% ELSE %]
-                                <li class="list-group-item text-muted" style="border: none; padding: 0.5rem 0;">No models installed</li>
+                                <li class="list-group-item text-muted">No models installed</li>
                                 [% END %]
                             </ul>
 
-                            <h6 class="mt-3" style="color: var(--header-color, #495057);">Available Models to Pull:</h6>
-                            <select id="available-select-[% loop.index %]" class="form-select form-select-sm mb-2" style="border: 1px solid var(--border-color, #ced4da); font-size: 0.85em;">
+                            <h6 class="mt-3 header-text">Available Models to Pull:</h6>
+                            <select id="available-select-[% loop.index %]" class="form-select form-select-sm mb-2" style="font-size: 0.85em;">
                                 [% FOREACH avail IN server.available_models %]
                                 <option value="[% avail %]">[% avail %]</option>
                                 [% END %]
                             </select>
                             [% IF can_select_model %]
-                            <button class="btn btn-success btn-sm" onclick="pullModel([% loop.index %], '[% server.host %]', [% server.port %])"
-                                    style="background: var(--success-color, #28a745); border-color: var(--success-color, #28a745); width: 100%; font-size: 0.85em;">
+                            <button class="btn btn-success btn-sm btn-full" onclick="pullModel([% loop.index %], '[% server.host %]', [% server.port %])"
+                                    style="font-size: 0.85em;">
                                 Pull Selected Model
                             </button>
                             [% END %]
@@ -130,7 +234,7 @@
                 <div class="row">
                     <div class="col-md-6">
                         <h3>Common Issues</h3>
-                        <ul style="color: var(--text-color, #6c757d);">
+                        <ul class="header-text">
                             <li><strong>Server Offline:</strong> Use Start button; check firewall/port 11434.</li>
                             <li><strong>No Models:</strong> Pull from list; ensure disk space.</li>
                             <li><strong>Permission Error:</strong> Login as admin/developer.</li>
@@ -138,7 +242,7 @@
                     </div>
                     <div class="col-md-6">
                         <h3>Next Steps</h3>
-                        <ul style="color: var(--text-color, #6c757d);">
+                        <ul class="header-text">
                             <li><a href="/Documentation/AI.tt">AI Setup Guide</a></li>
                             <li><a href="/admin/view_log">View Logs</a></li>
                             <li><a href="/Documentation/proxmox_integration.tt">Related Integrations</a></li>
@@ -151,7 +255,7 @@
 </div>
 
 <!-- Footer -->
-<div class="footer" style="margin-top: 40px; padding: 20px; background: var(--footer-bg, #343a40); color: var(--footer-text, white); text-align: center;">
+<div class="footer">
     <p>&copy; 2024 Comserv Team | Page Version 1.01 | Last Updated: Fri Oct 18 14:30:00 PDT 2024</p>
 </div>
 

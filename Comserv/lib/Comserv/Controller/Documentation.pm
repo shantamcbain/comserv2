@@ -2069,6 +2069,160 @@ sub _clean_for_json {
     }
 }
 
+# Run documentation sync audit
+sub run_audit :Path('/Documentation/run_audit') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_audit',
+        "Running documentation sync audit");
+
+    # Check admin permissions
+    unless ($self->_check_admin_access($c)) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => "Access denied. Administrator privileges required.",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    # Execute documentation_sync_audit.pl script
+    # Script is at project root (.zencoder/scripts/), not in Comserv/ directory
+    use File::Spec;
+    my $app_root = $c->path_to();  # /path/to/Comserv
+    my $project_root = File::Spec->catdir($app_root, '..');  # Go up one level to project root
+    my $script_path = File::Spec->catfile($project_root, '.zencoder', 'scripts', 'documentation_sync_audit.pl');
+    
+    unless (-e $script_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_audit',
+            "Script not found at: $script_path");
+        $c->response->status(404);
+        $c->stash(
+            error_msg => "Audit script not found at $script_path",
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    # Run the script
+    use IPC::Run qw(run);
+    my @cmd = ('perl', $script_path, '--verbose');
+    my $out = '';
+    my $err = '';
+    
+    eval {
+        run \@cmd, \undef, \$out, \$err or die "Script execution failed: $?";
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'run_audit',
+            "Audit script failed: $@");
+        $c->stash(
+            error_msg => "Audit failed: $@",
+            output => $err,
+            template => 'Documentation/Error.tt'
+        );
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'run_audit',
+        "Audit completed successfully");
+
+    # Read and render the audit report file
+    my $audit_file = File::Spec->catfile($project_root, 'Comserv', 'root', 'Documentation', 'AuditReports', 'DocumentationSyncAudit.tt');
+    
+    if (-e $audit_file) {
+        # Set proper encoding
+        $c->response->content_type('text/html; charset=utf-8');
+        
+        # Render the audit report template
+        $c->stash(template => 'Documentation/AuditReports/DocumentationSyncAudit.tt');
+    } else {
+        $c->stash(
+            error_msg => "Audit report file not found at $audit_file",
+            template => 'Documentation/Error.tt'
+        );
+    }
+}
+
+sub daily_plan :Path('/Documentation/DailyPlan') :Args {
+    my ($self, $c, @args) = @_;
+    my $requested_date = $args[0] if @args;
+
+    # Get current date in YYYY-MM-DD format
+    my $now = Time::Piece->new();
+    my $current_date_str = $now->strftime('%Y-%m-%d');
+    my $current_display = $now->strftime('%A, %B %d, %Y');
+
+    # Use requested date or default to today
+    my $selected_date = $requested_date || $current_date_str;
+
+    # Parse selected date and calculate navigation dates
+    my ($year, $month, $day);
+    if ($selected_date =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
+        ($year, $month, $day) = ($1, $2, $3);
+    } else {
+        # Invalid date format, use today
+        $selected_date = $current_date_str;
+        ($year, $month, $day) = split('-', $current_date_str);
+    }
+
+    # Create Time::Piece objects for date navigation
+    my $selected_tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d");
+    my $prev_tp = $selected_tp - (24 * 60 * 60);  # Subtract 1 day
+    my $next_tp = $selected_tp + (24 * 60 * 60);  # Add 1 day
+
+    my $prev_date = $prev_tp->strftime('%Y-%m-%d');
+    my $next_date = $next_tp->strftime('%Y-%m-%d');
+    my $display_date = $selected_tp->strftime('%A, %B %d, %Y');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
+        "Accessing DailyPlan view for date: $selected_date");
+
+    # Fetch todos for the selected date
+    my $todos_for_today = [];
+    if (my $todo_model = $c->model('Todo')) {
+        eval {
+            my $sitename = $c->session->{SiteName} || 'CSC';
+            my $all_todos = $todo_model->get_all_todos_for_calendar($c, $sitename);
+            
+            if ($all_todos && ref($all_todos) eq 'ARRAY') {
+                # Filter todos by start_date or due_date matching selected_date
+                foreach my $todo (@$all_todos) {
+                    my $start = $todo->start_date ? $todo->start_date->ymd : '';
+                    my $due = $todo->due_date ? $todo->due_date->ymd : '';
+                    
+                    if ($start eq $selected_date || $due eq $selected_date) {
+                        push @$todos_for_today, $todo;
+                    }
+                }
+                
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
+                    "Found " . scalar(@$todos_for_today) . " todos for date $selected_date");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+                "Error fetching todos: $@");
+        }
+    }
+
+    # Set proper charset for UTF-8 content
+    $c->response->content_type('text/html; charset=utf-8');
+
+    # Pass all date information and todos to template
+    $c->stash(
+        current_date_str => $current_date_str,
+        current_display => $current_display,
+        selected_date => $selected_date,
+        display_date => $display_date,
+        prev_date => $prev_date,
+        next_date => $next_date,
+        todos_for_today => $todos_for_today,
+        template => 'admin/documentation/DailyPlan.tt'
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

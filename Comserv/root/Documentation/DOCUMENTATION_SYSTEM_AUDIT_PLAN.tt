@@ -479,7 +479,36 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Medium</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Pending</td>
                 </tr>
+                <tr>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Fix Model documentation path mappings (52 files)</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Directory Reorganization + Config Fix</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">High</td>
+                    <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--warning-color);">Queued - Chat 63</td>
+                </tr>
             </table>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; margin-bottom: var(--spacing-medium); line-height: 1.8;">
+                <h4 style="color: var(--warning-color); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Model Documentation Path Reorganization Task (Jan 13, 2026)</h4>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Issue Found:</strong> RepositoryCodeAudit.json contains 52 Model documentation files with incorrect path mappings pointing to root-level Documentation/ instead of Documentation/models/
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Examples:</strong> AiConversation.tt, AiMessage.tt, Category.tt, CodeSearchIndex.tt, etc. are located in Documentation/models/ but RepositoryCodeAudit.json maps them to Documentation/SomeName.tt (root level)
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">
+                    <strong>Action Required:</strong>
+                    <ol style="margin-left: 1.5em; margin-top: var(--spacing-small);">
+                        <li>Audit all 52 Model files to verify they exist in Documentation/models/ directory</li>
+                        <li>Move any Model files from root Documentation/ to Documentation/models/ if misplaced</li>
+                        <li>Update RepositoryCodeAudit.json mappings from Documentation/SomeName.tt to Documentation/models/SomeName.tt</li>
+                        <li>Verify View and Controller paths are also correctly mapped (preliminary scan passed)</li>
+                        <li>Re-run documentation_sync_audit.pl to verify fixes</li>
+                    </ol>
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 0; line-height: 1.8;">
+                    <strong>Estimated Effort:</strong> 3-5 prompts to complete full reorganization. Deferred from Chat 63 to avoid scope creep.
+                </p>
+            </div>
         </div>
     </div>
 

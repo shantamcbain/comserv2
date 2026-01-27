@@ -105,7 +105,7 @@ Here are the details:
 - Key accomplishments: [2-3 ITEMS, e.g., "Completed K8s architecture design, created migration strategy, tested tooling"]
 
 Run the Daily Audit Agent workflow:
-1. Read current_session.md latest chat entries
+1. Read prompts_log.yaml latest chat entries
 2. Extract: files modified, code changes, issues
 3. Create: audit_[YESTERDAY-DATE].md (append mode) + audit_[YESTERDAY-DATE].json (merge mode)
 4. Generate code diffs for modified files
@@ -196,9 +196,9 @@ Do NOT create new files; update ONLY existing documentation files.</code></pre>
     
     <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
         <h4>🟢 What This Agent Does</h4>
-        <p>Takes the audit from Agent 2 and updates the MASTER_PLAN_COORDINATION.tt file (the single source of truth for all 15 plans). Updates version numbers, timestamps, status, and next steps.</p>
+        <p>Takes the audit from Agent 2 and updates the MasterPlanCoordination.tt file (the single source of truth for all 15 plans). Updates version numbers, timestamps, status, and next steps.</p>
         <p><strong>Input</strong>: Audit from Agent 1-2</p>
-        <p><strong>Output</strong>: Updated MASTER_PLAN_COORDINATION.tt with version bump</p>
+        <p><strong>Output</strong>: Updated MasterPlanCoordination.tt with version bump</p>
     </div>
 
     <h4>How to Run Agent 3</h4>
@@ -221,7 +221,7 @@ Do NOT create new files; update ONLY existing documentation files.</code></pre>
         </tr>
         <tr style="background: #f9f9f9;">
             <td style="padding: 10px;"><strong>Verify Update</strong></td>
-            <td style="padding: 10px;">Check <a href="/Documentation/MASTER_PLAN_COORDINATION">/Documentation/MASTER_PLAN_COORDINATION.tt</a></td>
+            <td style="padding: 10px;">Check <a href="/Documentation/MASTER_PLAN_COORDINATION">/Documentation/MasterPlanCoordination.tt</a></td>
         </tr>
         <tr>
             <td style="padding: 10px;"><strong>Wait for /chathandoff</strong></td>
@@ -240,7 +240,7 @@ Details:
 - Next priorities: [TOP 3 ITEMS FOR TODAY, e.g., "Continue A.2 Phase 3, Validate E.1 widget"]
 
 Run the Master Plan Updater Agent workflow:
-1. Read MASTER_PLAN_COORDINATION.tt current state
+1. Read MasterPlanCoordination.tt current state
 2. Extract current version number
 3. Increment version (e.g., 0.12 → 0.13)
 4. Update: page_version, last_updated timestamp, Status line
@@ -249,7 +249,7 @@ Run the Master Plan Updater Agent workflow:
 7. Validate: HTML/TT syntax correct, dates formatted consistently
 8. Execute /chathandoff when complete
 
-File location: /Comserv/root/Documentation/MASTER_PLAN_COORDINATION.tt</code></pre>
+File location: /Comserv/root/Documentation/MasterPlanCoordination.tt</code></pre>
 
     <h4>What Success Looks Like</h4>
     <ul>
@@ -269,7 +269,7 @@ File location: /Comserv/root/Documentation/MASTER_PLAN_COORDINATION.tt</code></p
     <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
         <h4>🔵 What This Agent Does</h4>
         <p>Takes the updated master plan and creates 7-day daily plans. These plans break down the master plan priorities into actionable daily tasks for the entire team.</p>
-        <p><strong>Input</strong>: Updated MASTER_PLAN_COORDINATION.tt from Agent 3</p>
+        <p><strong>Input</strong>: Updated MasterPlanCoordination.tt from Agent 3</p>
         <p><strong>Output</strong>: 7 new Daily_Plans-YYYY-MM-DD.tt files (one for each day of the week)</p>
     </div>
 
@@ -311,7 +311,7 @@ Details:
 - Special notes: [ANY CONSTRAINTS, e.g., "Weekend work on Jan 5-6, Holiday on Jan 1"]
 
 Run the Daily Plans Generator Agent workflow:
-1. Read MASTER_PLAN_COORDINATION.tt to extract priorities
+1. Read MasterPlanCoordination.tt to extract priorities
 2. Review previous 7 days of Daily_Plans-YYYY-MM-DD.tt files
 3. Calculate next 7-day date range (starting today)
 4. Break down master plan priorities into daily actionable tasks
@@ -516,7 +516,7 @@ Run the Daily Audit Agent workflow...
 
 Details:
 - Audit date: 2026-01-02
-- Changed files: Comserv/lib/Comserv/Model/KubernetesConfig.pm, Comserv/root/Documentation/MASTER_PLAN_COORDINATION.tt
+- Changed files: Comserv/lib/Comserv/Model/KubernetesConfig.pm, Comserv/root/Documentation/MasterPlanCoordination.tt
 - Documentation focus: K8s readiness docs, master plan updates
 
 Run the DocumentationSync Agent workflow...
@@ -572,7 +572,7 @@ Run the Daily Plans Generator Agent workflow...
             <h4>📍 Important File Locations</h4>
             <ul style="font-size: 0.95em;">
                 <li><strong>Audit logs:</strong> /Documentation/session_history/audit_logs/</li>
-                <li><strong>Master plan:</strong> /Documentation/MASTER_PLAN_COORDINATION.tt</li>
+                <li><strong>Master plan:</strong> /Documentation/MasterPlanCoordination.tt</li>
                 <li><strong>Daily plans:</strong> /Documentation/DailyPlans/</li>
                 <li><strong>Session history:</strong> /Documentation/session_history/</li>
                 <li><strong>Agent specs:</strong> /.zencoder/coding-standards.yaml</li>

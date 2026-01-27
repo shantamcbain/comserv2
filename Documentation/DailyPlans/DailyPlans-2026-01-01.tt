@@ -86,7 +86,7 @@
 <li><strong>Verify Session Archive:</strong>
 <ul>
 <li>Check: 2025-12-31_session_archive.md exists (full archive of Dec 26-31 work)</li>
-<li>Check: current_session.md reset and ready for 2026 work</li>
+<li>Check: current_session.md.archivenotused reset and ready for 2026 work</li>
 <li>Check: All chats properly documented with timestamps</li>
 </ul>
 </li>
@@ -160,7 +160,7 @@
 <li>Each plan includes: META block, overview, priority tasks, time estimates, deliverables, success criteria</li>
 <li>Updated MasterPlanCoordination.tt navigation link with "Week 1: Jan 2-8 Plans Ready" note</li>
 <li>Verified all files created successfully with proper syntax</li>
-<li>Incremented chat number (19→20) in current_session.md</li>
+<li>Incremented chat number (19→20) in current_session.md.archivenotused</li>
 <li>Documented Chat 20 execution in session history</li>
 </ul>
 </li>

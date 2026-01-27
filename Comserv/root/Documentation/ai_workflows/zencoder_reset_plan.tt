@@ -20,7 +20,7 @@
         Last Updated: 2026-01-02 |
         Version: 0.03 |
         Status: ✅ COMPLETED (Dec 31, 2025 - Cleanup Agent Phase 2-3) + Jan 2 Improvements |
-        Historical Document: This plan was executed with modifications. See current_session.md (Chats 7-17) for actual execution results; Chat 2 (Jan 2) for compliance improvements
+        Historical Document: This plan was executed with modifications. See prompts_log.yaml (Chats 7-17) for actual execution results; Chat 2 (Jan 2) for compliance improvements
     </div>
     <div style="background-color: var(--warning-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--danger-color);">
         <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">📌 IMPORTANT:</strong> This document describes a reset/consolidation plan. <strong>The plan was substantially completed on Dec 31, 2025.</strong> Current Zencoder configuration is now consolidated in /.zencoder/coding-standards.yaml (v1.0-STABLE). Read that file and repo.md for current state.</p>
@@ -402,7 +402,7 @@ hostname: "server_hostname"
                 <li><strong>✅ All 8 Agent Specs Centralized</strong> - Agent specifications for Cleanup, Docker, Master Plan Updater, Daily Audit, Daily Plan Automator, Master Plan Manager, Daily Plans Generator, DocumentationSync now in coding-standards.yaml</li>
                 <li><strong>✅ Startup Protocol Added</strong> - New mandatory startup protocol requires all agents to read coding-standards.yaml FIRST (documented in repo.md)</li>
                 <li><strong>⚠️ Not Fully Executed As Described</strong> - Plan described archive-and-rebuild approach; actual execution was consolidation-in-place with targeted cleanup (same end result, less disruptive)</li>
-                <li><strong>📋 Execution Evidence</strong> - See current_session.md Chats 7-17 (especially Chat 9 and Chat 10) for actual work performed Dec 31, 2025</li>
+                <li><strong>📋 Execution Evidence</strong> - See current_session.md.archivenotused Chats 7-17 (especially Chat 9 and Chat 10) for actual work performed Dec 31, 2025</li>
             </ul>
             <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>This document is now HISTORICAL.</strong> Current Zencoder state documented in /.zencoder/coding-standards.yaml and /.zencoder/rules/repo.md.</p>
         </div>

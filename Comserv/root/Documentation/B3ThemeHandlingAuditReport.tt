@@ -354,7 +354,7 @@
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">7</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color);"><code>MASTER_PLAN_COORDINATION.tt</code></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color);"><code>MasterPlanCoordination.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">250</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1-1.5 hours</td>
                 </tr>
@@ -372,7 +372,7 @@
                 </tr>
                 <tr style="background-color: #f9f9f9;">
                     <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">10</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/PHASE_0_KUBERNETES_READINESS_PLAN.tt</code></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/Phase0KubernetesReadinessPlan.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">209</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1 hour</td>
                 </tr>
@@ -524,7 +524,7 @@
             <li><strong>Refactor Inline Styles to CSS Variables</strong>
                 <ul>
                     <li><strong>Phase 1 - Top Priority Files (3-4 days):</strong> DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt and PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt (1,495 styles total)</li>
-                    <li><strong>Phase 2 - High Priority Files (2-3 days):</strong> Next 10 files (docker_pycharm_setup_guide.tt through PHASE_0_KUBERNETES_READINESS_PLAN.tt)</li>
+                    <li><strong>Phase 2 - High Priority Files (2-3 days):</strong> Next 10 files (docker_pycharm_setup_guide.tt through Phase0KubernetesReadinessPlan.tt)</li>
                     <li><strong>Phase 3 - Remaining Files (2-3 days):</strong> All other 36 files</li>
                     <li><strong>Testing:</strong> Visual regression testing to ensure no display changes</li>
                 </ul>
@@ -593,7 +593,7 @@
 
     <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
         <p>B.3 Theme Handling - Complete Audit Report | Version 0.01 | Generated Dec 26, 2025 19:25 UTC</p>
-        <p>Part of Daily Plan Dec 26 Quick Wins | Reference: MASTER_PLAN_COORDINATION.tt</p>
+        <p>Part of Daily Plan Dec 26 Quick Wins | Reference: MasterPlanCoordination.tt</p>
         <p><strong>Audit Findings:</strong> Theme system functional (✅), CSS variables available (✅), Site mappings partial (⚠️), Inline styles compliance critical (❌)</p>
     </div>
 </div>
