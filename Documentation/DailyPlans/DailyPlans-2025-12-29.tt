@@ -42,7 +42,7 @@
 </li>
 <li><strong>Document Results:</strong>
 <ul>
-<li>If passing: Update E.1 status in MASTER_PLAN_COORDINATION.tt → "Phase 3 Ready (Message Persistence Verified)"</li>
+<li>If passing: Update E.1 status in MasterPlanCoordination.tt → "Phase 3 Ready (Message Persistence Verified)"</li>
 <li>If failing: Document errors, check audit_2025-12-28.md for Chat 18 changes, verify both endpoints updated</li>
 </ul>
 </li>
@@ -78,7 +78,7 @@
 </li>
 <li><strong>Validate Master Plan Update:</strong>
 <ul>
-<li>Check if MASTER_PLAN_COORDINATION.tt updated with Dec 29 progress</li>
+<li>Check if MasterPlanCoordination.tt updated with Dec 29 progress</li>
 <li>Verify E.1 status reflects testing results</li>
 </ul>
 </li>

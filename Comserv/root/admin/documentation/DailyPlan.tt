@@ -1,0 +1,141 @@
+[% META 
+   title = "Daily Plan - Weekly Priority View"
+   description = "Weekly priority tasks organized by day with collapsible daily sections. Current day open, others collapsed."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "planning,priorities,daily-tasks"
+   page_version = "1.01"
+   last_updated = "Wed Jan 14 15:20:00 UTC 2026"
+   site_specific = "false"
+%]
+[% USE DateTime %]
+[% PageVersion = 'admin/documentation/DailyPlan.tt,v 1.01 2026/01/14 Zencoder Exp Zencoder - Dynamic date-aware collapsible containers; current day auto-opens based on system date' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% 
+    # Get current date from Catalyst and format for comparison
+    now = DateTime.now;
+    current_date_str = now.strftime('%Y-%m-%d');
+    current_display = now.strftime('%A, %B %d, %Y');
+    
+    # Define days for the week (Jan 14-20, 2026)
+    days = [
+        { date = '2026-01-14', display = 'Wednesday, January 14, 2026' },
+        { date = '2026-01-15', display = 'Thursday, January 15, 2026' },
+        { date = '2026-01-16', display = 'Friday, January 16, 2026' },
+        { date = '2026-01-17', display = 'Saturday, January 17, 2026' },
+        { date = '2026-01-18', display = 'Sunday, January 18, 2026' },
+        { date = '2026-01-19', display = 'Monday, January 19, 2026' },
+        { date = '2026-01-20', display = 'Tuesday, January 20, 2026' },
+    ];
+%]
+
+<div class="app-container">
+    <h1>Daily Plan - Weekly Priority View</h1>
+    
+    <div class="last-updated" style="color: #666; font-size: 13px; margin-bottom: 20px;">
+        Today: [% current_display %] | Version: 1.01 | Week of Jan 14-20
+    </div>
+
+    <div class="alert alert-info">
+        <p><strong>📋 How to Use:</strong> Click on any day to expand/collapse tasks for that day. Today ([% current_display %]) is expanded by default. All other days are collapsed.</p>
+    </div>
+
+    [% FOREACH day IN days %]
+        [% is_today = (day.date == current_date_str) ? 'yes' : 'no' %]
+        [% is_today_label = (day.date == current_date_str) ? ' (Today)' : '' %]
+        [% bg_color = (is_today == 'yes') ? '#e8f5e9' : '#f5f5f5' %]
+        [% border_color = (is_today == 'yes') ? '#4caf50' : '#999' %]
+        [% border_style = (is_today == 'yes') ? 'border-bottom: 2px solid' : 'border-bottom: 1px solid' %]
+        
+        <details [% IF is_today == 'yes' %]open[% END %] style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; padding: 15px; background: [% bg_color %]; [% border_style %] [% border_color %]; border-radius: 4px;">
+                📅 [% day.display %][% is_today_label %]
+            </summary>
+            <div style="padding: 15px; color: #333;">
+                [% IF day.date == '2026-01-14' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>🔴 CRITICAL #1</strong>: Fix Todo display bug in Todo.pm (todos not showing in daily list)</li>
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Continue Documentation sync audit and compare against code</li>
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Review model documentation path mappings (52 files identified)</li>
+                        <li style="margin-bottom: 10px;"><strong>Optional</strong>: Review testing framework and run test suite</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Code work + Documentation consistency
+                    </p>
+                [% ELSIF day.date == '2026-01-15' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>Continuation</strong>: Complete Todo.pm bug fix if not finished on Jan 14</li>
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Begin model documentation path mapping fixes (Phase 1: 10-15 files)</li>
+                        <li style="margin-bottom: 10px;"><strong>Documentation</strong>: Update audit config (RepositoryCodeAudit.json)</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Code bug follow-up + Documentation cleanup
+                    </p>
+                [% ELSIF day.date == '2026-01-16' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Continue model path mapping fixes (Phase 2: 15-20 files)</li>
+                        <li style="margin-bottom: 10px;"><strong>Testing</strong>: Run model documentation tests after path updates</li>
+                        <li style="margin-bottom: 10px;"><strong>Review</strong>: Verify all controller documentation is current</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Bulk documentation fixes + Validation
+                    </p>
+                [% ELSIF day.date == '2026-01-17' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Complete remaining model path mapping fixes (Phase 3: final files)</li>
+                        <li style="margin-bottom: 10px;"><strong>Audit</strong>: Run comprehensive documentation sync audit</li>
+                        <li style="margin-bottom: 10px;"><strong>Analysis</strong>: Review audit results and identify remaining gaps</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Completion + Audit verification
+                    </p>
+                [% ELSIF day.date == '2026-01-18' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>Review</strong>: Week summary - completed todos and blockers</li>
+                        <li style="margin-bottom: 10px;"><strong>Planning</strong>: Prepare next week's priority list</li>
+                        <li style="margin-bottom: 10px;"><strong>Documentation</strong>: Update master plan with latest progress</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Weekly review + Planning
+                    </p>
+                [% ELSIF day.date == '2026-01-19' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>New Week Start</strong>: Begin work on deferred tasks from previous week</li>
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Address any blocking issues from week 1 audit</li>
+                        <li style="margin-bottom: 10px;"><strong>Optional</strong>: Start secondary improvement tasks (performance, refactoring)</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> New week priorities + Deferred backlog
+                    </p>
+                [% ELSIF day.date == '2026-01-20' %]
+                    <ul style="margin-left: 2em; line-height: 1.8;">
+                        <li style="margin-bottom: 10px;"><strong>Continuation</strong>: Continue deferred/secondary tasks from Jan 19</li>
+                        <li style="margin-bottom: 10px;"><strong>Monitoring</strong>: Track any issues discovered in week 1 implementation</li>
+                        <li style="margin-bottom: 10px;"><strong>Planning</strong>: Prepare for mid-week review</li>
+                    </ul>
+                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
+                        <strong>Focus:</strong> Task continuation + Issue tracking
+                    </p>
+                [% END %]
+            </div>
+        </details>
+    [% END %]
+
+    <!-- Quick Reference Footer -->
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <h3>Quick Reference</h3>
+        <ul style="margin-left: 2em; line-height: 1.8;">
+            <li><strong>🔴 CRITICAL</strong> = Must complete before anything else</li>
+            <li><strong>Priority</strong> = Should complete within the day/week</li>
+            <li><strong>Optional</strong> = Nice to have, OK to defer if other work blocks</li>
+            <li>Click day headers to expand/collapse daily task sections</li>
+        </ul>
+        
+        <p style="color: #666; font-size: 13px; margin-top: 20px; font-style: italic;">
+            <!-- AI EDITABLE --> This file is the single source for daily priorities. Updated daily by Documentation Agent. Replaces individual DailyPlans-YYYY-MM-DD files.
+        </p>
+    </div>
+</div>

@@ -1,0 +1,317 @@
+[% META 
+   title = "Priority Todos & Blocking Dependencies - Top 10 High-Impact Items"
+   description = "Top 10 priority work items ordered by blocking dependencies and importance. Shows what must be done first to unblock downstream work. Updated daily via Documentation Agent workflow."
+   roles = "admin,developer,devops"
+   TemplateType = "Planning"
+   category = "planning,priorities,coordination"
+   page_version = "0.01"
+   last_updated = "2026-01-13"
+   editable = "true"
+%]
+
+[% PageVersion = 'Documentation/PriorityTodos.tt,v 0.01 2026/01/13 18:05:00 zencoder-docsync Exp - Initial priority list extracted from current_session.md and master plan, ordered by blocking dependencies' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- AI EDITABLE SECTION: This file is maintained by Documentation Agent via /Documentation/run_audit workflow. Update item statuses, blocking relationships, and completion dates when work progresses. Keep items sorted by blocking priority (unblock downstream work first). -->
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Priority Todos & Blocking Dependencies</h1>
+        <p>Top 10 high-impact work items ordered by what must be done first to unblock downstream work. Updated daily as part of documentation audit workflow.</p>
+    </div>
+
+    <div class="content-container">
+        
+        <div class="alert alert-warning">
+            <h3>📋 How to Use This List</h3>
+            <ul>
+                <li><strong>Work Top to Bottom:</strong> Items are sorted by blocking priority. Complete items 1-3 first, then 4-6, then 7-10.</li>
+                <li><strong>Blocking Dependencies:</strong> Each item shows what blocks it (↳ BLOCKED BY) and what it unblocks (↳ UNBLOCKS)</li>
+                <li><strong>Status Updates:</strong> When an item is complete, move to "Completed Items" section below</li>
+                <li><strong>Daily Sync:</strong> This list is synced via Documentation Agent during daily audit (see DailyAuditGuide.tt)</li>
+            </ul>
+        </div>
+
+        <h2>Current Priority Todos (Ordered by Blocking Priority)</h2>
+
+        <table style="width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 14px;">
+            <thead style="background: #f5f5f5;">
+                <tr>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 5%;">#</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 25%;">Priority Item</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 15%;">Category</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 20%;">Blocks/Unblocks</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 20%;">Owner</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 15%;">ETA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>1</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>🔴 CRITICAL: Fix Todo Display Bug in Todo.pm</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Todos not showing in daily list view. Affects user workflow visibility. Root cause: Todo model query or rendering issue.
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #2 (Daily workflow visibility), #3 (User task tracking)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Code Bug</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Critical Path</strong><br/>Blocks 2 items</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Code Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">ASAP</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>2</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Daily Plans: Apply Button Fixes (5 files)</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Update Daily_Plans-2026-01-14 through 01-18 with button styling improvements. Frontend consistency.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #1 (Todo visibility)</div>
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: Documentation rendering completion</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">UI/Docs</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Dependent<br/>on #1</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-15</td>
+                </tr>
+
+                <tr style="background: #e3f2fd; border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>3</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Fix Model Documentation Path Mappings (52 files)</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Move 52 Model .tt files from root to Documentation/models/ subdirectory. Update RepositoryCodeAudit.json mappings. High-impact structural fix.
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #4 (Doc system consistency), #5 (Audit automation)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs/Structure</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Critical Path</strong><br/>Blocks 2 items</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-17</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>4</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Documentation System Consistency Audit</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Verify all .tt files follow META block template, RCS PageVersion, CSS variables. Systematic template compliance check.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #3 (Model paths)</div>
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #5 (Audit automation), #6 (Code accuracy fixes)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs/QA</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Dependent<br/>on #3</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Audit Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-18</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>5</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Automate Documentation Sync Agent Workflow</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Create scheduled job to run documentation_sync_audit.pl daily. Eliminate manual execution. Enable real-time compliance checks.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #4 (System consistency)</div>
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #7 (Code accuracy sync), #8 (Daily audit reports)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Infra/Automation</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Dependent<br/>on #4</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">DevOps Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-20</td>
+                </tr>
+
+                <tr style="background: #f3e5f5; border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>6</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Fix Documentation Code-Accuracy Gaps (3 issues in documentation_system.tt)</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Audit found: (1) Doc claims role hierarchy but code only does direct matching. (2) Debug code bypasses all filtering. (3) Hardcoded usernames undocumented. Update docs OR code to match.
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #7 (Code accuracy compliance), #9 (Role/visibility docs)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Code/Docs</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">High Impact<br/>Blocks 2 items</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Tech Lead</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-19</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>7</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Convert Markdown-Only Files to Proper .tt Template</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Files identified: documentation_organization.tt (pure Markdown), Documentation_Workflow.tt (broken structure). Convert to META block + proper .tt or delete duplicates.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #6 (Code accuracy)</div>
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: Template compliance audit completion</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs/Structure</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Dependent<br/>on #6</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Docs Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-21</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>8</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Test /Documentation/run_audit Controller Action</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Browser test of audit script execution. Verify admin auth, inline rendering, error handling. Created in Chat 62, needs QA verification.
+                            <div style="margin-top: 5px;">↳ UNBLOCKS: #9 (Daily audit reliability)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">QA/Testing</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Independent<br/>path</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">QA Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-14</td>
+                </tr>
+
+                <tr style="background: #e8f5e9; border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>9</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Generate Weekly Report: Documentation System Health</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Aggregate audit findings into weekly health report. Template compliance %, code-accuracy issues, plan coverage. Track progress on todos #1-8.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #8 (Audit test), #5 (Automation)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Reporting</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Dependent<br/>on 2+ items</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Analysis Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-21</td>
+                </tr>
+
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>10</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">
+                        <strong>Documentation Agent Role Enhancement</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Update agent spec to auto-detect plan count changes, validate blocking dependencies, flag audit divergences. Long-term automation goal.
+                            <div style="margin-top: 5px;">↳ BLOCKED BY: #9 (Health reports)</div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Infrastructure</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Long-term<br/>improvement</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Zencoder Team</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-30</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2 style="margin-top: 40px;">Completed Items (Moved from Active List)</h2>
+        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">These items were completed in recent chats. Listed here for reference and to clean up active todo list.</p>
+
+        <table style="width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 14px; background: #f9f9f9;">
+            <thead style="background: #e8f5e9;">
+                <tr>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 5%;">✅</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 30%;">Completed Work</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 15%;">Chat</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 15%;">Date</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left; width: 35%;">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;">✅</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>DailyAuditGuide.tt Reorganization & Link Fixes</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Chat 61</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-13</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Moved admin/documentation.tt to admin/documentation/DailyAuditGuide.tt, fixed critical INCLUDE path in DailyPlans-2026-01-13.tt (line 374)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;">✅</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Documentation Sync Audit Link & /Documentation/run_audit Action</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Chat 62</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-13</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Created browser-safe audit script execution via Documentation controller with admin auth, inline rendering of DocumentationSyncAudit.tt</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;">✅</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Documentation/views/TT.tt & Audit Path Mappings</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Chat 63</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-13</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Created View documentation structure, fixed RepositoryCodeAudit.json mappings, identified 52 Model path fix task</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #ddd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;">✅</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Documentation Agent Workflow Test & Update (Chat 64)</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Chat 64</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2026-01-13</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Updated DailyAuditGuide.tt (v1.08), MasterPlanCoordination.tt metadata container, daily plan link sync, consolidated plan counts to 26</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="alert alert-info" style="margin-top: 40px;">
+            <h3>📊 Progress Dashboard</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 4px;">
+                    <strong>Active Todos:</strong> 10 items<br/>
+                    <strong>Completed (Chat 61-64):</strong> 4 major tasks<br/>
+                    <strong>Critical Path Items:</strong> 3 (#1, #3, #5)
+                </div>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 4px;">
+                    <strong>Blocking Items (must do first):</strong> #1, #3<br/>
+                    <strong>Parallel Work Available:</strong> #8 (QA testing)<br/>
+                    <strong>Dependencies to Resolve:</strong> 8 downstream blocks
+                </div>
+            </div>
+        </div>
+
+        <div class="last-updated" style="margin-top: 40px; padding: 15px; background: #f5f5f5; border-left: 4px solid #2196f3; border-radius: 4px;">
+            <strong>Last Updated:</strong> 2026-01-13 18:05:00 UTC (Documentation Agent - Chat 64)<br/>
+            <strong>Next Review:</strong> 2026-01-14 08:00:00 UTC (Daily audit cycle)<br/>
+            <strong>Source:</strong> current_session.md (Chats 61-64), prompts_log.yaml (22 success entries), DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .app-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .page-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #ddd;
+    }
+    
+    .alert {
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 4px;
+        border-left: 4px solid;
+    }
+    
+    .alert-warning {
+        background: rgba(255, 193, 7, 0.1);
+        border-color: #ff9800;
+        color: #333;
+    }
+    
+    .alert-info {
+        background: rgba(33, 150, 243, 0.1);
+        border-color: #2196f3;
+        color: #333;
+    }
+    
+    table {
+        font-family: Arial, sans-serif;
+    }
+    
+    table th {
+        font-weight: bold;
+        color: #333;
+    }
+</style>

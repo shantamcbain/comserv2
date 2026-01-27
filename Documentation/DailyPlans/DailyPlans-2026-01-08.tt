@@ -62,7 +62,7 @@
                 <li>Include: What was completed, remaining work, blockers identified</li>
             </ul>
         </li>
-        <li><strong>Update MASTER_PLAN_COORDINATION.tt:</strong>
+        <li><strong>Update MasterPlanCoordination.tt:</strong>
             <ul>
                 <li>Mark: A.2, A.3, B.1, B.3, C.1 status as COMPLETED</li>
                 <li>Update: version number and timestamps</li>

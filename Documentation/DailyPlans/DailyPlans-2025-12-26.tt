@@ -553,7 +553,7 @@ LIMIT 5;</code></pre>
             <p><strong>Why:</strong> This is the BLOCKING task for all infrastructure work (A.1 K8s Migration depends on it). Without A.2 completion, we cannot proceed with K8s setup.</p>
             <p><strong>Tomorrow's Action:</strong></p>
             <ul>
-                <li>Review PHASE_0_KUBERNETES_READINESS_PLAN.tt</li>
+                <li>Review Phase0KubernetesReadinessPlan.tt</li>
                 <li>Gather infrastructure requirements: VM setup, K8s cluster readiness</li>
                 <li>Approve plan or request modifications</li>
                 <li>Assign execution team/timeline</li>
