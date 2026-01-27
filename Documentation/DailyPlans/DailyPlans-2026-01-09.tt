@@ -106,7 +106,7 @@
         </li>
         <li><strong>Update master plan with Week 2 sequence:</strong>
             <ul>
-                <li>Read: MASTER_PLAN_COORDINATION.tt for Week 2 recommended sequence</li>
+                <li>Read: MasterPlanCoordination.tt for Week 2 recommended sequence</li>
                 <li>Adjust: C.2, C.3, F.1 timing based on Week 1 results</li>
                 <li>Note: Any dependencies that should be prioritized differently</li>
             </ul>

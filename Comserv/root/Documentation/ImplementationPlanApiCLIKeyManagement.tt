@@ -1,0 +1,523 @@
+[% META 
+   title = "Implementation Plan: API Command-Line Key Management & CLI Tool Integration"
+   description = "Comprehensive plan for implementing API key generation, configuration, and CLI tool integration. Enables command-line scripts and external tools to authenticate with Comserv API using secure token-based authentication."
+   roles = "admin,developer,devops"
+   TemplateType = "Implementation"
+   category = "api,authentication,cli,tooling"
+   page_version = "0.01"
+   last_updated = "2026-01-18"
+%]
+[% PageVersion = 'root/Documentation/IMPLEMENTATION_PLAN_ApiCLIKeyManagement.tt,v 0.01 2026/01/18 12:00:00 PlanningAgent Exp - Initial comprehensive plan created via PlanningAgent Phase 1 testing. Breaks down API key management for CLI into tactical sub-tasks with dependencies, implementation steps, and validation criteria.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Implementation Plan: API Command-Line Key Management & CLI Tool Integration</h1>
+    
+    <div class="alert alert-info">
+        <h3>📋 Strategic Context</h3>
+        <p><strong>Problem</strong>: Comserv API token system (Phase 1B) is functional but lacks dedicated CLI support. External tools, scripts, and command-line users cannot easily: (1) generate API keys via CLI, (2) configure token expiration/scope for scripts, (3) manage multiple API keys, or (4) test endpoints with curl/CLI tools without manual UI interaction.</p>
+        <p><strong>Solution</strong>: Implement comprehensive CLI key management workflow with: dedicated API endpoint for key setup, CLI wrapper script, documentation for common use cases, and integration with daily/weekly system tasks.</p>
+        <p><strong>Benefit</strong>: Enable DevOps automation, external tool integration (Grok, monitoring systems, backup tools), and simpler onboarding for users who prefer command-line workflows.</p>
+        <p><strong>Phase Integration</strong>: Extends Phase 1B (Token Usage Implementation) with Phase 1C (CLI Key Management) as new sub-phase.</p>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>⚡ Current Status (Jan 18, 2026)</h2>
+    
+    <div class="alert alert-warning">
+        <h3>🟡 PHASE 1B: Token System Foundation (COMPLETE)</h3>
+        <ul>
+            <li><strong>✅ Completed</strong>:
+                <ul>
+                    <li>✅ ApiToken database schema + Result class (hashed tokens, expiration, revocation)</li>
+                    <li>✅ Token validation utility (ApiTokenValidator.pm)</li>
+                    <li>✅ Core REST API endpoints: /api/generate-token, /api/tokens, /api/delete-token</li>
+                    <li>✅ Todo API endpoints: POST /api/todo/create, GET /api/todo/{id}, PUT /api/todo/{id}</li>
+                    <li>✅ Project API endpoints: GET /api/project/{id}, GET /api/todos/project/{project_id}</li>
+                </ul>
+            </li>
+            <li><strong>Testing Status</strong>: Bearer token auth validated, token hashing verified (SHA-256 comparison), expiration checks confirmed working</li>
+        </ul>
+    </div>
+
+    <div class="alert alert-success">
+        <h3>🟢 PHASE 1C: CLI Key Management (PLANNING - NEW)</h3>
+        <p><strong>This Implementation Plan</strong> - Breaking down CLI key management into 8 tactical sub-tasks with dependencies and validation criteria.</p>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>🎯 Feature Breakdown: What Users Will Be Able To Do</h2>
+    
+    <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <h3 style="margin-top: 0;">End-User Capabilities After Phase 1C Completion</h3>
+        <ol style="line-height: 1.8;">
+            <li><strong>Generate API Key (One-Time Setup)</strong>
+                <ul>
+                    <li><code>comserv-cli token generate --name "MyScript" --expires 90d</code></li>
+                    <li>Returns: API token, expiration date, and copy-paste format for <code>.env</code> files</li>
+                    <li>Scope: User can limit token to specific project or todo endpoints</li>
+                </ul>
+            </li>
+            <li><strong>Configure Token (Ongoing Management)</strong>
+                <ul>
+                    <li><code>comserv-cli token list</code> - Show all active tokens</li>
+                    <li><code>comserv-cli token revoke &lt;token-id&gt;</code> - Disable expired/compromised tokens</li>
+                    <li><code>comserv-cli token extend &lt;token-id&gt; --expires 60d</code> - Extend expiration date</li>
+                </ul>
+            </li>
+            <li><strong>Use Token in Scripts</strong>
+                <ul>
+                    <li><code>export COMSERV_API_KEY="token_xxxx..."</code></li>
+                    <li><code>curl -H "Authorization: Bearer $COMSERV_API_KEY" https://comserv.local/api/todo/create ...</code></li>
+                    <li>Environment variable auto-loaded from <code>~/.comserv/credentials</code></li>
+                </ul>
+            </li>
+            <li><strong>Test API Endpoints</strong>
+                <ul>
+                    <li><code>comserv-cli api test --endpoint /api/todo/create</code></li>
+                    <li>Validates: token validity, network connectivity, endpoint availability</li>
+                    <li>Returns: sample response, latency, and status</li>
+                </ul>
+            </li>
+            <li><strong>Integrate with External Tools</strong>
+                <ul>
+                    <li>Grok integration: Pass COMSERV_API_KEY to Grok for task creation</li>
+                    <li>Monitoring systems: Use tokens for health check endpoints</li>
+                    <li>Backup/archival tools: Authenticate to download project data</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>📊 Implementation Phase Breakdown</h2>
+
+    <div style="margin: 30px 0;">
+        <h3>Phase 1C Sub-Tasks (Tactical Implementation)</h3>
+        
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.1: Dedicated CLI Token Setup Endpoint</h4>
+            <p><strong>What To Build</strong>: New REST endpoint <code>POST /api/token/cli-setup</code> optimized for command-line use</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Endpoint</strong>: <code>POST /api/token/cli-setup</code></li>
+                <li><strong>Input Parameters</strong>:
+                    <ul>
+                        <li><code>name</code> (required): Human-readable key name (e.g., "DailyBackup", "GrokIntegration")</li>
+                        <li><code>expires_in_days</code> (optional, default=90): Token expiration period</li>
+                        <li><code>scope</code> (optional, default="all"): Limit to specific projects/endpoints (e.g., "project_1", "todo_only")</li>
+                        <li><code>auto_rotate</code> (optional, default=false): Enable automatic token rotation before expiry</li>
+                    </ul>
+                </li>
+                <li><strong>Response Format</strong>: JSON with token, expiration timestamp, and .env format snippet</li>
+                <li><strong>Authentication</strong>: Admin user or service account only</li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>Token generated and stored in database (hashed)</li>
+                        <li>Expiration date calculated correctly</li>
+                        <li>Response includes copy-paste .env format</li>
+                        <li>Scope limitations enforced on subsequent API calls</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: Phase 1B complete (ApiToken schema, ApiTokenValidator)</p>
+            <p><strong>Effort Estimate</strong>: 2-3 hours (endpoint implementation + validation logic)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.2: Token Scope & Permission System</h4>
+            <p><strong>What To Build</strong>: Fine-grained permission model for API tokens (which projects/endpoints they can access)</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Database Schema Extension</strong>:
+                    <ul>
+                        <li>Add <code>token_scopes</code> table: Links tokens to projects, endpoints, and operations (read/write)</li>
+                        <li>Add <code>scope</code> field to ApiToken: Serialized scope rules (JSON: ["project_1", "todo_readonly"])</li>
+                    </ul>
+                </li>
+                <li><strong>Validation in ApiTokenValidator</strong>:
+                    <ul>
+                        <li>After authenticating token, check scope against requested resource</li>
+                        <li>Examples: Token with "project_1" can only access /api/project/1 todos; token with "todo_readonly" cannot call POST /api/todo/create</li>
+                    </ul>
+                </li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>Out-of-scope requests return 403 Forbidden with clear error message</li>
+                        <li>Token with "all" scope (default) works as before (backward compatible)</li>
+                        <li>Admin can view/edit token scopes via /api/tokens/{id}/scopes endpoint</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 complete</p>
+            <p><strong>Effort Estimate</strong>: 3-4 hours (schema design, validator logic, API endpoints for scope management)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.3: CLI Wrapper Script (`comserv-cli` Command)</h4>
+            <p><strong>What To Build</strong>: User-friendly command-line tool for key generation, management, and API testing</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Language</strong>: Perl (matches Comserv codebase) or Bash wrapper</li>
+                <li><strong>Installation</strong>: <code>sudo cp comserv-cli /usr/local/bin/</code></li>
+                <li><strong>Sub-Commands</strong>:
+                    <ul>
+                        <li><code>comserv-cli token generate --name "X" --expires 90d</code> → Calls POST /api/token/cli-setup</li>
+                        <li><code>comserv-cli token list</code> → Calls GET /api/tokens</li>
+                        <li><code>comserv-cli token revoke &lt;id&gt;</code> → Calls DELETE /api/tokens/{id}</li>
+                        <li><code>comserv-cli api test --endpoint /api/todo/create</code> → Validates token + connectivity</li>
+                        <li><code>comserv-cli config init</code> → Interactive setup wizard for ~/.comserv/credentials</li>
+                    </ul>
+                </li>
+                <li><strong>Config File</strong>: <code>~/.comserv/credentials</code> (mode 600)
+                    <ul>
+                        <li>Stores: server_url, api_key, default_project_id</li>
+                        <li>Format: Simple KEY=VALUE or YAML</li>
+                    </ul>
+                </li>
+                <li><strong>Error Handling</strong>:
+                    <ul>
+                        <li>Clear messages for invalid tokens, expired keys, network errors</li>
+                        <li>Suggest fixes (e.g., "Token expired. Use 'comserv-cli token extend' to renew.")</li>
+                    </ul>
+                </li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>All sub-commands work offline (error handling) and online</li>
+                        <li>Generated API key appears in /api/tokens list</li>
+                        <li>Revoked tokens rejected on subsequent requests (within 1-2 sec cache timeout)</li>
+                        <li>Help text clear and discoverable (<code>comserv-cli --help</code>, <code>comserv-cli token --help</code>)</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 and #1C.2 complete</p>
+            <p><strong>Effort Estimate</strong>: 4-5 hours (script implementation, sub-command structure, config file handling, error handling)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.4: Documentation: API Token Reference Guide</h4>
+            <p><strong>What To Create</strong>: User and developer documentation for API token system (both UI and CLI)</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>File</strong>: <code>/Comserv/root/Documentation/ApiTokenReferenceGuide.tt</code></li>
+                <li><strong>Sections</strong>:
+                    <ul>
+                        <li>Token Concepts: What is a token, when to use, security best practices</li>
+                        <li>Quick Start (UI): Generate token via web interface, copy to clipboard</li>
+                        <li>Quick Start (CLI): <code>comserv-cli token generate --name "MyApp" --expires 90d</code></li>
+                        <li>Common Use Cases: Grok integration, backup scripts, monitoring tools, cron jobs</li>
+                        <li>Token Scope Examples: Project-limited tokens, endpoint-limited tokens, read-only tokens</li>
+                        <li>Troubleshooting: Expired tokens, invalid tokens, permission denied, network errors</li>
+                        <li>API Reference: /api/token/cli-setup, /api/tokens, /api/tokens/{id}/scopes</li>
+                    </ul>
+                </li>
+                <li><strong>Code Examples</strong>:
+                    <ul>
+                        <li>Bash: <code>curl -H "Authorization: Bearer $API_KEY" https://comserv/api/todo/create ...</code></li>
+                        <li>Perl: <code>my $ua = LWP::UserAgent->new; $ua->default_header('Authorization' => "Bearer $api_key")</code></li>
+                        <li>Python: <code>import requests; headers = {'Authorization': f'Bearer {api_key}'}</code></li>
+                    </ul>
+                </li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>All code examples tested and working</li>
+                        <li>Doc references actual endpoints (no placeholder paths)</li>
+                        <li>Clear distinction between UI and CLI workflows</li>
+                        <li>Security warnings about token storage and rotation</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: All prior sub-tasks documented and code-complete</p>
+            <p><strong>Effort Estimate</strong>: 2-3 hours (writing, examples, testing doc accuracy)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.5: End-to-End Testing: Token Generation → CLI Use → API Call</h4>
+            <p><strong>What To Test</strong>: Complete workflow from key generation to successful API call via command line</p>
+            <p><strong>Test Scenarios</strong>:</p>
+            <ul>
+                <li><strong>Test 1: Generate token via CLI, use in curl request</strong>
+                    <ul>
+                        <li><code>comserv-cli token generate --name "TestKey" --expires 1d</code></li>
+                        <li>Copy returned token</li>
+                        <li><code>curl -H "Authorization: Bearer &lt;token&gt;" https://localhost/api/todo/create ...</code></li>
+                        <li>Expected: 200 OK with todo created</li>
+                    </ul>
+                </li>
+                <li><strong>Test 2: Use config file for token storage</strong>
+                    <ul>
+                        <li><code>comserv-cli config init</code> → Interactive setup</li>
+                        <li><code>comserv-cli api test --endpoint /api/todos/project/1</code></li>
+                        <li>Expected: Config loaded, token validated, endpoint returns data</li>
+                    </ul>
+                </li>
+                <li><strong>Test 3: Token scope enforcement</strong>
+                    <ul>
+                        <li>Generate token with scope="project_2" only</li>
+                        <li>Try accessing project_1 resource</li>
+                        <li>Expected: 403 Forbidden</li>
+                    </ul>
+                </li>
+                <li><strong>Test 4: Expired token handling</strong>
+                    <ul>
+                        <li>Generate token with --expires 1s</li>
+                        <li>Wait 2 seconds</li>
+                        <li>Try API call</li>
+                        <li>Expected: 401 Unauthorized with "token expired" message</li>
+                    </ul>
+                </li>
+                <li><strong>Test 5: Token revocation</strong>
+                    <ul>
+                        <li>Generate token, use it successfully</li>
+                        <li><code>comserv-cli token revoke &lt;id&gt;</code></li>
+                        <li>Try API call again</li>
+                        <li>Expected: 401 Unauthorized with "token revoked" message</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.4 all complete</p>
+            <p><strong>Effort Estimate</strong>: 2-3 hours (test script development, execution, bug fixes)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.6: Grok Integration: Pass API Tokens to External Tools</h4>
+            <p><strong>What To Build</strong>: Configuration and examples for using Comserv API tokens with Grok and other external systems</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Environment Variable Export</strong>: <code>export COMSERV_API_KEY="..."</code> in Grok initialization</li>
+                <li><strong>Configuration File</strong>: Add token config to Grok's comserv.conf or similar</li>
+                <li><strong>Endpoint Usage</strong>: Grok calls <code>/api/todo/create</code> with COMSERV_API_KEY bearer token</li>
+                <li><strong>Examples to Provide</strong>:
+                    <ul>
+                        <li>Docker Compose: COMSERV_API_KEY environment variable injection</li>
+                        <li>Supervisor: Token passed to Grok worker processes</li>
+                        <li>Kubernetes: Secret mounting for API key</li>
+                    </ul>
+                </li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>Grok successfully authenticates to Comserv API using token</li>
+                        <li>Todos created via Grok integration appear in Comserv database</li>
+                        <li>Token rotation/revocation immediately affects Grok's ability to call API</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.5 complete</p>
+            <p><strong>Effort Estimate</strong>: 2-3 hours (integration testing, config examples, verification)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.7: Monitoring & Audit: Token Usage Logging</h4>
+            <p><strong>What To Build</strong>: Audit trail for token creation, use, and revocation</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Log Fields</strong>:
+                    <ul>
+                        <li>Token ID, creation timestamp, user who created it</li>
+                        <li>Each API call: timestamp, token ID, endpoint, HTTP method, response status</li>
+                        <li>Scope violations: timestamp, token ID, requested resource, denied reason</li>
+                        <li>Revocation: timestamp, token ID, user who revoked it</li>
+                    </ul>
+                </li>
+                <li><strong>Storage</strong>: Comserv application logs + optional syslog export</li>
+                <li><strong>UI Display</strong>: Token dashboard showing last-used timestamp, total API calls, recent activity</li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>All token operations logged and queryable</li>
+                        <li>Admin can view audit trail per token</li>
+                        <li>Suspicious activity (many 403s, rapid creation/revocation) visible</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.6 complete</p>
+            <p><strong>Effort Estimate</strong>: 2-3 hours (logging infrastructure, dashboard UI, log analysis utilities)</p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+            <h4>#1C.8: Security Hardening & Best Practices</h4>
+            <p><strong>What To Implement</strong>: Security controls and best practices for token management</p>
+            <p><strong>Implementation Details</strong>:</p>
+            <ul>
+                <li><strong>Token Storage Security</strong>:
+                    <ul>
+                        <li>Database: Hash tokens with SHA-256 (non-reversible)</li>
+                        <li>CLI Config: File permissions 600 (user read/write only)</li>
+                        <li>Logs: Never log full token value (show first/last 4 chars only)</li>
+                    </ul>
+                </li>
+                <li><strong>Token Lifecycle</strong>:
+                    <ul>
+                        <li>Mandatory expiration: No token lasts longer than 1 year by default</li>
+                        <li>Automatic rotation: Option to auto-rotate token X days before expiration</li>
+                        <li>Inactivity timeout: Revoke tokens unused for 180+ days (configurable)</li>
+                    </ul>
+                </li>
+                <li><strong>Rate Limiting</strong>:
+                    <ul>
+                        <li>Limit token generation to 5 per user per day (prevent mass key creation)</li>
+                        <li>Limit API calls to 100 req/min per token (prevent abuse)</li>
+                        <li>After 5 failed auth attempts: Temporarily lock token</li>
+                    </ul>
+                </li>
+                <li><strong>Scope Enforcement</strong>:
+                    <ul>
+                        <li>Principle of least privilege: New tokens default to read-only, single-project scope</li>
+                        <li>Upgrade scope only on explicit admin approval</li>
+                    </ul>
+                </li>
+                <li><strong>Validation Criteria</strong>:
+                    <ul>
+                        <li>Token never stored in plaintext anywhere</li>
+                        <li>Config files have correct permissions (600)</li>
+                        <li>Rate limiting prevents abuse (test with rapid requests)</li>
+                        <li>Scope enforcement blocks out-of-scope requests</li>
+                    </ul>
+                </li>
+            </ul>
+            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.7 complete</p>
+            <p><strong>Effort Estimate</strong>: 3-4 hours (security review, rate limiting middleware, validation testing)</p>
+        </div>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>📈 Timeline & Resource Allocation</h2>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">Sub-Task</th>
+                <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Effort (hours)</th>
+                <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Dependency</th>
+                <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">Timeline (Estimated)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background: #fafafa;">
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.1: CLI Token Setup Endpoint</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">Phase 1B</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 1 (Jan 19-25)</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.2: Token Scope System</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">3-4</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">#1C.1</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 1 (Jan 23-29, parallel with #1C.1)</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.3: CLI Wrapper Script</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">4-5</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">#1C.1 + #1C.2</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.4: Documentation</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.5: E2E Testing</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.6: Grok Integration</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.7: Audit Logging</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #ddd;">#1C.8: Security Hardening</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">3-4</td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+            </tr>
+            <tr style="background: #fff3cd; font-weight: bold;">
+                <td style="padding: 12px; border: 1px solid #ddd;"><strong>TOTAL PHASE 1C</strong></td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;"><strong>21-28 hours</strong></td>
+                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;"><strong>Phase 1B→1C</strong></td>
+                <td style="padding: 12px; border: 1px solid #ddd;"><strong>3 weeks (Jan 19-Feb 8)</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="background: #c8e6c9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <h3 style="margin-top: 0;">⚡ Parallelization Opportunities</h3>
+        <ul>
+            <li><strong>Parallel Work (Week 1)</strong>: #1C.1 (endpoint) and #1C.2 (scope system) can be developed in parallel as they target different layers</li>
+            <li><strong>Parallel Work (Week 2)</strong>: #1C.3 (CLI script), #1C.4 (docs), and #1C.5 (testing) can proceed in parallel - testing drives docs refinement</li>
+            <li><strong>Sequential Critical Path</strong>: Phase 1B → #1C.1 → #1C.2 → #1C.3 (must complete in this order for functionality)</li>
+        </ul>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>✅ Validation & Success Criteria</h2>
+
+    <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 4px; padding: 15px; margin: 20px 0;">
+        <h3 style="margin-top: 0;">Phase 1C Success Checklist</h3>
+        <ul style="line-height: 1.8;">
+            <li>✅ <strong>Endpoint Working</strong>: POST /api/token/cli-setup generates valid tokens, returns JSON response with token + .env format</li>
+            <li>✅ <strong>CLI Script Functional</strong>: <code>comserv-cli token generate</code> calls endpoint successfully, <code>comserv-cli token list</code> shows all tokens</li>
+            <li>✅ <strong>Token Use in API Calls</strong>: Bearer token authentication works: <code>curl -H "Authorization: Bearer $KEY" https://comserv/api/todo/create</code></li>
+            <li>✅ <strong>Scope Enforcement</strong>: Out-of-scope requests return 403; in-scope requests succeed</li>
+            <li>✅ <strong>Expiration Working</strong>: Expired tokens rejected with 401; can be extended via CLI</li>
+            <li>✅ <strong>Revocation Working</strong>: Revoked tokens rejected; appear as revoked in <code>comserv-cli token list</code></li>
+            <li>✅ <strong>Documentation Complete</strong>: All endpoints documented with examples (bash, perl, python, curl)</li>
+            <li>✅ <strong>Grok Integration Tested</strong>: Grok can authenticate and create todos via API token</li>
+            <li>✅ <strong>Audit Trail Logging</strong>: All token operations logged; admin dashboard shows usage history</li>
+            <li>✅ <strong>Security Hardened</strong>: Tokens never stored plaintext, config files have 600 permissions, rate limiting active</li>
+        </ul>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>🔗 Related Documentation & Resources</h2>
+
+    <div style="background: #f5f5f5; border-left: 4px solid #999; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <ul style="line-height: 1.8;">
+            <li><a href="/Documentation/TodoAPIAndMasterPlanSync" target="_blank">📄 Implementation Plan: Todo API & Master Plan DB Sync</a> (Phase 1B foundation: Token schema, endpoints)</li>
+            <li><a href="/Documentation/ApiTokenReferenceGuide" target="_blank">📘 API Token Reference Guide</a> (Documentation for users, detailed token usage)</li>
+            <li><a href="/Comserv/lib/Comserv/Controller/Api.pm" target="_blank">💻 Comserv/lib/Comserv/Controller/Api.pm</a> (API controller implementation)</li>
+            <li><a href="/Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm" target="_blank">💾 ApiToken Result Class</a> (Token database schema)</li>
+            <li><a href="/Comserv/lib/Comserv/Util/ApiTokenValidator.pm" target="_blank">🔐 ApiTokenValidator.pm</a> (Token validation logic)</li>
+            <li><a href="/Documentation/MasterPlanCoordination" target="_blank">📊 Master Plan Coordination</a> (Overall project priorities and dependencies)</li>
+            <li><a href="/Comserv/root/admin/documentation/PriorityTodos.tt" target="_blank">✅ Priority Todos</a> (Track this implementation as Priority #2 sub-task)</li>
+        </ul>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>📌 Key Decisions & Rationale</h2>
+
+    <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <ul style="line-height: 1.8;">
+            <li><strong>Why Phase 1C (not Phase 2)?</strong> CLI key management is a natural extension of Phase 1B token system - same authentication layer, adds user-facing workflow. Logically grouped as Phase 1C to keep token work together.</li>
+            <li><strong>Why Dedicated CLI Tool?</strong> External tools (Grok, scripts, monitoring) need simple, non-browser token management. CLI wrapper reduces friction vs. forcing UI interaction.</li>
+            <li><strong>Why Token Scopes?</strong> Principle of least privilege: tokens should only access what they need. Prevents damage if a single token is compromised.</li>
+            <li><strong>Why Config File (~/.comserv/credentials)?</strong> Standard practice for CLI tools (like aws, gcloud). Users expect this. File permissions (600) protect secrets from other local users.</li>
+            <li><strong>Why 3-Week Timeline?</strong> 21-28 hours of work, parallelized across 2-3 developers (if available), equals ~3 weeks with other responsibilities. Can compress to 2 weeks with full focus.</li>
+        </ul>
+    </div>
+
+</div>
+
+<style>
+    .status-pending { background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+    .status-in-progress { background: #cfe2ff; color: #084298; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+    .status-blocked { background: #f8d7da; color: #842029; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+</style>
