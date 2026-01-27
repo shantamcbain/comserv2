@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt,v 0.03 2025/12/30 shanta Exp shanta ' %]
+[% PageVersion = 'todo/day.tt, v  0.04 2025/12/30 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -12,81 +12,153 @@
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 
 <style>
-    /* Day View Specific Styles */
-    .day-schedule-grid {
-        display: grid;
-        grid-template-columns: 80px 1fr;
-        gap: 1px;
-        margin-bottom: 20px;
-        background-color: var(--border-color, #ddd);
+    /* Priority-based Collapsible Container Styles */
+    .priority-container {
+        margin-bottom: 10px;
         border: 1px solid var(--border-color, #ddd);
-        width: 100%;
-        max-width: 100%;
-        overflow: hidden;
+        border-radius: 4px;
+        background-color: var(--background-color, white);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    .time-slot {
+    .priority-header {
         background-color: var(--primary-color, #4CAF50);
         color: var(--nav-text, white);
-        padding: 8px;
-        text-align: center;
-        font-weight: bold;
-        font-size: 0.9em;
+        padding: 12px 15px;
+        cursor: pointer;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
-        min-height: 80px;
+        font-weight: bold;
+        border-radius: 4px 4px 0 0;
+        transition: background-color 0.3s ease;
     }
 
-    .time-content {
-        background-color: var(--background-color, white);
-        padding: 8px;
-        min-height: 80px;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        position: relative;
+    .priority-header:hover {
+        background-color: var(--primary-color, #4CAF50);
+    }
+
+    .priority-toggle {
+        font-size: 1.2em;
+        transition: transform 0.3s ease;
+    }
+
+    .priority-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+        padding: 0 15px;
+    }
+
+    .priority-content.expanded {
+        max-height: 1000px;
+        padding: 15px;
+    }
+
+    .priority-toggle.expanded {
+        transform: rotate(180deg);
     }
 
     .todo-item-day {
-        padding: 6px;
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color, #eee);
         display: flex;
         flex-direction: column;
         gap: 5px;
         margin-bottom: 5px;
-        opacity: 0.9;
+        background-color: var(--background-color, white);
+        border-radius: 4px;
+        transition: background-color 0.3s ease;
+    }
+
+    .todo-item-day.overdue {
+        border-left: 4px solid var(--warning-color, #ff9800);
+        background-color: var(--warning-color, #fff3cd);
     }
 
     .todo-subject {
-        font-size: 0.9em;
+        font-size: 1em;
+        font-weight: bold;
+        color: var(--text-color, #333);
     }
 
-    .add-todo-time {
-        margin-top: auto;
-        padding-top: 5px;
+    .todo-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 0.9em;
+        color: var(--secondary-text, #666);
+    }
+
+    .todo-details span {
+        background-color: var(--secondary-color, #f5f5f5);
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+
+    .todo-actions {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+    }
+
+    .todo-actions button, .todo-actions .btn {
+        font-size: 0.8em;
+        padding: 4px 8px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .add-todo-priority {
+        text-align: center;
+        padding: 10px;
         border-top: 1px dotted var(--border-color, #ddd);
     }
 
-    .add-todo-time button {
-        font-size: 0.7em;
-        padding: 3px 6px;
+    .add-todo-priority button {
+        background-color: var(--primary-color, #4CAF50);
+        color: var(--nav-text, white);
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background-color 0.3s ease;
     }
 
-    /* Responsive design for day view */
+    .add-todo-priority button:hover {
+        background-color: var(--primary-color, #4CAF50);
+    }
+
+    /* Responsive design */
     @media (max-width: 768px) {
-        .day-schedule-grid {
-            grid-template-columns: 60px 1fr;
+        .priority-header {
+            padding: 10px 12px;
+            font-size: 0.9em;
         }
-        
-        .time-slot {
-            font-size: 0.8em;
-            padding: 5px;
-            min-height: 60px;
+
+        .priority-content {
+            padding: 0 12px;
         }
-        
-        .time-content {
-            min-height: 60px;
-            padding: 5px;
+
+        .priority-content.expanded {
+            padding: 12px;
+        }
+
+        .todo-item-day {
+            padding: 8px;
+        }
+
+        .todo-actions {
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .todo-actions button, .todo-actions .btn {
+            font-size: 0.7em;
+            padding: 3px 6px;
         }
     }
 </style>

@@ -24,6 +24,7 @@ use JSON;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
+use Comserv::Util::SystemInfo;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -1084,15 +1085,20 @@ sub chat :Local :Args(0) {
             
             # If no conversation_id provided, create a new conversation
             unless ($final_conversation_id) {
-                # Get first user message for title (or use first message from history)
-                my $title_text = '';
-                if ($prompt && length($prompt) > 0) {
-                    $title_text = substr($prompt, 0, 80);
-                } elsif (@$history > 0 && $history->[0]->{content}) {
-                    $title_text = substr($history->[0]->{content}, 0, 80);
+                # Get title from request if provided
+                my $title = $json_data->{title} || $c->request->params->{title};
+                
+                # If no title provided, generate from prompt
+                unless ($title) {
+                    my $title_text = '';
+                    if ($prompt && length($prompt) > 0) {
+                        $title_text = substr($prompt, 0, 80);
+                    } elsif (@$history > 0 && $history->[0]->{content}) {
+                        $title_text = substr($history->[0]->{content}, 0, 80);
+                    }
+                    $title_text =~ s/\n/ /g;
+                    $title = $title_text || 'Chat Conversation';
                 }
-                $title_text =~ s/\n/ /g;
-                my $title = $title_text || 'Chat Conversation';
                 
                 # Create new conversation
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2452,6 +2458,41 @@ sub conversations :Local :Args(0) {
         view_all => $view_all,
         is_guest => $is_guest
     );
+}
+
+=head2 session_details
+
+API endpoint to retrieve session information (username, hostname, conversation_id)
+based on the provided session cookie.
+
+=cut
+
+sub session_details :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Set response content type
+    $c->response->content_type('application/json');
+    
+    my $session_id = $c->sessionid;
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id = $c->session->{user_id} || 199;
+    my $conversation_id = $c->session->{current_conversation_id} || $c->session->{conversation_id};
+    
+    # Get hostname from system utility
+    my $hostname = Comserv::Util::SystemInfo->get_server_hostname();
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'session_details', "Session details requested for user: $username (Session: $session_id)");
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        session_id => $session_id,
+        username => $username,
+        user_id => $user_id,
+        conversation_id => $conversation_id,
+        hostname => $hostname,
+        roles => $c->session->{roles} || [],
+    }));
 }
 
 sub reset_conversation :Local :Args(0) {

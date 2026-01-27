@@ -61,4 +61,4 @@ Guide for configuring IP addresses in Proxmox VMs and containers.
 - [Back to Documentation Index](/Documentation)
 - [Proxmox Command Reference](/Documentation/proxmox_commands.tt) (Most frequently used)
 - [Infrastructure Migration Plan](/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt)
-- [K8s Readiness Plan](/Documentation/system/PHASE_0_KUBERNETES_READINESS_PLAN.tt)
+- [K8s Readiness Plan](/Documentation/system/Phase0KubernetesReadinessPlan.tt)

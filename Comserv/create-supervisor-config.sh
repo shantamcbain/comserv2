@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 PORT=${WEB_PORT:-3000}
 CATALYST_HOME=${CATALYST_HOME:-/opt/comserv}
@@ -7,6 +6,7 @@ CATALYST_ENV=${CATALYST_ENV:-production}
 CATALYST_DEBUG=${CATALYST_DEBUG:-0}
 
 echo "[supervisor-config] Configuring Starman with WEB_PORT=$PORT, CATALYST_ENV=$CATALYST_ENV, DEBUG=$CATALYST_DEBUG"
+echo "[supervisor-config] Supervisor will capture all Starman output to log files and supervisord logs"
 
 # Map Catalyst env to Plack/Starman
 PLACK_ENV="deployment"
@@ -20,15 +20,10 @@ if [ "$CATALYST_ENV" = "development" ]; then
     WORKERS=1
 fi
 
-# Use perl -S to execute starman with the container's Perl interpreter
-# This avoids shebang issues when scripts are built with different Perl paths
-if command -v starman >/dev/null 2>&1; then
-  START_CMD="perl -S starman --env $PLACK_ENV --listen :$PORT --host 0.0.0.0 --workers $WORKERS ${CATALYST_HOME}/script/comserv_server.psgi"
-  echo "[supervisor-config] Using 'perl -S starman' (avoids shebang path issues)"
-else
-  START_CMD="perl -S plackup -s Starman -E $PLACK_ENV -p $PORT -o 0.0.0.0 ${CATALYST_HOME}/script/comserv_server.psgi"
-  echo "[supervisor-config] Using 'perl -S plackup' with Starman"
-fi
+# Use startup wrapper to pre-test module loading and capture errors
+# The wrapper will run pre-flight checks and log any issues clearly
+START_CMD="${CATALYST_HOME}/startup-wrapper.sh"
+echo "[supervisor-config] Using startup wrapper: $START_CMD"
 
 # Ensure log directory exists
 mkdir -p ${CATALYST_HOME}/root/log
@@ -49,24 +44,32 @@ if env | grep -q '^COMSERV_DB_'; then
   done
 fi
 
-# Create supervisor program configuration
+# Create supervisor program configuration with comprehensive logging
 cat > /etc/supervisor/conf.d/comserv.conf << EOFCONF
 [program:comserv-server]
 command=$START_CMD
 directory=${CATALYST_HOME}
 user=comserv
 autostart=true
-autorestart=true
+autorestart=unexpected
 startsecs=10
 stopasgroup=true
 stdout_logfile=${CATALYST_HOME}/root/log/catalyst.log
 stdout_logfile_maxbytes=0
+stdout_capture_maxbytes=0
 stderr_logfile=${CATALYST_HOME}/root/log/catalyst_error.log
 stderr_logfile_maxbytes=0
+stderr_capture_maxbytes=0
 environment=$ENV_VARS
+priority=999
 EOFCONF
 
 echo "[supervisor-config] Generated supervisor config:"
 echo "[supervisor-config] Command: $START_CMD"
 echo "[supervisor-config] Log file: ${CATALYST_HOME}/root/log/catalyst.log"
 echo "[supervisor-config] Error log: ${CATALYST_HOME}/root/log/catalyst_error.log"
+
+# Write config to supervisord log so we can see it in docker logs
+echo "[supervisor-config] ===== Supervisor config generated =====" >> /var/log/supervisor/supervisord.log 2>&1 || true
+cat /etc/supervisor/conf.d/comserv.conf >> /var/log/supervisor/supervisord.log 2>&1 || true
+echo "[supervisor-config] ===== End config =====" >> /var/log/supervisor/supervisord.log 2>&1 || true

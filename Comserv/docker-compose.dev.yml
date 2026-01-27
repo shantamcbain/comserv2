@@ -1,7 +1,7 @@
 services:
   web-dev:
     build:
-      context: .
+      context: ./Comserv
       dockerfile: Dockerfile
     container_name: comserv-web-dev
     restart: always

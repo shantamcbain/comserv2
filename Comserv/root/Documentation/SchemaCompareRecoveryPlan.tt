@@ -173,7 +173,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">✅ Phase 6: Completion Logging (COMPLETE - Prompt 4)</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">
-                ✅ Updated current_session.md with Phase 4-5 results, updated SchemaCompareRecoveryPlan.tt status to COMPLETE. All 6 phases documented with execution details and file references.
+                ✅ Updated prompts_log.yaml with Phase 4-5 results, updated SchemaCompareRecoveryPlan.tt status to COMPLETE. All 6 phases documented with execution details and file references.
             </p>
         </div>
     </div>
@@ -299,7 +299,7 @@ sync_result_to_table()
                     <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Ongoing (Phase 1-6)</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">current_session.md</td>
+                    <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">current_session.md.archivenotused</td>
                     <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Update Chat 40</td>
                     <td style="border: 1px solid #ccc; padding: 10px; color: var(--text-color);">Pending Phase 6</td>
                 </tr>
@@ -313,7 +313,7 @@ sync_result_to_table()
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">
                 <strong>Next Action:</strong> Phase 2 - Extract functions from schema branch with user approval.<br>
                 <strong>Recorded In:</strong> prompts_log.yaml Chat 40, Prompts 28-29<br>
-                <strong>Updated In:</strong> current_session.md Chat 40 entry<br>
+                <strong>Updated In:</strong> current_session.md.archivenotused Chat 40 entry<br>
                 <strong>Last Modified:</strong> 2026-01-08 05:16:00 UTC
             </p>
         </div>

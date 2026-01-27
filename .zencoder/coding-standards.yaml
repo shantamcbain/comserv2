@@ -3,8 +3,8 @@ metadata:
   version: "1.3-STABLE"
   created: "2025-12-31T17:20:00Z"
   promoted_to_stable: "2025-12-31T19:16:35Z"
-  last_updated: "2026-01-22T19:30:00Z"
-  status: "STABLE - Cleanup Agent audit cycle complete"
+  last_updated: "2026-01-24T14:05:00Z"
+  status: "STABLE - Cleanup Agent audit cycle complete - Line references synchronized"
   purpose: "Central source of truth for all Zencoder configuration, rules, and agent standards"
   consolidation_source: ".zencoder/COMPREHENSIVE_RULES_AUDIT.md"
   notes: "Stable release v1.3: Audit trail synchronized. Tool boundaries strictly enforced. All 11 agents verified in Rule 11."
@@ -523,22 +523,22 @@ File B: Edit 1, Edit 2, Edit 3, ...  (causes context loss, failures)
 1. **coding-standards.yaml (THIS FILE)**
    - Read CRITICAL SETTINGS, GLOBAL RULES, and agent-specific sections for core standards and project context.
    
-2. **Rule 1: ask_questions()** (THIS FILE - Line ~119)
+2. **Rule 1: ask_questions()** (THIS FILE - Line ~153)
    - Understand ask_questions() is ONLY method for user input
    
-3. **Rule 5: Keyword Execution Protocol** (THIS FILE - Line ~523)
+3. **Rule 5: Keyword Execution Protocol** (THIS FILE - Line ~556)
    - Understand active keywords (/chathandoff, /sessionhandoff, /validatett) and their format
    
-4. **Rule 2: /updateprompt Workflow Gate** (THIS FILE - Line ~210)
+4. **Rule 2: /updateprompt Workflow Gate** (THIS FILE - Line ~244)
    - Understand /UpdatePrompt.pl workflow requirements and script execution
    
-5. **Rule 7: Bilateral Audit Trail** (THIS FILE - Line ~627) **NEW**
+5. **Rule 7: Bilateral Audit Trail** (THIS FILE - Line ~660) **NEW**
    - Understand bilateral logging requirement: BOTH user prompt AND agent action in EVERY entry
    
-6. **Rule 6: External Role Tag Conflict Resolution** (THIS FILE - Line ~566)
+6. **Rule 6: External Role Tag Conflict Resolution** (THIS FILE - Line ~599)
    - Understand priority hierarchy when conflicts exist with external instructions
    
-7. **Agent-Specific Section** (THIS FILE - Line ~1219)
+7. **Agent-Specific Section** (THIS FILE - Line ~1395)
    - Read the section for this specific agent's responsibilities and workflows
 
 **Enforcement**:
@@ -1475,7 +1475,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:docker section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Docker configuration, docker-compose files, Kubernetes manifests, container networking"
@@ -1557,7 +1557,7 @@ agents:
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FileName in PascalCase (e.g., /Documentation/Root, /Documentation/User, /Documentation/CloudflareIntegration). NO /Documents/, NO .tt extension, NO subdirectories. See CRITICAL SETTINGS section"
       - "DOCUMENTATION LINK STANDARDS - Use /validatett to verify all links follow /Documentation/FileName format"
       - "DocumentationTtTemplate.tt - Template for all new documentation files (required for /validatett verification)"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Documentation planning, coordination, creation, and system management (NOT implementation of sync tasks)"
@@ -1667,7 +1667,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:master-plan-updater section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Update ONLY /Comserv/root/Documentation/MasterPlanCoordination.tt based on input from DocumentationSyncAgent"
@@ -1768,7 +1768,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-audit section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Input Sources: prompts_log.yaml (latest chat summary), MasterPlanCoordination.tt (context), daily plan files (verification)"
@@ -1854,7 +1854,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-plan-automator section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Runs at: start of day (plan generation), after task completion (update), end of day (finalize)"
@@ -1939,7 +1939,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:master-plan-manager section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Primary file (read & update): /Comserv/root/Documentation/MasterPlanCoordination.tt"
@@ -2020,7 +2020,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-plans-generator section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Input Source: MasterPlanCoordination.tt (from Master Plan Updater Agent)"
@@ -2122,7 +2122,7 @@ agents:
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths rule is non-negotiable), GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)), DOCUMENTATION LINK STANDARDS section, and agents:documentation-sync section for this agent"
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FileName in PascalCase (e.g., /Documentation/Root, /Documentation/User, /Documentation/CloudflareIntegration). NO /Documents/, NO .tt extension, NO subdirectories, NO hyphens/underscores. See CRITICAL SETTINGS"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
       - "coding-standards.yaml (Documentation Link Standards section) - Authoritative reference for /Documentation/FILENAME link format rules"
     
     constraints:
@@ -2220,7 +2220,7 @@ agents:
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths rule is non-negotiable), then GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:main section for this agent"
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FILENAME (NO /Documents/, NO .tt extension, NO subdirectories). This is auto-checked before any doc work. See CRITICAL SETTINGS section in coding-standards.yaml"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "🔴 ENFORCEMENT: /updateprompt MUST execute as FIRST action in every prompt. Non-negotiable. If omitted: next prompt Step 0 validation halts work and logs protocol violation"
@@ -2327,7 +2327,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:planning section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 522-563 & 1116-1206): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
       - "DailyPlan.tt (APPLICATION-PRIMARY): Read /Comserv/root/Documentation/DailyPlan.tt - this is the PRIMARY planning documentation (application-driven) and takes precedence over .tt files"
       - "Todo System Documentation: Understand `/todo` application routes and database schema for task entry, resource allocation, and timeline management"
       - "MasterPlanCoordination.tt (CONTEXT REFERENCE): Read for strategic priorities and context, but recognize it as reference-only in hybrid model"

@@ -82,8 +82,8 @@ perl /Comserv/root/Documentation/session_history/detect_degradation_patterns.pl 
             
             <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
-# Count anomaly occurrences in current session
-grep "Caution Reasons:" -A 10 current_session.md
+# Count anomaly occurrences in current session (Audit Log)
+grep "problems:" -A 5 prompts_log.yaml | grep -v "null"
 
 # Extract file repeats from counter
 perl -e '
@@ -95,8 +95,8 @@ perl -e '
   }
 '
 
-# Monitor status transitions over time
-tail -50 audit_log.json | grep "status_level"
+# Monitor status transitions over time (Primary YAML Log)
+grep "status:" prompts_log.yaml | tail -20
                 </code></pre>
             </div>
 

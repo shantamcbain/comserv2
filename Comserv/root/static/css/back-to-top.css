@@ -3,33 +3,56 @@
     position: fixed !important;
     bottom: 20px !important;
     left: 20px !important;
-    z-index: 99999 !important;
-    padding: 8px 16px !important;
-    background-color: white !important;
-    color: black !important;
+    z-index: 2147483647 !important;
+    width: 45px !important;
+    height: 45px !important;
+    padding: 0 !important;
+    background-color: var(--button-bg, #f2f2f2) !important;
+    color: var(--button-text, #000000) !important;
     cursor: pointer !important;
-    border: 2px solid #333333 !important;
-    border-radius: 4px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid var(--button-border, #cccccc) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.3s ease !important;
-    font-size: 13px !important;
-    font-weight: normal !important;
-    font-family: Arial, sans-serif !important;
-    text-align: center !important;
-    white-space: nowrap !important;
-    user-select: none !important;
     display: none !important;
-    line-height: 1.4 !important;
-    min-height: auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+}
+
+/* Use SVG mask directly on the button to ensure visibility */
+#back-to-top::before {
+    content: "" !important;
+    display: block !important;
+    width: 24px !important;
+    height: 24px !important;
+    background-color: currentColor !important;
+    -webkit-mask-image: url('/static/images/icons/arrow-up.svg') !important;
+    mask-image: url('/static/images/icons/arrow-up.svg') !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+}
+
+/* Hide the inner icon if we're using the pseudo-element */
+#back-to-top i {
+    display: none !important;
 }
 
 #back-to-top.show {
-    display: block !important;
+    display: flex !important;
+    animation: fadeInUp 0.3s ease-out !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
+
 #back-to-top:hover, #back-to-top:focus {
-    background-color: #f0f0f0 !important;
-    color: black !important;
+    background-color: var(--button-hover-bg, #e0e0e0) !important;
+    color: var(--button-text, #000000) !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 }
@@ -37,12 +60,14 @@
 /* Adjust for mobile devices */
 @media (max-width: 768px) {
     #back-to-top {
-        padding: 8px 12px;
-        bottom: 20px;
-        left: 20px;
-        font-size: 12px;
+        width: 40px !important;
+        height: 40px !important;
+        bottom: 15px !important;
+        left: 15px !important;
+        font-size: 16px !important;
     }
 }
+
 
 /* Accessibility improvements */
 #back-to-top:focus {

@@ -106,7 +106,7 @@
     [% END %]
 
     <!-- Back to Top Button CSS -->
-    <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
 
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>

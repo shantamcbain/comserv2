@@ -91,10 +91,11 @@ RUN mkdir -p /etc/supervisor/conf.d
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 RUN chmod 644 /etc/supervisor/supervisord.conf
 
-# Copy startup script that generates supervisor config with dynamic port
+# Copy startup scripts
 COPY create-supervisor-config.sh /opt/comserv/create-supervisor-config.sh
-RUN chmod +x /opt/comserv/create-supervisor-config.sh && \
-    chown comserv:comserv /opt/comserv/create-supervisor-config.sh
+COPY startup-wrapper.sh /opt/comserv/startup-wrapper.sh
+RUN chmod +x /opt/comserv/create-supervisor-config.sh /opt/comserv/startup-wrapper.sh && \
+    chown comserv:comserv /opt/comserv/create-supervisor-config.sh /opt/comserv/startup-wrapper.sh
 
 # Health check - will check dynamic port using /health endpoint
 # /health endpoint bypasses database queries and returns immediately

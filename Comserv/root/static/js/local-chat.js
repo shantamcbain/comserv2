@@ -451,8 +451,8 @@
             }
             
             .chat-button {
-                background-color: var(--primary-color, #007bff);
-                color: var(--text-on-primary, white);
+                background-color: var(--primary-color);
+                color: var(--text-color);
                 border: none;
                 border-radius: 50px;
                 padding: 10px 20px;
@@ -476,9 +476,9 @@
                 right: 20px;
                 width: 380px;
                 height: 500px;
-                background-color: var(--background-color, white);
+                background-color: var(--background-color);
                 border-radius: 10px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                box-shadow: var(--dropdown-shadow);
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
@@ -486,8 +486,8 @@
             }
             
             .chat-header {
-                background-color: var(--primary-color, #007bff);
-                color: var(--text-on-primary, white);
+                background-color: var(--primary-color);
+                color: var(--text-color);
                 padding: 10px 15px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
@@ -508,9 +508,9 @@
             }
             
             #new-chat {
-                background: rgba(255,255,255,0.2);
-                border: 1px solid rgba(255,255,255,0.3);
-                color: white;
+                background: var(--nav-hover-bg);
+                border: 1px solid var(--border-color);
+                color: var(--text-color);
                 font-size: 12px;
                 padding: 4px 8px;
                 border-radius: 4px;
@@ -519,13 +519,13 @@
             }
             
             #new-chat:hover {
-                background: rgba(255,255,255,0.3);
+                background: var(--secondary-color);
             }
             
             #close-chat {
                 background: none;
                 border: none;
-                color: white;
+                color: var(--text-color);
                 font-size: 20px;
                 cursor: pointer;
             }
@@ -534,7 +534,7 @@
                 flex-grow: 1;
                 padding: 15px;
                 overflow-y: auto;
-                background-color: #f8f9fa;
+                background-color: var(--background-color);
             }
             
             .message {
@@ -546,39 +546,40 @@
             }
             
             .system-message {
-                background-color: #e9ecef;
-                color: #212529;
+                background-color: var(--secondary-color);
+                color: var(--text-color);
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
             }
             
             .user-message {
-                background-color: var(--primary-color, #007bff);
-                color: var(--text-on-primary, white);
+                background-color: var(--primary-color);
+                color: var(--text-color);
                 align-self: flex-end;
                 margin-left: auto;
                 border-bottom-right-radius: 5px;
             }
             
             .ai-message {
-                background-color: #e3f2fd;
-                color: #1976d2;
+                background-color: var(--secondary-color);
+                color: var(--text-color);
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
-                border-left: 3px solid #2196f3;
+                border-left: 3px solid var(--success-color);
             }
             
             .ai-message.loading {
-                background-color: #f5f5f5;
-                color: #666;
+                background-color: var(--secondary-color);
+                color: var(--schema-text-muted);
                 font-style: italic;
             }
             
             .error-message {
-                background-color: #f8d7da;
-                color: #721c24;
+                background-color: var(--secondary-color);
+                border: 1px solid var(--warning-color);
+                color: var(--text-color);
                 align-self: center;
                 margin: 5px auto;
                 font-size: 0.9em;
@@ -588,20 +589,20 @@
                 padding: 5px 10px;
                 font-size: 0.8em;
                 text-align: center;
-                background-color: #f8f9fa;
-                border-top: 1px solid #dee2e6;
+                background-color: var(--background-color);
+                border-top: 1px solid var(--border-color);
             }
             
             .chat-status.connected {
-                color: #28a745;
+                color: var(--success-color);
             }
             
             .chat-status.error {
-                color: #dc3545;
+                color: var(--warning-color);
             }
             
             .chat-status.processing {
-                color: #ffc107;
+                color: var(--accent-color);
             }
             
             .loading-dots {
@@ -617,23 +618,25 @@
             
             .chat-input {
                 padding: 10px;
-                border-top: 1px solid #dee2e6;
+                border-top: 1px solid var(--border-color);
                 display: flex;
             }
             
             #message-input {
                 flex-grow: 1;
-                border: 1px solid #ced4da;
+                border: 1px solid var(--border-color);
                 border-radius: 4px;
                 padding: 8px;
                 resize: none;
                 height: 40px;
                 margin-right: 8px;
+                background-color: var(--background-color);
+                color: var(--text-color);
             }
             
             #send-message {
-                background-color: var(--primary-color, #007bff);
-                color: var(--text-on-primary, white);
+                background-color: var(--primary-color);
+                color: var(--text-color);
                 border: none;
                 border-radius: 4px;
                 padding: 8px 15px;
@@ -642,12 +645,14 @@
             }
             
             #send-message:hover {
-                background-color: var(--primary-color-dark, #0069d9);
-                color: var(--text-on-primary, white);
+                background-color: var(--primary-color);
+                opacity: 0.8;
+                color: var(--text-color);
             }
             
             #send-message:disabled {
-                background-color: #6c757d;
+                background-color: var(--secondary-color);
+                color: var(--schema-text-muted);
                 cursor: not-allowed;
             }
         `;

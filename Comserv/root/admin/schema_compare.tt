@@ -966,18 +966,19 @@ function batchSyncTable(tableName) {
 }
 
 // Create table from result
-function createTableFromResult(resultName) {
-    if (!confirm('Are you sure you want to create a table from result "' + resultName + '"?')) {
+function createTableFromResult(resultName, database) {
+    if (!confirm('Are you sure you want to create a table from result "' + resultName + '" in database "' + database + '"?')) {
         return;
     }
     
-    fetch('[% c.uri_for("/admin/create_table_from_result") %]', {
+    fetch('[% c.uri_for("/schema-comparison/create_table_from_result") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            result_name: resultName
+            result_name: resultName,
+            database: database
         })
     })
     .then(response => response.json())

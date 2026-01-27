@@ -3,11 +3,11 @@
    description = "View and manage your saved AI conversations. Admins can toggle to view all conversations in the system."
    roles = "user,admin,developer"
    category = "AI Module"
-   page_version = "0.02"
-   last_updated = "Sat Dec 27 13:41:00 GMT 2025"
+   page_version = "0.08"
+   last_updated = "Fri Jan 23 15:00:00 UTC 2026"
 %]
 
-[% PageVersion = 'ai/conversations.tt,v 0.07 2025/12/27 14:36:00 MainAgent Exp - Added message display in expandable conversation details'; %]
+[% PageVersion = 'ai/conversations.tt,v 0.08 2026/01/23 15:00:00 CleanupAgent Exp - Implemented CSS isolation and consolidated message formatting'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -131,13 +131,16 @@
                                             [% msg.role == 'user' ? 'User Prompt' : 'AI Response' %]
                                         </span>
                                         [% IF msg.agent_type %]
-                                        <span class="message-agent" style="font-size: 0.85em; color: #666;">
+                                        <span class="message-agent">
                                             ([% msg.agent_type %][% IF msg.model_used %] • [% msg.model_used %][% END %])
                                         </span>
                                         [% END %]
                                         <span class="message-time">
                                             [% USE date; date.format(msg.created_at, '%H:%M:%S') || 'Unknown' %]
                                         </span>
+                                        [% IF msg.role == 'assistant' %]
+                                        <button class="copy-message-btn" onclick="copyMessageText(this)" title="Copy message content">📋</button>
+                                        [% END %]
                                     </div>
                                     
                                     <div class="message-debug-toggle">
@@ -183,12 +186,12 @@
                                         </div>
                                         <div class="debug-field">
                                             <span class="debug-label">Metadata:</span>
-                                            <span class="debug-value"><pre style="margin: 4px 0; padding: 4px; background: #f5f5f5; border-radius: 3px; font-size: 0.85em;">[% msg.metadata || '{}' %]</pre></span>
+                                            <span class="debug-value"><pre class="debug-metadata-pre">[% msg.metadata || '{}' %]</pre></span>
                                         </div>
                                     </div>
                                     
                                     <div class="message-content">
-                                        [% msg.content %]
+                                        [% msg.content | html %]
                                     </div>
                                 </div>
                                 [% END %]
@@ -313,7 +316,7 @@
     align-items: center;
     gap: var(--spacing-medium);
     padding: var(--spacing-medium);
-    background-color: white;
+    background-color: var(--background-color);
     transition: background-color 0.2s ease;
 }
 
@@ -352,7 +355,8 @@
 
 .ai-conversations-item-id {
     font-size: 0.85em;
-    color: #666;
+    color: var(--text-color);
+    opacity: 0.8;
     white-space: nowrap;
     min-width: 60px;
     font-family: monospace;
@@ -402,7 +406,7 @@
 
 .status-active {
     background-color: var(--success-color);
-    color: white;
+    color: var(--text-color);
 }
 
 .status-archived {
@@ -424,7 +428,7 @@
 
 .ai-conversations-item-details:not([hidden]) {
     display: block;
-    max-height: 500px;
+    max-height: none;
 }
 
 .ai-conversations-details-content {
@@ -435,8 +439,8 @@
 .ai-conversations-debug-section {
     margin-bottom: var(--spacing-medium);
     padding: var(--spacing-small);
-    background-color: #f9f9f9;
-    border-left: 3px solid #2196f3;
+    background-color: var(--secondary-color);
+    border-left: 3px solid var(--link-color);
     border-radius: 4px;
 }
 
@@ -444,7 +448,7 @@
     margin: 0 0 var(--spacing-small) 0;
     font-size: 0.9em;
     font-weight: 600;
-    color: #2196f3;
+    color: var(--link-color);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -490,10 +494,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-small);
-    max-height: 400px;
+    max-height: 80vh;
+    min-height: 200px;
     overflow-y: auto;
+    resize: vertical;
     padding: var(--spacing-small);
-    background-color: white;
+    background-color: var(--background-color);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     margin-bottom: var(--spacing-medium);
@@ -513,26 +519,28 @@
 
 .message-debug-btn {
     background: none;
-    border: 1px solid #999;
-    color: #666;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
     padding: 4px 8px;
     font-size: 0.8em;
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.2s;
+    opacity: 0.7;
 }
 
 .message-debug-btn:hover {
-    background-color: #f0f0f0;
-    color: #333;
-    border-color: #333;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border-color: var(--text-color);
+    opacity: 1;
 }
 
 .message-debug-info {
     margin: var(--spacing-small) 0;
     padding: var(--spacing-small);
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 0.85em;
 }
@@ -542,7 +550,7 @@
     gap: var(--spacing-small);
     margin-bottom: var(--spacing-small);
     padding: 4px 0;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .debug-field:last-child {
@@ -552,16 +560,33 @@
 
 .debug-label {
     font-weight: 600;
-    color: #2196f3;
+    color: var(--link-color);
     min-width: 120px;
     flex-shrink: 0;
 }
 
 .debug-value {
-    color: #333;
+    color: var(--text-color);
     word-break: break-word;
     font-family: monospace;
     flex: 1;
+}
+
+.debug-metadata-pre {
+    margin: 4px 0;
+    padding: 4px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--text-color);
+    overflow-x: auto;
+}
+
+.message-agent {
+    font-size: 0.85em;
+    color: var(--text-color);
+    opacity: 0.7;
 }
 
 .ai-conversations-message[data-role="user"] {
@@ -592,12 +617,12 @@
 
 .message-role.role-user {
     background-color: var(--accent-color);
-    color: white;
+    color: var(--text-color);
 }
 
 .message-role.role-assistant {
     background-color: var(--success-color);
-    color: white;
+    color: var(--text-color);
 }
 
 .message-time {
@@ -607,12 +632,38 @@
     white-space: nowrap;
 }
 
+.copy-message-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-left: 10px;
+}
+
+.copy-message-btn:hover {
+    opacity: 0.7;
+}
+
 .message-content {
     font-size: 0.95em;
     color: var(--text-color);
     line-height: 1.5;
     word-break: break-word;
     white-space: pre-wrap;
+}
+
+.code-block {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    margin: 10px 0;
+    overflow-x: auto;
+    white-space: pre;
+    display: block;
 }
 
 .ai-conversations-detail-actions {
@@ -685,6 +736,7 @@
 }
 </style>
 
+<script src="/static/js/ai-common.js"></script>
 <script>
 function toggleMessageDebug(btn) {
     const messageDiv = btn.closest('.ai-conversations-message');
@@ -707,6 +759,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             this.setAttribute('aria-expanded', !isExpanded);
             details.hidden = isExpanded;
+
+            // Format message contents when expanded for the first time
+            if (!isExpanded && !details.getAttribute('data-formatted')) {
+                details.querySelectorAll('.message-content').forEach(el => {
+                    // Use a temporary div to get raw text if it was already somewhat processed
+                    const rawContent = el.getAttribute('data-raw-content') || el.textContent.trim();
+                    if (!el.getAttribute('data-raw-content')) {
+                        el.setAttribute('data-raw-content', rawContent);
+                    }
+                    el.innerHTML = AIUtils.formatMessageContent(rawContent);
+                });
+                details.setAttribute('data-formatted', 'true');
+            }
         });
     });
     

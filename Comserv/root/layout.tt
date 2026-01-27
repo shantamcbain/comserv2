@@ -25,7 +25,10 @@
     [% INCLUDE 'AdminNotes.tt' %]
     
     <!-- Back to Top Button -->
-    <button id="back-to-top" title="Back to Top" aria-label="Back to Top">Back to Top</button>
+    <button id="back-to-top" title="Back to Top" aria-label="Back to Top">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
     [% TRY %]
         [% INCLUDE 'footer.tt' %]
     [% CATCH %]
@@ -44,59 +47,6 @@
 
     
     <script src="/static/js/local-chat.js"></script>
-    <script>
-        function smoothScroll(target, duration) {
-            var start = window.scrollY;
-            var distance = target - start;
-            var startTime = Date.now();
-            
-            function easeInOutQuad(t) {
-                return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-            }
-            
-            function animateScroll() {
-                var elapsed = Date.now() - startTime;
-                var progress = Math.min(elapsed / duration, 1);
-                var ease = easeInOutQuad(progress);
-                
-                window.scrollTo(0, start + distance * ease);
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animateScroll);
-                }
-            }
-            
-            animateScroll();
-        }
-        
-        window.addEventListener('scroll', function() {
-            const backToTop = document.getElementById('back-to-top');
-            if (window.pageYOffset > 300) {
-                if (backToTop) backToTop.classList.add('show');
-            } else {
-                if (backToTop) backToTop.classList.remove('show');
-            }
-        });
-        
-        const backToTop = document.getElementById('back-to-top');
-        if (backToTop) {
-            backToTop.addEventListener('click', function(e) {
-                e.preventDefault();
-                var mainMenu = document.getElementById('main-menu');
-                if (mainMenu) {
-                    var menuOffset = mainMenu.offsetTop;
-                    smoothScroll(menuOffset, 800);
-                } else {
-                    window.scrollTo({top: 0, behavior: 'smooth'});
-                }
-            });
-            
-            backToTop.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    this.click();
-                }
-            });
-        }
-    </script>
 </body>
+
 </html>

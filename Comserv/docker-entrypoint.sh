@@ -108,9 +108,11 @@ supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 [supervisord]
 logfile=/var/log/supervisor/supervisord.log
+loglevel=debug
 pidfile=/var/run/supervisord.pid
 nodaemon=true
 user=root
+silent=false
 
 [include]
 files=/etc/supervisor/conf.d/*.conf
@@ -124,4 +126,6 @@ bash ${CATALYST_HOME}/create-supervisor-config.sh
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"
 
-exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+# Start supervisord with both file and stderr logging
+# The -n flag makes supervisord stay in foreground and log to stderr
+exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf -n

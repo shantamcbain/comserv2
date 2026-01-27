@@ -2,140 +2,426 @@
    title = "Daily Plan - Weekly Priority View"
    description = "Weekly priority tasks organized by day with collapsible daily sections. Current day open, others collapsed."
    roles = "admin,developer,devops"
-   TemplateType = "Documentation"
+   TemplateType = "Application"
    category = "planning,priorities,daily-tasks"
-   page_version = "1.01"
-   last_updated = "Wed Jan 14 15:20:00 UTC 2026"
+   page_version = "1.08"
+   last_updated = "Sun Jan 25 18:45:00 UTC 2026"
    site_specific = "false"
 %]
-[% USE DateTime %]
-[% PageVersion = 'admin/documentation/DailyPlan.tt,v 1.01 2026/01/14 Zencoder Exp Zencoder - Dynamic date-aware collapsible containers; current day auto-opens based on system date' %]
+[% PageVersion = 'admin/documentation/DailyPlan.tt,v 1.08 2026/01/25 Cleanup-Agent - Version 1.08: Added #2, #14, Plan A.2, and Plan A.3 to Completed Tasks tab.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% 
-    # Get current date from Catalyst and format for comparison
-    now = DateTime.now;
-    current_date_str = now.strftime('%Y-%m-%d');
-    current_display = now.strftime('%A, %B %d, %Y');
+<style>
+    /* Sticky Header Styles */
+    .daily-plan-header {
+        position: sticky;
+        top: 0;
+        background-color: rgba(255, 255, 255, 0.98);
+        border-bottom: 3px solid var(--primary-color);
+        padding: 10px 15px;
+        margin: -20px -20px 20px -20px;
+        z-index: 100;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
     
-    # Define days for the week (Jan 14-20, 2026)
+    .daily-plan-header h1 {
+        margin: 0 0 5px 0;
+        font-size: 1.4em;
+        color: var(--text-color);
+    }
+    
+    .header-nav {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85em;
+    }
+    
+    .header-nav-links {
+        display: flex;
+        gap: 15px;
+        }
+    
+    .header-nav-links a {
+        color: var(--primary-color);
+        text-decoration: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+    }
+    
+    .header-nav-links a:hover {
+        background-color: var(--bg-secondary);
+    }
+    
+    /* Tab Styles */
+    .tab-navigation {
+        display: flex;
+        border-bottom: 2px solid #ddd;
+        margin: 20px 0 0 0;
+        gap: 5px;
+    }
+    
+    .tab-button {
+        padding: 12px 24px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        color: var(--text-muted-color);
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .tab-button:hover {
+        color: var(--text-color);
+        background-color: #f5f5f5;
+    }
+    
+    .tab-button.active {
+        color: var(--text-color) !important;
+        background-color: var(--bg-secondary) !important;
+        border-bottom-color: var(--primary-color) !important;
+        border-bottom-width: 4px !important;
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+</style>
+
+[% 
+    display_date_str = selected_date;
+    
     days = [
-        { date = '2026-01-14', display = 'Wednesday, January 14, 2026' },
-        { date = '2026-01-15', display = 'Thursday, January 15, 2026' },
-        { date = '2026-01-16', display = 'Friday, January 16, 2026' },
-        { date = '2026-01-17', display = 'Saturday, January 17, 2026' },
-        { date = '2026-01-18', display = 'Sunday, January 18, 2026' },
-        { date = '2026-01-19', display = 'Monday, January 19, 2026' },
-        { date = '2026-01-20', display = 'Tuesday, January 20, 2026' },
+        { date = '2026-01-21', display = 'Wednesday, January 21, 2026' },
+        { date = '2026-01-22', display = 'Thursday, January 22, 2026' },
+        { date = '2026-01-23', display = 'Friday, January 23, 2026' },
+        { date = '2026-01-24', display = 'Saturday, January 24, 2026' },
+        { date = '2026-01-25', display = 'Sunday, January 25, 2026' },
+        { date = '2026-01-26', display = 'Monday, January 26, 2026' },
+        { date = '2026-01-27', display = 'Tuesday, January 27, 2026' },
     ];
 %]
 
-<div class="app-container">
+<div class="container">
+    <!-- Sticky Header with Navigation -->
+    <div class="daily-plan-header">
+        <h1>[DAILY PLAN] [% display_date %]</h1>
+        <div class="header-nav">
+            <div class="header-nav-links">
+                <span><strong>Today:</strong> [% current_display %]</span>
+                <span>|</span>
+                <a href="/Documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
+                <a href="/Documentation/MasterPlanCoordination" target="_blank">Master Plans</a>
+                <a href="/Documentation">All Docs</a>
+                <a href="/todo">Todo System</a>
+            </div>
+            <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                <a href="/Documentation/DailyPlan/[% prev_date %]">← Prev Day</a>
+                | Viewing [% display_date %] |
+                <a href="/Documentation/DailyPlan/[% next_date %]">Next Day →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+       <button class="tab-button active" onclick="switchTab(event, 'today-work')">
+            DAILY PRIORITIES
+        </button>
+         <button class="tab-button" onclick="switchTab(event, 'weekly-view')">
+            📅 THIS WEEK
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'todo-week-view')">
+            TODOS & WORKFLOW
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'priority-todos-new')">
+            PRIORITY TODOS (NEW)
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
+            DAILY PLAN GUIDE
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
+            ZENCODER PROMPT
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
+            MASTER PLAN COORDINATION
+        </button>
+        <button class="tab-button" onclick="switchTab(event, 'completed-tasks')">
+            ✅ COMPLETED TASKS
+        </button>
+    </div>
+
+<!-- TAB 1: TODAY'S WORK (Default) -->
+    <div id="today-work" class="tab-content active">
+        <div id="today-work-content">
+            <div class="focus-area">
+                <h3 style="margin-top: 0;">[TODAY'S FOCUS]</h3>
+                <p>Daily plan for [% display_date %] - Mark completed tasks and sync across all plan files. Review and execute master plan priorities listed below.</p>
+            </div>
+
+            <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px;">
+                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                    📊 MASTER PLAN PRIORITY LIST (PriorityTodos.tt)
+                </summary>
+                <div style="padding: 15px;">
+                    [% INCLUDE "admin/documentation/PriorityTodos.tt" %]
+                </div>
+            </details>
+            <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px;">
+                <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+                    📝 DAILY TASK LISTS (Master Plan & App Todos)
+                </summary>
+                <div style="padding: 15px;">
+                    <!-- Master Plan Priorities (Independent Dropdown) -->
+                    <div class="task-list">
+                        <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
+                            <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
+                            <span class="task-list-toggle">HIDE</span>
+                        </div>
+                        <div class="task-list-items" id="master-plan-items">
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-1">
+                                <label for="task-mp-1" class="task-label">
+                                    [1] <a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" target="_blank" style="color: var(--link-color);">A.1: Production DB K8s Migration (CRITICAL)</a> - Status: Ready for VM Rebuild
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-2">
+                                <label for="task-mp-2" class="task-label">
+                                    [2] <a href="/Documentation/docker_secrets_fallback_debugging_plan" target="_blank" style="color: var(--link-color);">B.1: Docker Secrets Fallback (CRITICAL)</a> - Status: In Progress
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-4">
+                                <label for="task-mp-4" class="task-label">
+                                    [3] <a href="/Documentation/ai_workflows/zencoder_reset_plan" target="_blank" style="color: var(--link-color);">B.3: Theme Handling (HIGH)</a> - Status: Planning
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-5">
+                                <label for="task-mp-5" class="task-label">
+                                    [4] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-6">
+                                <label for="task-mp-6" class="task-label">
+                                    [5] <a href="/Documentation/PriorityTodos#priority-3" target="_blank" style="color: var(--link-color);">#3: Update Format (MEDIUM)</a> - Status: Pending
+                                </label>
+                            </div>
+                        </div>
+                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
+                    </div>
+
+                    <!-- App Todos for Today (Independent Dropdown) -->
+                    <div class="task-list">
+                        <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
+                            <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
+                            <span class="task-list-toggle">HIDE</span>
+                        </div>
+                        <div class="task-list-items" id="app-todo-items">
+                            [% IF todos_for_today && todos_for_today.size %]
+                                [% FOREACH todo IN todos_for_today %]
+                                    <div class="task-item">
+                                        <input type="checkbox" id="todo-[% todo.record_id %]">
+                                        <label for="todo-[% todo.record_id %]" class="task-label">
+                                            <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" style="color: var(--link-color); text-decoration: none;">
+                                                <strong>[% todo.sitename || 'CSC' %]:</strong> [% todo.subject || '(No subject)' %]
+                                            </a>
+                                        </label>
+                                    </div>
+                                [% END %]
+                            [% ELSE %]
+                                <div style="padding: 15px; text-align: center; color: #666;">
+                                    <p>No todos scheduled for today.</p>
+                                    <p>Create a new todo using the button below.</p>
+                                </div>
+                            [% END %]
+                        </div>
+                        <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
+                    </div>
+                </div>
+            </details>
+
+            <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <h4 style="margin-top: 0;">Today's Recommendation:</h4>
+                <ol>
+                    <li><strong>Daily Plan Automation:</strong> Workflow now complete and production-ready. Run as part of daily morning routine.</li>
+                    <li><strong>Next Priority:</strong> Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for today's focus.</li>
+                    <li><strong>Infrastructure:</strong> Monitor K8s readiness planning and credentials audit scope work.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: WEEKLY VIEW -->
+    <div id="weekly-view" class="tab-content">
     <h1>Daily Plan - Weekly Priority View</h1>
     
     <div class="last-updated" style="color: #666; font-size: 13px; margin-bottom: 20px;">
-        Today: [% current_display %] | Version: 1.01 | Week of Jan 14-20
+        Today: [% current_display %] | Viewing: [% display_date %] | Version: 1.07 | Week of Jan 21-27
+    </div>
+
+    <!-- Date Navigation -->
+    <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+        <a href="/Documentation/DailyPlan/[% prev_date %]" class="nav-btn" style="padding: 8px 15px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; text-decoration: none; color: #333;">← Previous Day</a>
+        <span style="font-weight: bold; min-width: 250px;">[% display_date %]</span>
+        <a href="/Documentation/DailyPlan/[% next_date %]" class="nav-btn" style="padding: 8px 15px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px; text-decoration: none; color: #333;">Next Day →</a>
     </div>
 
     <div class="alert alert-info">
-        <p><strong>📋 How to Use:</strong> Click on any day to expand/collapse tasks for that day. Today ([% current_display %]) is expanded by default. All other days are collapsed.</p>
+        <p><strong>📋 How to Use:</strong> Click on any day to expand/collapse tasks. Use Previous/Next buttons to navigate between days. The currently viewing day's section will be expanded by default.</p>
     </div>
 
     [% FOREACH day IN days %]
-        [% is_today = (day.date == current_date_str) ? 'yes' : 'no' %]
-        [% is_today_label = (day.date == current_date_str) ? ' (Today)' : '' %]
-        [% bg_color = (is_today == 'yes') ? '#e8f5e9' : '#f5f5f5' %]
-        [% border_color = (is_today == 'yes') ? '#4caf50' : '#999' %]
-        [% border_style = (is_today == 'yes') ? 'border-bottom: 2px solid' : 'border-bottom: 1px solid' %]
+        [% is_viewing = (day.date == display_date_str) ? 'yes' : 'no' %]
+        [% is_actual_today = (day.date == current_date_str) ? 'yes' : 'no' %]
+        [% is_viewing_label = (day.date == display_date_str) ? ' (Viewing)' : '' %]
+        [% is_today_label = (day.date == current_date_str AND day.date != display_date_str) ? ' (Today)' : '' %]
+        [% bg_color = (is_viewing == 'yes') ? '#e8f5e9' : '#f5f5f5' %]
+        [% border_color = (is_viewing == 'yes') ? '#4caf50' : '#999' %]
+        [% border_style = (is_viewing == 'yes') ? 'border-bottom: 2px solid' : 'border-bottom: 1px solid' %]
         
-        <details [% IF is_today == 'yes' %]open[% END %] style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0; padding: 0;">
+        <details [% IF is_viewing == 'yes' %]open[% END %] style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0; padding: 0;">
             <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; padding: 15px; background: [% bg_color %]; [% border_style %] [% border_color %]; border-radius: 4px;">
-                📅 [% day.display %][% is_today_label %]
+                📅 [% day.display %][% is_viewing_label %][% is_today_label %]
             </summary>
             <div style="padding: 15px; color: #333;">
-                [% IF day.date == '2026-01-14' %]
+                [% IF day.date == '2026-01-21' %]
                     <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>🔴 CRITICAL #1</strong>: Fix Todo display bug in Todo.pm (todos not showing in daily list)</li>
+                        <li style="margin-bottom: 10px;"><strong>✅ COMPLETED #1</strong>: Fix Todo display bug in Todo.pm (todos not showing in daily list)</li>
                         <li style="margin-bottom: 10px;"><strong>Priority</strong>: Continue Documentation sync audit and compare against code</li>
                         <li style="margin-bottom: 10px;"><strong>Priority</strong>: Review model documentation path mappings (52 files identified)</li>
                         <li style="margin-bottom: 10px;"><strong>Optional</strong>: Review testing framework and run test suite</li>
                     </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Code work + Documentation consistency
-                    </p>
-                [% ELSIF day.date == '2026-01-15' %]
+                [% ELSIF day.date == '2026-01-22' %]
                     <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>Continuation</strong>: Complete Todo.pm bug fix if not finished on Jan 14</li>
-                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Begin model documentation path mapping fixes (Phase 1: 10-15 files)</li>
-                        <li style="margin-bottom: 10px;"><strong>Documentation</strong>: Update audit config (RepositoryCodeAudit.json)</li>
+                        <li style="margin-bottom: 10px;"><strong>Continuation</strong>: Complete Todo.pm bug fix if not finished on Jan 21</li>
+                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Begin Master Plan DB Sync implementation</li>
                     </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Code bug follow-up + Documentation cleanup
-                    </p>
-                [% ELSIF day.date == '2026-01-16' %]
-                    <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Continue model path mapping fixes (Phase 2: 15-20 files)</li>
-                        <li style="margin-bottom: 10px;"><strong>Testing</strong>: Run model documentation tests after path updates</li>
-                        <li style="margin-bottom: 10px;"><strong>Review</strong>: Verify all controller documentation is current</li>
-                    </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Bulk documentation fixes + Validation
-                    </p>
-                [% ELSIF day.date == '2026-01-17' %]
-                    <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Complete remaining model path mapping fixes (Phase 3: final files)</li>
-                        <li style="margin-bottom: 10px;"><strong>Audit</strong>: Run comprehensive documentation sync audit</li>
-                        <li style="margin-bottom: 10px;"><strong>Analysis</strong>: Review audit results and identify remaining gaps</li>
-                    </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Completion + Audit verification
-                    </p>
-                [% ELSIF day.date == '2026-01-18' %]
-                    <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>Review</strong>: Week summary - completed todos and blockers</li>
-                        <li style="margin-bottom: 10px;"><strong>Planning</strong>: Prepare next week's priority list</li>
-                        <li style="margin-bottom: 10px;"><strong>Documentation</strong>: Update master plan with latest progress</li>
-                    </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Weekly review + Planning
-                    </p>
-                [% ELSIF day.date == '2026-01-19' %]
-                    <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>New Week Start</strong>: Begin work on deferred tasks from previous week</li>
-                        <li style="margin-bottom: 10px;"><strong>Priority</strong>: Address any blocking issues from week 1 audit</li>
-                        <li style="margin-bottom: 10px;"><strong>Optional</strong>: Start secondary improvement tasks (performance, refactoring)</li>
-                    </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> New week priorities + Deferred backlog
-                    </p>
-                [% ELSIF day.date == '2026-01-20' %]
-                    <ul style="margin-left: 2em; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong>Continuation</strong>: Continue deferred/secondary tasks from Jan 19</li>
-                        <li style="margin-bottom: 10px;"><strong>Monitoring</strong>: Track any issues discovered in week 1 implementation</li>
-                        <li style="margin-bottom: 10px;"><strong>Planning</strong>: Prepare for mid-week review</li>
-                    </ul>
-                    <p style="color: #666; font-size: 13px; margin-top: 15px; font-style: italic;">
-                        <strong>Focus:</strong> Task continuation + Issue tracking
-                    </p>
+                [% ELSE %]
+                   <p style="color: #666; font-style: italic;">No specific task list documented for this day yet.</p>
                 [% END %]
             </div>
         </details>
     [% END %]
+    </div>
 
-    <!-- Quick Reference Footer -->
-    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-        <h3>Quick Reference</h3>
-        <ul style="margin-left: 2em; line-height: 1.8;">
-            <li><strong>🔴 CRITICAL</strong> = Must complete before anything else</li>
-            <li><strong>Priority</strong> = Should complete within the day/week</li>
-            <li><strong>Optional</strong> = Nice to have, OK to defer if other work blocks</li>
-            <li>Click day headers to expand/collapse daily task sections</li>
-        </ul>
+    <!-- TAB 4: DAILY PLAN GUIDE -->
+    <div id="daily-plan-guide" class="tab-content">
+        <h2>Instructions for Admin Working on The Daily Plan</h2>
+        [%  INCLUDE 'admin/documentation/DailyAuditGuide.tt' %]
+        <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 20px; margin: 20px 0;">
+            <h3>How to Update This Daily Plan</h3>
+            <ol style="line-height: 1.8;">
+                <li><strong>Read First:</strong> Always read the entire DailyPlan.tt file before making changes. Understand the tab structure and container relationships.</li>
+                <li><strong>Preserve Floating Header:</strong> The sticky header with navigation must remain at the top. Do not remove or modify the floating position.</li>
+                <li><strong>Preserve Tab Structure:</strong> Never remove existing tabs without explicit user permission. You may add new tabs, but do not delete TODAY'S WORK, RESOURCES & CONTEXT, or COMPLETED tabs.</li>
+                <li><strong>Update Within Containers:</strong> Edit task content within task-list containers, not the containers themselves. Preserve checkbox structure and task items.</li>
+                <li><strong>Link to Master Docs:</strong> Reference PriorityTodos.tt at /admin/documentation/PriorityTodos - never duplicate the full table into daily plans.</li>
+                <li><strong>Track Progress:</strong> Update checkbox status as tasks complete. Move items to COMPLETED tab when done.</li>
+                <li><strong>Conditional Planning:</strong> If a critical blocker succeeds, update the next day's plan to show unblocked work.</li>
+                <li><strong>Log Changes:</strong> After edits, execute updateprompt.pl --phase after with files modified and changes made.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- TAB 3: TODOS & WORKFLOW (Resources & Context) -->
+    <div id="todo-week-view" class="tab-content">
+        <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
         
-        <p style="color: #666; font-size: 13px; margin-top: 20px; font-style: italic;">
-            <!-- AI EDITABLE --> This file is the single source for daily priorities. Updated daily by Documentation Agent. Replaces individual DailyPlans-YYYY-MM-DD files.
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Related Documentation</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">Master Plan Coordination</a></li>
+                    <li><a href="/admin/documentation/PriorityTodos" style="color: var(--primary-color);">Priority Todos (Top 13 Blocking Dependencies)</a></li>
+                    <li><a href="/admin/documentation/DailyAuditGuide" style="color: var(--primary-color);">Daily Audit Guide</a></li>
+                </ul>
+            </div>
+
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Quick Links</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>Todo Controller:</strong> Comserv/lib/Comserv/Controller/Todo.pm</li>
+                    <li><a href="/todo" style="color: var(--primary-color);">Open Todo System</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
+            <strong>Live Todo System Integration:</strong> Below is the current week's todo items from the application todo system. This is a live view—update items directly in the <a href="/todo" style="color: var(--link-color);">Todo System</a> to see changes reflected here.
         </p>
+        
+        <!-- INCLUDE LIVE TODO WEEK VIEW -->
+        [% TRY %]
+            [% INCLUDE 'application/todo/WeekView.tt' %]
+        [% CATCH %]
+            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                <h4 style="margin-top: 0; color: #856404;">⚠️ Todo Week View Not Available</h4>
+                <p>The live todo week view component is not currently available. <a href="/todo" style="color: var(--link-color);">Open the full Todo System</a> to view and manage your tasks.</p>
+            </div>
+        [% END %]
+        
+        <h4 style="margin-top: 30px;">Quick Todo Actions</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <a href="/todo" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--primary-color); border-radius: 3px; text-align: center;">📋 Open Todo System</a>
+            </div>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <a href="/todo/addtodo" onclick="window.open('/todo/addtodo', '_blank'); return false;" style="display: block; color: var(--link-color); text-decoration: none; font-weight: bold; padding: 10px; border: 1px solid var(--success-color); border-radius: 3px; text-align: center;">➕ Add New Todo</a>
+            </div>
+        </div>
+
+        <h4>Daily Notes for [% display_date %]:</h4>
+        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-height: 150px;">
+            <p><em>Add notes about this day's work here...</em></p>
+        </div>
+    </div>
+
+    <!-- TAB: PRIORITY TODOS (NEW) -->
+    <div id="priority-todos-new" class="tab-content">
+        [% INCLUDE "admin/documentation/PriorityTodosRefactored.tt" %]
+    </div>
+
+    <!-- TAB 5: ZENCODER PROMPT -->
+    <div id="zencoder-prompt" class="tab-content">
+        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
+    </div>
+
+    <!-- TAB 6: MASTER PLAN COORDINATION -->
+    <div id="master-plan-coordination" class="tab-content">
+        [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
+    </div>
+
+    <!-- TAB 7: COMPLETED TASKS -->
+    <div id="completed-tasks" class="tab-content">
+        [% INCLUDE "admin/documentation/CompletedTasks.tt" %]
     </div>
 </div>
+
+<script>
+    function switchTab(evt, tabName) {
+        var i, tabcontent, tabbuttons;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+        tabbuttons = document.getElementsByClassName("tab-button");
+        for (i = 0; i < tabbuttons.length; i++) {
+            tabbuttons[i].classList.remove("active");
+        }
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+</script>
