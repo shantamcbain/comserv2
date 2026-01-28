@@ -204,7 +204,7 @@
                             <div class="task-item sortable" draggable="true">
                                 <input type="checkbox" id="task-mp-3">
                                 <label for="task-mp-3" class="task-label">
-                                    [3] <a href="/Documentation/DailyPlanSystem" target="_blank" style="color: var(--link-color);">Planning System Migration (HIGH)</a> - Status: Phase 1.5 Complete - ✅ DBIC Result files created (5 files). ✅ Code audit complete (28 Todo methods, 11 templates analyzed). 📄 Audit doc: .zenflow/tasks/new-task-46bb/phase1.5_audit.md (533 lines). Next: Phase 2 - DailyPlan controller. AWAITING REVIEW before proceeding.
+                                    [3] <a href="#planning-system-migration" onclick="switchTab(event, 'todo-week-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Planning System Migration (HIGH)</a> - Phase 1.5 Complete ✅ - <a href="#planning-system-migration" onclick="switchTab(event, 'todo-week-view'); setTimeout(function(){ document.getElementById('planning-system-migration').scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); return false;" style="color: var(--link-color);">Click for details in RESOURCES tab</a>
                                 </label>
                             </div>
                             <div class="task-item sortable" draggable="true">
@@ -346,6 +346,59 @@
     <div id="todo-week-view" class="tab-content">
         <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
         
+        <!-- Planning System Migration Progress Section -->
+        <div id="planning-system-migration" style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 20px; margin-bottom: 30px; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #2e7d32;">📋 Planning System Migration - Phase 1.5 Complete</h3>
+            
+            <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                <h4 style="margin-top: 0;">✅ Phase 1: Database Schema (COMPLETE)</h4>
+                <p><strong>Created DBIC Result Files (5 files):</strong></p>
+                <ul>
+                    <li><code>DailyPlan.pm</code> - Main plan aggregator (id, plan_name, status, dates, priority)</li>
+                    <li><code>DailyPlanProject.pm</code> - Many-to-many plan↔project links</li>
+                    <li><code>PlanSystemMapping.pm</code> - System-to-plan sync tracking</li>
+                    <li><code>TodoDependency.pm</code> - Explicit todo dependencies with circular validation</li>
+                    <li><code>Todo.pm</code> - Enhanced with 6 new columns: plan_id, parent_id, blocked_by_todo_id, sort_order, is_blocking, scheduled_date</li>
+                    <li><code>Project.pm</code> - Enhanced with dailyplans relationship</li>
+                </ul>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+                <h4 style="margin-top: 0;">✅ Phase 1.5: Code Audit (COMPLETE)</h4>
+                <p><strong>Analyzed existing code dependencies:</strong></p>
+                <ul>
+                    <li><strong>Todo.pm Controller:</strong> 1,397 lines, 28 methods analyzed
+                        <ul>
+                            <li>13 methods require updates (create, modify, edit - HIGH impact)</li>
+                            <li>7 new actions needed: add_dependency, remove_dependency, add_subtodo, reorder_subtodos, reschedule, get_dependency_chain</li>
+                            <li>3 API endpoints need new field support</li>
+                        </ul>
+                    </li>
+                    <li><strong>Project.pm Controller:</strong> 799 lines, 9 methods analyzed
+                        <ul>
+                            <li>3 methods require updates for daily plan relationships</li>
+                        </ul>
+                    </li>
+                    <li><strong>Templates:</strong> 24 todo templates analyzed
+                        <ul>
+                            <li>11 require updates (addtodo.tt, edit.tt, details.tt - highest priority)</li>
+                            <li>Need dropdowns for: plan_id, parent_id, blocked_by_todo_id</li>
+                            <li>Need displays for: subtodos list, dependency chains, scheduled dates</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p><strong>📄 Complete Audit Document:</strong> <code>.zenflow/tasks/new-task-46bb/phase1.5_audit.md</code> (533 lines)</p>
+                <p><strong>Includes:</strong> Detailed refactoring requirements, API changes, template code examples, timeline estimates (10-12 days MVP / 15-24 days full), risk assessment, testing requirements</p>
+            </div>
+            
+            <div style="background: #fff3e0; border: 1px solid #ff9800; padding: 15px; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #e65100;">⏸️ Phase 2: AWAITING USER REVIEW</h4>
+                <p><strong>Next Steps:</strong> Create DailyPlan controller with CRUD operations and API endpoints</p>
+                <p><strong>Status:</strong> Work paused - awaiting user approval of Phase 1.5 audit before proceeding</p>
+                <p><strong>Review Required:</strong> <code>.zenflow/tasks/new-task-46bb/phase1.5_audit.md</code></p>
+            </div>
+        </div>
+        
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
             <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
                 <h4>Related Documentation</h4>
@@ -353,6 +406,7 @@
                     <li><a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">Master Plan Coordination</a></li>
                     <li><a href="/admin/documentation/PriorityTodos" style="color: var(--primary-color);">Priority Todos (Top 13 Blocking Dependencies)</a></li>
                     <li><a href="/admin/documentation/DailyAuditGuide" style="color: var(--primary-color);">Daily Audit Guide</a></li>
+                    <li><a href="/Documentation/DailyPlanSystem" style="color: var(--primary-color);">DailyPlan System Architecture</a></li>
                 </ul>
             </div>
 
@@ -361,6 +415,7 @@
                 <ul style="margin: 0; padding-left: 20px;">
                     <li><strong>Todo Controller:</strong> Comserv/lib/Comserv/Controller/Todo.pm</li>
                     <li><a href="/todo" style="color: var(--primary-color);">Open Todo System</a></li>
+                    <li><strong>Audit Document:</strong> .zenflow/tasks/new-task-46bb/phase1.5_audit.md</li>
                 </ul>
             </div>
         </div>
