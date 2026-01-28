@@ -4,11 +4,11 @@
    roles = "admin,developer,devops"
    TemplateType = "Application"
    category = "planning,priorities,daily-tasks"
-   page_version = "1.08"
-   last_updated = "Sun Jan 25 18:45:00 UTC 2026"
+   page_version = "1.09"
+   last_updated = "Tue Jan 28 16:05:00 UTC 2026"
    site_specific = "false"
 %]
-[% PageVersion = 'admin/documentation/DailyPlan.tt,v 1.08 2026/01/25 Cleanup-Agent - Version 1.08: Added #2, #14, Plan A.2, and Plan A.3 to Completed Tasks tab.' %]
+[% PageVersion = 'admin/documentation/DailyPlan.tt,v 1.09 2026/01/28 Zencoder - Version 1.09: Added [3] Planning System Migration (HIGH) to MASTER PLAN PRIORITIES. 7-phase MVP to migrate MASTER_PLAN_COORDINATION.tt to database-driven system with sub-todos, dependencies, dynamic scheduling. Spec: .zenflow/tasks/new-task-46bb/spec.md. Renumbered subsequent items [4]-[6].' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -202,21 +202,27 @@
                                 </label>
                             </div>
                             <div class="task-item sortable" draggable="true">
+                                <input type="checkbox" id="task-mp-3">
+                                <label for="task-mp-3" class="task-label">
+                                    [3] <a href="/Documentation/DailyPlanSystem" target="_blank" style="color: var(--link-color);">Planning System Migration (HIGH)</a> - Status: Phase 1 Started - Migrate MASTER_PLAN_COORDINATION.tt to database-driven DailyPlan system with sub-todos, dependencies, dynamic scheduling. MVP: 7 phases. Spec: .zenflow/tasks/new-task-46bb/spec.md
+                                </label>
+                            </div>
+                            <div class="task-item sortable" draggable="true">
                                 <input type="checkbox" id="task-mp-4">
                                 <label for="task-mp-4" class="task-label">
-                                    [3] <a href="/Documentation/ai_workflows/zencoder_reset_plan" target="_blank" style="color: var(--link-color);">B.3: Theme Handling (HIGH)</a> - Status: Planning
+                                    [4] <a href="/Documentation/ai_workflows/zencoder_reset_plan" target="_blank" style="color: var(--link-color);">B.3: Theme Handling (HIGH)</a> - Status: Planning
                                 </label>
                             </div>
                             <div class="task-item sortable" draggable="true">
                                 <input type="checkbox" id="task-mp-5">
                                 <label for="task-mp-5" class="task-label">
-                                    [4] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
+                                    [5] <a href="/Documentation/DOCUMENTATION_SYSTEM_AUDIT_PLAN" target="_blank" style="color: var(--link-color);">C.1: Documentation System Audit (HIGH)</a> - Status: In Progress (Phase 1)
                                 </label>
                             </div>
                             <div class="task-item sortable" draggable="true">
                                 <input type="checkbox" id="task-mp-6">
                                 <label for="task-mp-6" class="task-label">
-                                    [5] <a href="/Documentation/PriorityTodos#priority-3" target="_blank" style="color: var(--link-color);">#3: Update Format (MEDIUM)</a> - Status: Pending
+                                    [6] <a href="/Documentation/PriorityTodos#priority-3" target="_blank" style="color: var(--link-color);">#3: Update Format (MEDIUM)</a> - Status: Pending
                                 </label>
                             </div>
                         </div>
