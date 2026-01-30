@@ -6,10 +6,20 @@
    page_version = '0.25'
    last_updated = '2026-01-26'
 %]
-[% PageVersion = 'admin/documentation/PriorityTodos.tt,v 0.25 2026/01/26 07:45:00 Standardized layout and reordered. Included todo/day.tt.' %]
+[% PageVersion = 'admin/documentation/Planning.tt ,v 0.25 2026/01/26 07:45:00 Standardized layout and reordered. Included todo/day.tt.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+
+<style>
+    /* Ensure all jump targets land with enough space above the container title */
+    .nav-anchor {
+        display: block;
+        position: relative;
+        visibility: hidden;
+        scroll-margin-top: 180px !important;
+    }
+</style>
 
 <div class="container">
     <h1>Priority Todos - Blocking Dependencies</h1>
@@ -25,6 +35,7 @@
                         <div class="jump-links">
                             <a href="#priority-11" class="jump-link">Arch Phase 2</a>
                             <a href="#priority-4" class="jump-link">Refactor Master Plan</a>
+                            <a href="#priority-schema-system" class="jump-link">Schema System Plan</a>
                             <a href="#priority-19" class="jump-link">API Logging Fix</a>
                             <a href="#priority-3" class="jump-link">Update Format</a>
                         </div>
@@ -42,6 +53,7 @@
                         <h6>🔄 Sync & Standards</h6>
                         <div class="jump-links">
                             <a href="#priority-16" class="jump-link">Project IDs</a>
+                            <a href="#priority-zencoder-efficiency" class="jump-link">Zencoder Efficiency</a>
                             <a href="#priority-17" class="jump-link">Theme Sync</a>
                             <a href="#priority-18" class="jump-link">Doc Cleanup</a>
                             <a href="#priority-9" class="jump-link">Auto-Sync Test</a>
@@ -83,7 +95,8 @@
         </div>
     </details>
 
-    <div class="doc-section" id="dynamic-daily">
+    <a id="dynamic-daily" class="nav-anchor"></a>
+    <div class="doc-section">
         <h2>Dynamic Daily Tasks</h2>
         <div class="dynamic-container">
             [% INCLUDE 'todo/day.tt' %]
@@ -94,9 +107,11 @@
         <h2>Priority Todo List</h2>
 
         <!-- Group 1: Architecture & Infrastructure -->
+        <a id="group-arch" class="nav-anchor"></a>
         <h3 class="group-header">🏗️ Architecture & Infrastructure</h3>
 
-        <details class="priority-container" id="priority-11">
+        <a id="priority-11" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Architecture Migration Phase 2 (Migration Strategy)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -130,7 +145,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-4">
+        <a id="priority-4" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Refactor Master Plan Coordination</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -164,7 +180,39 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-19">
+        <a id="priority-schema-system" class="nav-anchor"></a>
+        <details class="priority-container">
+            <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
+            <div class="priority-content">
+                <div class="metadata-row">
+                    <p><strong>Project Metadata:</strong> Schema System | Database Sync | Target: Stability</p>
+                </div>
+                <div class="links-row">
+                    <p><strong>Project Links:</strong> <a href="/admin/schema_compare">Schema Comparison</a></p>
+                </div>
+                <div class="tasks-row">
+                    <p><strong>Task List:</strong></p>
+                    <ul>
+                        <li>Add tick box to sync individual attributes.</li>
+                        <li>Add ability to edit an attribute.</li>
+                        <li>Fix add attribute missing field bug.</li>
+                        <li>Fix Schema Metadata comparison sync buttons.</li>
+                    </ul>
+                </div>
+                <div class="description-row">
+                    <p><strong>Description:</strong> Complete restoration and enhancement of the bidirectional schema synchronization system.</p>
+                </div>
+                <div class="status-row">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL - Core Functionality</p>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="createTodoFromText('schema-system-plan')">Create Todo from Text</button>
+                </div>
+            </div>
+        </details>
+
+        <a id="priority-19" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">🤖 Fix updateprompt.pl API Logging (AI Persistence)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -198,7 +246,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-3">
+        <a id="priority-3" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Update Format & Multi-Plan Support</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -233,9 +282,11 @@
         </details>
 
         <!-- Group 2: Daily & Dynamic Tasks -->
+        <a id="group-daily" class="nav-anchor"></a>
         <h3 class="group-header">📅 Daily & Dynamic Tasks</h3>
 
-        <details class="priority-container" id="priority-12">
+        <a id="priority-12" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">DailyPlan (Synchronization)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -269,7 +320,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-5">
+        <a id="priority-5" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">DailyPlan Flag System</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -303,7 +355,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-6">
+        <a id="priority-6" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Integrate PriorityTodo into DailyPlan</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -338,9 +391,11 @@
         </details>
 
         <!-- Group 3: Synchronization & Standards -->
+        <a id="group-sync" class="nav-anchor"></a>
         <h3 class="group-header">🔄 Synchronization & Standards</h3>
 
-        <details class="priority-container" id="priority-16">
+        <a id="priority-16" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Project IDs (Synchronization)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -374,7 +429,37 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-17">
+        <a id="priority-zencoder-efficiency" class="nav-anchor"></a>
+        <details class="priority-container">
+            <summary class="priority-summary">🚀 Zencoder Efficiency Improvements</summary>
+            <div class="priority-content">
+                <div class="metadata-row">
+                    <p><strong>Project Metadata:</strong> Efficiency | Agent Workflow</p>
+                </div>
+                <div class="links-row">
+                    <p><strong>Project Links:</strong> <a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">Zencoder Guide</a></p>
+                </div>
+                <div class="tasks-row">
+                    <p><strong>Task List:</strong></p>
+                    <ul>
+                        <li>Batch Processing: Stop editing one thing at a time.</li>
+                        <li>Update Prompt Compliance: Adhere to bilateral protocol.</li>
+                    </ul>
+                </div>
+                <div class="description-row">
+                    <p><strong>Description:</strong> Critical workflow improvements to reduce resource waste and improve agent throughput.</p>
+                </div>
+                <div class="status-row">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> HIGH - Efficiency</p>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="createTodoFromText('zencoder-efficiency-details')">Create Todo from Text</button>
+                </div>
+            </div>
+        </details>
+
+        <a id="priority-17" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">🔄 Theme Sync (Synchronization)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -408,7 +493,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-18">
+        <a id="priority-18" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">🔄 Doc Cleanup (Documentation Cleanup)</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -442,7 +528,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-9">
+        <a id="priority-9" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Auto-Sync Test System</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -477,9 +564,11 @@
         </details>
 
         <!-- Group 4: Maintenance & Improvements -->
+        <a id="group-maint" class="nav-anchor"></a>
         <h3 class="group-header">🛠️ Maintenance & Improvements</h3>
 
-        <details class="priority-container" id="cleanup-todos">
+        <a id="cleanup-todos" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Cleanup Outdated Todos</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -513,7 +602,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-improvement">
+        <a id="priority-improvement" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Priority Todos Layout Improvement</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -547,7 +637,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-10">
+        <a id="priority-10" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Archive Documentation Cleanup</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -581,7 +672,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-8">
+        <a id="priority-8" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">API & Documentation Update</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -615,7 +707,8 @@
             </div>
         </details>
 
-        <details class="priority-container" id="priority-7">
+        <a id="priority-7" class="nav-anchor"></a>
+        <details class="priority-container">
             <summary class="priority-summary">Master Plan Agent Example</summary>
             <div class="priority-content">
                 <div class="metadata-row">
@@ -729,177 +822,28 @@
     </div>
 </div>
 
-<style>
-    /* Navigation Styles */
-    .nav-jump {
-        background: #f9f9f9;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        margin-bottom: 20px;
-    }
-    .nav-jump summary {
-        padding: 15px;
-        cursor: pointer;
-        font-weight: bold;
-        background: #f5f5f5;
-        border-bottom: 1px solid #ddd;
-        user-select: none;
-    }
-    .jump-links-container {
-        padding: 15px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-    }
-    .jump-group h6 {
-        margin: 0 0 10px 0;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-        color: #333;
-    }
-    .jump-links {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-    .jump-link {
-        font-size: 0.85em;
-        color: #1565c0;
-        text-decoration: none;
-    }
-    .jump-link:hover {
-        text-decoration: underline;
-    }
-
-    /* Container Styles */
-    .priority-container {
-        border: 2px solid #ddd;
-        border-radius: 4px;
-        margin-bottom: 15px;
-        background: var(--bg-secondary, #fdfdfd);
-    }
-    .priority-summary {
-        padding: 15px;
-        cursor: pointer;
-        font-weight: bold;
-        background: #f5f5f5;
-        border-bottom: 2px solid #ddd;
-        user-select: none;
-    }
-    .priority-content {
-        padding: 15px;
-    }
-    .group-header {
-        margin: 30px 0 15px 0;
-        color: #1565c0;
-        border-bottom: 1px solid #ccc;
-        padding-bottom: 5px;
-    }
-
-    /* Row Styles */
-    .metadata-row, .links-row, .tasks-row, .description-row, .status-row, .blockers-row {
-        margin-bottom: 12px;
-    }
-    .action-buttons {
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-
-    /* Components */
-    .btn {
-        padding: 8px 15px;
-        border-radius: 4px;
-        cursor: pointer;
-        border: none;
-        font-size: 0.9em;
-        transition: opacity 0.2s;
-    }
-    .btn:hover { opacity: 0.8; }
-    .btn-primary { background: #1976d2; color: white; }
-    .btn-info { background: #00bcd4; color: white; }
-    .btn-secondary { background: #78909c; color: white; }
-
-    .status-pending { color: #9e9e9e; font-weight: bold; }
-    .status-in-progress { color: #ff9800; font-weight: bold; }
-    .status-completed { color: #4caf50; font-weight: bold; }
-
-    .doc-metadata {
-        background: #f5f5f5;
-        padding: 15px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-        font-size: 0.9em;
-    }
-    .overview-section {
-        background: #e3f2fd;
-        border: 1px solid #bbdefb;
-        border-radius: 4px;
-        margin-bottom: 25px;
-    }
-    .overview-section summary {
-        padding: 10px 15px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-    .section-content { padding: 15px; }
-
-    .info-box { background: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; }
-    .warning-box { background: #fff3e0; padding: 15px; border-left: 4px solid #ff9800; }
-    .success-box { background: #e8f5e9; padding: 15px; border-left: 4px solid #4caf50; }
-
-    .config-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-    }
-    .config-table th, .config-table td {
-        border: 1px solid #ddd;
-        padding: 10px;
-        text-align: left;
-    }
-    .config-table th { background: #f5f5f5; }
-
-    .footer {
-        margin-top: 40px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-        color: #666;
-        font-size: 0.9em;
-    }
-</style>
-
 <script>
-function addTodoToDatabase(priorityId) {
-    const section = document.getElementById('priority-' + priorityId) || document.getElementById(priorityId);
-    if (!section) {
-        alert('Error: Priority section not found');
-        return;
+    // Automatically open the targeted <details> container when navigating via anchor
+    function openTargetDetails() {
+        const hash = window.location.hash;
+        if (hash) {
+            const target = document.querySelector(hash);
+            if (target) {
+                // If the target is an anchor, look for the next details element
+                let details = target.tagName === 'DETAILS' ? target : target.nextElementSibling;
+                // Skip other anchors or hidden elements if necessary
+                while (details && details.tagName !== 'DETAILS' && (details.classList.contains('nav-anchor') || details.nodeType === 3)) {
+                    details = details.nextElementSibling;
+                }
+                
+                if (details && details.tagName === 'DETAILS') {
+                    details.open = true;
+                }
+            }
+        }
     }
 
-    const summary = section.querySelector('summary').innerText;
-    
-    const todoData = {
-        subject: summary.trim(),
-        priority_id: priorityId
-    };
-
-    console.log('Sending Todo Data:', todoData);
-    alert(`Adding priority todo #${priorityId} to database...\nSubject: ${todoData.subject}`);
-}
-
-function createTodoFromText(id) {
-    const section = document.getElementById(id);
-    const summary = section ? section.querySelector('summary').innerText : 'Unknown';
-    alert('Creating todo from text for: ' + summary);
-}
-
-function logTime(id) {
-    const section = document.getElementById(id);
-    const summary = section ? section.querySelector('summary').innerText : 'Unknown';
-    alert('Logging time for: ' + summary);
-}
+    // Run on load and on hash change
+    window.addEventListener('load', openTargetDetails);
+    window.addEventListener('hashchange', openTargetDetails);
 </script>
