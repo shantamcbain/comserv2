@@ -49,8 +49,11 @@ CREATE TABLE IF NOT EXISTS `plan_audit` (
 -- Add allowed_roles column to dailyplan table
 ALTER TABLE `dailyplan` ADD COLUMN `allowed_roles` JSON AFTER `last_modified`;
 
+-- Add time_of_day column to todo table (if not exists)
+ALTER TABLE `todo` ADD COLUMN IF NOT EXISTS `time_of_day` TIME AFTER `scheduled_date`;
+
 -- Add allowed_roles column to todo table
-ALTER TABLE `todo` ADD COLUMN `allowed_roles` JSON AFTER `scheduled_date`;
+ALTER TABLE `todo` ADD COLUMN `allowed_roles` JSON AFTER `time_of_day`;
 
 -- Create indexes for performance
 CREATE INDEX `idx_site_roles_sitename` ON `site_roles` (`sitename`);
