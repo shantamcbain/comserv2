@@ -1,6 +1,7 @@
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
 use JSON::MaybeXS;
@@ -125,31 +126,6 @@ sub begin :Private {
 
     # If we get here, the user is authorized
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
-}
-
-sub index :Path(/todo) :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Retrieve all of the todo records as todo model objects and store in the stash
-    $c->stash(todos => [$c->model('DB::Todo')->all]);
-
-    # Set the TT template to use.
-    $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
-    $c->forward($c->view('TT'));
-}
-sub auto :Private {
-    my ($self, $c) = @_;
-
-    # Check if the user is logged in and has admin or developer role
-    unless (defined $c->session->{username} && grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
-        $c->response->redirect($c->uri_for('/'));
-        return 0;
-    }
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
-    return 1;
 }
 
 # Main todo action with filtering capabilities
@@ -380,7 +356,8 @@ sub details :Path('/todo/details') :Args {
         $c->stash(
             record => $todo, 
             accumulative_time => $accumulative_time,
-            projects => $projects
+            projects => $projects,
+            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
         # Set the template to 'todo/details.tt'
@@ -414,6 +391,9 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
+    
     # Fetch the project_id from query parameters (if any)
     my $project_id = $c->request->query_parameters->{project_id};
     my $current_project;
@@ -472,6 +452,9 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         users           => \@users,          # List of users to populate dropdown
         build_priority  => \%priority_options, # Priority options for dropdown
         build_status    => \%status_options,   # Status options for dropdown
+        return_to       => $return_to,       # URL to return to after action
+        start_date      => $c->request->params->{start_date},
+        time_of_day     => $c->request->params->{time_of_day},
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -541,6 +524,9 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
+
     # Fetch all users to populate the user drop-down
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
 
@@ -583,6 +569,7 @@ sub edit :Path('/todo/edit') :Args(1) {
         accumulative_time => $accumulative_time,
         build_priority   => \%priority_options, # Priority options for dropdown
         build_status     => \%status_options,   # Status options for dropdown
+        return_to        => $return_to,         # URL to return to after action
         template         => 'todo/edit.tt'
     );
 
@@ -710,6 +697,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
             priority             => $form_data->{priority},
+            time_of_day          => $form_data->{time_of_day},
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
@@ -747,8 +735,14 @@ sub modify :Path('/todo/modify') :Args(1) {
     );
 
     # Handle successful update
+    $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
+    
+    if ($form_data->{return_to}) {
+        $c->response->redirect($form_data->{return_to});
+        $c->detach();
+    }
+    
     $c->stash(
-        success_msg => "Todo item with ID $record_id has been successfully updated.",
         record      => $todo,             # Provide updated data
         template    => 'todo/details.tt',  # Redirect back to the form for review
     );
@@ -888,6 +882,7 @@ sub create :Local {
         username_of_poster => $current_user,
         status => $self->convert_status_to_string($params->{status}) || 'NEW',
         priority => $params->{priority} || 3, # Medium priority by default
+        time_of_day => $params->{time_of_day},
         share => $params->{share} ? 1 : 0,
         last_mod_by => $current_user,
         last_mod_date => $current_date,
@@ -920,9 +915,13 @@ sub create :Local {
         $c->detach();
     }
 
-    # Redirect to the todo list with success message
+    # Redirect to the todo list or return_to URL with success message
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
-    $c->response->redirect($c->uri_for($self->action_for('todo')));
+    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
+    
+    # Handle the case where the return_to URL might already have a fragment
+    # or ensure it's properly handled if coming from internal referer
+    $c->response->redirect($redirect_url);
 }
 
 sub day :Path('/todo/day') :Args {
@@ -951,22 +950,30 @@ sub day :Path('/todo/day') :Args {
 
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
+
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
+    # Separate overdue and today's todos
+    my @overdue_todos;
+    my @today_todos;
     
-    # Debug logging
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-        "Filtering for date: $date, Total todos: " . scalar(@$todos) . ", Filtered todos: " . scalar(@$filtered_todos));
-    
-    if ($c->session->{debug_mode}) {
-        foreach my $todo (@$todos) {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-                "Todo: " . $todo->subject . ", Start: " . ($todo->start_date || 'NULL') . 
-                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status);
+    foreach my $todo (@sorted_todos) {
+        if ($todo->due_date && $todo->due_date lt $date && $todo->status != 3) {
+            push @overdue_todos, $todo;
+        } else {
+            push @today_todos, $todo;
         }
     }
 
     # Add the todos to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@today_todos,
+        overdue_todos => \@overdue_todos,
         sitename => $c->session->{SiteName},
         date => $date,
         previous_date => $previous_date,
@@ -1019,9 +1026,16 @@ sub week :Path('/todo/week') :Args {
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
 
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
     # Add the todos to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@sorted_todos,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
@@ -1062,9 +1076,16 @@ sub month :Path('/todo/month') :Args {
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
 
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
     # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
-    foreach my $todo (@$filtered_todos) {
+    foreach my $todo (@sorted_todos) {
         my $display_date = $todo->due_date || $todo->start_date;
         if ($display_date) {
             my $todo_date = DateTime::Format::ISO8601->parse_datetime($display_date);
@@ -1100,7 +1121,7 @@ sub month :Path('/todo/month') :Args {
 
     # Add the todos and calendar to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@sorted_todos,
         calendar => \@calendar,
         sitename => $c->session->{SiteName},
         month_name => $dt->month_name,

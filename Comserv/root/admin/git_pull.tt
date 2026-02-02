@@ -30,7 +30,7 @@
                         [% END %]
                     [% END %]
                     <p>User exists: [% c.user_exists ? 'Yes' : 'No' %]</p>
-                    <p>Username: [% c.user.username || 'Not logged in' %]</p>
+                    <p>Username: [% (c.user ? c.user.username : 'Not logged in') %]</p>
                     <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
                     <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
                 </div>

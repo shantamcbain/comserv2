@@ -9,33 +9,38 @@
    editable = "true"
 %]
 
-[% PageVersion = 'admin/documentation/PriorityTodos.tt,v 0.27 2026/01/29 02:25:00 Converted from table format back to container format with enhanced detail per priority item.' %]
+[% PageVersion = 'admin/documentation/PriorityTodos.tt, v 0.27 2026/01/29 02:25:00 Converted from table format back to container format with enhanced detail per priority item.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <style>
     .priority-container {
-        background: #fff;
-        border: 1px solid #ddd;
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
         border-radius: 6px;
         margin: 15px 0;
         padding: 0;
+        scroll-margin-top: 170px !important;
+    }
+    
+    [id^="priority-"], #dynamic-daily, #cleanup-todos, #completed {
+        scroll-margin-top: 170px !important;
     }
     
     .priority-container.priority-high {
-        border-left: 5px solid #d32f2f;
-        background: #fff8e1;
+        border-left: 5px solid var(--warning-color);
+        background: var(--schema-alert-warning-bg);
     }
     
     .priority-container.priority-medium {
-        border-left: 5px solid #f57c00;
-        background: #e3f2fd;
+        border-left: 5px solid var(--accent-color);
+        background: var(--light-color);
     }
     
     .priority-container.priority-low {
-        border-left: 5px solid #388e3c;
-        background: #f9f9f9;
+        border-left: 5px solid var(--success-color);
+        background: var(--secondary-color);
     }
     
     .priority-container summary {
@@ -64,7 +69,7 @@
     
     .priority-content {
         padding: 0 20px 20px 20px;
-        border-top: 1px solid #e0e0e0;
+        border-top: 1px solid var(--border-color);
     }
     
     .priority-meta {
@@ -84,7 +89,7 @@
     
     .priority-meta-label {
         font-size: 0.85em;
-        color: #666;
+        color: var(--text-muted-color);
         margin-bottom: 5px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -95,17 +100,17 @@
     }
     
     .status-pending {
-        color: #d32f2f;
+        color: var(--warning-color);
         font-weight: bold;
     }
     
     .status-in-progress {
-        color: #f57c00;
+        color: var(--accent-color);
         font-weight: bold;
     }
     
     .status-completed {
-        color: #388e3c;
+        color: var(--success-color);
         font-weight: bold;
     }
     
@@ -115,17 +120,17 @@
     
     .priority-section h4 {
         margin: 0 0 10px 0;
-        color: #444;
+        color: var(--text-color);
         font-size: 0.95em;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     
     .priority-tasks {
-        background: #fff;
+        background: var(--background-color);
         padding: 15px;
         border-radius: 4px;
-        border: 1px solid #e0e0e0;
+        border: 1px solid var(--border-color);
     }
     
     .priority-tasks ul {
@@ -141,8 +146,8 @@
     .blocker-tag {
         display: inline-block;
         padding: 4px 10px;
-        background: #ffebee;
-        border: 1px solid #ef5350;
+        background: var(--schema-alert-danger-bg);
+        border: 1px solid var(--warning-color);
         border-radius: 3px;
         font-size: 0.9em;
         margin: 3px;
@@ -151,16 +156,16 @@
     .unblocks-tag {
         display: inline-block;
         padding: 4px 10px;
-        background: #e8f5e9;
-        border: 1px solid #66bb6a;
+        background: var(--schema-alert-success-bg);
+        border: 1px solid var(--success-color);
         border-radius: 3px;
         font-size: 0.9em;
         margin: 3px;
     }
     
     .nav-jump {
-        background: #f5f5f5;
-        border: 1px solid #ddd;
+        background: var(--secondary-color);
+        border: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 0;
         margin: 20px 0;
@@ -170,7 +175,7 @@
         padding: 15px 20px;
         cursor: pointer;
         font-weight: bold;
-        background: linear-gradient(to right, #2196f3, #1976d2);
+        background: var(--info-color);
         color: white;
         border-radius: 6px;
     }
@@ -184,7 +189,7 @@
     
     .jump-group h6 {
         margin: 0 0 10px 0;
-        color: #1976d2;
+        color: var(--info-color);
         font-size: 0.9em;
     }
     
@@ -196,23 +201,23 @@
     
     .jump-link {
         padding: 8px 12px;
-        background: white;
-        border: 1px solid #ddd;
+        background: var(--background-color);
+        border: 1px solid var(--border-color);
         border-radius: 4px;
         text-decoration: none;
-        color: #1976d2;
+        color: var(--info-color);
         transition: all 0.2s;
     }
     
     .jump-link:hover {
-        background: #e3f2fd;
-        border-color: #1976d2;
+        background: var(--light-color);
+        border-color: var(--info-color);
         transform: translateX(5px);
     }
     
     .completed-section {
-        background: #f9f9f9;
-        border: 1px solid #ddd;
+        background: var(--secondary-color);
+        border: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 20px;
         margin-top: 30px;
@@ -220,8 +225,8 @@
     
     .completed-item {
         padding: 12px;
-        background: white;
-        border-left: 4px solid #4caf50;
+        background: var(--background-color);
+        border-left: 4px solid var(--success-color);
         margin: 10px 0;
         border-radius: 4px;
     }
@@ -241,12 +246,14 @@
                 <div class="jump-links">
                     <a href="#priority-11" class="jump-link">#11 Architecture Phase 2</a>
                     <a href="#priority-4" class="jump-link">#4 Refactor Master Plan</a>
+                    <a href="#priority-schema-system" class="jump-link">#Schema System Plan</a>
                     <a href="#priority-19" class="jump-link">#19 API Logging Fix</a>
                 </div>
             </div>
             <div class="jump-group">
                 <h6>🟠 MEDIUM Priority</h6>
                 <div class="jump-links">
+                    <a href="#dynamic-daily" class="jump-link">#Dynamic Daily View</a>
                     <a href="#priority-3" class="jump-link">#3 Update Format</a>
                     <a href="#priority-12" class="jump-link">#12 DailyPlan Sync</a>
                     <a href="#priority-5" class="jump-link">#5 DailyPlan Flag</a>
@@ -257,6 +264,7 @@
                 <h6>🟢 LOW Priority</h6>
                 <div class="jump-links">
                     <a href="#priority-16" class="jump-link">#16 Project IDs</a>
+                    <a href="#priority-zencoder-efficiency" class="jump-link">#Zencoder Efficiency</a>
                     <a href="#priority-17" class="jump-link">#17 Theme Sync</a>
                     <a href="#priority-18" class="jump-link">#18 Doc Cleanup</a>
                     <a href="#priority-9" class="jump-link">#9 Auto-Sync Test</a>
@@ -265,8 +273,11 @@
             <div class="jump-group">
                 <h6>🛠️ Maintenance</h6>
                 <div class="jump-links">
+                    <a href="#cleanup-todos" class="jump-link">#Cleanup Outdated</a>
+                    <a href="#priority-improvement" class="jump-link">#Layout Improve</a>
                     <a href="#priority-10" class="jump-link">#10 Archive Docs</a>
                     <a href="#priority-8" class="jump-link">#8 API Docs</a>
+                    <a href="#priority-7" class="jump-link">#7 Agent Example</a>
                     <a href="#completed" class="jump-link">✅ Completed Tasks</a>
                 </div>
             </div>
@@ -276,7 +287,7 @@
     <h2>Current Active Priorities</h2>
 
     <!-- HIGH PRIORITY ITEMS -->
-    <h3 style="color: #d32f2f; margin-top: 30px;">🔴 HIGH Priority</h3>
+    <h3 style="color: var(--warning-color); margin-top: 30px;">🔴 HIGH Priority</h3>
 
     <details class="priority-container priority-high" id="priority-11">
         <summary>#11 - Architecture Migration Phase 2</summary>
@@ -390,6 +401,45 @@
         </div>
     </details>
 
+    <details class="priority-container priority-high" id="priority-schema-system">
+        <summary>#Schema System Plan & Enhancements</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">DB Admin</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">CRITICAL - Core Functionality</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Complete restoration and enhancement of the bidirectional schema synchronization system.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Add tick box to sync individual attributes</li>
+                        <li>Add ability to edit an attribute</li>
+                        <li>Fix add attribute missing field bug</li>
+                        <li>Fix Schema Metadata comparison sync buttons</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p><a href="/admin/schema_compare">Schema Comparison</a></p>
+            </div>
+        </div>
+    </details>
+
     <details class="priority-container priority-high" id="priority-19">
         <summary>#19 - Fix updateprompt.pl API Logging (AI Persistence)</summary>
         <div class="priority-content">
@@ -449,7 +499,14 @@
     </details>
 
     <!-- MEDIUM PRIORITY ITEMS -->
-    <h3 style="color: #f57c00; margin-top: 30px;">🟠 MEDIUM Priority</h3>
+    <h3 style="color: var(--accent-color); margin-top: 30px;">🟠 MEDIUM Priority</h3>
+
+    <div class="doc-section" id="dynamic-daily" style="margin: 20px 0; padding: 20px; background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 6px;">
+        <h2>Dynamic Daily Tasks</h2>
+        <div class="dynamic-container">
+            [% INCLUDE 'todo/day.tt' %]
+        </div>
+    </div>
 
     <details class="priority-container priority-medium" id="priority-3">
         <summary>#3 - Update Format & Multi-Plan Support</summary>
@@ -681,7 +738,7 @@
     </details>
 
     <!-- LOW PRIORITY ITEMS -->
-    <h3 style="color: #388e3c; margin-top: 30px;">🟢 LOW Priority</h3>
+    <h3 style="color: var(--success-color); margin-top: 30px;">🟢 LOW Priority</h3>
 
     <details class="priority-container priority-low" id="priority-16">
         <summary>#16 - Project IDs Synchronization</summary>
@@ -734,6 +791,44 @@
                     <a href="/project/list">Project List</a> | 
                     <a href="/admin/system/ids">ID Management</a>
                 </p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container priority-low" id="priority-zencoder-efficiency">
+        <summary>#Zencoder Efficiency Improvements</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Owner</span>
+                    <span class="priority-meta-value">Zencoder Team</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">HIGH - Efficiency</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Critical workflow improvements to reduce resource waste and improve agent throughput.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Batch Processing: Stop editing one thing at a time</li>
+                        <li>Update Prompt Compliance: Adhere to bilateral protocol</li>
+                        <li>Implement automated resource usage monitoring</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📌 Related Links</h4>
+                <p><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">Zencoder Guide</a></p>
             </div>
         </div>
     </details>
@@ -1015,14 +1110,83 @@
         </div>
     </details>
 
+    <!-- MAINTENANCE & IMPROVEMENTS -->
+    <h3 style="color: var(--text-color); margin-top: 30px;">🛠️ Maintenance & Improvements</h3>
+
+    <details class="priority-container" id="cleanup-todos">
+        <summary>#Cleanup Outdated Todos</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Priority Level</span>
+                    <span class="priority-meta-value">LOW</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Identify and archive todos older than 6 months with no activity to maintain database hygiene.</p>
+            </div>
+            <div class="priority-section">
+                <h4>✅ Required Tasks</h4>
+                <div class="priority-tasks">
+                    <ul>
+                        <li>Identify stale todos (no activity > 6 months)</li>
+                        <li>Archive to legacy tables</li>
+                        <li>Update status of active stale items to 'Deferred'</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container" id="priority-improvement">
+        <summary>#Priority Todos Layout Improvement</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-in-progress">IN PROGRESS</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Standardize priority containers and integrate dynamic daily view (todo/day.tt) for better UX.</p>
+            </div>
+        </div>
+    </details>
+
+    <details class="priority-container" id="priority-7">
+        <summary>#7 - Agent Example Documentation</summary>
+        <div class="priority-content">
+            <div class="priority-meta">
+                <div class="priority-meta-item">
+                    <span class="priority-meta-label">Status</span>
+                    <span class="priority-meta-value status-pending">PENDING</span>
+                </div>
+            </div>
+            <div class="priority-section">
+                <h4>📋 Description</h4>
+                <p>Create example documentation for agent integration based on Architecture Phase 2 outcomes.</p>
+            </div>
+            <div class="priority-section">
+                <h4>🔗 Dependencies</h4>
+                <p><span class="blocker-tag">↳ BLOCKED BY: #11 (Arch Phase 2)</span></p>
+            </div>
+        </div>
+    </details>
+
     <!-- COMPLETED TASKS SECTION -->
     <div class="completed-section" id="completed">
         <h2>✅ Recently Completed Tasks</h2>
-        <p style="color: #666; margin-bottom: 20px;">Successfully completed priority items archived for reference.</p>
+        <p style="color: var(--text-muted-color); margin-bottom: 20px;">Successfully completed priority items archived for reference.</p>
         
         <div class="completed-item">
             <h4 style="margin: 0 0 5px 0;">#1 CRITICAL: Fix Todo Display Bug</h4>
-            <p style="margin: 0; color: #666;">
+            <p style="margin: 0; color: var(--text-muted-color);">
                 <strong>Completed:</strong> 2026-01-25 | 
                 <strong>Result:</strong> Fixed bug in Todo.pm rendering logic. Todos now display correctly in daily list view.
             </p>
@@ -1030,7 +1194,7 @@
 
         <div class="completed-item">
             <h4 style="margin: 0 0 5px 0;">#2: API Auth Migration</h4>
-            <p style="margin: 0; color: #666;">
+            <p style="margin: 0; color: var(--text-muted-color);">
                 <strong>Completed:</strong> 2026-01-25 | 
                 <strong>Result:</strong> Successfully migrated to token-based Bearer authentication. All API endpoints now use secure token auth.
             </p>
@@ -1038,7 +1202,7 @@
 
         <div class="completed-item">
             <h4 style="margin: 0 0 5px 0;">Plan A.2: K8s Readiness Assessment</h4>
-            <p style="margin: 0; color: #666;">
+            <p style="margin: 0; color: var(--text-muted-color);">
                 <strong>Completed:</strong> 2026-01-13 | 
                 <strong>Result:</strong> Infrastructure assessment finalized. Kubernetes migration path validated and documented.
             </p>
@@ -1046,10 +1210,28 @@
 
         <div class="completed-item">
             <h4 style="margin: 0 0 5px 0;">Plan A.3: Credentials Audit</h4>
-            <p style="margin: 0; color: #666;">
+            <p style="margin: 0; color: var(--text-muted-color);">
                 <strong>Completed:</strong> 2026-01-13 | 
                 <strong>Result:</strong> Security-critical credentials audit completed. All credentials rotated and secured.
             </p>
         </div>
     </div>
 </div>
+
+<script>
+    // Automatically open the targeted <details> container when navigating via anchor
+    function openTargetDetails() {
+        const hash = window.location.hash;
+        if (hash) {
+            const target = document.querySelector(hash);
+            if (target && target.tagName === 'DETAILS') {
+                target.open = true;
+                // If it's nested inside another details (like nav-jump), we don't necessarily want to open the parent
+            }
+        }
+    }
+
+    // Run on load and on hash change
+    window.addEventListener('load', openTargetDetails);
+    window.addEventListener('hashchange', openTargetDetails);
+</script>
