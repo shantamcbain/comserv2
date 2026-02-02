@@ -82,6 +82,7 @@
 <h1>Add a New To-do Item</h1>
 
 <form action="/todo/create" method="post">
+    <input type="hidden" name="return_to" value="[% return_to %]">
     <!-- record_id is auto-increment, no need for manual input -->
     <div>
         <label for="sitename">Site Name:</label>
@@ -106,6 +107,10 @@
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
+    </div>
+    <div>
+        <label for="time_of_day">Time of Day:</label>
+        <input type="time" id="time_of_day" name="time_of_day" value="[% time_of_day OR '09:00' %]">
     </div>
     <div>
         <label for="subject">Subject:</label>

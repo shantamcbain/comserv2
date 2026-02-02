@@ -1485,6 +1485,7 @@ sub get_database_comparison {
     # Get Ency database tables and compare with result files
     try {
         my $ency_tables = $self->get_ency_database_tables($c);
+        @$ency_tables = sort { lc($a) cmp lc($b) } @$ency_tables; # Alphabetical sort
         $comparison->{ency}->{tables} = $ency_tables;
         $comparison->{ency}->{table_count} = scalar(@$ency_tables);
         $comparison->{ency}->{connection_status} = 'connected';
@@ -1501,11 +1502,6 @@ sub get_database_comparison {
         foreach my $table_name (@$ency_tables) {
             my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'ency', $result_table_mapping);
             
-            # Debug logging
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
-                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
-            
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
                 $comparison->{summary}->{tables_with_results}++;
@@ -1516,19 +1512,15 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
+        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
-        # Organize comparisons: tables with results first, then tables without results
+        # Sort comparisons alphabetically
+        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
         $comparison->{ency}->{table_comparisons} = [@tables_with_results, @tables_without_results];
         $comparison->{ency}->{results_without_tables} = \@results_without_tables;
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-            "Found " . scalar(@$ency_tables) . " tables in ency database, " . 
-            scalar(@tables_with_results) . " with results, " . 
-            scalar(@tables_without_results) . " without results, " . 
-            scalar(@results_without_tables) . " orphaned results");
-            
     } catch {
         my $error = "Error connecting to ency database: $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
@@ -1539,6 +1531,7 @@ sub get_database_comparison {
     # Get Forager database tables and compare with result files
     try {
         my $forager_tables = $self->get_forager_database_tables($c);
+        @$forager_tables = sort { lc($a) cmp lc($b) } @$forager_tables; # Alphabetical sort
         $comparison->{forager}->{tables} = $forager_tables;
         $comparison->{forager}->{table_count} = scalar(@$forager_tables);
         $comparison->{forager}->{connection_status} = 'connected';
@@ -1555,11 +1548,6 @@ sub get_database_comparison {
         foreach my $table_name (@$forager_tables) {
             my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'forager', $result_table_mapping);
             
-            # Debug logging
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Forager Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
-                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
-            
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
                 $comparison->{summary}->{tables_with_results}++;
@@ -1570,10 +1558,12 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
+        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
-        # Organize comparisons: tables with results first, then tables without results
+        # Sort comparisons alphabetically
+        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
         $comparison->{forager}->{table_comparisons} = [@tables_with_results, @tables_without_results];
         $comparison->{forager}->{results_without_tables} = \@results_without_tables;
         
@@ -1809,7 +1799,8 @@ sub extract_table_name_from_result_file {
     }
     
     # Extract table name from __PACKAGE__->table('table_name') declaration
-    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
+    # Robust multiline regex to handle different formatting styles
+    if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
         return $1;
     }
     
@@ -1916,12 +1907,23 @@ sub find_orphaned_result_files_v2 {
     foreach my $table_name (keys %$result_table_mapping) {
         unless (exists $table_lookup{$table_name}) {
             my $result_info = $result_table_mapping->{$table_name};
+            
+            # Extract schema information for orphaned results
+            my $result_schema = { columns => {} };
+            eval {
+                $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
+            };
+            
             push @orphaned_results, {
                 result_name => $result_info->{result_name},
                 result_path => $result_info->{result_path},
                 expected_table_name => $table_name,
                 actual_table_name => $table_name,
-                last_modified => $result_info->{last_modified}
+                last_modified => $result_info->{last_modified},
+                columns => $result_schema->{columns},
+                primary_keys => $result_schema->{primary_keys} || [],
+                relationships => $result_schema->{relationships} || {},
+                raw_package_calls => $result_schema->{raw_package_calls} || []
             };
         }
     }
@@ -1938,25 +1940,17 @@ sub get_all_result_files {
     
     if (lc($database) eq 'ency') {
         my $result_dir = "$base_path/Ency/Result";
-        @result_files = $self->scan_result_directory($result_dir, '');
-        
-        # Also scan subdirectories
-        if (-d "$result_dir/System") {
-            push @result_files, $self->scan_result_directory("$result_dir/System", 'System/');
-        }
-        if (-d "$result_dir/User") {
-            push @result_files, $self->scan_result_directory("$result_dir/User", 'User/');
-        }
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
     } elsif (lc($database) eq 'forager') {
         my $result_dir = "$base_path/Forager/Result";
-        @result_files = $self->scan_result_directory($result_dir, '');
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
     }
     
     return @result_files;
 }
 
-# Scan a directory for Result files
-sub scan_result_directory {
+# Scan a directory recursively for Result files
+sub scan_result_directory_recursive {
     my ($self, $dir_path, $prefix) = @_;
     
     my @files = ();
@@ -1964,19 +1958,23 @@ sub scan_result_directory {
     if (opendir(my $dh, $dir_path)) {
         while (my $file = readdir($dh)) {
             next if $file =~ /^\.\.?$/;  # Skip . and ..
-            next unless $file =~ /\.pm$/;  # Only .pm files
             
             my $full_path = "$dir_path/$file";
-            next unless -f $full_path;  # Only regular files
             
-            my $name = $file;
-            $name =~ s/\.pm$//;  # Remove .pm extension
-            
-            push @files, {
-                name => $prefix . $name,
-                path => $full_path,
-                last_modified => (stat($full_path))[9]
-            };
+            if (-d $full_path) {
+                # Recursively scan subdirectory
+                push @files, $self->scan_result_directory_recursive($full_path, $prefix . $file . '/');
+            } elsif ($file =~ /\.pm$/) {
+                # Add Result file
+                my $name = $file;
+                $name =~ s/\.pm$//;  # Remove .pm extension
+                
+                push @files, {
+                    name => $prefix . $name,
+                    path => $full_path,
+                    last_modified => (stat($full_path))[9]
+                };
+            }
         }
         closedir($dh);
     }
@@ -2150,7 +2148,10 @@ sub get_table_result_comparison_v2 {
         database => $database,
         has_result_file => $result_info ? 1 : 0,
         result_file_path => $result_info ? $result_info->{result_path} : undef,
-        fields => {}
+        fields => {},
+        primary_keys => $result_schema->{primary_keys} || [],
+        relationships => $result_schema->{relationships} || {},
+        raw_package_calls => $result_schema->{raw_package_calls} || []
     };
     
     # Get all unique field names from both sources
@@ -2167,6 +2168,20 @@ sub get_table_result_comparison_v2 {
         my $table_field = $table_schema->{columns}->{$field_name};
         my $result_field = $result_schema->{columns}->{$field_name};
         
+        # Add primary key and foreign key status to field data
+        if ($table_field) {
+            $table_field->{is_primary_key} = (grep { $_ eq $field_name } @{$table_schema->{primary_keys} || []}) ? 1 : 0;
+            $table_field->{is_foreign_key} = (grep { $_->{column} eq $field_name } @{$table_schema->{foreign_keys} || []}) ? 1 : 0;
+        }
+        if ($result_field) {
+            $result_field->{is_primary_key} = (grep { $_ eq $field_name } @{$result_schema->{primary_keys} || []}) ? 1 : 0;
+            # In Result files, foreign keys are often identified via belongs_to relationships
+            # Already set in get_result_file_schema, but ensuring it here too
+            unless ($result_field->{is_foreign_key}) {
+                $result_field->{is_foreign_key} = (grep { ($_->{column} || '') eq $field_name } values %{$result_schema->{relationships} || {}}) ? 1 : 0;
+            }
+        }
+        
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
             result => $result_field,
@@ -2182,7 +2197,7 @@ sub compare_field_attributes {
     my ($self, $table_field, $result_field, $c, $field_name) = @_;
     
     my @differences = ();
-    my @attributes = qw(data_type size is_nullable is_auto_increment default_value);
+    my @attributes = qw(data_type size is_nullable is_auto_increment is_primary_key is_foreign_key default_value extra relationship);
     
     foreach my $attr (@attributes) {
         my $table_value = $table_field ? $table_field->{$attr} : undef;
@@ -2256,109 +2271,32 @@ sub normalize_field_value {
     }
     
     # Handle boolean attributes
-    if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment') {
+    if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment' || $attribute eq 'is_primary_key' || $attribute eq 'is_foreign_key') {
         return $value ? 1 : 0;
     }
     
     # Handle numeric attributes
     if ($attribute eq 'size') {
-        return $value + 0 if $value =~ /^\d+$/;
+        return "$value" if $value =~ /^[\d,]+$/;
+    }
+    
+    # Handle extra attributes normalization
+    if ($attribute eq 'extra') {
+        $value =~ s/\s+/ /g; # Normalize whitespace
+        $value =~ s/^\s+|\s+$//g; # Trim
+        return $value;
+    }
+
+    # Handle relationship object normalization for comparison
+    if ($attribute eq 'relationship') {
+        if (ref($value) eq 'HASH') {
+            return $value->{type} . ":" . $value->{accessor} . "->" . ($value->{related_class} =~ s/.*:://r);
+        }
+        return $value;
     }
     
     # Handle string attributes
     return "$value";
-}
-
-# Parse Result file schema
-sub parse_result_file_schema {
-    my ($self, $c, $file_path) = @_;
-    
-    my $schema = {
-        columns => {},
-        primary_keys => [],
-        relationships => [],
-        table_name => undef
-    };
-    
-    # Read the Result file
-    my $content;
-    eval {
-        $content = File::Slurp::read_file($file_path);
-    };
-    if ($@) {
-        warn "Failed to read Result file $file_path: $@";
-        return $schema;
-    }
-    
-    # Extract table name
-    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
-        $schema->{table_name} = $1;
-    }
-    
-    # Extract columns
-    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
-        my $columns_block = $1;
-        
-        # Parse individual column definitions (format: column_name => { attributes })
-        while ($columns_block =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
-            my ($col_name, $col_def) = ($1, $2);
-            
-            my $column = {
-                data_type => undef,
-                is_nullable => 1,
-                size => undef,
-                is_auto_increment => 0,
-                default_value => undef
-            };
-            
-            # Parse column attributes
-            if ($col_def =~ /data_type\s*=>\s*['"]([^'"]+)['"]/) {
-                $column->{data_type} = $1;
-            }
-            if ($col_def =~ /is_nullable\s*=>\s*(\d+)/) {
-                $column->{is_nullable} = $1;
-            }
-            if ($col_def =~ /size\s*=>\s*(\d+)/) {
-                $column->{size} = $1;
-            }
-            if ($col_def =~ /is_auto_increment\s*=>\s*(\d+)/) {
-                $column->{is_auto_increment} = $1;
-            }
-            if ($col_def =~ /default_value\s*=>\s*['"]([^'"]+)['"]/) {
-                $column->{default_value} = $1;
-            }
-            
-            $schema->{columns}->{$col_name} = $column;
-        }
-    }
-    
-    # Extract primary keys
-    if ($content =~ /__PACKAGE__->set_primary_key\(([^)]+)\);/) {
-        my $pk_def = $1;
-        while ($pk_def =~ /['"]([^'"]+)['"]/g) {
-            push @{$schema->{primary_keys}}, $1;
-        }
-    }
-    
-    # Extract relationships
-    while ($content =~ /__PACKAGE__->(belongs_to|has_many|might_have|has_one)\(\s*['"]([^'"]+)['"],\s*['"]([^'"]+)['"],\s*\{([^}]+)\}/gs) {
-        my ($rel_type, $accessor, $related_class, $rel_def) = ($1, $2, $3, $4);
-        
-        my $relationship = {
-            type => $rel_type,
-            accessor => $accessor,
-            related_class => $related_class,
-            foreign_key => undef
-        };
-        
-        if ($rel_def =~ /['"]foreign\.([^'"]+)['"]/) {
-            $relationship->{foreign_key} = $1;
-        }
-        
-        push @{$schema->{relationships}}, $relationship;
-    }
-    
-    return $schema;
 }
 
 # Find differences between database and Result file schemas
@@ -2420,6 +2358,100 @@ sub find_schema_differences {
                     description => "Nullable status mismatch for column '$col_name'"
                 };
             }
+
+            # Compare size
+            if (($db_col->{size} || '') ne ($result_col->{size} || '')) {
+                push @differences, {
+                    type => 'column_size_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{size} || 'N/A',
+                    result_value => $result_col->{size} || 'N/A',
+                    description => "Size mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare auto increment
+            if (($db_col->{is_auto_increment} || 0) != ($result_col->{is_auto_increment} || 0)) {
+                push @differences, {
+                    type => 'column_auto_increment_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{is_auto_increment} ? 'YES' : 'NO',
+                    result_value => $result_col->{is_auto_increment} ? 'YES' : 'NO',
+                    description => "Auto-increment mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare default value
+            if (($db_col->{default_value} // '') ne ($result_col->{default_value} // '')) {
+                push @differences, {
+                    type => 'column_default_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{default_value} // 'NULL',
+                    result_value => $result_col->{default_value} // 'NULL',
+                    description => "Default value mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare extra
+            if (($db_col->{extra} || '') ne ($result_col->{extra} || '')) {
+                push @differences, {
+                    type => 'column_extra_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{extra} || 'N/A',
+                    result_value => $result_col->{extra} || 'N/A',
+                    description => "Extra attributes mismatch for column '$col_name'"
+                };
+            }
+        }
+    }
+    
+    # Compare Primary Keys
+    my @db_pks = sort @{$db_schema->{primary_keys} || []};
+    my @result_pks = sort @{$result_schema->{primary_keys} || []};
+    
+    if (join(',', @db_pks) ne join(',', @result_pks)) {
+        push @differences, {
+            type => 'primary_key_mismatch',
+            attribute => 'set_primary_key',
+            database_value => join(', ', @db_pks) || 'None',
+            result_value => join(', ', @result_pks) || 'None',
+            description => "Primary key mismatch"
+        };
+    }
+    
+    # Compare Unique Constraints
+    my %db_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints} || []};
+    my %result_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$result_schema->{unique_constraints} || []};
+    
+    foreach my $name (keys %db_uniques) {
+        if (!exists $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_result',
+                attribute => "add_unique_constraint ($name)",
+                database_value => $db_uniques{$name},
+                result_value => undef,
+                description => "Unique constraint '$name' missing in Result file"
+            };
+        } elsif ($db_uniques{$name} ne $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_mismatch',
+                attribute => "add_unique_constraint ($name)",
+                database_value => $db_uniques{$name},
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' column mismatch"
+            };
+        }
+    }
+    
+    foreach my $name (keys %result_uniques) {
+        if (!exists $db_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_table',
+                attribute => "add_unique_constraint ($name)",
+                database_value => undef,
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' exists in Result file but not in database"
+            };
         }
     }
     
@@ -2547,6 +2579,7 @@ sub get_ency_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef  # Will be parsed from Type if needed
             };
             
@@ -2615,6 +2648,7 @@ sub get_forager_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef  # Will be parsed from Type if needed
             };
             
@@ -2775,21 +2809,22 @@ sub get_result_files {
         if (-d $result_dir) {
             find(sub {
                 return unless -f $_ && /\.pm$/;
-                return if $_ eq 'User.pm' && -d $File::Find::dir . '/User'; # Skip if there's a User directory
+                # Skip helper directories/files if any
+                return if $File::Find::dir =~ /\/Result\/(User|Base|Audit)$/; 
                 
                 my $file_path = $File::Find::name;
                 my $relative_path = $file_path;
                 $relative_path =~ s/^\Q$result_dir\E\/?//;
                 
-                # Skip files in subdirectories for now (like User/User.pm)
-                return if $relative_path =~ /\//;
+                # Extract class name (e.g., Comserv::Model::Schema::Ency::Result::PlanSystemMapping)
+                my $class_rel = $relative_path;
+                $class_rel =~ s/\.pm$//;
+                $class_rel =~ s/\//::/g;
+                my $full_class = "Comserv::Model::Schema::Ency::Result::$class_rel";
                 
-                my $table_name = $_;
-                $table_name =~ s/\.pm$//;
-                
-                my $schema_info = $self->get_result_file_schema($c, $table_name, $file_path);
-                if ($schema_info) {
-                    $result_files->{$schema_info->{table_name} || lc($table_name)} = $schema_info;
+                my $schema_info = $self->get_result_file_schema($c, $full_class, $file_path);
+                if ($schema_info && $schema_info->{table_name}) {
+                    $result_files->{$schema_info->{table_name}} = $schema_info;
                 }
             }, $result_dir);
         }
@@ -2804,14 +2839,14 @@ sub get_result_files {
 
 # Get schema information from a Result file
 sub get_result_file_schema {
-    my ($self, $c, $class_name, $file_path) = @_;
+    my ($self, $c, $file_path) = @_;
     
     my $schema_info = {
         file_path => $file_path,
         columns => {},
         primary_keys => [],
         unique_constraints => [],
-        relationships => [],
+        relationships => {},
         table_name => undef
     };
     
@@ -2820,26 +2855,43 @@ sub get_result_file_schema {
         my $content = read_file($file_path);
         
         # Extract table name
-        if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\)/) {
+        if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
             $schema_info->{table_name} = $1;
         }
         
+        # Capture all __PACKAGE__ calls for display
+        $schema_info->{raw_package_calls} = [];
+        while ($content =~ /(__PACKAGE__->(\w+)\s*\((.*?)\)\s*;)/gs) {
+            push @{$schema_info->{raw_package_calls}}, {
+                full => $1,
+                method => $2,
+                args => $3
+            };
+        }
+        
         # Extract columns
-        if ($content =~ /__PACKAGE__->add_columns\((.*?)\);/s) {
+        if ($content =~ /__PACKAGE__->add_columns\s*\((.*?)\);/s) {
             my $columns_text = $1;
             $schema_info->{columns} = $self->parse_result_file_columns($columns_text);
         }
         
         # Extract primary key
-        if ($content =~ /__PACKAGE__->set_primary_key\((.*?)\)/) {
+        if ($content =~ /__PACKAGE__->set_primary_key\s*\((.*?)\)/s) {
             my $pk_text = $1;
             $pk_text =~ s/['"\s]//g;
             @{$schema_info->{primary_keys}} = split(/,/, $pk_text);
+            
+            # Mark columns as PK in the columns hash
+            foreach my $pk (@{$schema_info->{primary_keys}}) {
+                if ($schema_info->{columns}->{$pk}) {
+                    $schema_info->{columns}->{$pk}->{is_primary_key} = 1;
+                }
+            }
         }
         
         # Extract unique constraints
-        while ($content =~ /__PACKAGE__->add_unique_constraint\(['"]([^'"]+)['"] => \[(.*?)\]\)/g) {
-            my $constraint_name = $1;
+        while ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*(?:['"]([^'"]+)['"]\s*=>\s*)?\[(.*?)\]\s*\)/gs) {
+            my $constraint_name = $1 || 'unnamed';
             my $columns_text = $2;
             $columns_text =~ s/['"\s]//g;
             push @{$schema_info->{unique_constraints}}, {
@@ -2848,29 +2900,32 @@ sub get_result_file_schema {
             };
         }
         
-        # Extract relationships
-        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\(([^)]+)\)/g) {
-            my $relationship_type = $1;
-            my $relationship_text = $2;
+        # Extract relationships (belongs_to, has_many, etc.)
+        # Pattern: __PACKAGE__->rel_type('accessor' => 'Related::Class', 'foreign_key', { options })
+        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\s*\(\s*['"]?(\w+)['"]?\s*=>\s*['"]?([^'",\s\)]+)['"]?\s*(?:,\s*(?:['"]?(\w+)['"]?|\{(.*?)\}))?/gs) {
+            my $type = $1;
+            my $accessor = $2;
+            my $related_class = $3;
+            my $fk_col_or_opt = $4;
             
-            # Parse relationship parameters
-            my @params = split(/,/, $relationship_text);
-            if (@params >= 3) {
-                my $accessor = $params[0];
-                my $related_class = $params[1];
-                my $foreign_key = $params[2];
-                
-                # Clean up the parameters
-                $accessor =~ s/['"\s]//g;
-                $related_class =~ s/['"\s]//g;
-                $foreign_key =~ s/['"\s]//g;
-                
-                push @{$schema_info->{relationships}}, {
-                    type => $relationship_type,
-                    accessor => $accessor,
+            # Handle cases where the 3rd param is a hashref (options)
+            my $fk_col = ($fk_col_or_opt && $fk_col_or_opt !~ /^\{/) ? $fk_col_or_opt : undef;
+            
+            $schema_info->{relationships}->{$accessor} = {
+                type => $type,
+                class => $related_class,
+                column => $fk_col || $accessor # Fallback to accessor name if no FK specified
+            };
+            
+            # Mark the column as a foreign key if we can find it
+            my $target_col = $fk_col || $accessor;
+            if ($schema_info->{columns}->{$target_col}) {
+                $schema_info->{columns}->{$target_col}->{relationship} = {
+                    type => $type,
                     related_class => $related_class,
-                    foreign_key => $foreign_key
+                    accessor => $accessor
                 };
+                $schema_info->{columns}->{$target_col}->{is_foreign_key} = 1;
             }
         }
         
@@ -2883,6 +2938,12 @@ sub get_result_file_schema {
     return $schema_info;
 }
 
+# Legacy wrapper for parse_result_file_schema
+sub parse_result_file_schema {
+    my ($self, $c, $file_path) = @_;
+    return $self->get_result_file_schema($c, $file_path);
+}
+
 # Parse column definitions from Result file
 sub parse_result_file_columns {
     my ($self, $columns_text) = @_;
@@ -2890,27 +2951,42 @@ sub parse_result_file_columns {
     my $columns = {};
     
     # Split by column definitions (looking for column_name => { ... })
-    while ($columns_text =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+    # Using more robust matching for nested structures
+    while ($columns_text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
         my $column_name = $1;
         my $column_def = $2;
         
         my $column_info = {};
         
         # Parse column attributes
-        while ($column_def =~ /(\w+)\s*=>\s*['"]?([^'",\s]+)['"]?/g) {
+        # Handles: attr => 'value', attr => 1, attr => \'SCALAR', attr => { ... }
+        while ($column_def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
             my $attr = $1;
-            my $value = $2;
+            my $value = $2 // $3 // $4 // $5;
             
             if ($attr eq 'size' && $value =~ /^\d+$/) {
                 $column_info->{$attr} = int($value);
             } elsif ($attr eq 'is_nullable' || $attr eq 'is_auto_increment') {
-                $column_info->{$attr} = ($value eq '1' || $value eq 'true') ? 1 : 0;
+                $column_info->{$attr} = ($value eq '1' || $value eq 'true' || $value =~ /true/i) ? 1 : 0;
             } else {
                 $column_info->{$attr} = $value;
             }
         }
         
         $columns->{$column_name} = $column_info;
+    }
+    
+    # Fallback if the above robust regex fails for some reason
+    if (scalar(keys %$columns) == 0) {
+        while ($columns_text =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+            my $column_name = $1;
+            my $column_def = $2;
+            my $column_info = {};
+            while ($column_def =~ /(\w+)\s*=>\s*['"]?([^'",\s]+)['"]?/g) {
+                $column_info->{$1} = $2;
+            }
+            $columns->{$column_name} = $column_info;
+        }
     }
     
     return $columns;
@@ -3814,6 +3890,15 @@ sub update_result_field_from_table {
         # Try array format: "field_name", { ... }
         elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
             $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+            $updated = 1;
+        }
+        # If not found, append it to the columns section
+        else {
+            if ($columns_section =~ /,\s*$/) {
+                $columns_section .= "\n    $field_name => $new_field_def,";
+            } else {
+                $columns_section .= ",\n    $field_name => $new_field_def,";
+            }
             $updated = 1;
         }
         

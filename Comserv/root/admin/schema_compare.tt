@@ -1,4 +1,4 @@
-[% PageVersion = 'admin/schema_compare.tt,v 4.1 2026/01/08 shanta Exp shanta ' %]
+[% PageVersion = 'admin/schema_compare.tt ,v 4.1 2026/01/08 shanta Exp shanta ' %]
 <!-- Schema Comparison Page - CSS loaded by Header.tt wrapper -->
 <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
 
@@ -179,8 +179,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH result_file IN database_comparison.ency.results_without_tables %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-table="[% result_file.actual_table_name | html %]" data-database="ency">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-file-alt"></i>
                                     <h4>[% result_file.result_name | html %] (Result only)</h4>
@@ -190,6 +190,13 @@
                                     <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'ency'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Table
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading result schema...</span>
                                 </div>
                             </div>
                         </div>
@@ -317,8 +324,8 @@
                     </div>
                     <div class="table-group-content">
                     [% FOREACH result_file IN database_comparison.forager.results_without_tables %]
-                        <div class="table-comparison-card">
-                            <div class="table-comparison-header">
+                        <div class="table-comparison-card" data-table="[% result_file.actual_table_name | html %]" data-database="forager">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
                                 <div class="table-comparison-title">
                                     <i class="fas fa-file-alt"></i>
                                     <h4>[% result_file.result_name | html %] (Result only)</h4>
@@ -328,6 +335,13 @@
                                     <button class="create-btn" onclick="createTableFromResult('[% result_file.result_name | html %]', 'forager'); event.stopPropagation();">
                                         <i class="fas fa-plus"></i> Create Table
                                     </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading result schema...</span>
                                 </div>
                             </div>
                         </div>
@@ -414,11 +428,13 @@ function toggleSection(button) {
     
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
+        button.classList.remove('expanded');
         content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
     } else {
         content.classList.add('expanded');
+        button.classList.add('expanded');
         content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
@@ -433,11 +449,13 @@ function toggleTableGroup(header) {
     
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
+        header.classList.remove('expanded');
         content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
     } else {
         content.classList.add('expanded');
+        header.classList.add('expanded');
         content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
@@ -452,12 +470,14 @@ function toggleTableComparison(header) {
     
     if (content.classList.contains('expanded')) {
         content.classList.remove('expanded');
+        header.classList.remove('expanded');
         content.style.display = 'none';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-right');
         card.classList.remove('expanded');
     } else {
         content.classList.add('expanded');
+        header.classList.add('expanded');
         content.style.display = 'block';
         icon.classList.remove('fa-chevron-right');
         icon.classList.add('fa-chevron-down');
@@ -474,6 +494,17 @@ function toggleTableComparison(header) {
 
 // Load field comparison data via AJAX
 function loadFieldComparison(container, tableName, database) {
+    // Check if this is an orphaned result file (no table expected)
+    const card = container.closest('.table-comparison-card');
+    const titleElement = card.querySelector('.table-comparison-title h4');
+    const isOrphanedResult = titleElement && titleElement.textContent.includes('(Result only)');
+    
+    if (isOrphanedResult) {
+        // For orphaned results, skip get_table_schema and go straight to field comparison
+        loadDetailedFieldComparison(container, tableName, database, { columns: {} });
+        return;
+    }
+
     // First try to get the basic table schema (this was working)
     fetch('[% c.uri_for("/admin/get_table_schema") %]', {
         method: 'POST',
@@ -486,8 +517,6 @@ function loadFieldComparison(container, tableName, database) {
     .then(data => {
         if (data.success) {
             // Check if this table has a result file by looking at the card's title
-            const card = container.closest('.table-comparison-card');
-            const titleElement = card.querySelector('.table-comparison-title h4');
             const hasResultFile = titleElement && !titleElement.textContent.includes('(Table only)');
             
             if (hasResultFile) {
@@ -498,17 +527,21 @@ function loadFieldComparison(container, tableName, database) {
                 container.innerHTML = buildTableSchemaHTML(data.schema, tableName, database);
             }
         } else {
-            container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Error loading table schema: ' + (data.error || 'Unknown error') + '</div>';
+            // If get_table_schema fails, it might be because the table is missing
+            // but we might still have a result file. Try detailed comparison anyway.
+            console.log('get_table_schema failed, trying detailed comparison:', data.error);
+            loadDetailedFieldComparison(container, tableName, database, { columns: {} });
         }
     })
     .catch(error => {
-        container.innerHTML = '<div class="error-message"><i class="fas fa-exclamation-triangle"></i> Failed to load table schema. Please try again.</div>';
+        console.log('get_table_schema request failed, trying detailed comparison:', error);
+        loadDetailedFieldComparison(container, tableName, database, { columns: {} });
     });
 }
 
 // Load detailed field comparison (new functionality)
 function loadDetailedFieldComparison(container, tableName, database, tableSchema) {
-    fetch('[% c.uri_for("/admin/get_field_comparison") %]', {
+    fetch('[% c.uri_for("/schema-comparison/get_field_comparison") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -543,6 +576,51 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
     
     let html = '<div class="field-comparison-display">';
     html += '<h5>Field Comparison: ' + tableName + ' (' + database + ')</h5>';
+    
+    // Add high-level differences (PK/Unique)
+    if (comparison.differences && comparison.differences.length > 0) {
+        html += '<div class="schema-differences-summary" style="margin-bottom: 20px; border: 1px solid #ffcccc; border-radius: 8px; overflow: hidden;">';
+        html += '<div style="background: #fff0f0; padding: 10px; border-bottom: 1px solid #ffcccc; font-weight: bold; color: #d32f2f;">';
+        html += '<i class="fas fa-exclamation-circle"></i> Schema-level Differences</div>';
+        html += '<table style="width: 100%; border-collapse: collapse; background: white; font-size: 13px;">';
+        html += '<thead style="background: #fdfdfd; text-align: left;"><tr><th style="padding: 8px;">Attribute</th><th style="padding: 8px;">Table Value</th><th style="padding: 8px;">Result Value</th><th style="padding: 8px;">Actions</th></tr></thead>';
+        html += '<tbody>';
+        
+        comparison.differences.forEach(diff => {
+            html += '<tr style="border-top: 1px solid #eee;">';
+            html += '<td style="padding: 8px;"><strong>' + diff.attribute + '</strong></td>';
+            html += '<td style="padding: 8px;"><code style="background: #f5f5f5; padding: 2px 4px;">' + (diff.table_value || 'None') + '</code></td>';
+            html += '<td style="padding: 8px;"><code style="background: #fff8e1; padding: 2px 4px;">' + (diff.result_value || 'None') + '</code></td>';
+            html += '<td style="padding: 8px;">';
+            
+            if (diff.type === 'primary_key_mismatch') {
+                if (diff.table_value && diff.table_value !== 'None') {
+                    html += '<button class="sync-btn small" style="padding: 4px 8px; font-size: 11px; margin-right: 5px;" onclick="syncPrimaryKeyToResult(\'' + tableName + '\', \'' + database + '\')">';
+                    html += '<i class="fas fa-arrow-right"></i> To Result</button>';
+                }
+                if (diff.result_value && diff.result_value !== 'None') {
+                    html += '<button class="sync-btn small" style="padding: 4px 8px; font-size: 11px;" onclick="syncPrimaryKeyToTable(\'' + tableName + '\', \'' + database + '\')">';
+                    html += '<i class="fas fa-arrow-left"></i> To Table</button>';
+                }
+            } else if (diff.type.includes('unique_constraint')) {
+                const constraintMatch = diff.attribute.match(/\((.*?)\)/);
+                const constraintName = constraintMatch ? constraintMatch[1] : 'unnamed';
+                
+                if (diff.type !== 'unique_constraint_missing_in_table') {
+                    html += '<button class="sync-btn small" style="padding: 4px 8px; font-size: 11px; margin-right: 5px;" onclick="syncUniqueConstraintToResult(\'' + tableName + '\', \'' + database + '\', \'' + constraintName + '\')">';
+                    html += '<i class="fas fa-arrow-right"></i> To Result</button>';
+                }
+                if (diff.type !== 'unique_constraint_missing_in_result') {
+                    html += '<button class="sync-btn small" style="padding: 4px 8px; font-size: 11px;" onclick="syncUniqueConstraintToTable(\'' + tableName + '\', \'' + database + '\', \'' + constraintName + '\')">';
+                    html += '<i class="fas fa-arrow-left"></i> To Table</button>';
+                }
+            }
+            
+            html += '</td></tr>';
+        });
+        
+        html += '</tbody></table></div>';
+    }
     
     // Add debug information only if debug mode is enabled
     if (debugMode) {
@@ -592,7 +670,10 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         html += '<th class="size-column">Size</th>';
         html += '<th class="nullable-column">Nullable</th>';
         html += '<th class="auto-increment-column">Auto Inc</th>';
+        html += '<th class="pk-column">PK</th>';
+        html += '<th class="fk-column">FK</th>';
         html += '<th class="default-column">Default</th>';
+        html += '<th class="extra-column">Extra</th>';
         html += '<th class="actions-column">Actions</th>';
         html += '</tr>';
         html += '</thead>';
@@ -606,7 +687,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             
             // Field header row (spans all columns)
             html += '<tr class="field-header-row">';
-            html += '<td colspan="8" class="field-header">';
+            html += '<td colspan="11" class="field-header">';
             html += '<strong>' + fieldName + '</strong>';
             if (tableMissing) {
                 html += ' <span class="missing-indicator">(Missing in Table)</span>';
@@ -623,7 +704,10 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
                     tableField.is_nullable !== resultField.is_nullable ||
                     tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.default_value !== resultField.default_value
+                    tableField.is_primary_key !== resultField.is_primary_key ||
+                    tableField.is_foreign_key !== resultField.is_foreign_key ||
+                    tableField.default_value !== resultField.default_value ||
+                    tableField.extra !== resultField.extra
                 );
                 
                 html += '<tr class="table-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -635,17 +719,23 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const sizeDiff = !resultMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
                 const nullableDiff = !resultMissing && tableField.is_nullable !== resultField.is_nullable;
                 const autoIncDiff = !resultMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
+                const pkDiff = !resultMissing && tableField.is_primary_key !== resultField.is_primary_key;
+                const fkDiff = !resultMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
                 const defaultDiff = !resultMissing && tableField.default_value !== resultField.default_value;
+                const extraDiff = !resultMissing && tableField.extra !== resultField.extra;
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(tableField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(tableField.data_type, tableField.size) + '</td>';
                 html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_nullable) + '</td>';
                 html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_auto_increment) + '</td>';
+                html += '<td class="pk-column' + (pkDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.is_primary_key) + '</td>';
+                html += '<td class="fk-column' + (fkDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.relationship || tableField.is_foreign_key) + '</td>';
                 html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.default_value) + '</td>';
+                html += '<td class="extra-column' + (extraDiff ? ' field-different' : '') + '">' + formatFieldValue(tableField.extra) + '</td>';
                 html += '<td class="actions-column">';
                 // Add sync to result button if there are differences and result exists
                 if (hasDifferences) {
-                    html += '<button class="sync-to-result-btn" onclick="syncTableToResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<button class="sync-to-result-btn" onclick="syncTableToResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event);">';
                     html += '<i class="fas fa-arrow-right"></i> To Result</button>';
                 }
                 html += '</td>';
@@ -653,19 +743,22 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             } else {
                 html += '<tr class="table-row missing-row">';
                 html += '<td class="source-column"><strong>Table</strong></td>';
-                html += '<td colspan="6" class="missing-field">Field not found in table</td>';
+                html += '<td colspan="9" class="missing-field">Field not found in table</td>';
                 html += '<td class="actions-column"></td>';
                 html += '</tr>';
             }
             
             // Result row
             if (!resultMissing) {
-                const hasDifferences = !tableMissing && (
+                const hasDifferences = tableMissing || (
                     formatDataType(tableField.data_type) !== formatDataType(resultField.data_type) ||
                     formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size) ||
                     tableField.is_nullable !== resultField.is_nullable ||
                     tableField.is_auto_increment !== resultField.is_auto_increment ||
-                    tableField.default_value !== resultField.default_value
+                    tableField.is_primary_key !== resultField.is_primary_key ||
+                    tableField.is_foreign_key !== resultField.is_foreign_key ||
+                    tableField.default_value !== resultField.default_value ||
+                    tableField.extra !== resultField.extra
                 );
                 
                 html += '<tr class="result-row' + (hasDifferences ? ' has-differences' : '') + '">';
@@ -677,17 +770,23 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
                 const sizeDiff = !tableMissing && formatSize(tableField.data_type, tableField.size) !== formatSize(resultField.data_type, resultField.size);
                 const nullableDiff = !tableMissing && tableField.is_nullable !== resultField.is_nullable;
                 const autoIncDiff = !tableMissing && tableField.is_auto_increment !== resultField.is_auto_increment;
+                const pkDiff = !tableMissing && tableField.is_primary_key !== resultField.is_primary_key;
+                const fkDiff = !tableMissing && tableField.is_foreign_key !== resultField.is_foreign_key;
                 const defaultDiff = !tableMissing && tableField.default_value !== resultField.default_value;
+                const extraDiff = !tableMissing && tableField.extra !== resultField.extra;
                 
                 html += '<td class="data-type-column' + (dataTypeDiff ? ' field-different' : '') + '">' + formatDataType(resultField.data_type) + '</td>';
                 html += '<td class="size-column' + (sizeDiff ? ' field-different' : '') + '">' + formatSize(resultField.data_type, resultField.size) + '</td>';
                 html += '<td class="nullable-column' + (nullableDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_nullable) + '</td>';
                 html += '<td class="auto-increment-column' + (autoIncDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_auto_increment) + '</td>';
+                html += '<td class="pk-column' + (pkDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.is_primary_key) + '</td>';
+                html += '<td class="fk-column' + (fkDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.relationship || resultField.is_foreign_key) + '</td>';
                 html += '<td class="default-column' + (defaultDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.default_value) + '</td>';
+                html += '<td class="extra-column' + (extraDiff ? ' field-different' : '') + '">' + formatFieldValue(resultField.extra) + '</td>';
                 html += '<td class="actions-column">';
                 // Add sync to table button if there are differences
                 if (hasDifferences) {
-                    html += '<button class="sync-to-table-btn" onclick="syncResultToTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
+                    html += '<button class="sync-to-table-btn" onclick="syncResultToTable(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\', event);">';
                     html += '<i class="fas fa-arrow-left"></i> To Table</button>';
                 }
                 html += '</td>';
@@ -695,7 +794,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             } else {
                 html += '<tr class="result-row missing-row">';
                 html += '<td class="source-column"><strong>Result</strong></td>';
-                html += '<td colspan="6" class="missing-field">Field not found in result file</td>';
+                html += '<td colspan="9" class="missing-field">Field not found in result file</td>';
                 html += '<td class="actions-column">';
                 if (!tableMissing) {
                     html += '<button class="create-field-btn" onclick="createFieldInResult(\'' + tableName + '\', \'' + database + '\', \'' + fieldName + '\');">';
@@ -706,11 +805,78 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             }
             
             // Add spacing row between fields
-            html += '<tr class="field-spacer"><td colspan="8"></td></tr>';
+            html += '<tr class="field-spacer"><td colspan="11"></td></tr>';
         }
         
         html += '</tbody>';
         html += '</table>';
+        
+        // Add primary key and relationship summaries like in fallback view
+        if (comparison && (comparison.primary_keys || comparison.unique_constraints || comparison.relationships || comparison.raw_package_calls)) {
+            html += '<div class="schema-metadata-summary" style="margin-top: 15px; padding: 15px; background: var(--secondary-color, #f9f9f9); border-radius: 6px; border-left: 4px solid var(--primary-color, #ccffff);">';
+            html += '<h6 style="margin-top: 0; color: #000000;"><i class="fas fa-info-circle"></i> Schema Metadata (__PACKAGE__)</h6>';
+            
+            // Primary Keys
+            if (comparison.primary_keys) {
+                const tablePKs = comparison.primary_keys.table || [];
+                const resultPKs = comparison.primary_keys.result || [];
+                
+                html += '<div style="margin-bottom: 8px; color: #000000;"><strong>Primary Keys:</strong><br>';
+                html += '<span style="display: inline-block; width: 60px;">Table:</span> ';
+                html += tablePKs.length > 0 ? '<span class="prop primary">' + tablePKs.join('</span>, <span class="prop primary">') + '</span>' : '<em>None</em>';
+                html += '<br><span style="display: inline-block; width: 60px;">Result:</span> ';
+                html += resultPKs.length > 0 ? '<span class="prop primary">' + resultPKs.join('</span>, <span class="prop primary">') + '</span>' : '<em>None</em>';
+                html += '</div>';
+            }
+            
+            // Unique Constraints
+            if (comparison.unique_constraints && (comparison.unique_constraints.table.length > 0 || comparison.unique_constraints.result.length > 0)) {
+                html += '<div style="margin-top: 10px; color: #000000;"><strong>Unique Constraints:</strong><br>';
+                
+                const showUniques = (uniques, label) => {
+                    html += '<span style="display: inline-block; width: 60px;">' + label + ':</span> ';
+                    if (uniques && uniques.length > 0) {
+                        uniques.forEach(u => {
+                            html += '<span class="prop unique" title="' + u.name + '">' + (u.name || 'unnamed') + ' ([' + u.columns.join(', ') + '])</span> ';
+                        });
+                    } else {
+                        html += '<em>None</em>';
+                    }
+                    html += '<br>';
+                };
+                
+                showUniques(comparison.unique_constraints.table, 'Table');
+                showUniques(comparison.unique_constraints.result, 'Result');
+                html += '</div>';
+            }
+            
+            if (comparison.relationships && Object.keys(comparison.relationships).length > 0) {
+                html += '<div style="margin-top: 10px; color: #000000;"><strong>Relationships:</strong><ul style="margin: 5px 0 0 20px; padding: 0;">';
+                for (var rel_name in comparison.relationships) {
+                    var rel = comparison.relationships[rel_name];
+                    var shortClass = (rel.class || 'N/A').split('::').pop();
+                    html += '<li style="margin-bottom: 5px; color: #000000;">';
+                    html += '<span class="relationship-tag" title="' + rel.type + ': ' + rel.class + '">';
+                    html += '<i class="fas fa-link"></i> <strong>' + rel_name + '</strong> (' + rel.type + ') → ' + shortClass;
+                    if (rel.column) {
+                        html += ' <small>on ' + rel.column + '</small>';
+                    }
+                    html += '</span></li>';
+                }
+                html += '</ul></div>';
+            }
+
+            if (comparison.raw_package_calls && comparison.raw_package_calls.length > 0) {
+                html += '<div style="margin-top: 10px; color: #000000;"><strong>Raw __PACKAGE__ Calls:</strong><pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: #333;">';
+                comparison.raw_package_calls.forEach(function(call) {
+                    if (call.method !== 'add_columns' && call.method !== 'table') { // Skip very verbose ones already shown
+                        html += call.full + '\n';
+                    }
+                });
+                html += '</pre></div>';
+            }
+            html += '</div>';
+        }
         
         // Add action buttons
         html += '<div class="field-actions">';
@@ -723,6 +889,104 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
     } else {
         html += '<p>No field information available.</p>';
     }
+    
+    // Add Detailed Metadata Comparison
+    html += '<div class="metadata-comparison" style="margin-top: 30px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
+    html += '<div style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">';
+    html += '<i class="fas fa-file-code"></i> Result File Package Metadata Comparison</div>';
+    html += '<div style="padding: 15px;">';
+    html += '<p style="font-size: 13px; color: #666; margin-bottom: 15px;">Comparison of <code>__PACKAGE__</code> calls in the Result file vs database schema.</p>';
+    
+    html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+    html += '<thead style="background: #fdfdfd; text-align: left;"><tr><th style="padding: 8px; border-bottom: 2px solid #eee;">Method</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Database State</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Result File Content</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Status</th></tr></thead>';
+    html += '<tbody>';
+    
+    // Table name comparison
+    const dbTableName = tableName;
+    const resultTableName = comparison.package_table;
+    const tableNameMatch = dbTableName === resultTableName;
+    html += '<tr style="border-bottom: 1px solid #eee;">';
+    html += '<td style="padding: 8px;"><code>table</code></td>';
+    html += '<td style="padding: 8px;">' + dbTableName + '</td>';
+    html += '<td style="padding: 8px;">' + (resultTableName || '<span style="color:red">Missing</span>') + '</td>';
+    html += '<td style="padding: 8px;">' + (tableNameMatch ? '<span style="color:green"><i class="fas fa-check"></i> Match</span>' : '<span style="color:red"><i class="fas fa-times"></i> Mismatch</span>') + '</td>';
+    html += '<td style="padding: 8px;">';
+    if (!tableNameMatch) {
+        html += '<button class="sync-field-btn sync-to-result" onclick="syncMetadataToResult(\'' + tableName + '\', \'' + database + '\', \'table\', \'' + dbTableName + '\')" title="Update __PACKAGE__->table in Result file">';
+        html += '<i class="fas fa-file-export"></i> To Result</button>';
+    }
+    html += '</td>';
+    html += '</tr>';
+    
+    // Primary Key comparison
+    const dbPKs = (comparison.primary_keys.table || []).join(', ');
+    const resultPKs = (comparison.primary_keys.result || []).join(', ');
+    const pksMatch = dbPKs === resultPKs;
+    html += '<tr style="border-bottom: 1px solid #eee;">';
+    html += '<td style="padding: 8px;"><code>set_primary_key</code></td>';
+    html += '<td style="padding: 8px;">' + (dbPKs || 'None') + '</td>';
+    html += '<td style="padding: 8px;">' + (resultPKs || 'None') + '</td>';
+    html += '<td style="padding: 8px;">' + (pksMatch ? '<span style="color:green"><i class="fas fa-check"></i> Match</span>' : '<span style="color:red"><i class="fas fa-times"></i> Mismatch</span>') + '</td>';
+    html += '<td style="padding: 8px;">';
+    if (!pksMatch) {
+        html += '<button class="sync-field-btn sync-to-result" onclick="syncMetadataToResult(\'' + tableName + '\', \'' + database + '\', \'primary_key\', \'' + dbPKs + '\')" title="Update set_primary_key in Result file">';
+        html += '<i class="fas fa-file-export"></i> To Result</button> ';
+        html += '<button class="sync-field-btn sync-to-table" onclick="syncMetadataToTable(\'' + tableName + '\', \'' + database + '\', \'primary_key\', \'' + resultPKs + '\')" title="Update primary key in Database">';
+        html += '<i class="fas fa-database"></i> To Table</button>';
+    }
+    html += '</td>';
+    html += '</tr>';
+    
+    // Unique Constraints summary
+    const dbUniques = (comparison.unique_constraints.table || []);
+    const resultUniques = (comparison.unique_constraints.result || []);
+    
+    // Create a map of unique constraints for easier comparison
+    const dbUniquesMap = {};
+    dbUniques.forEach(u => dbUniquesMap[u.name || 'unnamed'] = u.columns.sort().join(','));
+    const resultUniquesMap = {};
+    resultUniques.forEach(u => resultUniquesMap[u.name || 'unnamed'] = u.columns.sort().join(','));
+    
+    // Get all unique names
+    const allUniqueNames = new Set([...Object.keys(dbUniquesMap), ...Object.keys(resultUniquesMap)]);
+    
+    allUniqueNames.forEach(name => {
+        const dbCols = dbUniquesMap[name];
+        const resultCols = resultUniquesMap[name];
+        const match = dbCols === resultCols;
+        
+        if (!match) {
+            html += '<tr style="border-bottom: 1px solid #eee;">';
+            html += '<td style="padding: 8px;"><code>add_unique_constraint</code> (' + name + ')</td>';
+            html += '<td style="padding: 8px;">' + (dbCols || '<span style="color:red">Missing</span>') + '</td>';
+            html += '<td style="padding: 8px;">' + (resultCols || '<span style="color:red">Missing</span>') + '</td>';
+            html += '<td style="padding: 8px;"><span style="color:red"><i class="fas fa-times"></i> Mismatch</span></td>';
+            html += '<td style="padding: 8px;">';
+            
+            if (dbCols) {
+                html += '<button class="sync-field-btn sync-to-result" onclick="syncMetadataToResult(\'' + tableName + '\', \'' + database + '\', \'unique_constraint\', \'\', \'' + name + '\')" title="Add/Update unique constraint in Result file">';
+                html += '<i class="fas fa-file-export"></i> To Result</button> ';
+            }
+            if (resultCols) {
+                html += '<button class="sync-field-btn sync-to-table" onclick="syncMetadataToTable(\'' + tableName + '\', \'' + database + '\', \'unique_constraint\', \'\', \'' + name + '\')" title="Add/Update unique constraint in Database">';
+                html += '<i class="fas fa-database"></i> To Table</button>';
+            }
+            
+            html += '</td>';
+            html += '</tr>';
+        }
+    });
+    
+    if (allUniqueNames.size === 0 || Array.from(allUniqueNames).every(name => dbUniquesMap[name] === resultUniquesMap[name])) {
+        html += '<tr style="border-bottom: 1px solid #eee;">';
+        html += '<td style="padding: 8px;"><code>add_unique_constraint</code></td>';
+        html += '<td colspan="2" style="padding: 8px; text-align: center; color: #666;">All unique constraints match</td>';
+        html += '<td style="padding: 8px;"><span style="color:green"><i class="fas fa-check"></i> Match</span></td>';
+        html += '<td style="padding: 8px;"></td>';
+        html += '</tr>';
+    }
+    
+    html += '</tbody></table></div></div>';
     
     html += '</div>';
     return html;
@@ -741,8 +1005,11 @@ function buildTableSchemaHTML(schema, tableName, database) {
         html += '<th>Data Type</th>';
         html += '<th>Size</th>';
         html += '<th>Nullable</th>';
-        html += '<th>Default</th>';
         html += '<th>Auto Increment</th>';
+        html += '<th>PK</th>';
+        html += '<th>FK</th>';
+        html += '<th>Default</th>';
+        html += '<th>Extra</th>';
         html += '</tr>';
         html += '</thead>';
         html += '<tbody>';
@@ -753,8 +1020,11 @@ function buildTableSchemaHTML(schema, tableName, database) {
             html += '<td>' + (columnInfo.data_type || 'N/A') + '</td>';
             html += '<td>' + (columnInfo.size || 'N/A') + '</td>';
             html += '<td>' + (columnInfo.is_nullable ? 'YES' : 'NO') + '</td>';
-            html += '<td>' + (columnInfo.default_value || 'NULL') + '</td>';
             html += '<td>' + (columnInfo.is_auto_increment ? 'YES' : 'NO') + '</td>';
+            html += '<td>' + (columnInfo.is_primary_key ? 'YES' : '') + '</td>';
+            html += '<td>' + formatFieldValue(columnInfo.relationship || columnInfo.is_foreign_key) + '</td>';
+            html += '<td>' + (columnInfo.default_value || 'NULL') + '</td>';
+            html += '<td>' + (columnInfo.extra || 'N/A') + '</td>';
             html += '</tr>';
         }
         
@@ -795,18 +1065,30 @@ function formatPropertyName(prop) {
         'is_nullable': 'Nullable',
         'default_value': 'Default Value',
         'is_auto_increment': 'Auto Increment',
-        'is_primary_key': 'Primary Key'
+        'is_primary_key': 'Primary Key',
+        'extra': 'Extra'
     };
     return names[prop] || prop;
 }
 
 // Format field values for display
+// Format field values for display
 function formatFieldValue(value) {
     if (value === null || value === undefined) {
         return '<em>NULL</em>';
     }
+    if (typeof value === 'object' && value.type && value.accessor) {
+        const shortClass = value.related_class.split('::').pop();
+        return '<span class="relationship-tag" title="' + value.type + ': ' + value.related_class + '"><i class="fas fa-link"></i> ' + value.accessor + ' → ' + shortClass + '</span>';
+    }
     if (typeof value === 'boolean') {
         return value ? 'YES' : 'NO';
+    }
+    if (value === 1 || value === '1') {
+        return 'YES';
+    }
+    if (value === 0 || value === '0') {
+        return 'NO';
     }
     if (value === '') {
         return '<em>Empty</em>';
@@ -995,6 +1277,98 @@ function createTableFromResult(resultName, database) {
     });
 }
 
+// Sync metadata to result file
+function syncMetadataToResult(tableName, database, attribute, value, constraintName) {
+    if (!confirm('Are you sure you want to update ' + attribute + (constraintName ? ' (' + constraintName + ')' : '') + ' in the Result file to match the Table?')) {
+        return;
+    }
+    
+    let url = '';
+    const body = { 
+        table_name: tableName, 
+        database: database 
+    };
+    
+    if (attribute === 'table') {
+        url = '[% c.uri_for("/schema-comparison/sync_table_name_to_result") %]';
+    } else if (attribute === 'primary_key') {
+        url = '[% c.uri_for("/schema-comparison/sync_primary_key_to_result") %]';
+    } else if (attribute === 'unique_constraint') {
+        url = '[% c.uri_for("/schema-comparison/sync_unique_constraint_to_result") %]';
+        body.constraint_name = constraintName;
+    }
+    
+    if (!url) {
+        alert('Unknown attribute: ' + attribute);
+        return;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Metadata updated in Result file successfully!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error updating Result file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to update Result file. Please try again.');
+    });
+}
+
+// Sync metadata to table
+function syncMetadataToTable(tableName, database, attribute, value, constraintName) {
+    if (!confirm('Are you sure you want to update ' + attribute + (constraintName ? ' (' + constraintName + ')' : '') + ' in the Table to match the Result file?')) {
+        return;
+    }
+    
+    let url = '';
+    const body = { 
+        table_name: tableName, 
+        database: database 
+    };
+    
+    if (attribute === 'primary_key') {
+        url = '[% c.uri_for("/schema-comparison/sync_primary_key_to_table") %]';
+    } else if (attribute === 'unique_constraint') {
+        url = '[% c.uri_for("/schema-comparison/sync_unique_constraint_to_table") %]';
+        body.constraint_name = constraintName;
+    }
+    
+    if (!url) {
+        alert('Sync to table not supported for attribute: ' + attribute);
+        return;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Table schema updated successfully!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error updating Table: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to update Table. Please try again.');
+    });
+}
+
 // Create result from table
 function createResultFromTable(tableName, database) {
     console.log('createResultFromTable called with:', { tableName, database });
@@ -1049,16 +1423,19 @@ function createResultFromTable(tableName, database) {
 }
 
 // Sync table field to result file
-function syncTableToResult(tableName, database, fieldName) {
+function syncTableToResult(tableName, database, fieldName, event) {
     if (!confirm('Are you sure you want to sync table field "' + fieldName + '" to the result file?')) {
         return;
     }
     
     // Show loading state
-    const button = event.target;
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    button.disabled = true;
+    const button = event ? event.currentTarget : null;
+    let originalText = '';
+    if (button) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.disabled = true;
+    }
     
     fetch('[% c.uri_for("/schema-comparison/sync_table_to_result") %]', {
         method: 'POST',
@@ -1073,8 +1450,10 @@ function syncTableToResult(tableName, database, fieldName) {
     })
     .then(response => response.json())
     .then(data => {
-        button.innerHTML = originalText;
-        button.disabled = false;
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
         
         if (data.success) {
             alert('Field synchronized successfully from table to result!');
@@ -1085,23 +1464,28 @@ function syncTableToResult(tableName, database, fieldName) {
         }
     })
     .catch(error => {
-        button.innerHTML = originalText;
-        button.disabled = false;
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
         alert('Failed to synchronize field. Please try again.');
     });
 }
 
 // Sync result field to table
-function syncResultToTable(tableName, database, fieldName) {
+function syncResultToTable(tableName, database, fieldName, event) {
     if (!confirm('Are you sure you want to sync result field "' + fieldName + '" to the table? This will modify the database schema.')) {
         return;
     }
     
     // Show loading state
-    const button = event.target;
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    button.disabled = true;
+    const button = event ? event.currentTarget : null;
+    let originalText = '';
+    if (button) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.disabled = true;
+    }
     
     fetch('[% c.uri_for("/schema-comparison/sync_result_to_table") %]', {
         method: 'POST',
@@ -1116,8 +1500,10 @@ function syncResultToTable(tableName, database, fieldName) {
     })
     .then(response => response.json())
     .then(data => {
-        button.innerHTML = originalText;
-        button.disabled = false;
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
         
         if (data.success) {
             alert('Field synchronized successfully from result to table!');
@@ -1128,8 +1514,10 @@ function syncResultToTable(tableName, database, fieldName) {
         }
     })
     .catch(error => {
-        button.innerHTML = originalText;
-        button.disabled = false;
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
         alert('Failed to synchronize field. Please try again.');
     });
 }
@@ -1152,8 +1540,137 @@ function parseDataType(dataType) {
 
 // Format data type for display (base type only)
 function formatDataType(dataType) {
+    if (!dataType) return 'N/A';
     const parsed = parseDataType(dataType);
-    return parsed.baseType;
+    let base = parsed.baseType.toLowerCase();
+    
+    // Normalize types to match backend logic
+    const mapping = {
+        'int': 'integer',
+        'int4': 'integer',
+        'tinyint': 'boolean',
+        'bool': 'boolean'
+    };
+    
+    return mapping[base] || base;
+}
+
+// Create field in result file (alias for syncTableToResult)
+function createFieldInResult(tableName, database, fieldName) {
+    if (!confirm('Are you sure you want to add field "' + fieldName + '" to the result file?')) {
+        return;
+    }
+    syncTableToResult(tableName, database, fieldName);
+}
+
+// Sync primary key to result
+function syncPrimaryKeyToResult(tableName, database) {
+    if (!confirm('Are you sure you want to sync the primary key from table to result file?')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/schema-comparison/sync_primary_key_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Primary key synchronized successfully!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error syncing primary key: ' + data.error);
+        }
+    })
+    .catch(error => alert('Failed to sync primary key: ' + error));
+}
+
+// Sync primary key from result to table
+function syncPrimaryKeyToTable(tableName, database) {
+    if (!confirm('Sync primary key from Result file to database table? This will execute an ALTER TABLE command.')) return;
+    
+    fetch('[% c.uri_for("/schema-comparison/sync_primary_key_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Primary key synced successfully from result to table!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error syncing primary key: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => alert('Failed to sync primary key.'));
+}
+
+// Sync unique constraint from result to table
+function syncUniqueConstraintToTable(tableName, database, constraintName) {
+    if (!confirm('Sync unique constraint "' + constraintName + '" from Result file to database table? This will execute an ALTER TABLE command.')) return;
+    
+    fetch('[% c.uri_for("/schema-comparison/sync_unique_constraint_to_table") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database,
+            constraint_name: constraintName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Unique constraint synced successfully from result to table!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error syncing unique constraint: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => alert('Failed to sync unique constraint.'));
+}
+
+// Sync unique constraint to result
+function syncUniqueConstraintToResult(tableName, database, constraintName) {
+    if (!confirm('Are you sure you want to sync unique constraint "' + constraintName + '" to result file?')) {
+        return;
+    }
+    
+    fetch('[% c.uri_for("/schema-comparison/sync_unique_constraint_to_result") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            table_name: tableName,
+            database: database,
+            constraint_name: constraintName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Unique constraint synchronized successfully!');
+            refreshFieldComparison(tableName, database);
+        } else {
+            alert('Error syncing unique constraint: ' + data.error);
+        }
+    })
+    .catch(error => alert('Failed to sync unique constraint: ' + error));
 }
 
 // Format size for display, combining explicit size with parsed size

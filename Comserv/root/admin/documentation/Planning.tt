@@ -1,73 +1,128 @@
-[% META title = 'Priority Todos - Blocking Dependencies'
-   description = 'Critical priority tasks blocking development progress, ordered by dependency chain. Includes Architecture Migration Phase 2, DailyPlan System, Project IDs, Theme Sync, and Fix updateprompt.pl API Logging. All sections collapsible for improved readability.'
-   roles = 'admin,developer'
-   TemplateType = 'PriorityList'
-   category = 'todo,priority,blocking'
-   page_version = '0.25'
-   last_updated = '2026-01-26'
+[%# Define all version, date, and path variables in one place here %]
+[% version = '0.40' %]
+[% date_iso = '2026/02/01' %]
+[% formatted_date = 'February 01, 2026' %]
+[% time = '13:05:00' %]
+[% change_log = 'Added Step 5 (Migration & Cleanup) and Step 6 (Data Integrity & Cascade Logic) to ToDo System Update Plan.' %]
+[%# Determine file path for metadata %]
+[% file_path = 'admin/documentation/Planning.tt' %]
+
+
+[% META title = 'Application planning - '
+description = 'Critical priority tasks blocking development progress, ordered by dependency chain. Includes Architecture Migration Phase 2, DailyPlan System, Project IDs, Theme Sync, Fix updateprompt.pl API Logging, and ToDo System Update Plan. All sections collapsible for improved readability.'
+roles = 'admin,developer'
+TemplateType = 'PriorityList'
+category = 'todo,priority,blocking'
+page_version = '0.34'
+last_updated = '2026/02/01'
 %]
-[% PageVersion = 'admin/documentation/Planning.tt ,v 0.25 2026/01/26 07:45:00 Standardized layout and reordered. Included todo/day.tt.' %]
+
+[% PageVersion = file_path _ ' ,v ' _ version _ ' ' _ date_iso _ ' ' _ time _ ' ' _ change_log %]
+
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion %]
 [% END %]
 
 <style>
-    /* Ensure all jump targets land with enough space above the container title */
+    /* Force visibility of content when details is open */
+    details[open] > .priority-content,
+    details[open] > .section-content,
+    details[open] > .jump-links-container {
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 10px !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    /* Ultra-compact horizontal jump links */
+    .jump-links-container {
+        padding: 8px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.9em;
+        line-height: 1.6;
+    }
+
+    /* Status styling classes */
+    .status-pending { color: #dc3545; font-weight: bold; background: #f8d7da; padding: 2px 6px; border-radius: 3px; }
+    .status-in-progress { color: #856404; font-weight: bold; background: #fff3cd; padding: 2px 6px; border-radius: 3px; }
+    .status-completed { color: #155724; font-weight: bold; background: #d4edda; padding: 2px 6px; border-radius: 3px; }
+    .jump-line {
+        margin-bottom: 4px;
+    }
+    .jump-line:last-child {
+        margin-bottom: 0;
+    }
+    .jump-link {
+        color: #0056b3;
+        text-decoration: none;
+        padding: 0 4px;
+        white-space: nowrap;
+    }
+    .jump-link:hover {
+        text-decoration: underline;
+        background: #e9ecef;
+    }
+
+    /* Navigation Anchors - strictly for positioning jump targets */
     .nav-anchor {
         display: block;
         position: relative;
         visibility: hidden;
-        scroll-margin-top: 180px !important;
+        scroll-margin-top: 140px; /* Leave container header exposed */
+    }
+
+    /* Target highlight for containers when jump link is used */
+    .priority-container:target, .doc-section:target, .priority-group-container:target {
+        border: 2px solid #007bff;
+        box-shadow: 0 0 10px rgba(0,123,255,0.2);
     }
 </style>
 
 <div class="container">
-    <h1>Priority Todos - Blocking Dependencies</h1>
+    <h1>Planning </h1>
 
     <div class="row">
         <div class="col-12">
             <!-- Priority Todos Quick Navigation Menu -->
-            <details class="nav-jump">
-                <summary>🎯 Quick Jump to Priority (Click to Expand)</summary>
+            <details class="nav-jump" open>
+                <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
-                    <div class="jump-group">
-                        <h6>🏗️ Architecture & Infra</h6>
-                        <div class="jump-links">
-                            <a href="#priority-11" class="jump-link">Arch Phase 2</a>
-                            <a href="#priority-4" class="jump-link">Refactor Master Plan</a>
-                            <a href="#priority-schema-system" class="jump-link">Schema System Plan</a>
-                            <a href="#priority-19" class="jump-link">API Logging Fix</a>
-                            <a href="#priority-3" class="jump-link">Update Format</a>
-                        </div>
+                    <div class="jump-line">
+                        <strong>🏗️ Arch</strong>: 
+                        <a href="#anchor-priority-11" class="jump-link">Phase 2</a> |
+                        <a href="#anchor-priority-4" class="jump-link">Plan</a> |
+                        <a href="#anchor-priority-schema" class="jump-link">Schema</a> |
+                        <a href="#anchor-priority-19" class="jump-link">API Log</a> |
+                        <a href="#anchor-priority-3" class="jump-link">Format</a>
                     </div>
-                    <div class="jump-group">
-                        <h6>📅 Daily & Dynamic</h6>
-                        <div class="jump-links">
-                            <a href="#dynamic-daily" class="jump-link">Dynamic Daily View</a>
-                            <a href="#priority-12" class="jump-link">DailyPlan Sync</a>
-                            <a href="#priority-5" class="jump-link">DailyPlan Flag</a>
-                            <a href="#priority-6" class="jump-link">Integrate Priority</a>
-                        </div>
+                    <div class="jump-line">
+                        <strong>📅 Daily</strong>:
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">Improvements</a> |
+                        <a href="#anchor-dynamic-daily" class="jump-link">View</a> |
+                        <a href="#anchor-priority-12" class="jump-link">Sync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">Flag</a> |
+                        <a href="#anchor-priority-6" class="jump-link">Integrate</a> |
+                        <a href="#anchor-todo-plan" class="jump-link">Todo</a>
                     </div>
-                    <div class="jump-group">
-                        <h6>🔄 Sync & Standards</h6>
-                        <div class="jump-links">
-                            <a href="#priority-16" class="jump-link">Project IDs</a>
-                            <a href="#priority-zencoder-efficiency" class="jump-link">Zencoder Efficiency</a>
-                            <a href="#priority-17" class="jump-link">Theme Sync</a>
-                            <a href="#priority-18" class="jump-link">Doc Cleanup</a>
-                            <a href="#priority-9" class="jump-link">Auto-Sync Test</a>
-                        </div>
+                    <div class="jump-line">
+                        <strong>🔄 Sync</strong>: 
+                        <a href="#anchor-priority-16" class="jump-link">IDs</a> |
+                        <a href="#anchor-priority-efficiency" class="jump-link">Efficiency</a> |
+                        <a href="#anchor-priority-17" class="jump-link">Themes</a> |
+                        <a href="#anchor-priority-18" class="jump-link">Cleanup</a> |
+                        <a href="#anchor-priority-9" class="jump-link">Auto-Sync</a>
                     </div>
-                    <div class="jump-group">
-                        <h6>🛠️ Maintenance</h6>
-                        <div class="jump-links">
-                            <a href="#cleanup-todos" class="jump-link">Cleanup Outdated</a>
-                            <a href="#priority-improvement" class="jump-link">Layout Improve</a>
-                            <a href="#priority-10" class="jump-link">Archive Docs</a>
-                            <a href="#priority-8" class="jump-link">API Docs</a>
-                            <a href="#priority-7" class="jump-link">Agent Example</a>
-                        </div>
+                    <div class="jump-line">
+                        <strong>🛠️ Maint</strong>: 
+                        <a href="#anchor-cleanup" class="jump-link">Cleanup</a> |
+                        <a href="#anchor-improvement" class="jump-link">Layout</a> |
+                        <a href="#anchor-priority-10" class="jump-link">Archive</a> |
+                        <a href="#anchor-priority-8" class="jump-link">API Docs</a> |
+                        <a href="#anchor-priority-7" class="jump-link">Agent Ex</a>
                     </div>
                 </div>
             </details>
@@ -75,775 +130,492 @@
     </div>
 
     <div class="doc-metadata">
-        <p><strong>File:</strong> /Documentation/PriorityTodos</p>
-        <p><strong>Date:</strong> January 26, 2026</p>
-        <p><strong>Author:</strong> System Documentation</p>
-        <p><strong>Status:</strong> Active - Priority Task Management</p>
+        <p><strong>File:</strong> [% file_path %] | <strong>Updated:</strong> [% formatted_date %]</p>
+
     </div>
 
-    <details class="overview-section">
+    <details id="overview" class="overview-section">
         <summary>📋 Overview</summary>
         <div class="section-content">
-            <p>This document lists priority todos that are blocking critical development progress. Tasks are ordered by their blocking dependencies - resolve items higher on the list first to unblock lower items.</p>
-            <p><strong>Key Features:</strong></p>
-            <ul>
-                <li>Dependency-ordered priority list</li>
-                <li>Dynamic Daily Task integration via todo/day.tt</li>
-                <li>Structured project metadata and tracking</li>
-                <li>Action buttons for IDE agent integration</li>
-            </ul>
+            <p>This document lists priority todos that are blocking development. <a href="#planning">View Priority List</a>.</p>
         </div>
     </details>
 
-    <a id="dynamic-daily" class="nav-anchor"></a>
-    <div class="doc-section">
+    <div id="anchor-dynamic-daily" class="nav-anchor"></div>
+    <div id="dynamic-daily" class="doc-section">
         <h2>Dynamic Daily Tasks</h2>
         <div class="dynamic-container">
             [% INCLUDE 'todo/day.tt' %]
         </div>
     </div>
 
-    <div class="doc-section">
-        <h2>Priority Todo List</h2>
+    <div id="planning" class="doc-section">
+        <h2>Planning lists</h2>
 
         <!-- Group 1: Architecture & Infrastructure -->
-        <a id="group-arch" class="nav-anchor"></a>
-        <h3 class="group-header">🏗️ Architecture & Infrastructure</h3>
+        <div id="group-arch" class="priority-group-container">
+            <h3 class="group-header">🏗️ Architecture & Infrastructure</h3>
 
-        <a id="priority-11" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Architecture Migration Phase 2 (Migration Strategy)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Architecture Phase 2 | Owner: Dev Team | Target: Q1 2026</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/ArchitectureMigrationPhase2">ArchitectureMigrationPhase2.tt</a> | <a href="/todo/addtodo?project_id=arch-phase2">Create Task</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Task List:</strong></p>
+            <div id="anchor-priority-11" class="nav-anchor"></div>
+            <details id="priority-11" class="priority-container">
+                <summary class="priority-summary">Architecture Migration Phase 2 (Migration Strategy)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span> | <strong>Blockers:</strong> <a href="#priority-19">API Logging Fix</a></p>
                     <ul>
                         <li>Finalize schema migration scripts for Phase 2.</li>
-                        <li>Update model classes to reflect architectural changes.</li>
-                        <li>Implement backward compatibility layer for legacy components.</li>
                     </ul>
                 </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Move core application components to the new architecture. This involves refactoring several critical controllers and models to improve scalability and maintainability.</p>
-                </div>
-                <div class="status-row">
-                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span> | <strong>Priority:</strong> HIGH - Critical Path</p>
-                </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-19">API Logging Fix</a> | Schema Migration completion</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-11')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-11')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('11')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-4" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Refactor Master Plan Coordination</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Master Plan Coordination | Phase: 0.35 | Ref: <a href="/Documentation/MasterPlanCoordination">MasterPlanCoordination.tt</a></p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/MasterPlanCoordination">Coordination Dashboard</a> | <a href="/admin/documentation/PriorityTodos">Priority Todos</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Implement Coordination Architecture Principle (Master Plan = Coordinator Only).</li>
-                        <li>Extract detailed content to individual plan files.</li>
-                        <li>Update priority matrix and dependency mappings.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Refactor the Master Plan to act as a high-level coordinator rather than a detailed task list, ensuring scalability and readability as plans grow.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-4" class="nav-anchor"></div>
+            <details id="priority-4" class="priority-container">
+                <summary class="priority-summary">Refactor Master Plan Coordination</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-4')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-4')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('4')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-schema-system" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Schema System | Database Sync | Target: Stability</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/admin/schema_compare">Schema Comparison</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Task List:</strong></p>
-                    <ul>
-                        <li>Add tick box to sync individual attributes.</li>
-                        <li>Add ability to edit an attribute.</li>
-                        <li>Fix add attribute missing field bug.</li>
-                        <li>Fix Schema Metadata comparison sync buttons.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Complete restoration and enhancement of the bidirectional schema synchronization system.</p>
-                </div>
-                <div class="status-row">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL - Core Functionality</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('schema-system-plan')">Create Todo from Text</button>
-                </div>
-            </div>
-        </details>
-
-        <a id="priority-19" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">🤖 Fix updateprompt.pl API Logging (AI Persistence)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> AI Chat System | Persistence Layer | Target: Stability</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/AI">AI Documentation</a> | <a href="/api/ai/conversations">AI Conversations API</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Investigate AiConversation and AiMessage create() failure.</li>
-                        <li>Verify mandatory guest user (ID: 199) existence.</li>
-                        <li>Check session_id and conversation_id passing in payload.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Resolve the functional gap where updateprompt.pl fails to save messages to the AI Chat system due to database recording blockers.</p>
-                </div>
-                <div class="status-row">
-                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
-                </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="/Documentation/AI#database-blocker">Database Blocker</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-19')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-19')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('19')">Add to Database</button>
-                </div>
-            </div>
-        </details>
-
-        <a id="priority-3" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Update Format & Multi-Plan Support</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Todo API v2 | Format Support | Cross-Referencing</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/Api">API Docs</a> | <a href="/todo/list">Todo List</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Update Todo API for multi-plan support.</li>
-                        <li>Support Markdown vs Template Toolkit formats.</li>
-                        <li>Enable plan cross-referencing.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Update the Todo system to handle multiple plans concurrently and allow for different documentation formats.</p>
-                </div>
-                <div class="status-row">
-                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
-                </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-3')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-3')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('3')">Add to Database</button>
-                </div>
-            </div>
-        </details>
-
-        <!-- Group 2: Daily & Dynamic Tasks -->
-        <a id="group-daily" class="nav-anchor"></a>
-        <h3 class="group-header">📅 Daily & Dynamic Tasks</h3>
-
-        <a id="priority-12" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">DailyPlan (Synchronization)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Daily Workflow | Sync Engine | User ID: [% c.user.id || 'N/A' %]</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/DailyPlan">Daily Plan Doc</a> | <a href="/todo/day">Daily View</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Sync daily priorities with database todos.</li>
-                        <li>Implement automated daily status reporting.</li>
-                        <li>Verify user-specific view filtering.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Ensure the Daily Plan documentation stays synchronized with the actual database todos for the current user and date.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-schema" class="nav-anchor"></div>
+            <details id="priority-schema-system" class="priority-container">
+                <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-16">Project IDs Sync</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-12')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-12')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('12')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-5" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">DailyPlan Flag System</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Workflow Automation | System Flags | Logic Gate</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/SystemSettings">System Settings</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Implement 'DailyPlanActive' flag in system configuration.</li>
-                        <li>Integrate flag checks in daily task automation scripts.</li>
-                        <li>Provide UI toggle for administrators.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Implementation of a system flag to control and monitor the status of the Daily Plan automation pipeline.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-19" class="nav-anchor"></div>
+            <details id="priority-19" class="priority-container">
+                <summary class="priority-summary">🤖 Fix updateprompt.pl API Logging</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-5')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-5')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('5')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-6" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Integrate PriorityTodo into DailyPlan</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Integration Layer | UI/UX | Workflow Streamlining</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/DailyPlan">Daily Plan</a> | <a href="/todo/day">Today's View</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Display blocking dependencies directly in the Daily Plan view.</li>
-                        <li>Implement 'Quick Resolve' buttons for priority items.</li>
-                        <li>Update documentation templates to include priority containers.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Bridge the gap between static priority documentation and the dynamic daily workflow by embedding priority items into the Daily Plan.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-3" class="nav-anchor"></div>
+            <details id="priority-3" class="priority-container">
+                <summary class="priority-summary">Update Format & Multi-Plan Support</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-improvement">Layout Improvement</a></p>
+            </details>
+        </div>
+
+        <!-- Group 2: DailyPlan UI/UX Improvement Plan -->
+        <div id="group-daily" class="priority-group-container">
+            <h3 class="group-header">📅 DailyPlan UI/UX Improvement Plan</h3>
+
+            <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
+            <details id="dailyplan-improvements" class="priority-container">
+                <summary class="priority-summary">🚨 TOP PRIORITY: DailyPlan UI/UX Improvements (HIGH PRIORITY)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p>Comprehensive improvement plan to enhance DailyPlan.tt user experience and functionality.</p>
+
+                    <h4>Visual Design Enhancements (MEDIUM)</h4>
+                    <ul>
+                        <li>Mobile responsiveness improvements</li>
+                        <li>Accessibility enhancements (WCAG AA)</li>
+                        <li>Visual hierarchy improvements</li>
+                        <li>Icon font replacements</li>
+                        <li>Progress bars and charts</li>
+                    </ul>
+
+                    <h4>Navigation & Flow Optimization (HIGH)</h4>
+                    <ul>
+                        <li><a href="#daily-plan-guide" onclick="switchTab(event, 'daily-plan-guide'); return false;">Tab consolidation</a> (merge related tabs)</li>
+                        <li>Progressive disclosure implementation</li>
+                        <li>Search/filter functionality</li>
+                        <li>Contextual actions and tooltips</li>
+                        <li>Quick start summary</li>
+                    </ul>
+
+                    <h4>Planning System Functional Enhancements (HIGH)</h4>
+                    <ul>
+                        <li>Real-time API-driven updates</li>
+                        <li>Visual status tracking with persistence</li>
+                        <li>Automated sync integration</li>
+                        <li>Collaboration features</li>
+                        <li>Metrics dashboard</li>
+                    </ul>
+
+                    <h4>Tab Consolidation & Content Merging (MEDIUM, IN PROGRESS)</h4>
+                    <ul>
+                        <li>Merge TODOS & WORKFLOW + MONTH VIEW into PLANNING tab</li>
+                        <li>Move planning system migration details to sub-section</li>
+                        <li>Update navigation anchors and jump links</li>
+                    </ul>
+
+                    <p><em>Drill-down to detailed specifications:</em> <a href="#daily-plan-guide" onclick="switchTab(event, 'daily-plan-guide'); return false;">DAILY PLAN GUIDE tab</a></p>
                 </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-6')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-6')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('6')">Add to Database</button>
+            </details>
+
+            <div id="anchor-priority-12" class="nav-anchor"></div>
+            <details id="priority-12" class="priority-container">
+                <summary class="priority-summary">DailyPlan (Synchronization)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                    <p>Implement synchronization between DailyPlan components and master plan data.</p>
                 </div>
-            </div>
-        </details>
+            </details>
+
+            <div id="anchor-priority-5" class="nav-anchor"></div>
+            <details id="priority-5" class="priority-container">
+                <summary class="priority-summary">DailyPlan Flag (Priority Flag)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                </div>
+            </details>
+
+            <div id="anchor-priority-6" class="nav-anchor"></div>
+            <details id="priority-6" class="priority-container">
+                <summary class="priority-summary">Integrate Priority (Dynamic Tasks)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                </div>
+            </details>
+        </div>
 
         <!-- Group 3: Synchronization & Standards -->
-        <a id="group-sync" class="nav-anchor"></a>
-        <h3 class="group-header">🔄 Synchronization & Standards</h3>
+        <div id="group-sync" class="priority-group-container">
+            <h3 class="group-header">🔄 Synchronization & Standards</h3>
 
-        <a id="priority-16" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Project IDs (Synchronization)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Data Integrity | Unique Identifiers | Cross-System Sync</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/project/list">Project List</a> | <a href="/admin/system/ids">ID Management</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Standardize Project ID format across documentation and database.</li>
-                        <li>Update legacy projects with new ID mapping.</li>
-                        <li>Implement automated ID validation in project creation forms.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Ensure all projects are correctly identified and synchronized across the entire system, preventing data fragmentation.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-16" class="nav-anchor"></div>
+            <details id="priority-16" class="priority-container">
+                <summary class="priority-summary">Project IDs (Synchronization)</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-16')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-16')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('16')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-zencoder-efficiency" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">🚀 Zencoder Efficiency Improvements</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Efficiency | Agent Workflow</p>
+            <div id="anchor-priority-efficiency" class="nav-anchor"></div>
+            <details id="priority-zencoder-efficiency" class="priority-container">
+                <summary class="priority-summary">🚀 Zencoder Efficiency Improvements</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p>Improve efficiency in the Zencoder system with optimizations and updates.</p>
                 </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">Zencoder Guide</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Task List:</strong></p>
-                    <ul>
-                        <li>Batch Processing: Stop editing one thing at a time.</li>
-                        <li>Update Prompt Compliance: Adhere to bilateral protocol.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Critical workflow improvements to reduce resource waste and improve agent throughput.</p>
-                </div>
-                <div class="status-row">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> HIGH - Efficiency</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('zencoder-efficiency-details')">Create Todo from Text</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-17" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">🔄 Theme Sync (Synchronization)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> UI Consistency | Branding | Theme Engine</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/B3ThemeHandlingAuditReport">Audit Report</a> | <a href="/admin/themes">Theme Config</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Synchronize theme configuration in DocumentationConfig.json.</li>
-                        <li>Update site controllers with correct theme mappings.</li>
-                        <li>Verify CSS variable compliance across all themes.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Audit and synchronize theme handling across all site documentation to ensure a consistent visual experience.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-17" class="nav-anchor"></div>
+            <details id="priority-17" class="priority-container">
+                <summary class="priority-summary">🔄 Theme Sync (Synchronization)</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="/Documentation/B3ThemeHandlingAuditReport">Theme Audit</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-17')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-17')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('17')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-18" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">🔄 Doc Cleanup (Documentation Cleanup)</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Standards Compliance | PascalCase | Directory Structure</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/DocumentationSystemComprehensive">Documentation Standards</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Scan for non-PascalCase filenames in root/Documentation.</li>
-                        <li>Remove redundant or duplicate documentation files.</li>
-                        <li>Fix internal cross-document links.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Comprehensive cleanup of documentation to ensure standard compliance and remove legacy clutter.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-18" class="nav-anchor"></div>
+            <details id="priority-18" class="priority-container">
+                <summary class="priority-summary">🔄 Doc Cleanup (Documentation Cleanup)</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> Legacy Archive completion</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-18')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-18')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('18')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-9" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Auto-Sync Test System</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Automated Testing | Synchronization | CI/CD Integration</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/admin/system/test">System Test Panel</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Develop test suite for auto-sync verification.</li>
-                        <li>Implement 'Test Sync' trigger in admin panel.</li>
-                        <li>Log sync discrepancies to system audit trail.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Automated testing system to ensure that todos and documentation stay in sync without manual intervention.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-9" class="nav-anchor"></div>
+            <details id="priority-9" class="priority-container">
+                <summary class="priority-summary">Auto-Sync Test System</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-3">Multi-Plan Support</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-9')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-9')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('9')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
+        </div>
 
         <!-- Group 4: Maintenance & Improvements -->
-        <a id="group-maint" class="nav-anchor"></a>
-        <h3 class="group-header">🛠️ Maintenance & Improvements</h3>
+        <div id="group-maint" class="priority-group-container">
+            <h3 class="group-header">🛠️ Maintenance & Improvements</h3>
 
-        <a id="cleanup-todos" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Cleanup Outdated Todos</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> System Maintenance | Database Hygiene</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/todo/list">Todo List</a> | <a href="/todo/day">Daily View</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Identify todos older than 6 months with no activity.</li>
-                        <li>Archive completed or cancelled tasks to legacy tables.</li>
-                        <li>Update status of 'Stale' items to 'Deferred'.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Comprehensive cleanup of outdated todos and system files to maintain database performance and task relevance.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-cleanup" class="nav-anchor"></div>
+            <details id="cleanup-todos" class="priority-container">
+                <summary class="priority-summary">Cleanup Outdated Todos</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('cleanup-todos')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('cleanup-todos')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('cleanup')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-improvement" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Priority Todos Layout Improvement</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Documentation UX | Template Refactor | Zencoder Integration</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/PriorityTodos">Priority Todos Doc</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Standardize priority containers across documentation.</li>
-                        <li>Integrate dynamic daily view (todo/day.tt).</li>
-                        <li>Implement action buttons for IDE agent workflow.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Improve the layout and tracking capabilities of the Priority Todos documentation for better developer experience.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-improvement" class="nav-anchor"></div>
+            <details id="priority-improvement" class="priority-container">
+                <summary class="priority-summary">Priority Todos Layout Improvement</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-improvement')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-improvement')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('improvement')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-10" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Archive Documentation Cleanup</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Maintenance | Storage Optimization | Legacy Management</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/Archive">Documentation Archive</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Move completed tasks to CompletedTasks.tt archive.</li>
-                        <li>Compress or delete obsolete planning documents.</li>
-                        <li>Update archive index and search functionality.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Optimize documentation storage by properly archiving completed initiatives and removing obsolete files.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-10" class="nav-anchor"></div>
+            <details id="priority-10" class="priority-container">
+                <summary class="priority-summary">Archive Documentation Cleanup</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> None</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-10')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-10')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('10')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-8" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">API & Documentation Update</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> API Lifecycle | Developer Tools | Documentation Sync</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/Api">API Reference</a> | <a href="/api/v1/swagger">Swagger UI</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Update API documentation to reflect v2 changes.</li>
-                        <li>Implement automated Swagger/OpenAPI doc generation.</li>
-                        <li>Verify all endpoints are correctly documented and tested.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Keep application APIs and their corresponding documentation synchronized and up-to-date for external and internal use.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-8" class="nav-anchor"></div>
+            <details id="priority-8" class="priority-container">
+                <summary class="priority-summary">API & Documentation Update</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-3">Format Support</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-8')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-8')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('8')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
 
-        <a id="priority-7" class="nav-anchor"></a>
-        <details class="priority-container">
-            <summary class="priority-summary">Master Plan Agent Example</summary>
-            <div class="priority-content">
-                <div class="metadata-row">
-                    <p><strong>Project Metadata:</strong> Agent Training | Documentation Examples | Workflow Guide</p>
-                </div>
-                <div class="links-row">
-                    <p><strong>Project Links:</strong> <a href="/Documentation/DailyWorkflowTutorial">Workflow Tutorial</a></p>
-                </div>
-                <div class="tasks-row">
-                    <p><strong>Tasks:</strong></p>
-                    <ul>
-                        <li>Create a teaching example for agents using the Phase 2 migration.</li>
-                        <li>Document step-by-step resolution of a priority item.</li>
-                        <li>Verify agent compliance with coordination architecture rules.</li>
-                    </ul>
-                </div>
-                <div class="description-row">
-                    <p><strong>Description:</strong> Provide clear, executable examples for AI agents to follow when interacting with the Master Plan and Todo systems.</p>
-                </div>
-                <div class="status-row">
+            <div id="anchor-priority-7" class="nav-anchor"></div>
+            <details id="priority-7" class="priority-container">
+                <summary class="priority-summary">Master Plan Agent Example</summary>
+                <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
-                <div class="blockers-row">
-                    <p><strong>Blockers:</strong> <a href="#priority-11">Arch Phase 2 Strategy</a></p>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-primary" onclick="createTodoFromText('priority-7')">Create Todo from Text</button>
-                    <button class="btn btn-info" onclick="logTime('priority-7')">Log Time</button>
-                    <button class="btn btn-secondary" onclick="addTodoToDatabase('7')">Add to Database</button>
-                </div>
-            </div>
-        </details>
+            </details>
+        </div>
 
+        <!-- Group 5: ToDo System Update Plan -->
+        <div id="group-todo" class="priority-group-container">
+            <h3 class="group-header">📝 ToDo System Update Plan</h3>
+
+            <div id="anchor-todo-plan" class="nav-anchor"></div>
+            <details id="todo-update-plan" class="priority-container" open>
+                <summary class="priority-summary">🚀 ToDo System Comprehensive Update</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                    <p>Comprehensive plan to update the ToDo system, focusing on performance, schema stability, and integration with the DailyPlan system using a multi-interval time tracking strategy.</p>
+
+                    <h4>Key Objectives</h4>
+                    <ul>
+                        <li><strong>Performance Audit</strong>: Review <code>Todo.pm</code> controller and model for optimization opportunities.</li>
+                        <li><strong>Logic Optimization</strong>: Enhance task fetching and filtering logic (ref: <code>day.tt</code>).</li>
+                        <li><strong>Schema Refinement</strong>: Transition to normalized time tracking with <code>todo_interval</code>.</li>
+                    </ul>
+
+                    <h4>Step 1: Schema & Data Model (Core Infrastructure)</h4>
+                    <ul>
+                        <li><strong>Task 1.1: Core <code>todo</code> Table Refinement</strong>
+                            <ul>
+                                <li><strong>Action</strong>: Maintain existing fields for backward compatibility but plan for deprecation of <code>time_of_day</code> and <code>scheduled_date</code> in favor of the intervals table.</li>
+                                <li><strong>Files</strong>: <code>Ency::Result::Todo.pm</code></li>
+                            </ul>
+                        </li>
+                        <li><strong>Task 1.2: Implement <code>todo_interval</code> Table</strong>
+                            <ul>
+                                <li><strong>Proven Strategy</strong>: Mirror the structure of the existing <code>log</code> table (which uses <code>start_time</code>, <code>end_time</code>, and <code>time</code>) to maintain system consistency.</li>
+                                <li><strong>Fields</strong>: 
+                                    <ul>
+                                        <li><code>id</code> (INT, PK, AI)</li>
+                                        <li><code>todo_id</code> (INT, FK to <code>todo.record_id</code>)</li>
+                                        <li><code>start_date</code> (DATE)</li>
+                                        <li><code>start_time</code> (TIME)</li>
+                                        <li><code>end_date</code> (DATE)</li>
+                                        <li><code>end_time</code> (TIME)</li>
+                                        <li><code>interval_type</code> (ENUM: 'planned', 'actual') - <em>Optional: allows unifying planning and logging.</em></li>
+                                        <li><code>status</code> (ENUM: 'scheduled', 'completed', 'canceled')</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Pros</strong>: Supports multiple non-contiguous work blocks for a single task; leverages existing logic patterns from the Log system.</li>
+                                <li><strong>Action</strong>: Create <code>Ency::Result::TodoInterval.pm</code>.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Task 1.3: Define Relationships</strong>
+                            <ul>
+                                <li><strong>Todo -> TodoInterval</strong>: <code>has_many</code> relationship in <code>Todo.pm</code>.</li>
+                                <li><strong>TodoInterval -> Todo</strong>: <code>belongs_to</code> relationship in <code>TodoInterval.pm</code>.</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Step 2: Add/Edit Form Enhancements</h4>
+                    <ul>
+                        <li><strong>Implementation</strong>: Modify forms to handle dynamic interval creation.</li>
+                        <li><strong>Files</strong>:
+                            <ul>
+                                <li><strong>addtodo.tt</strong>: Update to include <code>start_time</code> and <code>end_time</code> fields. Plan for a "Add another interval" button (JS-driven).</li>
+                                <li><strong>edit.tt</strong>: Add a "Time Intervals" section to list, edit, and delete associated intervals for the todo item.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Controller (Todo.pm)</strong>:
+                            <ul>
+                                <li>Update <code>create</code> action to populate <code>todo_interval</code> table alongside <code>todo</code>.</li>
+                                <li>Update <code>update</code> action to synchronize intervals (Add/Edit/Delete).</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Step 3: Fluid Scheduling Logic (Day/Week Views)</h4>
+                    <ul>
+                        <li><strong>Day View (day.tt)</strong>:
+                            <ul>
+                                <li><strong>Implementation</strong>: Join <code>todo</code> with <code>todo_interval</code>. Render tasks in the schedule grid for EVERY interval they occupy.</li>
+                                <li><strong>Dynamic Availability</strong>: Calculate free windows by identifying gaps between <code>todo_interval</code> records across all tasks for the selected day.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Week View (week.tt)</strong>:
+                            <ul>
+                                <li><strong>Implementation</strong>: Similar multi-interval rendering. Ensure tasks spanning multiple days via intervals are correctly reflected.</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Step 4: Sequential Dependency Logic</h4>
+                    <ul>
+                        <li><strong>Validation</strong>: In <code>Todo.pm</code> (or <code>TodoInterval.pm</code>), implement logic to prevent a task interval from being scheduled before its dependent predecessors are either completed or have earlier intervals.</li>
+                        <li><strong>Construction Example</strong>:
+                            <ol>
+                                <li>Dig Hole (Step 1)</li>
+                                <li>Lay Forms (Step 2 - Dependent on Step 1)</li>
+                            </ol>
+                            <em>If 'Lay Forms' is scheduled at 10 AM, 'Dig Hole' MUST have an interval ending before 10 AM.</em>
+                        </li>
+                    </ul>
+
+                    <h4>Step 5: Migration & Cleanup Plan</h4>
+                    <ul>
+                        <li><strong>Migration Script</strong>: Create a data migration script to populate <code>todo_interval</code> for all existing tasks.
+                            <ul>
+                                <li>Map <code>start_date</code> and <code>due_date</code> to new interval records.</li>
+                                <li>Assign default <code>start_time</code> (09:00) and <code>end_time</code> (10:00) for records where <code>time_of_day</code> is empty.</li>
+                                <li>Handle records with existing <code>time_of_day</code> by mapping it to <code>start_time</code>.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Deprecation & Removal</strong>: 
+                            <ul>
+                                <li>Once migration is verified, surgically remove <code>scheduled_date</code> and <code>time_of_day</code> columns from the <code>todo</code> table.</li>
+                                <li>Update all legacy code references to use <code>todo_interval</code>.</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Step 6: Data Integrity & Cascade Logic</h4>
+                    <ul>
+                        <li><strong>Interval Cascading</strong>: Ensure <code>todo_interval</code> records are automatically deleted via <code>ON DELETE CASCADE</code> when their parent <code>todo</code> is removed.</li>
+                        <li><strong>Project-to-Task Relationship</strong>:
+                            <ul>
+                                <li><strong>Current State</strong>: Project deletion triggers hard-deletion of all todos (<code>cascade_delete => 1</code>).</li>
+                                <li><strong>Improvement</strong>: Transition projects to a "soft-delete" or "archived" status to preserve historical task data and time tracking intervals.</li>
+                                <li><strong>Dependency Safety</strong>: Prevent deletion of tasks that are currently "blocking" other active tasks until dependencies are resolved or reassigned.</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Summary of Files to Modify/Create</h4>
+                    <ul>
+                        <li><strong>Controller</strong>: <code>Comserv/lib/Comserv/Controller/Todo.pm</code></li>
+                        <li><strong>Models</strong>: <code>Ency/Result/Todo.pm</code>, <code>Ency/Result/TodoDependency.pm</code>, <code>Ency/Result/TodoInterval.pm</code> (NEW)</li>
+                        <li><strong>Templates</strong>:
+                            <code>root/todo/addtodo.tt</code>,
+                            <code>root/todo/edit.tt</code>,
+                            <code>root/todo/day.tt</code>,
+                            <code>root/todo/week.tt</code>
+                        </li>
+                    </ul>
+
+                    <h4>Related Documentation (from RepositoryCodeAudit.json)</h4>
+                    <ul>
+                        <li><a href="/Documentation/TodoSystemComprehensive" target="_blank">Todo System Comprehensive</a></li>
+                        <li><a href="/Documentation/Todo" target="_blank">Todo Controller Documentation</a></li>
+                        <li><a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync" target="_blank">API & Master Plan Sync</a></li>
+                        <li><a href="/Documentation/DailyPlanSystem" target="_blank">Daily Plan System</a></li>
+                        <li><a href="/Documentation/TodoSystemDocumentation" target="_blank">2025-01-20 Todo System Documentation</a></li>
+                    </ul>
+
+                    <h4>System Integrations (Dependencies & Context)</h4>
+                    <ul>
+                        <li><strong>Planning</strong>: <a href="/Documentation/Planning" target="_blank">Planning.tt</a> (This file)</li>
+                        <li><strong>Projects</strong>: <a href="/Documentation/ProjectManagementSystem" target="_blank">Project Management System</a></li>
+                        <li><strong>Logs</strong>: <code>Log.pm Controller</code></li>
+                        <li><strong>AI Integration</strong>: <a href="/Documentation/AiConfiguration" target="_blank">AiConfiguration.tt</a></li>
+                        <li><strong>Master Plan Coordination</strong>: <a href="/Documentation/MasterPlanCoordination" target="_blank">MasterPlanCoordination.tt</a></li>
+                    </ul>
+                </div>
+            </details>
+        </div>
     </div>
 
-    <!-- Additional Sections -->
-    <div class="doc-section">
+    <div id="advanced-usage" class="doc-section">
         <h2>Advanced Usage</h2>
-        <div class="info-box">
-            <p>For bulk operations or automation:</p>
-            <ul>
-                <li>Use the API endpoints programmatically from IDE agents.</li>
-                <li>Integrate with build scripts or CI/CD pipelines.</li>
-                <li>Monitor progress via database queries.</li>
-            </ul>
-        </div>
+        <p>Use the API endpoints programmatically.</p>
     </div>
 
-    <div class="doc-section">
+    <div id="troubleshooting" class="doc-section">
         <h2>Troubleshooting</h2>
-        <div class="warning-box">
-            <h4>Common Issues</h4>
-            <ul>
-                <li><strong>API returns 401:</strong> Check token validity and Authorization header format.</li>
-                <li><strong>Table missing:</strong> Run schema migration to create required tables.</li>
-                <li><strong>Dev-only error:</strong> Ensure using comserv_server.pl, not Starman production.</li>
-                <li><strong>Schema blocker:</strong> Resolve schema issues before proceeding with Phase 2.</li>
-            </ul>
-        </div>
+        <p><strong>API returns 401:</strong> Check token validity.</p>
     </div>
 
-    <div class="doc-section">
-        <h2>Configuration Table</h2>
-        <table class="config-table">
-            <thead>
-                <tr>
-                    <th>Setting</th>
-                    <th>Value</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>API Base URL</td>
-                    <td><code>http://localhost:3000/api</code></td>
-                    <td>Development server endpoint</td>
-                </tr>
-                <tr>
-                    <td>Token Expiration</td>
-                    <td>30 days default</td>
-                    <td>Configurable via API</td>
-                </tr>
-                <tr>
-                    <td>Database Table</td>
-                    <td><code>api_tokens</code></td>
-                    <td>Required for token storage</td>
-                </tr>
-                <tr>
-                    <td>Role Required</td>
-                    <td><code>admin/developer</code></td>
-                    <td>For API access</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="doc-section">
+    <div id="see-also" class="doc-section">
         <h2>See Also</h2>
-        <div class="success-box">
-            <ul>
-                <li><a href="/Documentation/ImplementationPlanTodoApiAndMasterPlanSync">Implementation Plan - Full Details</a></li>
-                <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
-                <li><a href="/Documentation/Api">API Documentation</a></li>
-                <li><a href="/Documentation/MasterPlanCoordination">Master Plan Coordination</a></li>
-            </ul>
-        </div>
+        <ul>
+            <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
+        </ul>
     </div>
 
     <div class="footer">
-        <p><em>Last updated: January 26, 2026. This document auto-updates as todos are added to the database.</em></p>
+        <p><em>Last updated: [% formatted_date %].</em></p>
     </div>
 </div>
 
 <script>
-    // Automatically open the targeted <details> container when navigating via anchor
     function openTargetDetails() {
         const hash = window.location.hash;
-        if (hash) {
+        if (!hash) return;
+        
+        try {
             const target = document.querySelector(hash);
-            if (target) {
-                // If the target is an anchor, look for the next details element
-                let details = target.tagName === 'DETAILS' ? target : target.nextElementSibling;
-                // Skip other anchors or hidden elements if necessary
-                while (details && details.tagName !== 'DETAILS' && (details.classList.contains('nav-anchor') || details.nodeType === 3)) {
-                    details = details.nextElementSibling;
-                }
-                
-                if (details && details.tagName === 'DETAILS') {
-                    details.open = true;
+            if (!target) return;
+            
+            // If we are inside a tabbed interface (like DailyPlan.tt), ensure our tab is active
+            let tabContent = target.closest('.tab-content');
+            if (tabContent && !tabContent.classList.contains('active')) {
+                if (typeof switchTab === 'function') {
+                    switchTab(null, tabContent.id);
+                } else {
+                    tabContent.classList.add('active');
                 }
             }
+
+            // If target is a nav-anchor, we want to open the container immediately following it
+            let container = target;
+            if (target.classList.contains('nav-anchor')) {
+                container = target.nextElementSibling;
+            }
+            
+            if (!container) return;
+
+            // If the container is a details element or inside one
+            let details = container.tagName.toUpperCase() === 'DETAILS' ? container : container.closest('details');
+            
+            // If still not found, check if it's a div containing a details
+            if (!details && container.tagName.toUpperCase() === 'DIV') {
+                details = container.querySelector('details');
+            }
+            
+            if (details) {
+                details.open = true;
+                // Recursive open if nested
+                let parent = details.parentElement.closest('details');
+                while (parent) {
+                    parent.open = true;
+                    parent = parent.parentElement.closest('details');
+                }
+            }
+            
+            // Smooth scroll to the container (not the hidden anchor)
+            // The scroll-margin-top handles the offset
+            setTimeout(() => {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+
+        } catch (e) {
+            console.error("Error navigating to hash:", e);
         }
     }
 
-    // Run on load and on hash change
+    // Handle all hash links (including absolute paths with hashes)
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a[href*="#"]');
+        if (link) {
+            const url = new URL(link.href, window.location.origin);
+            if (url.pathname === window.location.pathname) {
+                // Give time for browser to update hash
+                setTimeout(openTargetDetails, 50);
+            }
+        }
+    });
+
     window.addEventListener('load', openTargetDetails);
     window.addEventListener('hashchange', openTargetDetails);
 </script>

@@ -2,11 +2,12 @@ package Comserv::Model::Log;
 use Moose;
 use namespace::autoclean;
 use Data::Dumper; # Import Data::Dumper for debugging
+use Scalar::Util 'blessed';
 use Comserv::Util::Logging;
 has 'record_id' => (is => 'rw', isa => 'Str');
 has 'priority' => (is => 'rw', isa => 'HashRef');
 has 'status' => (is => 'rw', isa => 'HashRef');
-BEGIN { extends 'Catalyst::Controller'; }
+BEGIN { extends 'Catalyst::Model'; }
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -59,7 +60,6 @@ sub modify {
     my $log_record = $c->model('DBEncy')->resultset('Log')->find($log_id);
 
     # Log the input parameters for debugging
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'Input log record: ' . Dumper($log_record));
     $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'New values: ' . Dumper($new_values));
 
     # Ensure $log_record is a blessed object
@@ -73,9 +73,6 @@ sub modify {
         # Update the corresponding field in the log record
         $log_record->$key($value);
     }
-
-    # Log the updated log record for debugging
-    $self->logging->log_with_details($c, __FILE__, __LINE__, 'modify', 'Updated log record: ' . Dumper($log_record));
 
     # Save the updated log record
     $log_record->update;
