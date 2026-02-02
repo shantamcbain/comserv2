@@ -7,7 +7,7 @@
    page_version = "0.003"
    last_updated = "2026-01-17"
 %]
-[% PageVersion = 'Documentaton/DailyPlanSystem.tt,v 0.05 2026/01/17 02:15:00 Reorganized Phase 1: Result files first (DailyPlan.pm, DailyPlanProject.pm), update Todo.pm, then browser-based schema system. Removed script references. Added API token blocker note. Tasks managed via browser until API configured.' %]
+[% PageVersion = 'Documentaton/DailyPlanSystem.tt, v 0.05 2026/01/17 02:15:00 Reorganized Phase 1: Result files first (DailyPlan.pm, DailyPlanProject.pm), update Todo.pm, then browser-based schema system. Removed script references. Added API token blocker note. Tasks managed via browser until API configured.' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]

@@ -124,42 +124,98 @@
                                 </div>
                             </div>
                             
-                            <!-- Result File Details -->
-                            <div class="result-file-details" style="display: none;">
-                                [% IF result_file.fields %]
+                                <div class="result-file-details" style="display: none;">
+                                [% IF result_file.columns %]
                                     <div class="field-preview">
                                         <h4>Field Structure Preview</h4>
                                         <div class="field-preview-grid">
                                             <div class="field-preview-header">
                                                 <div class="field-header">Field Name</div>
-                                                <div class="field-header">Suggested Type</div>
-                                                <div class="field-header">Properties</div>
-                                                <div class="field-header">Sample Data</div>
+                                                <div class="field-header">Type</div>
+                                                <div class="field-header">Size</div>
+                                                <div class="field-header">PK</div>
+                                                <div class="field-header">FK</div>
+                                                <div class="field-header">Nullable</div>
+                                                <div class="field-header">Auto Inc</div>
+                                                <div class="field-header">Default</div>
                                             </div>
-                                            [% FOREACH field IN result_file.fields %]
+                                            [% FOREACH col_name IN result_file.columns.keys.sort %]
+                                                [% SET col = result_file.columns.$col_name %]
                                                 <div class="field-preview-row">
                                                     <div class="field-name">
                                                         <i class="fas fa-columns"></i>
-                                                        [% field.name | html %]
+                                                        [% col_name | html %]
                                                     </div>
                                                     <div class="field-type">
-                                                        [% field.suggested_type | html %]
+                                                        [% col.data_type | html %]
                                                     </div>
-                                                    <div class="field-properties">
-                                                        [% IF field.nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]
-                                                        [% IF field.max_length %]<span class="prop">Max: [% field.max_length %]</span>[% END %]
-                                                        [% IF field.is_primary_key %]<span class="prop primary">PRIMARY</span>[% END %]
+                                                    <div class="field-size">
+                                                        [% col.size || 'N/A' %]
                                                     </div>
-                                                    <div class="field-sample">
-                                                        [% IF field.sample_data %]
-                                                            <code>[% field.sample_data | html | truncate(50) %]</code>
-                                                        [% ELSE %]
-                                                            <span class="no-sample">No sample data</span>
+                                                    <div class="field-pk">
+                                                        [% IF col.is_primary_key %]<span class="prop primary">YES</span>[% END %]
+                                                    </div>
+                                                    <div class="field-fk">
+                                                        [% IF col.relationship %]
+                                                            <span class="relationship-tag" title="[% col.relationship.type %]: [% col.relationship.related_class %]">
+                                                                <i class="fas fa-link"></i> [% col.relationship.accessor %] → [% col.relationship.related_class.split('::').last %]
+                                                            </span>
+                                                        [% ELSIF col.is_foreign_key %]
+                                                            <span class="prop foreign">YES</span>
                                                         [% END %]
+                                                    </div>
+                                                    <div class="field-nullable">
+                                                        [% IF col.is_nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]
+                                                        [% IF col.max_length %]<span class="prop">Max: [% col.max_length %]</span>[% END %]
+                                                    </div>
+                                                    <div class="field-auto-inc">
+                                                        [% IF col.is_auto_increment %]<span class="prop">YES</span>[% END %]
+                                                    </div>
+                                                    <div class="field-default">
+                                                        <code>[% col.default_value || 'NULL' %]</code>
                                                     </div>
                                                 </div>
                                             [% END %]
                                         </div>
+                                    </div>
+                                [% END %]
+
+                                <!-- Metadata Summary (__PACKAGE__) -->
+                                [% IF result_file.primary_keys.size > 0 || result_file.relationships.size > 0 || result_file.raw_package_calls.size > 0 %]
+                                    <div class="schema-metadata-summary" style="margin-top: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border-left: 4px solid #ccffff; color: #000000;">
+                                        <h4 style="margin-top: 0; color: #000000; font-size: 14px;"><i class="fas fa-info-circle"></i> Result File Metadata (__PACKAGE__)</h4>
+                                        
+                                        [% IF result_file.primary_keys.size > 0 %]
+                                            <div style="margin-bottom: 8px;">
+                                                <strong>Primary Keys:</strong> 
+                                                [% FOREACH pk IN result_file.primary_keys %]
+                                                    <span class="prop primary">[% pk %]</span>
+                                                [% END %]
+                                            </div>
+                                        [% END %]
+                                        
+                                        [% IF result_file.relationships.size > 0 %]
+                                            <div style="margin-bottom: 8px;">
+                                                <strong>Relationships:</strong>
+                                                <ul style="margin: 5px 0 0 20px; padding: 0;">
+                                                    [% FOREACH rel_name IN result_file.relationships.keys %]
+                                                        [% SET rel = result_file.relationships.$rel_name %]
+                                                        <li style="margin-bottom: 3px;">
+                                                            <span class="relationship-tag">
+                                                                <i class="fas fa-link"></i> <strong>[% rel_name %]</strong> ([% rel.type %]) → [% rel.class.split('::').last %]
+                                                            </span>
+                                                        </li>
+                                                    [% END %]
+                                                </ul>
+                                            </div>
+                                        [% END %]
+
+                                        [% IF result_file.raw_package_calls.size > 0 %]
+                                            <div style="margin-top: 10px;">
+                                                <strong>Raw __PACKAGE__ Calls:</strong>
+                                                <pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: #333; border: 1px solid #ccc;">[% FOREACH call IN result_file.raw_package_calls %][% IF call.method != 'add_columns' && call.method != 'table' %][% call.full | html %][% "\n" %][% END %][% END %]</pre>
+                                            </div>
+                                        [% END %]
                                     </div>
                                 [% END %]
                             </div>
@@ -294,16 +350,45 @@
 
 .field-preview-grid {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 2fr 2fr;
+    grid-template-columns: 2fr 1.5fr 1fr 0.8fr 0.8fr 1.2fr 0.8fr 1.5fr;
     gap: 1px;
     background-color: var(--border-color);
     border-radius: var(--border-radius);
     overflow: hidden;
 }
 
-.field-preview-grid > div {
+.field-preview-row {
+    display: contents;
+}
+
+.field-preview-row > div {
     background-color: var(--surface-primary);
     padding: var(--spacing-sm);
+    font-size: var(--text-sm);
+    display: flex;
+    align-items: center;
+}
+
+.prop.foreign {
+    background-color: var(--info);
+    color: white;
+}
+
+.relationship-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    padding: 2px 8px;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--text-xs);
+    border: 1px solid var(--primary);
+    white-space: nowrap;
+}
+
+.relationship-tag i {
+    font-size: 10px;
 }
 
 .field-header {
