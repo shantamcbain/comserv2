@@ -1255,6 +1255,21 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         }
     }
     
+    # Get database environment info
+    my $db_env = Comserv::Util::DatabaseEnv->new;
+    
+    # Check if environment parameter is provided in URL
+    my $requested_env = $c->req->param('environment');
+    if ($requested_env && $db_env->validate_environment($requested_env)) {
+        # Temporarily override environment for this request (store in session)
+        $c->session->{override_db_environment} = $requested_env;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "User requested database environment: $requested_env");
+    }
+    
+    my $active_env = $db_env->get_active_environment($c);
+    my $available_envs = $db_env->get_available_environments($c, 'ency');
+    
     # Get database comparison data
     my $database_comparison = $self->get_database_comparison($c);
     
@@ -1277,6 +1292,7 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         push @{$c->stash->{debug_msg}}, "Forager tables: " . scalar(@{$database_comparison->{forager}->{tables}});
         push @{$c->stash->{debug_msg}}, "Tables with results: " . $database_comparison->{summary}->{tables_with_results};
         push @{$c->stash->{debug_msg}}, "Tables without results: " . $database_comparison->{summary}->{tables_without_results};
+        push @{$c->stash->{debug_msg}}, "Active DB environment: $active_env";
     }
     
     # Set the template and data
@@ -1284,7 +1300,9 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         template => 'admin/schema_compare.tt',
         database_comparison => $database_comparison,
         theme_name => $theme_name,
-        site_name => $site_name
+        site_name => $site_name,
+        active_environment => $active_env,
+        available_environments => $available_envs
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 

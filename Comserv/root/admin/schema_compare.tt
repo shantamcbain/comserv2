@@ -1,6 +1,29 @@
-[% PageVersion = 'admin/schema_compare.tt ,v 4.1 2026/01/08 shanta Exp shanta ' %]
+[% PageVersion = 'admin/schema_compare.tt ,v 4.2 2026/02/02 shanta Exp shanta - Added database environment selector' %]
 <!-- Schema Comparison Page - CSS loaded by Header.tt wrapper -->
 <link rel="stylesheet" href="[% c.uri_for('/static/css/themes/schema_compare.css') %]">
+<style>
+.env-badge {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.env-badge-production {
+    background-color: #dc3545;
+    color: white;
+}
+
+.env-badge-staging {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.env-badge-dev {
+    background-color: #28a745;
+    color: white;
+}
+</style>
 
 <div class="schema-compare-container">
     <header class="schema-compare-header">
@@ -13,6 +36,31 @@
             </button>
         </div>
     </header>
+    
+    <!-- Database Environment Selector -->
+    <div class="db-env-selector" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <strong><i class="fas fa-server"></i> Database Environment:</strong>
+            <select id="dbEnvironmentSelect" onchange="switchEnvironment(this.value)" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
+                [% FOREACH env IN available_environments %]
+                [% IF env.available %]
+                <option value="[% env.environment %]" [% env.environment == active_environment ? 'selected' : '' %]>
+                    [% env.metadata.display_name %]
+                </option>
+                [% END %]
+                [% END %]
+            </select>
+            <span id="envBadge" class="env-badge env-badge-[% active_environment %]" style="padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">
+                [% active_environment.ucfirst %]
+            </span>
+            [% IF active_environment == 'production' %]
+            <span style="color: #dc3545; font-size: 0.85rem;">
+                <i class="fas fa-exclamation-triangle"></i> Caution: Production Database
+            </span>
+            [% END %]
+        </div>
+    </div>
+    
     <p class="intro">Compare database table schemas with their corresponding Result files to ensure synchronization during development.</p>
 
     <!-- Summary Statistics -->
@@ -1688,6 +1736,24 @@ function formatSize(dataType, explicitSize) {
     }
     
     return '<em>N/A</em>';
+}
+
+// Switch database environment
+function switchEnvironment(environment) {
+    if (environment === 'production') {
+        const confirmed = confirm(
+            'WARNING: You are switching to PRODUCTION database!\n\n' +
+            'Changes made in this environment will affect live data.\n\n' +
+            'Are you sure you want to proceed?'
+        );
+        if (!confirmed) {
+            document.getElementById('dbEnvironmentSelect').value = '[% active_environment %]';
+            return;
+        }
+    }
+    
+    // Store environment preference in session and reload
+    window.location.href = '[% c.uri_for("/admin/schema_compare") %]?environment=' + environment;
 }
 
 // Initialize page
