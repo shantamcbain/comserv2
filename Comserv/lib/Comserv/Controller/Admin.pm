@@ -1267,8 +1267,37 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
             "User requested database environment: $requested_env");
     }
     
+    # Handle Full Dev Mode parameter
+    my $full_dev = $c->req->param('full_dev');
+    if (defined $full_dev) {
+        $c->session->{in_dev_mode} = $full_dev ? 1 : 0;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "Full Dev Mode " . ($c->session->{in_dev_mode} ? "ENABLED" : "DISABLED"));
+    }
+    
     my $active_env = $db_env->get_active_environment($c);
     my $available_envs = $db_env->get_available_environments($c, 'ency');
+    
+    # Select schema based on Full Dev Mode
+    my $main_schema;
+    if ($c->session->{in_dev_mode}) {
+        # Use development schema
+        eval {
+            $main_schema = $c->model('DBEncy'); # In dev mode, use dev connection
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+                "Full Dev Mode: Using development schema");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare',
+                "Failed to load dev schema: $@");
+            $main_schema = $c->model('DBEncy'); # Fallback to default
+        }
+    } else {
+        # Use production schema
+        $main_schema = $c->model('DBEncy');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "Using production schema");
+    }
     
     # Get database comparison data
     my $database_comparison = $self->get_database_comparison($c);
@@ -1302,7 +1331,9 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
         theme_name => $theme_name,
         site_name => $site_name,
         active_environment => $active_env,
-        available_environments => $available_envs
+        available_environments => $available_envs,
+        current_schema => $main_schema,
+        in_dev_mode => $c->session->{in_dev_mode} || 0
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
