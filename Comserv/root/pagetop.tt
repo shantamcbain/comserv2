@@ -20,6 +20,30 @@
     color: var(--text-color);
 }
 
+.db-env-indicator {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.db-env-production {
+    background-color: #dc3545;
+    color: white;
+}
+
+.db-env-staging {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.db-env-dev {
+    background-color: #28a745;
+    color: white;
+}
+
 .k8s-migration-banner {
     background-color: var(--schema-alert-warning-bg, #fff3cd);
     border-bottom: 2px solid var(--accent-color);
@@ -87,7 +111,8 @@
         Client IP: <strong>[% c.req.address %]</strong> | 
         Catalyst Server: <strong>[% server_hostname || 'Unknown' %]</strong> |
         Server IP: <strong>[% c.forward('/get_server_ip') %]</strong> |
-        Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %]
+        Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
+        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% (active_db_environment || 'production').upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |
         [% IF is_admin %]
         <button id="css-edit-toggle">
