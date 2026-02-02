@@ -1,0 +1,357 @@
+[% META
+    title = "Database Synchronization"
+    description = "Synchronize database schemas and data between environments"
+    roles = "admin"
+    TemplateType = "Application"
+    category = "admin"
+    page_version = "1.0"
+    last_updated = "Sun Feb 02 10:00:00 AM PST 2026"
+    site_specific = "true"
+%]
+
+<style>
+.env-production {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+.env-staging {
+    border-left: 4px solid #ffc107;
+    background-color: #fffef5;
+}
+
+.env-dev {
+    border-left: 4px solid #28a745;
+    background-color: #f5fff5;
+}
+
+.env-badge {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.env-badge-production {
+    background-color: #dc3545;
+    color: white;
+}
+
+.env-badge-staging {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.env-badge-dev {
+    background-color: #28a745;
+    color: white;
+}
+
+.sync-output {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    padding: 15px;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sync-option-card {
+    transition: border-color 0.3s;
+}
+
+.sync-option-card:hover {
+    border-color: #007bff;
+}
+</style>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Database Synchronization</h1>
+            <p class="text-muted">Synchronize database schemas and data between environments</p>
+            
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> 
+                <strong>Important:</strong> Database synchronization can overwrite data. 
+                Always test with --dry-run first and ensure you have backups.
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Environment Indicator -->
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Current Active Environment</h5>
+                    <p>
+                        <span class="env-badge env-badge-[% active_environment %]">
+                            [% active_environment.ucfirst %]
+                        </span>
+                    </p>
+                    <small class="text-muted">
+                        This is the default database environment for operations. 
+                        You can override this for specific sync operations below.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Environments -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h4>Available Environments</h4>
+            <div class="row">
+                [% FOREACH env IN available_environments %]
+                <div class="col-md-4 mb-3">
+                    <div class="card env-[% env.environment %]">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                [% env.metadata.display_name %]
+                                <span class="badge badge-[% env.available ? 'success' : 'secondary' %] float-right">
+                                    [% env.available ? 'Available' : 'Not Configured' %]
+                                </span>
+                            </h5>
+                            <p class="card-text"><small>[% env.metadata.description %]</small></p>
+                            [% IF env.available %]
+                            <p class="mb-1"><small><strong>Connection:</strong> [% env.connection_name %]</small></p>
+                            <p class="mb-0"><small><strong>Warning Level:</strong> [% env.metadata.warning_level.ucfirst %]</small></p>
+                            [% END %]
+                        </div>
+                    </div>
+                </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Sync Form -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-sync"></i> Trigger Database Sync</h5>
+                </div>
+                <div class="card-body">
+                    <form id="syncForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="sourceEnv">Source Environment</label>
+                                    <select class="form-control" id="sourceEnv" name="source_env">
+                                        [% FOREACH env IN available_environments %]
+                                        [% IF env.available %]
+                                        <option value="[% env.environment %]" [% env.environment == 'production' ? 'selected' : '' %]>
+                                            [% env.metadata.display_name %]
+                                        </option>
+                                        [% END %]
+                                        [% END %]
+                                    </select>
+                                    <small class="form-text text-muted">Database to copy FROM</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="targetEnv">Target Environment</label>
+                                    <select class="form-control" id="targetEnv" name="target_env">
+                                        [% FOREACH env IN available_environments %]
+                                        [% IF env.available %]
+                                        <option value="[% env.environment %]" [% env.environment == 'dev' ? 'selected' : '' %]>
+                                            [% env.metadata.display_name %]
+                                        </option>
+                                        [% END %]
+                                        [% END %]
+                                    </select>
+                                    <small class="form-text text-muted">Database to copy TO (will be overwritten)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <h6>Sync Options</h6>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card sync-option-card mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="dryRun" name="dry_run" checked>
+                                            <label class="form-check-label" for="dryRun">
+                                                <strong>Dry Run</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Preview changes without applying them</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="card sync-option-card mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="schemaOnly" name="schema_only">
+                                            <label class="form-check-label" for="schemaOnly">
+                                                <strong>Schema Only</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Sync table structure without data</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <div class="card sync-option-card mb-3">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="anonymize" name="anonymize" checked>
+                                            <label class="form-check-label" for="anonymize">
+                                                <strong>Anonymize Data</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Anonymize sensitive information</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="tables">Specific Tables (optional)</label>
+                                    <input type="text" class="form-control" id="tables" name="tables" 
+                                           placeholder="Leave empty for all tables, or enter comma-separated list: users,projects,todos">
+                                    <small class="form-text text-muted">
+                                        Comma-separated list of table names to sync. Leave empty to sync all tables.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <button type="button" id="btnTriggerSync" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-play"></i> Trigger Sync
+                                </button>
+                                <button type="reset" class="btn btn-secondary btn-lg">
+                                    <i class="fas fa-redo"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Output -->
+    <div class="row mt-4" id="syncOutputContainer" style="display: none;">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Sync Output</h5>
+                </div>
+                <div class="card-body">
+                    <div id="syncStatus" class="alert alert-info mb-3">
+                        <i class="fas fa-spinner fa-spin"></i> Sync in progress...
+                    </div>
+                    <pre id="syncOutput" class="sync-output"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Last Sync Info -->
+    [% IF last_sync %]
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Last Sync</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Time:</strong> [% last_sync.timestamp %]</p>
+                    <p><strong>Source:</strong> [% last_sync.source_env %] → <strong>Target:</strong> [% last_sync.target_env %]</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge badge-[% last_sync.success ? 'success' : 'danger' %]">
+                            [% last_sync.success ? 'Success' : 'Failed' %]
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    [% END %]
+</div>
+
+<script>
+document.getElementById('btnTriggerSync').addEventListener('click', function() {
+    const form = document.getElementById('syncForm');
+    const formData = {
+        source_env: document.getElementById('sourceEnv').value,
+        target_env: document.getElementById('targetEnv').value,
+        dry_run: document.getElementById('dryRun').checked,
+        schema_only: document.getElementById('schemaOnly').checked,
+        anonymize: document.getElementById('anonymize').checked,
+        tables: document.getElementById('tables').value,
+    };
+    
+    if (formData.source_env === formData.target_env) {
+        alert('Source and target environments must be different!');
+        return;
+    }
+    
+    if (formData.target_env === 'production' && !formData.dry_run) {
+        const confirmed = confirm(
+            'WARNING: You are about to modify the PRODUCTION database!\n\n' +
+            'This operation will overwrite production data.\n\n' +
+            'Are you absolutely sure you want to proceed?'
+        );
+        if (!confirmed) {
+            return;
+        }
+    }
+    
+    document.getElementById('syncOutputContainer').style.display = 'block';
+    document.getElementById('syncStatus').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sync in progress...';
+    document.getElementById('syncStatus').className = 'alert alert-info mb-3';
+    document.getElementById('syncOutput').textContent = '';
+    
+    fetch('[% c.uri_for("/admin/database-sync/trigger") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('syncStatus').innerHTML = '<i class="fas fa-check-circle"></i> Sync completed successfully!';
+            document.getElementById('syncStatus').className = 'alert alert-success mb-3';
+        } else {
+            document.getElementById('syncStatus').innerHTML = '<i class="fas fa-times-circle"></i> Sync failed!';
+            document.getElementById('syncStatus').className = 'alert alert-danger mb-3';
+        }
+        
+        let output = data.output || '';
+        if (data.errors) {
+            output += '\n\n=== ERRORS ===\n' + data.errors;
+        }
+        
+        document.getElementById('syncOutput').textContent = output;
+    })
+    .catch(error => {
+        document.getElementById('syncStatus').innerHTML = '<i class="fas fa-times-circle"></i> Error: ' + error.message;
+        document.getElementById('syncStatus').className = 'alert alert-danger mb-3';
+        document.getElementById('syncOutput').textContent = 'Error occurred: ' + error.message;
+    });
+});
+</script>
