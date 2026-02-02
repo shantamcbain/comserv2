@@ -112,7 +112,7 @@
         Catalyst Server: <strong>[% server_hostname || 'Unknown' %]</strong> |
         Server IP: <strong>[% c.forward('/get_server_ip') %]</strong> |
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
-        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% (active_db_environment || 'production').upper %]</span>
+        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |
         [% IF is_admin %]
         <button id="css-edit-toggle">
