@@ -45,14 +45,29 @@ sub get_chat_name {
     if ($full_prompt) {
         # Handle literal \n if passed as string
         $full_prompt =~ s/\\n/\n/g;
-        if ($full_prompt =~ /^CHAT NAME:\s*(.*?)$/m) {
-            return $1;
+        
+        # Try to find CHAT NAME: or Title: or Task:
+        if ($full_prompt =~ /^(?:CHAT NAME|TITLE):\s*(.*?)$/mi) {
+            my $name = $1;
+            $name =~ s/^\s+|\s+$//g;
+            return $name if $name;
         }
-        # Fallback to first line of prompt, truncated
-        my ($first_line) = split(/\n/, $full_prompt, 2);
-        $first_line =~ s/^\s+|\s+$//g;
-        $first_line = substr($first_line, 0, 100) if length($first_line) > 100;
-        return $first_line;
+        
+        # Fallback to Task:
+        if ($full_prompt =~ /^TASK:\s*(.*?)$/mi) {
+            my $name = $1;
+            $name =~ s/^\s+|\s+$//g;
+            return substr($name, 0, 100) if $name;
+        }
+
+        # Fallback to first line of prompt that isn't empty or whitespace
+        my @lines = split(/\n/, $full_prompt);
+        foreach my $line (@lines) {
+            $line =~ s/^\s+|\s+$//g;
+            next if $line eq '';
+            next if $line =~ /^#/; # Skip comments
+            return substr($line, 0, 100);
+        }
     }
     return;
 }
@@ -339,7 +354,7 @@ sub get_session_details {
     
     # Base URL for Comserv API - Use port 3000 for development server if 3001 fails
     my @urls = (
-        $ENV{COMSERV_API_URL} || 'http://localhost:3000',
+        $ENV{COMSERV_API_URL} || '',
         'http://workstation.local:3001',
         'http://localhost:3001'
     );
@@ -381,6 +396,20 @@ sub create_ai_chat_record {
         'http://localhost:3001'
     );
     
+    # Normalize agent_type for DB enum compatibility
+    # agent_type is now VARCHAR(100) in DB, no need to normalize to old enum values
+    my $agent_type = $args->{agent_type} // 'chat';
+    
+    # Extract original user prompt from description if present (bilateral logging)
+    # Match both 'USER PROMPT: "content"' and 'USER PROMPT: content' formats
+    my $user_p;
+    if ($args->{description} && $args->{description} =~ /USER PROMPT(?:\s*\(VERBATIM\))?:\s*['"]?(.*?)['"]?(\. Agent| \.| \-\-| \n|$)/si) {
+        $user_p = $1;
+        # Clean up any trailing quotes or markers if they were accidentally captured
+        $user_p =~ s/['"]$//;
+        $user_p =~ s/^\s+|\s+$//g;
+    }
+
     my $message;
     if ($is_agent_work) {
         my $phase_label = ($args->{phase} eq 'before') ? "Research/Plan" : "Execution/Results";
@@ -391,25 +420,20 @@ sub create_ai_chat_record {
         $message .= "Files: " . ($args->{files} // '') . "\n";
         $message .= "Changes: " . ($args->{code_changed} // '') . "\n" if $args->{code_changed};
         $message .= "\nDescription: " . ($args->{description} // '');
+        
+        # If it's a new chat, use the user prompt as the primary message so the chat starts naturally
+        if ($args->{'new-chat'} && $user_p) {
+            $message = $user_p;
+        }
     } else {
         $message = $args->{user_message} || "System Log Entry";
-    }
-    
-    # Extract original user prompt from description if present (bilateral logging)
-    # Match both 'USER PROMPT: "content"' and 'USER PROMPT: content' formats
-    if (!$args->{user_message} && $args->{description} && $args->{description} =~ /USER PROMPT:\s*['"]?(.*?)['"]?(\. Agent| \.| \-\-| \n|$)/s) {
-        my $user_p = $1;
-        # Clean up any trailing quotes or markers if they were accidentally captured
-        $user_p =~ s/['"]$//;
-        $user_p =~ s/^\s+|\s+$//g;
-        $message = $user_p unless $is_agent_work;
     }
 
     # If this is a new conversation, the message acts as the title
     # Limit length for title if needed, but the AI chat system usually handles this
     
     foreach my $base_url (@urls) {
-        my $url = "$base_url/chat/send_message";
+        my $url = "$base_url/api/chat/message";
         
         # Use session cookie if available
         if ($args->{session_id}) {
@@ -418,14 +442,18 @@ sub create_ai_chat_record {
         
         # Add metadata for the AI system
         my %payload = (
-            message => $message,
-            agent_type => $args->{agent_type} || 'cleanup-agent',
+            content => $message,
+            role => $is_agent_work ? 'assistant' : 'user',
+            agent_type => $args->{agent_type} || 'chat',
         );
         $payload{conversation_id} = $args->{conversation_id} if $args->{conversation_id};
-        $payload{is_new_conversation} = 1 if $args->{'new-chat'};
         $payload{title} = $args->{chat_name} if $args->{chat_name};
         
-        my $response = $ua->post($url, \%payload);
+        my $json_payload = encode_json(\%payload);
+        my $response = $ua->post($url, 
+            'Content-Type' => 'application/json',
+            'Content' => $json_payload
+        );
         
         if ($response->is_success) {
             my $data = eval { JSON::PP::decode_json($response->content) };
@@ -525,10 +553,10 @@ print $fh $yaml_entry;
 close $fh or die "Cannot close $log_file: $!\n";
 
 if (defined $args{action}) {
-    print "✅ Updated prompts_log.yaml: Conversation $args{conversation_id}, Prompt $args{prompt} - Agent Action Logged\n";
+    print "✅ Updated prompts_log.yaml: Conversation " . ($args{conversation_id} // 'UNKNOWN') . ", Prompt " . ($args{prompt} // 'UNKNOWN') . " - Agent Action Logged\n";
     print "   Action: $args{action}\n";
 } elsif (defined $args{user_message}) {
-    print "✅ Updated prompts_log.yaml: Conversation $args{conversation_id}, Prompt $args{prompt} - User Input Logged\n";
+    print "✅ Updated prompts_log.yaml: Conversation " . ($args{conversation_id} // 'UNKNOWN') . ", Prompt " . ($args{prompt} // 'UNKNOWN') . " - User Input Logged\n";
     print "   Message: $args{user_message}\n";
 }
 exit 0;

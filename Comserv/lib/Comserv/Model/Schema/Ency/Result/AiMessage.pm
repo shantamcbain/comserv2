@@ -36,8 +36,8 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     agent_type => {
-        data_type => 'enum',
-        extra => { list => ['documentation', 'helpdesk', 'ency', 'beekeeping', 'hamradio', 'chat', 'cleanup-agent', 'daily-audit', 'documentation-sync', 'master-plan', 'daily-plans', 'prompt-logging', 'MainAgent'] },
+        data_type => 'varchar',
+        size => 100,
         default_value => 'documentation',
         is_nullable => 1,
     },

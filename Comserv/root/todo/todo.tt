@@ -191,11 +191,12 @@
           <input type="hidden" name="comments" value="[% task.comments %]">
           <button type="submit" class="action-button log-button">Add Log</button>
         </form>
-        <form action="/todo/details" method="POST">
+        <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
           <input type="hidden" name="record_id" value="[% task.record_id %]">
+          <input type="hidden" name="return_to" value="">
           <button type="submit" class="action-button details-button">Details</button>
         </form>
-        <form action="/todo/edit/[% task.record_id %]" method="GET" style="display: inline;">
+        <form action="/todo/edit/[% task.record_id %]" method="GET" style="display: inline;" onsubmit="const returnTo = window.location.href + window.location.hash; this.action = this.action + (this.action.includes('?') ? '&' : '?') + 'return_to=' + encodeURIComponent(returnTo);">
           <button type="submit" class="action-button edit-button">Edit</button>
         </form>
       </td>

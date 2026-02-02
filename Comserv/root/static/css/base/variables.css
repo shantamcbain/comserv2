@@ -12,6 +12,9 @@
   --table-header-bg: #f2f2f2;
   --warning-color: #ff0000;
   --success-color: #009900;
+  --info-color: #17a2b8;
+  --light-color: #f8f9fa;
+  --text-muted-color: #6c757d;
   
   /* Typography */
   --header-font: Verdana, Helvetica, sans-serif;

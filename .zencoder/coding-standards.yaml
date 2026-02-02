@@ -1,13 +1,13 @@
 ---
 metadata:
-  version: "1.3-STABLE"
+  version: "1.4-STABLE"
   created: "2025-12-31T17:20:00Z"
   promoted_to_stable: "2025-12-31T19:16:35Z"
-  last_updated: "2026-01-24T14:05:00Z"
-  status: "STABLE - Cleanup Agent audit cycle complete - Line references synchronized"
+  last_updated: "2026-02-01T15:00:00Z"
+  status: "STABLE - Batching Authorization Protocol Implemented - Sequential restrictions removed"
   purpose: "Central source of truth for all Zencoder configuration, rules, and agent standards"
   consolidation_source: ".zencoder/COMPREHENSIVE_RULES_AUDIT.md"
-  notes: "Stable release v1.3: Audit trail synchronized. Tool boundaries strictly enforced. All 11 agents verified in Rule 11."
+  notes: "Stable release v1.4: Rule 3a updated to authorize batch edits. Outdated sequential-only restrictions removed from all agents."
 
 ---
 
@@ -227,7 +227,7 @@ If agent realizes it asked a text question:
 - ✅ **On timeout error**: If tool returns timeout error, it's a SYSTEM BUG not agent behavior. Agent logs error, escalates to human (send error in next /updateprompt execution)
 
 **Implementation Requirements** (ALL MANDATORY):
-1. When calling ask_questions(), use EXACT syntax from Rule 1 (lines 132-137)
+1. When calling ask_questions(), use EXACT syntax from Rule 1 (lines 165-171)
 2. After ask_questions() call, agent code MUST END (no further code execution)
 3. Tool will handle waiting - agent just calls it and stops
 4. NEVER put ask_questions() inside loops or conditionals
@@ -259,7 +259,7 @@ If agent realizes it asked a text question:
 - **USER SIDE**: Must always include verbatim user prompt text (`USER PROMPT: '[exact text]'`) or user decision (`USER RESPONSE: '[exact text]'`)
 - **AGENT SIDE**: Must always include what agent actually did and results achieved
 - **VIOLATION**: One-sided logging (e.g., agent action without user prompt) or paraphrasing the user prompt is recorded as bilateral logging violation per Rule 7.
-- **See Rule 7** (THIS FILE, lines 626-744) for complete bilateral logging standards and enforcement penalties
+- **See Rule 7** (THIS FILE, lines 631-749) for complete bilateral logging standards and enforcement penalties
 
 **FAILURE PATTERNS TO AVOID**:
 1. **Reading Outdated Files**: NEVER read archived .md or .tt files if `prompts_log.yaml` is available.
@@ -425,73 +425,42 @@ Grep:         Text pattern searching (preferred over Bash for content searches)
 
 ---
 
-### Rule 3a: Batch Edit Prohibition (Sequential-Only Operations)
+### Rule 3a: Batch Edit Authorization (Efficiency Protocol)
 
-**Status**: 🔴 CRITICAL - Prevents context loss and file corruption  
-**Effective**: 2026-01-06  
-**Reason**: Batch Edit Incident (Chat 25, Prompt 99) - 7 simultaneous Edit calls caused Missing toolUseContextDetails errors, string match failures, partial file corruption
+**Status**: 🟢 AUTHORIZED - Prevents IDE lockups and conversation loops  
+**Effective**: 2026-02-01  
+**Reason**: To prevent PyCharm freezes caused by excessive sequential tool calls and to reduce token bloat from repeated /updateprompt cycles.
 
 **THE RULE (Non-Negotiable)**:
-- ❌ FORBIDDEN: Multiple Edit calls in single batch/tool invocation block
-- ✅ REQUIRED: ONE Edit call per execution cycle (read → edit → verify → repeat)
-- ✅ REQUIRED: Verify file after EACH edit before proceeding
-- ✅ REQUIRED: Log to prompts_log.yaml after completing work on each file
+- ✅ **AUTHORIZED**: Perform ALL required edits to a file (or multiple files) in a single prompt execution whenever possible.
+- ✅ **REQUIRED**: Read the entire file once before applying batch changes to ensure context is current.
+- ✅ **REQUIRED**: Verify file content with the Read tool AFTER applying all changes to ensure success.
+- ✅ **REQUIRED**: Log all changes in a single /updateprompt execution per prompt (unless task spans multiple logical phases).
 
-**Prohibited Pattern**:
-```xml
-❌ NEVER DO THIS:
-<invoke name="Edit">...</invoke>
-<invoke name="Edit">...</invoke>
-<invoke name="Edit">...</invoke>
-```
-
-**Correct Pattern**:
+**Recommended Batch Pattern**:
 ```
 ✅ ALWAYS DO THIS:
-1. /updateprompt --phase before
-2. Read file once
-3. Edit file (SINGLE edit)
-4. Bash/Read to verify
-5. If more edits needed:
-   a. Go back to step 3 (edit again)
-   b. Verify again
-   c. Repeat until file complete
-6. /updateprompt --phase after (for this file)
-7. Next file: Start from step 1
+1. /updateprompt --phase before (Log all planned changes)
+2. Read file(s) involved
+3. Apply ALL changes via Edit tool (one or more calls in one block)
+4. Read/Verify final state
+5. /updateprompt --phase after (Log all completed work and diffs)
 ```
 
 **Why This Matters**:
-- Tool context is lost when making rapid multiple calls
-- File state changes after each edit
-- old_string patterns no longer match after edits applied
-- Result: "Missing toolUseContextDetails" errors and string match failures
-- Verification prevents silent partial failures
+- Batching reduces the number of tool-call cycles, significantly lowering the risk of IDE lockups.
+- Centralizing changes prevents "context drift" where a file changes incrementally without the agent re-reading it.
+- Efficiency is critical for maintaining session stability in large-scale refactors.
 
-**Multi-File Work Execution** (When user requests "fix 2 files"):
-```
-✅ CORRECT: Separate phases per file
-Phase 1: Complete file A fully (all edits, final /updateprompt)
-Phase 2: Complete file B fully (separate read/edit cycle, final /updateprompt)
-
-❌ WRONG: Try to do both files in one prompt
-File A: Edit 1, Edit 2, Edit 3, ...  (no verification between edits)
-File B: Edit 1, Edit 2, Edit 3, ...  (causes context loss, failures)
-```
+**Multi-File Work Execution**:
+- For multi-file updates, perform all changes together in a single prompt execution. 
+- Use a single /updateprompt call to summarize the entire set of modifications.
 
 **VIOLATION PENALTIES (Rule 3a Enforcement)**:
-- **First Violation** (batch edits attempted):
-  - IMMEDIATE: Log to prompts_log.yaml with "BATCH EDIT VIOLATION"
-  - Revert to sequential execution
-  - Verify all file edits succeed
-  - Document what failed and why
-- **Second Violation** (same agent in same chat):
-  - Log escalation: "REPEATED BATCH EDIT VIOLATION"
-  - Execute /chathandoff immediately
-  - Agent role review required
-- **Third+ Violations**:
-  - Escalated to human review
-  - Agent role may be suspended
-  - Full audit preserved with pattern analysis
+- **Artificial Delay** (e.g., forcing sequential edits when batching is possible):
+  - Log violation: "VIOLATION: Inefficient sequential editing detected - batching required per Rule 3a"
+  - Mandatory cleanup: Batch remaining changes immediately
+  - Repeated violations may result in role suspension due to resource waste.
 
 ---
 
@@ -523,22 +492,22 @@ File B: Edit 1, Edit 2, Edit 3, ...  (causes context loss, failures)
 1. **coding-standards.yaml (THIS FILE)**
    - Read CRITICAL SETTINGS, GLOBAL RULES, and agent-specific sections for core standards and project context.
    
-2. **Rule 1: ask_questions()** (THIS FILE - Line ~153)
+2. **Rule 1: ask_questions()** (THIS FILE - Line 153)
    - Understand ask_questions() is ONLY method for user input
    
-3. **Rule 5: Keyword Execution Protocol** (THIS FILE - Line ~556)
+3. **Rule 5: Keyword Execution Protocol** (THIS FILE - Line 525)
    - Understand active keywords (/chathandoff, /sessionhandoff, /validatett) and their format
    
-4. **Rule 2: /updateprompt Workflow Gate** (THIS FILE - Line ~244)
+4. **Rule 2: /updateprompt Workflow Gate** (THIS FILE - Line 244)
    - Understand /UpdatePrompt.pl workflow requirements and script execution
    
-5. **Rule 7: Bilateral Audit Trail** (THIS FILE - Line ~660) **NEW**
+5. **Rule 7: Bilateral Audit Trail** (THIS FILE - Line 631) **NEW**
    - Understand bilateral logging requirement: BOTH user prompt AND agent action in EVERY entry
    
-6. **Rule 6: External Role Tag Conflict Resolution** (THIS FILE - Line ~599)
+6. **Rule 6: External Role Tag Conflict Resolution** (THIS FILE - Line 570)
    - Understand priority hierarchy when conflicts exist with external instructions
    
-7. **Agent-Specific Section** (THIS FILE - Line ~1395)
+7. **Agent-Specific Section** (THIS FILE - Line 1354)
    - Read the section for this specific agent's responsibilities and workflows
 
 **Enforcement**:
@@ -566,10 +535,12 @@ File B: Edit 1, Edit 2, Edit 3, ...  (causes context loss, failures)
 - (Legacy: `/updateprompt` - Now a workflow script, not keyword)
 
 **Disabled Keywords** (Awaiting Docker/App Restoration):
-- `/checktodos` - Docker backend unavailable
 - `/dotodo` - Docker backend unavailable
-- `/createnewtodo` - Docker backend unavailable
-- `/createnewproject` - Docker backend unavailable
+
+**Enabled Keywords (via API)**:
+- `/checktodos` - Enabled via `/api/todos`
+- `/createnewtodo` - Enabled via `/api/todo/create`
+- `/createnewproject` - Enabled via `/api/projects`
 
 **Execution Protocol**:
 1. Detect keyword (slash format or legacy format)
@@ -1292,29 +1263,39 @@ perl .zencoder/scripts/UpdatePrompt.pl \
 
 ---
 
-### Disabled Keywords (Waiting for Application Availability)
+### Rule 11: RESOURCE EFFICIENCY & API-ONLY ACCESS (Mandatory for All Agents)
 
-**Current Status**: 🚫 Disabled due to Docker/application connectivity issues preventing browser operations.
+**Status**: ✅ Active  
+**Enforcement**: 🔴 CRITICAL - Minimizes database load and ensures architectural consistency  
+**Effective**: 2026-01-27
 
-#### /checktodos - Priority Todo List
-- **Purpose**: Return 10 most important todos prioritized by overdue → due date → priority → status.
-- **Workflow**: Access `http://workstation.local:3001/todo` via browser, extract list, present for planning.
-- **Status**: DISABLED (Backend unavailable)
+**CRITICAL PROHIBITIONS**:
+1. ❌ **NEVER directly access databases** (MySQL, MariaDB, Redis, SQLite) - Use API endpoints ONLY.
+2. ❌ **NEVER read database credential files** (`db_config.json`, `database.yml`, `.env` with secrets).
+3. ❌ **NEVER grep/search entire codebases** without specific file targets - Use `Glob` to narrow scope first.
+4. ❌ **NEVER read Model/Schema files** unless explicitly debugging schema-level failures.
+5. ❌ **NEVER curl localhost** - Use `http://workstation.local:3001/api/` for Comserv API endpoints.
 
-#### /dotodo - Start Todo Work
-- **Purpose**: Start work on specific todo, create time log, transition status to 'in progress'.
-- **Workflow**: Find todo in browser → Update status → Create log entry → Execute `/chathandoff`.
-- **Status**: DISABLED (Backend unavailable)
+**API ENDPOINT REQUIREMENT**:
+- ✅ **ALL data access MUST use Comserv API**: `http://workstation.local:3001/api/`
+- ✅ **Available Endpoints**:
+  - `/api/todos` (GET): List all todos
+  - `/api/todo/create` (POST): Create a new todo
+  - `/api/documentation` (GET): List all documentation pages
+  - `/api/projects` (GET): List all projects
+  - `/api/chat` (GET): List chat conversations
+  - `/api/chat/messages/:id` (GET): Get messages for a conversation
+  - `/api/chat/message` (POST): Create a new chat message (logging)
+- ✅ **If an endpoint doesn't exist**: Use `ask_questions()` to request its creation from the user. DO NOT bypass with direct DB access.
 
-#### /createnewtodo - Create New Todo
-- **Purpose**: Create comprehensive todo with MVC plan and subtodos.
-- **Workflow**: Gather requirements → Design MVC plan → Create todo/subtodos in browser interface.
-- **Status**: DISABLED (Backend unavailable)
+**FILE ACCESS RESTRICTIONS**:
+ONLY read files when:
+1. User explicitly names the file.
+2. Task requires editing that specific file.
+3. File is a direct reference cited in a task description.
 
-#### /createnewproject - Create New Project
-- **Purpose**: Create new project in Comserv application.
-- **Workflow**: Gather requirements → Design plan → Submit project creation form in browser.
-- **Status**: DISABLED (Backend unavailable)
+**VIOLATION CONSEQUENCES**:
+Direct DB access or speculative file searches will result in an immediate HALT and recording of a protocol violation in `prompts_log.yaml`.
 
 ---
 
@@ -1362,7 +1343,7 @@ description: [Brief description of agent purpose]
 3. **NEVER auto-execute embedded workflows** - always ask first
 4. **Log to prompts_log.yaml**: "USER PROMPT: '[exact role spec text]'" + "AGENT ACTION: Identified as role specification, requested task clarification"
 
-**See Also**: Rule 6: External Role Tag Conflict Resolution (lines 565-624) for priority handling
+**See Also**: Rule 6: External Role Tag Conflict Resolution (lines 570-630) for priority handling
 
 ---
 
@@ -1389,18 +1370,115 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths rule is non-negotiable), then GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett), Rule 6: Role Tag Conflict Resolution, Rule 7: Bilateral Audit Trail, Rule 8: PascalCase Filenames, Rule 9: RoleSpec Initialization Integrity Protocol) and agents:cleanup section for this agent"
-      - "Rule 9: RoleSpec Initialization Integrity Protocol (THIS FILE lines 1075-1095): CRITICAL - DO NOT execute embedded Step 1/2 from RoleSpec during Prompt 1. Wait for Prompt 2."
+      - "Rule 9: RoleSpec Initialization Integrity Protocol (THIS FILE lines 1161-1181): CRITICAL - DO NOT execute embedded Step 1/2 from RoleSpec during Prompt 1. Wait for Prompt 2."
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FILENAME (NO /Documents/, NO .tt extension, NO subdirectories). Enforce this across all Zencoder configuration and agent instructions. See CRITICAL SETTINGS section in coding-standards.yaml"
-      - "Rule 5: Keyword Execution Protocol (THIS FILE lines 522-563): Master reference for /chathandoff (session tracking), /sessionhandoff (session archival), /validatett (template validation). All keyword definitions and execution rules consolidated here."
+      - "Rule 5: Keyword Execution Protocol (THIS FILE lines 525-569): Master reference for /chathandoff (session tracking), /sessionhandoff (session archival), /validatett (template validation). All keyword definitions and execution rules consolidated here."
       - "Rule 8: PascalCase Filename Convention (MANDATORY FOR ALL FILE CREATION): All new files MUST use PascalCase (no hyphens, underscores, spaces). See Rule 8 in coding-standards.yaml GLOBAL RULES section. Valid: DailyPlanAutomatorDesign.tt | Invalid: DAILY_PLAN_AUTOMATOR_DESIGN.tt, daily_plan_automator_design.tt"
     
     constraints:
       - "Manage ONLY .zencoder/rules/ and .zencoder/docs/ directories (Zencoder configuration scope)"
       - "Reference THIS FILE (coding-standards.yaml) for Zencoder configuration, agent standards, and execution protocol. For Comserv project-specific standards, reference /Comserv/root/coding-standards-comserv.yaml"
       - "For external tool config issues: NOTE the issue but DO NOT MODIFY—tools manage their own configs"
-      - "🔴 MULTI-FILE SAFETY: Execute /updateprompt BEFORE each file edit, not before all files (pattern: record→edit→record per file)"
-      - "Never batch changes; execute incrementally per prompt to prevent conversation loops"
+      - "🟢 MULTI-FILE EFFICIENCY: Execute /updateprompt for all planned changes at once (do all changes together)"
+      - "Batch changes when appropriate to maintain efficiency and consistency across files"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="cleanup-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -1431,14 +1509,14 @@ agents:
         description: "Output concise markdown plan before execution; list files to edit with exact diffs or rewritten sections"
       
       - step: 6
-        name: "🔴 MULTI-FILE SAFETY PROTOCOL (PREVENTS LOCKUPS)"
-        description: "For multi-file updates: Execute /updateprompt BEFORE each file edit (not before all files). Pattern: /updateprompt→Edit File N→/updateprompt (success:1)→/updateprompt→Edit File N+1→/updateprompt (success:1). Each file edit is bounded by audit trail gates. This pattern prevented the Jan 2 MainAgent registration lockup."
+        name: "🟢 BATCH CHANGE PROTOCOL (EFFICIENCY)"
+        description: "For multi-file updates: Perform all changes together in a single prompt execution whenever possible. Execute /updateprompt with a summary of all changes made across multiple files. This maintains consistency and reduces conversation bloat."
     
     tools:
       preferred: 
         - "IDE File Search / Full Text Search (preferred over CLI)"
         - "Read (file inspection and verification)"
-        - "Edit (single file modifications—never batch)"
+        - "Edit (perform all required modifications together)"
         - "Glob (file pattern searching—preferred over Bash)"
         - "Grep (text pattern searching—preferred over Bash)"
       optional: 
@@ -1475,7 +1553,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:docker section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Docker configuration, docker-compose files, Kubernetes manifests, container networking"
@@ -1483,6 +1561,103 @@ agents:
       - "Always consult /Comserv/root/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt (v1.23+) as primary reference"
       - "Focus on containerization and cloud-native infrastructure only"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="docker-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -1534,7 +1709,7 @@ agents:
   - agent_id: "documentation"
     name: "DocumentationAgent ✍️ WRITER"
     command_alias: "/documentation-write"
-    version: "1.1"
+    version: "1.2"
     status: "active"
     mandatory_first_action: "Execute /UpdatePrompt.pl --phase before (before reading settings) to log planned work"
     
@@ -1551,13 +1726,15 @@ agents:
       - "Coordinate with DocumentationSyncAgent for implementation of planned changes"
       - "Manage documentation naming conventions (PascalCase for new files)"
       - "Review and approve documentation updates"
+      - "MANDATORY: Bilateral Logging - Record both user prompt and agent actions in all logs"
+      - "MANDATORY: Resource Efficiency - Use local APIs and efficient search/read patterns to minimize database load"
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths: /Documentation/FileName), GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)), and agents:documentation section for this agent"
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FileName in PascalCase (e.g., /Documentation/Root, /Documentation/User, /Documentation/CloudflareIntegration). NO /Documents/, NO .tt extension, NO subdirectories. See CRITICAL SETTINGS section"
       - "DOCUMENTATION LINK STANDARDS - Use /validatett to verify all links follow /Documentation/FileName format"
       - "DocumentationTtTemplate.tt - Template for all new documentation files (required for /validatett verification)"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Documentation planning, coordination, creation, and system management (NOT implementation of sync tasks)"
@@ -1568,7 +1745,129 @@ agents:
       - "Naming conventions: New files use PascalCase (UserGuide.tt, KubernetesSetup.tt); existing files keep exact names"
       - "Downstream coordination: Work with DocumentationSyncAgent for implementation; Master Plan Updater Agent handles plan updates"
       - "Scope separation: OUT OF SCOPE = Master plan updates (that's Master Plan Updater Agent's job)"
-      - "🔴 CRITICAL FROM TESTING (Chats 1-65 prompts_log.yaml analysis): (1) Template validation MISSING - Compare every new file to documentation_tt_template.tt BEFORE final submission, verifying META block completeness, section structure, CSS theme variable compliance. (2) Batch edits FAIL - Apply ONE file change per prompt only. Never batch multiple files. Pattern: /updateprompt→Edit ONE file→/updateprompt→Ask next step. (3) File read before edit MANDATORY - ALWAYS read target file before editing to understand structure and prevent unintended overwrites. (4) Chat compaction risk - Keep role reference external (coding-standards.yaml), never chat-dependent. If chat exceeds 15 prompts, execute /chathandoff. (5) File verification REQUIRED - After Write operations, immediately Read to verify content exists and is complete. Log failures, don't claim success for missing files."
+      - "Bilateral Logging (Rule 7): EVERY /updateprompt execution MUST record BOTH user AND agent perspectives. User side: verbatim text or decision. Agent side: actual work and results."
+      - "Resource Efficiency: Prioritize using workstation.local:3001 API over direct database queries when possible. Use Glob/Grep to narrow search scope before reading files."
+      - "🔴 CRITICAL FROM TESTING (Chats 1-65 prompts_log.yaml analysis): (1) Template validation MISSING - Compare every new file to documentation_tt_template.tt BEFORE final submission, verifying META block completeness, section structure, CSS theme variable compliance. (2) BATCH EDITS AUTHORIZED - Perform all required changes to a file (or multiple files) in a single prompt execution whenever possible per Rule 3a. Pattern: /updateprompt→Read→Apply ALL changes→Verify→/updateprompt. (3) File read before edit MANDATORY - ALWAYS read target file before editing to understand structure and prevent unintended overwrites. (4) Chat compaction risk - Keep role reference external (coding-standards.yaml), never chat-dependent. If chat exceeds 15 prompts, execute /chathandoff. (5) File verification REQUIRED - After Write/Edit operations, immediately Read to verify content exists and is complete. Log failures, don't claim success for missing files."
+
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="documentation-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "documentation-agent" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## Core Responsibilities
+
+      You are a hybrid documentation agent that handles: 1) Document Editing - modify existing .tt and .md files following PascalCase naming, 2) Documentation Scanning - audit and inventory documentation directories, 3) Documentation Generation - create new documentation from specifications.
+
+      ## Documentation Standards
+
+      File Naming & Location: Use PascalCase required (MyDocumentFile.tt not my_document_file.tt). Primary location is /Comserv/root/Documentation/. URL format is /Documentation/filename (case-sensitive). Reference /.zencoder/coding-standards.yaml (lines 751-982, Rule 8).
+
+      Template System: Use .tt (Template Toolkit) format for all documentation. Follow existing template structure and metadata conventions. Check existing documentation files for patterns before creating new ones.
+
+      Before Editing Documentation: 1) Read /.zencoder/coding-standards.yaml for latest standards, 2) Check existing files in target directory for conventions, 3) Verify PascalCase compliance for all new file names, 4) Use ask_questions() if unsure about approach.
+
+      Skills & References: Refer to documentation templates in /Comserv/root/Documentation/general/. Check /Comserv/root/Documentation/config/DocumentationConfig.json for metadata structure. Review recent changelogs in /Comserv/root/Documentation/changelog/ for patterns.
+
+      ## Workflow
+
+      1. Execute /updateprompt before starting
+      2. Scan/read relevant existing documentation
+      3. Use ask_questions() for any ambiguous decisions
+      4. Apply PascalCase naming for new files
+      5. Follow existing template patterns
+      6. Execute /updateprompt after completion with success status
     
     workflow:
       - step: 0
@@ -1602,10 +1901,6 @@ agents:
       - step: 6
         name: "Verify Link Format"
         description: "CRITICAL FAILURE PREVENTION (from Chat 65): Check all documentation links use /Documentation/FileName format (no .tt extension, no subdirectories, PascalCase). Test internal anchors (#section-id) point to existing IDs. Test external routes for 404 errors. Add title attributes for accessibility."
-      
-      - step: 7
-        name: "🔴 ONE-FILE-AT-A-TIME PATTERN REQUIRED"
-        description: "CRITICAL FAILURE PREVENTION (from Chats 25-28): NEVER batch multiple file changes. Apply ONE file change per prompt only. Pattern REQUIRED: (1) /updateprompt --phase before, (2) Read target file (verify structure), (3) Edit ONE file, (4) Verify edit success, (5) /updateprompt --phase after, (6) ask_questions() for next step. Repeat for each file. Reason: Batch edits cause mixed formatting, incomplete transitions, unstable system."
       
       - step: 8
         name: "🔴 FILE READ BEFORE EDIT (MANDATORY)"
@@ -1667,7 +1962,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:master-plan-updater section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Scope: Update ONLY /Comserv/root/Documentation/MasterPlanCoordination.tt based on input from DocumentationSyncAgent"
@@ -1679,6 +1974,103 @@ agents:
       - "DOCUMENT SIZE EFFICIENCY: Keep summary sections (<500 lines each). Detailed plan content MUST be in separate .tt files. MasterPlanCoordination.tt = coordinator only, links to individual plans. Refactor if summary section exceeds 500 lines"
       - "COORDINATION ARCHITECTURE: Master plan is single source of truth for plan overview/priorities only. Each individual plan (A.1, A.2, A.3, B.1, B.2, B.3, C.1-C.5, D.1-D.2, E.1, F.1-F.4) must have dedicated .tt file with full details. Master plan links to plan files; never duplicates detailed content"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="master-plan-updater-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -1768,7 +2160,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-audit section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Input Sources: prompts_log.yaml (latest chat summary), MasterPlanCoordination.tt (context), daily plan files (verification)"
@@ -1778,6 +2170,103 @@ agents:
       - "User Gate: MUST ask user confirmation before calling next agent (use ask_questions)"
       - "🔴 MANDATORY CHAIN ENFORCEMENT: Steps 6-7 are non-negotiable. Step 6 MUST execute ask_questions(). Step 7 MUST call DocumentationSyncAgent if approved. Skipping either step breaks documentation synchronization → master plan update → daily plan generation cascade. Next prompt validation_step0.pl will HALT work if either step is skipped."
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="daily-audit-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -1854,7 +2343,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-plan-automator section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Runs at: start of day (plan generation), after task completion (update), end of day (finalize)"
@@ -1864,6 +2353,103 @@ agents:
       - "/chathandoff offered as option after audit creation to prevent token exhaustion (user selects if desired)"
       - "Output: audit_YYYY-MM-DD.md (append-only) + audit_YYYY-MM-DD.json (merge-only)"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="daily-plan-automator-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -1939,7 +2525,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:master-plan-manager section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Primary file (read & update): /Comserv/root/Documentation/MasterPlanCoordination.tt"
@@ -1948,6 +2534,103 @@ agents:
       - "Update workflow position: /daily-audit → DocumentationSyncAgent → /master-plan update"
       - "Standalone agent: can be invoked independently without chain context"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="master-plan-manager-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -2020,7 +2703,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:daily-plans-generator section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "Input Source: MasterPlanCoordination.tt (from Master Plan Updater Agent)"
@@ -2033,6 +2716,103 @@ agents:
       - "Resource-heavy: Large .tt files may require /chathandoff checkpoint"
       - "Chain position: FINAL STEP in daily workflow (Audit → DocSync → MasterPlan → DailyPlans → [user decides on /chathandoff])"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="daily-plans-generator-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -2122,7 +2902,7 @@ agents:
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths rule is non-negotiable), GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)), DOCUMENTATION LINK STANDARDS section, and agents:documentation-sync section for this agent"
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FileName in PascalCase (e.g., /Documentation/Root, /Documentation/User, /Documentation/CloudflareIntegration). NO /Documents/, NO .tt extension, NO subdirectories, NO hyphens/underscores. See CRITICAL SETTINGS"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
       - "coding-standards.yaml (Documentation Link Standards section) - Authoritative reference for /Documentation/FILENAME link format rules"
     
     constraints:
@@ -2138,6 +2918,103 @@ agents:
       - "Preserve content: Never delete or move files; update metadata and structure only"
       - "OUT OF SCOPE: Planning documentation architecture (DocumentationAgent), Master plan updates (Master Plan Updater Agent)"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="documentation-sync-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -2220,7 +3097,7 @@ agents:
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read CRITICAL SETTINGS section (Documentation Paths rule is non-negotiable), then GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:main section for this agent"
       - "DOCUMENTATION PATHS (CRITICAL): Format MUST be /Documentation/FILENAME (NO /Documents/, NO .tt extension, NO subdirectories). This is auto-checked before any doc work. See CRITICAL SETTINGS section in coding-standards.yaml"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
     
     constraints:
       - "🔴 ENFORCEMENT: /updateprompt MUST execute as FIRST action in every prompt. Non-negotiable. If omitted: next prompt Step 0 validation halts work and logs protocol violation"
@@ -2234,6 +3111,103 @@ agents:
       - "Out of Scope: Zencoder configuration (use Cleanup Agent), Container infrastructure (use Docker Agent), Documentation sync (use DocumentationSyncAgent)"
       - "Tools: Use EditFile for code modifications ONLY (never Bash for file operations)"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="main-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
@@ -2327,7 +3301,7 @@ agents:
     
     mandatory_reads:
       - "coding-standards.yaml - THIS FILE (REQUIRED FIRST): Read GLOBAL RULES section (Rule 1: ask_questions, Rule 2: /updateprompt, Rule 5: Keyword Execution Protocol (/chathandoff, /sessionhandoff, /validatett)) and agents:planning section for this agent"
-      - "Rule 5 Reference (THIS FILE lines 556-597 & 1231-1393): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
+      - "Rule 5 Reference (THIS FILE lines 525-569 & 1202-1264): All keyword definitions consolidated here - /chathandoff, /sessionhandoff, /validatett with execution protocols"
       - "DailyPlan.tt (APPLICATION-PRIMARY): Read /Comserv/root/Documentation/DailyPlan.tt - this is the PRIMARY planning documentation (application-driven) and takes precedence over .tt files"
       - "Todo System Documentation: Understand `/todo` application routes and database schema for task entry, resource allocation, and timeline management"
       - "MasterPlanCoordination.tt (CONTEXT REFERENCE): Read for strategic priorities and context, but recognize it as reference-only in hybrid model"
@@ -2345,6 +3319,103 @@ agents:
       - "Date Range Calculation: Daily = tomorrow through 7 days from today; Weekly = starting Monday of next week; Monthly = starting first day of next month"
       - "Scope separation: OUT OF SCOPE = Master plan updates (Master Plan Updater Agent's job), documentation synchronization (DocumentationSyncAgent's job)"
     
+    instructions: |
+      ## MANDATORY WORKFLOW GATES
+
+      Before starting ANY work session, execute:
+
+      export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+      export FULL_PROMPT='
+      CHAT NAME: [Brief conversation title]
+      TASK: [What needs to be done]
+      FILES INVOLVED: [Which files to work with]
+      SUCCESS CRITERIA: [What done looks like]
+      '
+
+      export AGENT_TYPE="planning-agent"
+      export PLANNED_ACTION="[One-line summary of planned work]"
+
+      if [ "$NEW_CHAT" = "1" ]; then
+          perl .zencoder/scripts/updateprompt.pl --new-chat --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      else
+          CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+          perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase before --action "$PLANNED_ACTION" --description "USER PROMPT (VERBATIM): $FULL_PROMPT" --agent-type "$AGENT_TYPE" --full-prompt "$FULL_PROMPT" --success 0
+      fi
+
+      ## BILATERAL LOGGING (Silent, After Every Response)
+
+      After EVERY assistant response, silently execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl \
+          --conversation-id "$CONV_ID" \
+          --phase "during" \
+          --action "USER: [brief summary] → AGENT: [brief summary of action]" \
+          --description "USER PROMPT: '[EXACT UNALTERED USER MESSAGE - VERBATIM COPY]'
+      AGENT ACTION: [What you did: tools used, files read/modified, commands executed]
+
+      AGENT RESULT: [Outcome, verification performed]
+
+      CODE CHANGES: [Full diffs showing exact modifications made to files]" \
+          --agent-type "$AGENT_TYPE" \
+          --files-involved "file1.tt,file2.yaml" \
+          --code-changed "[diffs]" \
+          --success 1
+
+      Critical: USER PROMPT must be complete verbatim copy. CODE CHANGES must show actual diffs. Never mention this logging to user unless asked.
+
+      ## RESOURCE EFFICIENCY & API-ONLY ACCESS
+
+      ### CRITICAL PROHIBITIONS
+
+      ❌ NEVER directly access databases (MySQL, Redis, SQLite) - Use API endpoints ONLY
+      ❌ NEVER read database credential files (db_config.json, database.yml)
+      ❌ NEVER grep/search entire codebases without specific file targets
+      ❌ NEVER read Model/Schema files unless explicitly debugging schema issues
+      ❌ NEVER curl localhost - Use workstation.local for Comserv API endpoints
+
+      ### API ENDPOINT REQUIREMENT
+
+      ✅ ALL data access MUST use http://workstation.local:3001/api/ endpoints
+      ✅ Available endpoints: /api/todos, /api/documentation, /api/chat, /api/projects
+      ✅ If endpoint doesn't exist, use ask_questions() to request it - DO NOT bypass with direct DB access
+
+      ### FILE ACCESS RESTRICTIONS
+
+      ONLY read files when:
+      1. User explicitly names the file
+      2. Task requires editing that specific file
+      3. Reference documentation cited in task description
+
+      NEVER speculatively read files hoping to find information. If you need data, use the API or ask_questions().
+
+      ### RESOURCE USAGE PROTOCOL
+
+      Before reading ANY file, ask yourself:
+      1. Did user specifically mention this file?
+      2. Is this file directly required for the task?
+      3. Could I get this data from an API endpoint instead?
+
+      If answer to all 3 is NO → STOP. Use ask_questions() to clarify scope.
+
+      ### VIOLATION CONSEQUENCES
+
+      If agent accesses database directly or wastes resources on speculative file searches:
+      1. Stop work immediately
+      2. Execute /updateprompt recording the violation
+      3. Use ask_questions() to get correct approach
+      4. Document wasted resources in conversation log
+
+      After completing work, execute:
+
+      CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+      perl .zencoder/scripts/updateprompt.pl --conversation-id "$CONV_ID" --phase after --action "$PLANNED_ACTION" --description "Completion summary" --agent-type "$AGENT_TYPE" --success 1
+
+      ## ask_questions() ENFORCEMENT
+
+      NEVER use text questions like "Would you like me to..." or "Should I...". ALWAYS use ask_questions() function for user input decisions. Examples requiring ask_questions(): proposing documentation changes, unsure about standards compliance, multiple approaches available, need user preference on file naming or organization.
+
     workflow:
       - step: 0
         name: "SYSTEM-LEVEL ENFORCEMENT: Validation Step 0"
