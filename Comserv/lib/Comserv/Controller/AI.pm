@@ -288,12 +288,17 @@ sub generate :Local :Args(0) {
         (length($system) > 0 ? 'provided' : 'none'));
     
     # Normalize agent_type to database enum values
-    # Map custom agent_id to standard enum: documentation|helpdesk|ency|beekeeping|hamradio|chat
-    my $normalized_agent_type = 'documentation';  # default
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat)$/i) {
+    # Normalize agent_type for dynamic storage (was database enum)
+    my $normalized_agent_type = $agent_id || 'documentation';
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|prompt-logging)$/i) {
         $normalized_agent_type = lc($agent_id);
-    } elsif ($agent_id && $agent_id eq 'general') {
-        $normalized_agent_type = 'documentation';  # map general to documentation
+        # Special case for MainAgent which is camelcase in enum
+        $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
+    } elsif ($agent_id && ($agent_id eq 'general' || $agent_id eq 'documentation-agent')) {
+        $normalized_agent_type = 'documentation';  # map general and documentation-agent to documentation
+    } else {
+        # Allow any agent_id since we switched to VARCHAR
+        $normalized_agent_type = $agent_id if $agent_id;
     }
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 

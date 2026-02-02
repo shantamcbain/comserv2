@@ -12,6 +12,8 @@ use FindBin;
 use Time::Piece;
 use JSON;
 use File::Slurp;
+use DateTime;
+use DateTime::Format::ISO8601;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -2168,7 +2170,18 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     }
 
     # Create Time::Piece objects for date navigation
-    my $selected_tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d");
+    my $selected_tp;
+    eval {
+        $selected_tp = Time::Piece->strptime("$year-$month-$day", "%Y-%m-%d");
+    };
+    if ($@ || !$selected_tp) {
+        # Fallback if strptime fails on an invalid date
+        $selected_tp = $now;
+        $selected_date = $current_date_str;
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Invalid date requested: $year-$month-$day. Falling back to today.");
+    }
+
     my $prev_tp = $selected_tp - (24 * 60 * 60);  # Subtract 1 day
     my $next_tp = $selected_tp + (24 * 60 * 60);  # Add 1 day
 
@@ -2179,26 +2192,67 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
         "Accessing DailyPlan view for date: $selected_date");
 
-    # Fetch todos for the selected date
+    # --- Prepare data for week.tt and month.tt ---
+    my $dt = DateTime::Format::ISO8601->parse_datetime($selected_date);
+    
+    # Week data
+    my $start_of_week = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');
+    my $end_of_week = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');
+    my $prev_week_date = $dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
+    my $next_week_date = $dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+    
+    my $start_dt = DateTime::Format::ISO8601->parse_datetime($start_of_week);
+    $start_dt = $start_dt->subtract(days => 1); # Start on Sunday for week view
+    
+    my @week_dates = ();
+    for my $day_offset (0..6) {
+        my $current_date_dt = $start_dt->clone->add(days => $day_offset);
+        push @week_dates, {
+            date_str => $current_date_dt->strftime('%Y-%m-%d'),
+            day_num => $current_date_dt->day,
+            is_today => ($current_date_dt->strftime('%Y-%m-%d') eq $current_date_str),
+        };
+    }
+
+    # Month data
+    my $start_of_month = $dt->clone->set_day(1)->strftime('%Y-%m-%d');
+    my $end_of_month = $dt->clone->set_day($dt->month_length)->strftime('%Y-%m-%d');
+    my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+    my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
+
+    # Fetch todos for the selected date and for week/month views
     my $todos_for_today = [];
+    my $all_todos_calendar = [];
+    my %todos_by_day;
+
     if (my $todo_model = $c->model('Todo')) {
         eval {
             my $sitename = $c->session->{SiteName} || 'CSC';
-            my $all_todos = $todo_model->get_all_todos_for_calendar($c, $sitename);
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, $sitename);
             
-            if ($all_todos && ref($all_todos) eq 'ARRAY') {
-                # Filter todos by start_date or due_date matching selected_date
-                foreach my $todo (@$all_todos) {
-                    my $start = $todo->start_date ? $todo->start_date->ymd : '';
-                    my $due = $todo->due_date ? $todo->due_date->ymd : '';
+            if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
+                # Filter todos for today
+                foreach my $todo (@$all_todos_calendar) {
+                    my $start = $todo->start_date || '';
+                    my $due = $todo->due_date || '';
+                    
+                    # Normalize dates
+                    $start = $start->ymd if ref $start && eval { $start->can('ymd') };
+                    $due = $due->ymd if ref $due && eval { $due->can('ymd') };
                     
                     if ($start eq $selected_date || $due eq $selected_date) {
                         push @$todos_for_today, $todo;
                     }
+
+                    # Organize for month calendar
+                    my $display_date = $due || $start;
+                    if ($display_date =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
+                        my ($y, $m, $d) = ($1, $2, $3);
+                        if (int($y) == $dt->year && int($m) == $dt->month) {
+                            push @{$todos_by_day{int($d)}}, $todo;
+                        }
+                    }
                 }
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
-                    "Found " . scalar(@$todos_for_today) . " todos for date $selected_date");
             }
         };
         if ($@) {
@@ -2207,18 +2261,55 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
         }
     }
 
+    # Generate calendar structure for month.tt
+    my @calendar;
+    my $first_day_of_month = DateTime->new(year => $dt->year, month => $dt->month, day => 1);
+    my $day_of_week_start = $first_day_of_month->day_of_week % 7; # 0 for Sunday
+    for (my $i = 0; $i < $day_of_week_start; $i++) {
+        push @calendar, { day => '', todos => [] };
+    }
+    for (my $day_idx = 1; $day_idx <= $dt->month_length; $day_idx++) {
+        push @calendar, {
+            day => $day_idx,
+            date => sprintf("%04d-%02d-%02d", $dt->year, $dt->month, $day_idx),
+            todos => $todos_by_day{$day_idx} || []
+        };
+    }
+
     # Set proper charset for UTF-8 content
     $c->response->content_type('text/html; charset=utf-8');
 
     # Pass all date information and todos to template
     $c->stash(
+        # Date strings
         current_date_str => $current_date_str,
         current_display => $current_display,
         selected_date => $selected_date,
         display_date => $display_date,
         prev_date => $prev_date,
         next_date => $next_date,
-        todos_for_today => $todos_for_today,
+        
+        # Week data
+        week_dates => \@week_dates,
+        start_of_week => $start_of_week,
+        end_of_week => $end_of_week,
+        prev_week_date => $prev_week_date,
+        next_week_date => $next_week_date,
+        
+        # Month data
+        calendar => \@calendar,
+        month_name => $dt->month_name,
+        year => $dt->year,
+        start_of_month => $start_of_month,
+        end_of_month => $end_of_month,
+        prev_month_date => $prev_month_date,
+        next_month_date => $next_month_date,
+        today => $current_date_str,
+        
+        # Todos
+        todos => $all_todos_calendar, # For week.tt
+        todos_for_today => $todos_for_today, # For day view
+        
         template => 'admin/documentation/DailyPlan.tt'
     );
 }

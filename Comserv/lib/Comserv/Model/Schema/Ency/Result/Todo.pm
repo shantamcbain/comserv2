@@ -17,6 +17,7 @@ __PACKAGE__->add_columns(
     },
     parent_todo => {
         data_type => 'varchar',
+        size => 255,
     },
     due_date => {
         data_type => 'date',
@@ -31,25 +32,48 @@ __PACKAGE__->add_columns(
     estimated_man_hours => {
         data_type => 'integer',
     },
-  "comments",
-  { data_type => "text", is_nullable => 1 },
+    comments => {
+        data_type => 'text',
+        is_nullable => 1,
+    },
     accumulative_time => {
         data_type => 'time',
+        is_nullable => 1,
     },
-    "reporter",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
-    "company_code",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
-    "owner",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
+    reporter => {
+        data_type => 'varchar',
+        size => 50,
+        is_nullable => 1,
+        default_value => '',
+    },
+    company_code => {
+        data_type => 'varchar',
+        size => 30,
+        is_nullable => 1,
+        default_value => '',
+    },
+    owner => {
+        data_type => 'varchar',
+        size => 30,
+        is_nullable => 1,
+        default_value => '',
+    },
     project_code => {
         data_type => 'varchar',
         size => 255,
     },
-    "developer",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 50 },
-    "username_of_poster",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
+    developer => {
+        data_type => 'varchar',
+        size => 50,
+        is_nullable => 1,
+        default_value => '',
+    },
+    username_of_poster => {
+        data_type => 'varchar',
+        size => 30,
+        is_nullable => 1,
+        default_value => '',
+    },
     status => {
         data_type => 'varchar',
         size => 255,
@@ -79,8 +103,12 @@ __PACKAGE__->add_columns(
     project_id => {
         data_type => 'integer',
     },
-    "date_time_posted",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
+    date_time_posted => {
+        data_type => 'varchar',
+        size => 30,
+        is_nullable => 1,
+        default_value => '',
+    },
     plan_id => {
         data_type => 'integer',
         is_nullable => 1,
@@ -107,11 +135,20 @@ __PACKAGE__->add_columns(
         data_type => 'date',
         is_nullable => 1,
     },
+    time_of_day => {
+        data_type => 'time',
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('record_id');
 __PACKAGE__->has_many(
     'logs' => 'Comserv::Model::Schema::Ency::Result::Log',
+    { 'foreign.todo_record_id' => 'self.record_id' },
+    { cascade_delete => 1 }
+);
+__PACKAGE__->has_many(
+    'intervals' => 'Comserv::Model::Schema::Ency::Result::TodoInterval',
     { 'foreign.todo_record_id' => 'self.record_id' },
     { cascade_delete => 1 }
 );

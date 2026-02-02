@@ -116,11 +116,359 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     $c->forward('View::JSON');
 }
 
+=head2 sync_primary_key_to_result
+
+Sync database primary key to Result file
+
+=cut
+
+sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    
+    try {
+        my $table_schema;
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        }
+        
+        my $pks = $table_schema->{primary_keys} || [];
+        my $pk_list = join(', ', map { "'$_'" } @$pks);
+        
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $table_key = lc($table_name);
+        my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+        
+        my $content = read_file($result_file_path);
+        
+        if ($content =~ /__PACKAGE__->set_primary_key\s*\(.*?\)\s*;/s) {
+            $content =~ s/__PACKAGE__->set_primary_key\s*\(.*?\)\s*;/__PACKAGE__->set_primary_key($pk_list);/s;
+        } else {
+            # Add after add_columns
+            if ($content =~ /(__PACKAGE__->add_columns\s*\(.*?\)\s*;)/s) {
+                my $match = $1;
+                $content =~ s/\Q$match\E/$match\n\n__PACKAGE__->set_primary_key($pk_list);/s;
+            } else {
+                die "Could not find add_columns block to insert primary key";
+            }
+        }
+        
+        write_file($result_file_path, $content);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced primary key for table '$table_name' to result file"
+        });
+        
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error syncing primary key: $_" });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+=head2 sync_primary_key_to_table
+
+Sync Result file primary key to database table
+
+=cut
+
+sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    
+    try {
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $table_key = lc($table_name);
+        my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+        
+        my $result_schema = $self->get_result_file_schema($c, $result_file_path);
+        my $pks = $result_schema->{primary_keys} || [];
+        
+        die "No primary keys found in Result file" unless @$pks;
+        
+        my $pk_list = join(', ', @$pks);
+        
+        my $dbh;
+        if ($database eq 'ency') {
+            $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        } elsif ($database eq 'forager') {
+            $dbh = $c->model('DBForager')->schema->storage->dbh;
+        }
+        
+        # Try to drop existing PK first, ignore error if none exists
+        eval { $dbh->do("ALTER TABLE $table_name DROP PRIMARY KEY") };
+        
+        # Add new PK
+        my $sql = "ALTER TABLE $table_name ADD PRIMARY KEY ($pk_list)";
+        $dbh->do($sql);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced primary key from result to table '$table_name'",
+            sql => $sql
+        });
+        
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error syncing primary key to table: $_" });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+=head2 sync_unique_constraint_to_table
+
+Sync Result file unique constraint to database table
+
+=cut
+
+sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constraint_to_table') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    my $constraint_name = $json_data->{constraint_name};
+    
+    try {
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $table_key = lc($table_name);
+        my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+        
+        my $result_schema = $self->get_result_file_schema($c, $result_file_path);
+        my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$result_schema->{unique_constraints} || []};
+        
+        die "Constraint '$constraint_name' not found in Result file" unless $constraint;
+        
+        my $cols_list = join(', ', @{$constraint->{columns}});
+        
+        my $dbh;
+        if ($database eq 'ency') {
+            $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        } elsif ($database eq 'forager') {
+            $dbh = $c->model('DBForager')->schema->storage->dbh;
+        }
+        
+        # Try to drop existing index first, ignore error if none exists
+        eval { $dbh->do("ALTER TABLE $table_name DROP INDEX $constraint_name") };
+        
+        # Add new constraint
+        my $sql = "ALTER TABLE $table_name ADD CONSTRAINT $constraint_name UNIQUE ($cols_list)";
+        $dbh->do($sql);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced unique constraint '$constraint_name' from result to table",
+            sql => $sql
+        });
+        
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error syncing unique constraint to table: $_" });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+=head2 sync_unique_constraint_to_result
+
+Sync database unique constraint to Result file
+
+=cut
+
+sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_constraint_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    my $constraint_name = $json_data->{constraint_name};
+    
+    try {
+        my $table_schema;
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        }
+        
+        my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$table_schema->{unique_constraints} || []};
+        die "Constraint '$constraint_name' not found in database" unless $constraint;
+        
+        my $cols_list = '[' . join(', ', map { "'$_'" } @{$constraint->{columns}}) . ']';
+        my $new_call = "__PACKAGE__->add_unique_constraint('$constraint_name' => $cols_list);";
+        
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $table_key = lc($table_name);
+        my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+        
+        my $content = read_file($result_file_path);
+        
+        if ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->add_unique_constraint\s*\(\s*['"]\Q$constraint_name\E['"]\s*=>\s*\[.*?\]\s*\)\s*;/ $new_call/s;
+        } else {
+            # Add after set_primary_key or add_columns
+            if ($content =~ /(__PACKAGE__->set_primary_key\s*\(.*?\)\s*;)/s) {
+                my $match = $1;
+                $content =~ s/\Q$match\E/$match\n$new_call/s;
+            } elsif ($content =~ /(__PACKAGE__->add_columns\s*\(.*?\)\s*;)/s) {
+                my $match = $1;
+                $content =~ s/\Q$match\E/$match\n\n$new_call/s;
+            } else {
+                die "Could not find insertion point for unique constraint";
+            }
+        }
+        
+        write_file($result_file_path, $content);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced unique constraint '$constraint_name' to result file"
+        });
+        
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error syncing unique constraint: $_" });
+    };
+    
+    $c->forward('View::JSON');
+}
+
 =head2 sync_result_to_table
 
 Sync Result file field to database table
 
 =cut
+
+sub sync_table_name_to_result :Path('/schema-comparison/sync_table_name_to_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $json_data;
+    try {
+        my $body = $c->req->body;
+        if ($body) {
+            local $/;
+            my $json_text = <$body>;
+            $json_data = decode_json($json_text);
+        } else {
+            die "No request body provided";
+        }
+    } catch {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
+        $c->forward('View::JSON');
+        return;
+    };
+    
+    my $table_name = $json_data->{table_name};
+    my $database = $json_data->{database};
+    
+    try {
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        my $table_key = lc($table_name);
+        my $result_file_path = $result_table_mapping->{$table_key}->{result_path};
+        
+        my $content = read_file($result_file_path);
+        
+        if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)\s*;/s) {
+            $content =~ s/__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)\s*;/ __PACKAGE__->table('$table_name');/s;
+        } else {
+            # Add before add_columns
+            if ($content =~ /(__PACKAGE__->add_columns)/s) {
+                $content =~ s/__PACKAGE__->add_columns/__PACKAGE__->table('$table_name');\n__PACKAGE__->add_columns/s;
+            } else {
+                die "Could not find add_columns block to insert table name";
+            }
+        }
+        
+        write_file($result_file_path, $content);
+        
+        $c->stash(json => {
+            success => 1,
+            message => "Successfully synced table name for '$table_name' to result file"
+        });
+        
+    } catch {
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => "Error syncing table name: $_" });
+    };
+    
+    $c->forward('View::JSON');
+}
 
 sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(0) {
     my ($self, $c) = @_;
@@ -603,34 +951,49 @@ sub update_result_field_from_table {
     
     my $content = read_file($result_file_path);
     
-    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
-    if ($table_field_info->{enum_list}) {
+    my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}',";
+    if ($table_field_info->{enum_list} && @{$table_field_info->{enum_list}}) {
         my $list_str = join("', '", @{$table_field_info->{enum_list}});
-        $new_field_def .= ", extra => { list => ['$list_str'] }";
+        $new_field_def .= "\n        extra => { list => ['$list_str'] },";
     }
-    $new_field_def .= ", size => $table_field_info->{size}" if $table_field_info->{size};
-    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
-    $new_field_def .= ", is_auto_increment => 1" if $table_field_info->{is_auto_increment};
+    $new_field_def .= "\n        size => $table_field_info->{size}," if $table_field_info->{size};
+    $new_field_def .= "\n        is_nullable => " . ($table_field_info->{is_nullable} ? 1 : 0) . ",";
+    $new_field_def .= "\n        is_auto_increment => 1," if $table_field_info->{is_auto_increment};
     if (defined $table_field_info->{default_value}) {
         my $def = $table_field_info->{default_value};
         $def =~ s/'/\\'/g;
-        $new_field_def .= ", default_value => '$def'";
+        $new_field_def .= "\n        default_value => '$def',";
     }
-    $new_field_def .= " }";
+    $new_field_def .= "\n    }";
     
-    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
-        my $columns_section = $1;
+    if ($content =~ /(__PACKAGE__->add_columns\s*\()(.*?)(\)\s*;)/s) {
+        my ($prefix, $columns_section, $suffix) = ($1, $2, $3);
         
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
-            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
-            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
-            
-            write_file($result_file_path, $content);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
-                "Updated field '$field_name' in result file '$result_file_path'");
-            
-            return 1;
+        # Look for field name followed by => { ... }
+        # We use a non-greedy match but try to catch the closing brace correctly
+        # Most DBIx::Class fields end with }, or just } at the end of add_columns
+        if ($columns_section =~ /(['"]?)$field_name\1\s*=>\s*\{/s) {
+            # Update existing field. We match from field name until the closing brace that is followed by a comma or closing paren
+            $columns_section =~ s/(['"]?)$field_name\1\s*=>\s*\{.*?\}(?=\s*(?:,|\s*$))/$field_name => $new_field_def/s;
+        } else {
+            # Add new field definition
+            # Ensure there's a comma before if not empty
+            $columns_section =~ s/\s+$//;
+            if ($columns_section =~ /\S/ && $columns_section !~ /,\s*$/) {
+                $columns_section .= ",";
+            }
+            $columns_section .= "\n    $field_name => $new_field_def,\n";
         }
+        
+        # Reconstruct content
+        my $new_add_columns = "__PACKAGE__->add_columns($columns_section);";
+        $content =~ s/__PACKAGE__->add_columns\s*\(.*?\)\s*;/$new_add_columns/s;
+        
+        write_file($result_file_path, $content);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_field_from_table',
+            "Updated/Added field '$field_name' in result file '$result_file_path'");
+        
+        return 1;
     }
     
     die "Could not update field '$field_name' in result file";
@@ -674,21 +1037,32 @@ sub update_table_field_from_result {
     my $extra = "";
     $extra = "AUTO_INCREMENT" if $result_field_info->{is_auto_increment};
     
-    my $sql = "ALTER TABLE $table_name MODIFY COLUMN $field_name $data_type $nullable $default $extra";
+    my $dbh;
+    if ($database eq 'ency') {
+        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+    } elsif ($database eq 'forager') {
+        $dbh = $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        die "Invalid database: $database";
+    }
+
+    # Check if column exists to determine if we should use ADD or MODIFY
+    my $column_exists = 0;
+    try {
+        my $sth = $dbh->prepare("SHOW COLUMNS FROM $table_name LIKE ?");
+        $sth->execute($field_name);
+        $column_exists = 1 if $sth->fetchrow_hashref;
+    } catch {
+        warn "Error checking column existence: $_";
+    };
+
+    my $action = $column_exists ? "MODIFY COLUMN" : "ADD COLUMN";
+    my $sql = "ALTER TABLE $table_name $action $field_name $data_type $nullable $default $extra";
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
-        "Executing SQL: $sql");
+        "Executing SQL ($action): $sql");
     
     try {
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        } else {
-            die "Invalid database: $database";
-        }
-        
         $dbh->do($sql);
     } catch {
         die "Error executing SQL: $_";
@@ -806,35 +1180,86 @@ Build mapping of table names to Result files
 sub build_result_table_mapping {
     my ($self, $c, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $schema = $c->model($model_name)->schema;
     my %mapping = ();
     
-    foreach my $source_name ($schema->sources) {
-        my $source = $schema->source($source_name);
-        my $table = $source->from;
+    # Get all Result files for this database by scanning the directory
+    my @result_files = $self->get_all_result_files($database);
+    
+    foreach my $result_file (@result_files) {
+        # Extract actual table name from Result file
+        my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
         
-        # Handle cases where 'from' might be a scalar ref (subquery) or other complex structure
-        next if ref($table);
-        
-        my $class = $schema->class($source_name);
-        my $rel_path = $class;
-        $rel_path =~ s/::/\//g;
-        $rel_path .= ".pm";
-        
-        # Use %INC to find the absolute path of the loaded module
-        my $full_path = $INC{$rel_path};
-        
-        if ($full_path) {
-            $mapping{lc($table)} = {
-                result_name => $source_name,
-                result_path => $full_path,
-                last_modified => (stat($full_path))[9] || 0
+        if ($table_name) {
+            $mapping{lc($table_name)} = {
+                result_name => $result_file->{name},
+                result_path => $result_file->{path},
+                last_modified => $result_file->{last_modified}
             };
         }
     }
     
     return \%mapping;
+}
+
+sub get_all_result_files {
+    my ($self, $database) = @_;
+    
+    my @result_files = ();
+    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    
+    if (lc($database) eq 'ency') {
+        my $result_dir = "$base_path/Ency/Result";
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
+    } elsif (lc($database) eq 'forager') {
+        my $result_dir = "$base_path/Forager/Result";
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
+    }
+    
+    return @result_files;
+}
+
+sub scan_result_directory_recursive {
+    my ($self, $dir_path, $prefix) = @_;
+    
+    my @files = ();
+    
+    if (opendir(my $dh, $dir_path)) {
+        while (my $file = readdir($dh)) {
+            next if $file =~ /^\.\.?$/;
+            
+            my $full_path = "$dir_path/$file";
+            
+            if (-d $full_path) {
+                push @files, $self->scan_result_directory_recursive($full_path, $prefix . $file . '/');
+            } elsif ($file =~ /\.pm$/) {
+                my $name = $file;
+                $name =~ s/\.pm$//;
+                
+                push @files, {
+                    name => $prefix . $name,
+                    path => $full_path,
+                    last_modified => (stat($full_path))[9]
+                };
+            }
+        }
+        closedir($dh);
+    }
+    
+    return @files;
+}
+
+sub extract_table_name_from_result_file {
+    my ($self, $file_path) = @_;
+    
+    return undef unless -f $file_path;
+    
+    my $content = read_file($file_path);
+    
+    if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
+        return $1;
+    }
+    
+    return undef;
 }
 
 =head2 get_ency_table_schema
@@ -868,6 +1293,7 @@ sub get_ency_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef
             };
             
@@ -938,6 +1364,7 @@ sub get_forager_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef
             };
             
@@ -977,11 +1404,388 @@ sub get_forager_table_schema {
     return $schema_info;
 }
 
-=head2 get_result_file_path
+=head2 get_field_comparison
 
-Get filesystem path for Result file
+AJAX endpoint to get detailed field comparison
 
 =cut
+
+sub get_field_comparison :Path('/schema-comparison/get_field_comparison') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
+        "Starting get_field_comparison action");
+    
+    my $table_name = $c->request->param('table_name');
+    my $database = $c->request->param('database');
+    
+    unless ($table_name && $database) {
+        $c->response->status(400);
+        $c->stash(json => {
+            success => 0,
+            error => 'Missing table_name or database parameter'
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        # Build comprehensive mapping for this database
+        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
+        
+        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
+        
+        $c->stash(json => {
+            success => 1,
+            comparison => $comparison,
+            debug_mode => $c->session->{debug_mode} ? 1 : 0
+        });
+        
+    } catch {
+        my $error = "Error getting field comparison for $table_name ($database): $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_field_comparison', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => {
+            success => 0,
+            error => $error
+        });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+=head2 get_table_result_comparison_v2
+
+Compare table and result file schemas (v2)
+
+=cut
+
+sub get_table_result_comparison_v2 {
+    my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
+    
+    # Get table schema
+    my $table_schema;
+    eval {
+        if ($database eq 'ency') {
+            $table_schema = $self->get_ency_table_schema($c, $table_name);
+        } elsif ($database eq 'forager') {
+            $table_schema = $self->get_forager_table_schema($c, $table_name);
+        } else {
+            die "Invalid database: $database";
+        }
+    };
+    if ($@) {
+        warn "Failed to get table schema for $table_name ($database): $@";
+        $table_schema = { columns => {} };
+    }
+    
+    # Check if this table has a corresponding result file using the mapping
+    my $table_key = lc($table_name);
+    my $result_info = $result_table_mapping->{$table_key};
+    my $result_schema = { columns => {} };
+    
+    if ($result_info && -f $result_info->{result_path}) {
+        eval {
+            $result_schema = $self->get_result_file_schema($c, $result_info->{result_path});
+        };
+        if ($@) {
+            warn "Failed to parse Result file $result_info->{result_path}: $@";
+            $result_schema = { columns => {} };
+        }
+    }
+    
+    # Create field comparison
+    my $comparison = {
+        table_name => $table_name,
+        database => $database,
+        has_result_file => $result_info ? 1 : 0,
+        result_file_path => $result_info ? $result_info->{result_path} : undef,
+        package_table => $result_schema->{table_name},
+        fields => {},
+        primary_keys => {
+            table => $table_schema->{primary_keys} || [],
+            result => $result_schema->{primary_keys} || []
+        },
+        unique_constraints => {
+            table => $table_schema->{unique_constraints} || [],
+            result => $result_schema->{unique_constraints} || []
+        },
+        relationships => $result_schema->{relationships} || {},
+        raw_package_calls => $result_schema->{raw_package_calls} || []
+    };
+    
+    # Get all unique field names from both sources
+    my %all_fields = ();
+    if ($table_schema && $table_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$table_schema->{columns}});
+    }
+    if ($result_schema && $result_schema->{columns}) {
+        %all_fields = (%all_fields, map { $_ => 1 } keys %{$result_schema->{columns}});
+    }
+    
+    # Compare each field
+    foreach my $field_name (sort keys %all_fields) {
+        my $table_field = $table_schema->{columns}->{$field_name};
+        my $result_field = $result_schema->{columns}->{$field_name};
+        
+        # Add primary key and foreign key status to field data
+        if ($table_field) {
+            $table_field->{is_primary_key} = (grep { $_ eq $field_name } @{$table_schema->{primary_keys} || []}) ? 1 : 0;
+            $table_field->{is_foreign_key} = (grep { $_->{column} eq $field_name } @{$table_schema->{foreign_keys} || []}) ? 1 : 0;
+        }
+        if ($result_field) {
+            $result_field->{is_primary_key} = (grep { $_ eq $field_name } @{$result_schema->{primary_keys} || []}) ? 1 : 0;
+            unless ($result_field->{is_foreign_key}) {
+                $result_field->{is_foreign_key} = (grep { ($_->{column} || '') eq $field_name } values %{$result_schema->{relationships} || {}}) ? 1 : 0;
+            }
+        }
+        
+        $comparison->{fields}->{$field_name} = {
+            table => $table_field,
+            result => $result_field,
+            differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
+        };
+    }
+    
+    # Add high-level differences for __PACKAGE__ attributes
+    $comparison->{differences} = $self->find_schema_differences($table_schema, $result_schema, $table_name);
+    
+    return $comparison;
+}
+
+=head2 find_schema_differences
+
+Find high-level differences including PK and Unique constraints
+
+=cut
+
+sub find_schema_differences {
+    my ($self, $db_schema, $result_schema, $actual_table_name) = @_;
+    
+    my @differences = ();
+    
+    # Compare __PACKAGE__->table
+    if ($result_schema->{table_name} && $actual_table_name && $result_schema->{table_name} ne $actual_table_name) {
+        push @differences, {
+            type => 'table_name_mismatch',
+            attribute => 'table',
+            table_value => $actual_table_name,
+            result_value => $result_schema->{table_name},
+            description => "Table name mismatch in __PACKAGE__->table"
+        };
+    }
+    
+    # Column presence/absence differences are already handled by get_table_result_comparison_v2
+    # but we can add them here for a summary
+    
+    # Compare Primary Keys
+    my @db_pks = sort @{$db_schema->{primary_keys} || []};
+    my @result_pks = sort @{$result_schema->{primary_keys} || []};
+    
+    if (join(',', @db_pks) ne join(',', @result_pks)) {
+        push @differences, {
+            type => 'primary_key_mismatch',
+            attribute => 'set_primary_key',
+            table_value => join(', ', @db_pks) || 'None',
+            result_value => join(', ', @result_pks) || 'None',
+            description => "Primary key mismatch"
+        };
+    }
+    
+    # Compare Unique Constraints
+    # This is more complex because they have names
+    my %db_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints} || []};
+    my %result_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$result_schema->{unique_constraints} || []};
+    
+    foreach my $name (keys %db_uniques) {
+        if (!exists $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_result',
+                attribute => "add_unique_constraint ($name)",
+                table_value => $db_uniques{$name},
+                result_value => undef,
+                description => "Unique constraint '$name' missing in Result file"
+            };
+        } elsif ($db_uniques{$name} ne $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_mismatch',
+                attribute => "add_unique_constraint ($name)",
+                table_value => $db_uniques{$name},
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' column mismatch"
+            };
+        }
+    }
+    
+    foreach my $name (keys %result_uniques) {
+        if (!exists $db_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_table',
+                attribute => "add_unique_constraint ($name)",
+                table_value => undef,
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' exists in Result file but not in database"
+            };
+        }
+    }
+    
+    return \@differences;
+}
+
+sub compare_field_attributes {
+    my ($self, $table_field, $result_field, $c, $field_name) = @_;
+    
+    my @differences = ();
+    my @attributes = qw(data_type size is_nullable is_auto_increment is_primary_key is_foreign_key default_value extra);
+    
+    foreach my $attr (@attributes) {
+        my $table_value = $table_field ? $table_field->{$attr} : undef;
+        my $result_value = $result_field ? $result_field->{$attr} : undef;
+        
+        my $orig_table = $table_value;
+        my $orig_result = $result_value;
+        
+        $table_value = $self->normalize_field_value($attr, $table_value);
+        $result_value = $self->normalize_field_value($attr, $result_value);
+        
+        if (defined $table_value && defined $result_value) {
+            if ($table_value ne $result_value) {
+                push @differences, {
+                    attribute => $attr,
+                    table_value => $table_value,
+                    result_value => $result_value,
+                    original_table_value => $orig_table,
+                    original_result_value => $orig_result,
+                    type => 'different'
+                };
+            }
+        } elsif (defined $table_value && !defined $result_value) {
+            push @differences, {
+                attribute => $attr,
+                table_value => $table_value,
+                result_value => undef,
+                type => 'missing_in_result'
+            };
+        } elsif (!defined $table_value && defined $result_value) {
+            push @differences, {
+                attribute => $attr,
+                table_value => undef,
+                result_value => $result_value,
+                type => 'missing_in_table'
+            };
+        }
+    }
+    
+    return \@differences;
+}
+
+sub normalize_field_value {
+    my ($self, $attribute, $value) = @_;
+    return undef unless defined $value;
+    
+    if ($attribute eq 'data_type') {
+        return $self->normalize_data_type($value);
+    }
+    if ($attribute =~ /^is_/) {
+        return $value ? 1 : 0;
+    }
+    if ($attribute eq 'size') {
+        return "$value" if $value =~ /^[\d,]+$/;
+    }
+    return "$value";
+}
+
+sub normalize_data_type {
+    my ($self, $data_type) = @_;
+    return '' unless defined $data_type;
+    $data_type = lc($data_type);
+    $data_type =~ s/\([^)]*\)//g;
+    $data_type =~ s/^\s+|\s+$//g;
+    $data_type =~ s/\s+(unsigned|signed|zerofill|binary)//g;
+    
+    my %mapping = (
+        'int' => 'integer', 'int4' => 'integer', 'integer' => 'integer',
+        'varchar' => 'varchar', 'text' => 'text', 'longtext' => 'text',
+        'tinyint' => 'boolean', 'bool' => 'boolean', 'boolean' => 'boolean',
+        'datetime' => 'datetime', 'timestamp' => 'timestamp', 'json' => 'json'
+    );
+    return $mapping{$data_type} || $data_type;
+}
+
+sub get_result_file_schema {
+    my ($self, $c, $file_path) = @_;
+    
+    my $schema_info = {
+        file_path => $file_path,
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        relationships => {},
+        table_name => undef,
+        raw_package_calls => []
+    };
+    
+    try {
+        my $content = read_file($file_path);
+        
+        if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
+            $schema_info->{table_name} = $1;
+        }
+        
+        while ($content =~ /(__PACKAGE__->(\w+)\s*\((.*?)\)\s*;)/gs) {
+            push @{$schema_info->{raw_package_calls}}, {
+                full => $1, method => $2, args => $3
+            };
+        }
+        
+        if ($content =~ /__PACKAGE__->add_columns\s*\((.*?)\);/s) {
+            $schema_info->{columns} = $self->parse_result_file_columns($1);
+        }
+        
+        if ($content =~ /__PACKAGE__->set_primary_key\s*\((.*?)\)/s) {
+            my $pk_text = $1;
+            $pk_text =~ s/['"\s]//g;
+            @{$schema_info->{primary_keys}} = split(/,/, $pk_text);
+        }
+        
+        while ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*(?:['"]([^'"]+)['"]\s*=>\s*)?\[(.*?)\]\s*\)/gs) {
+            my $name = $1 || 'unnamed';
+            my $cols = $2;
+            $cols =~ s/['"\s]//g;
+            push @{$schema_info->{unique_constraints}}, {
+                name => $name, columns => [split(/,/, $cols)]
+            };
+        }
+        
+        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\s*\(\s*['"]?(\w+)['"]?\s*=>\s*['"]?([^'",\s\)]+)['"]?\s*(?:,\s*(?:['"]?(\w+)['"]?|\{(.*?)\}))?/gs) {
+            my ($type, $accessor, $class, $fk) = ($1, $2, $3, $4);
+            $schema_info->{relationships}->{$accessor} = {
+                type => $type, class => $class, column => $fk || $accessor
+            };
+        }
+    } catch {
+        warn "Error parsing Result file $file_path: $_";
+    };
+    
+    return $schema_info;
+}
+
+sub parse_result_file_columns {
+    my ($self, $text) = @_;
+    my $columns = {};
+    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
+        my ($name, $def) = ($1, $2);
+        my $info = {};
+        while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
+            my $attr = $1;
+            my $val = $2 // $3 // $4 // $5;
+            $info->{$attr} = $val;
+        }
+        $columns->{$name} = $info;
+    }
+    return $columns;
+}
 
 sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
