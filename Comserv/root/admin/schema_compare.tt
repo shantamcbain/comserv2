@@ -39,6 +39,17 @@
     
     <!-- Database Environment Selector -->
     <div class="db-env-selector" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
+        <!-- Full Dev Mode Checkbox -->
+        <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+            <label style="cursor: pointer; font-weight: bold;">
+                <input type="checkbox" id="fullDevMode" [% c.session.in_dev_mode ? 'checked' : '' %]> 
+                <i class="fas fa-code"></i> Full Dev Mode — Routes entire app to dev database
+            </label>
+            <small style="display: block; margin-left: 20px; color: #856404;">
+                When enabled, all database operations use the development environment
+            </small>
+        </div>
+        
         <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <strong><i class="fas fa-server"></i> Database Environment:</strong>
             <select id="dbEnvironmentSelect" onchange="switchEnvironment(this.value)" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
@@ -1867,6 +1878,18 @@ function submitNewEnvironment(event) {
         console.error('Error:', error);
     });
 }
+
+// Handle Full Dev Mode checkbox
+document.getElementById('fullDevMode').addEventListener('change', function() {
+    const currentEnv = document.getElementById('dbEnvironmentSelect').value;
+    if (this.checked) {
+        // Enable full dev mode
+        location.href = '[% c.uri_for("/admin/schema_compare") %]?full_dev=1&environment=' + currentEnv;
+    } else {
+        // Disable full dev mode
+        location.href = '[% c.uri_for("/admin/schema_compare") %]?full_dev=0&environment=' + currentEnv;
+    }
+});
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
