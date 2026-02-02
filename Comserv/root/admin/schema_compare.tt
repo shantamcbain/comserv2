@@ -39,7 +39,7 @@
     
     <!-- Database Environment Selector -->
     <div class="db-env-selector" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
-        <div style="display: flex; align-items: center; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
             <strong><i class="fas fa-server"></i> Database Environment:</strong>
             <select id="dbEnvironmentSelect" onchange="switchEnvironment(this.value)" style="padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; min-width: 200px;">
                 [% FOREACH env IN available_environments %]
@@ -49,6 +49,8 @@
                 </option>
                 [% END %]
                 [% END %]
+                <!-- Static development option - always available -->
+                <option value="development" [% active_environment == 'development' ? 'selected' : '' %]>Development</option>
             </select>
             <span id="envBadge" class="env-badge env-badge-[% active_environment %]" style="padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">
                 [% active_environment.ucfirst %]
@@ -58,6 +60,59 @@
                 <i class="fas fa-exclamation-triangle"></i> Caution: Production Database
             </span>
             [% END %]
+            <button type="button" onclick="toggleAddForm()" style="padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                <i class="fas fa-plus"></i> Add New Environment
+            </button>
+        </div>
+        
+        <!-- Add New Environment Form (hidden by default) -->
+        <div id="addEnvForm" style="display: none; margin-top: 15px; padding: 15px; background: white; border: 1px solid #dee2e6; border-radius: 4px;">
+            <h4 style="margin-top: 0;">Add New Database Environment</h4>
+            <form id="newEnvForm" onsubmit="submitNewEnvironment(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Environment Name:</label>
+                        <input type="text" id="newEnvName" name="env_name" placeholder="e.g., staging, test" required 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Display Name:</label>
+                        <input type="text" id="newEnvDisplayName" name="display_name" placeholder="e.g., Staging" required 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Host:</label>
+                        <input type="text" id="newEnvHost" name="db_host" placeholder="e.g., 192.168.1.100" required 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Name:</label>
+                        <input type="text" id="newEnvDbName" name="db_name" placeholder="e.g., ency_staging" required 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Port:</label>
+                        <input type="number" id="newEnvPort" name="port" value="3306" required 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Warning Level:</label>
+                        <select id="newEnvWarning" name="warning_level" style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                            <option value="low">Low (Green)</option>
+                            <option value="medium" selected>Medium (Yellow)</option>
+                            <option value="high">High (Red)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="fas fa-save"></i> Save Environment
+                    </button>
+                    <button type="button" onclick="toggleAddForm()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     
@@ -150,12 +205,16 @@
     [% IF database_comparison.ency.connection_status == 'connected' OR database_comparison.forager.connection_status == 'connected' %]
         
         <!-- Ency Database Section -->
-        [% IF database_comparison.ency.connection_status == 'connected' %]
+        [% IF database_comparison.ency.connection_status == 'connected' OR 1 %]
         <div class="schema-section">
             <button class="section-toggle" onclick="toggleSection(this)">
                 <span>
                     <i class="fas fa-database"></i> [% database_comparison.ency.display_name %]
+                    [% IF database_comparison.ency.connection_status == 'connected' %]
                     <span class="status-badge connected">Connected</span>
+                    [% ELSE %]
+                    <span class="status-badge" style="background-color: #dc3545;">Not Connected</span>
+                    [% END %]
                     <span class="table-count">[% database_comparison.ency.table_count %] tables</span>
                 </span>
                 <i class="fas fa-chevron-right"></i>
@@ -295,12 +354,16 @@
         [% END %]
         
         <!-- Forager Database Section -->
-        [% IF database_comparison.forager.connection_status == 'connected' %]
+        [% IF database_comparison.forager.connection_status == 'connected' OR 1 %]
         <div class="schema-section">
             <button class="section-toggle" onclick="toggleSection(this)">
                 <span>
                     <i class="fas fa-database"></i> [% database_comparison.forager.display_name %]
+                    [% IF database_comparison.forager.connection_status == 'connected' %]
                     <span class="status-badge connected">Connected</span>
+                    [% ELSE %]
+                    <span class="status-badge" style="background-color: #dc3545;">Not Connected</span>
+                    [% END %]
                     <span class="table-count">[% database_comparison.forager.table_count %] tables</span>
                 </span>
                 <i class="fas fa-chevron-right"></i>
@@ -1754,6 +1817,55 @@ function switchEnvironment(environment) {
     
     // Store environment preference in session and reload
     window.location.href = '[% c.uri_for("/admin/schema_compare") %]?environment=' + environment;
+}
+
+// Toggle add environment form visibility
+function toggleAddForm() {
+    const form = document.getElementById('addEnvForm');
+    if (form.style.display === 'none' || form.style.display === '') {
+        form.style.display = 'block';
+    } else {
+        form.style.display = 'none';
+    }
+}
+
+// Submit new environment form
+function submitNewEnvironment(event) {
+    event.preventDefault();
+    
+    const formData = {
+        env_name: document.getElementById('newEnvName').value,
+        display_name: document.getElementById('newEnvDisplayName').value,
+        db_host: document.getElementById('newEnvHost').value,
+        db_name: document.getElementById('newEnvDbName').value,
+        port: document.getElementById('newEnvPort').value,
+        warning_level: document.getElementById('newEnvWarning').value
+    };
+    
+    // TODO: Submit to backend endpoint
+    fetch('[% c.uri_for("/admin/database-env/add") %]', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Environment added successfully!');
+            toggleAddForm();
+            document.getElementById('newEnvForm').reset();
+            // Reload page to show new environment
+            window.location.reload();
+        } else {
+            alert('Error adding environment: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Failed to add environment: ' + error);
+        console.error('Error:', error);
+    });
 }
 
 // Initialize page
