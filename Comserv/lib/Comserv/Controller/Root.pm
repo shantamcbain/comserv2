@@ -654,6 +654,19 @@ sub auto :Private {
         
         $c->stash->{db_connections} = \@db_connections;
         
+        # Set active database environment
+        eval {
+            require Comserv::Util::DatabaseEnv;
+            my $db_env = Comserv::Util::DatabaseEnv->new();
+            my $active_env = $db_env->get_active_environment($c);
+            $c->stash->{active_db_environment} = $active_env;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Error getting active database environment: $@");
+            $c->stash->{active_db_environment} = 'production';
+        }
+        
         # CRITICAL DIAGNOSTICS: Log actual values before stash assignment
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
             "DEBUG: system_info->{hostname}='" . (defined $system_info->{hostname} ? $system_info->{hostname} : 'UNDEF') . "', " .
