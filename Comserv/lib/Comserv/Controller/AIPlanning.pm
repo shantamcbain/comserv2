@@ -362,6 +362,8 @@ sub create_plan_entry :Path('/ai/planning/daily_plan/entry') :Args(0) {
             metadata => encode_json($metadata),
         });
         
+        $entry->discard_changes;
+        
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'create_plan_entry', "Created entry ${\$entry->id} for plan $plan_id");
         
@@ -377,7 +379,7 @@ sub create_plan_entry :Path('/ai/planning/daily_plan/entry') :Args(0) {
                 zenflow_task_id => $entry->zenflow_task_id,
                 ai_conversation_id => $entry->ai_conversation_id,
                 status => $entry->status,
-                created_at => $entry->created_at->datetime,
+                created_at => $entry->created_at ? $entry->created_at->datetime : undef,
                 created_by => $entry->created_by,
             },
             message => "Daily plan entry created"
@@ -638,6 +640,8 @@ sub create_entry_from_conversation :Path('/ai/planning/daily_plan/entry/from_con
             created_by => $c->session->{username} || 'ai_system',
             metadata => encode_json($metadata),
         });
+        
+        $entry->discard_changes;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'create_entry_from_conversation', 
