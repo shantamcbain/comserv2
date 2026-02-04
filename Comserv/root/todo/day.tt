@@ -45,7 +45,7 @@
        
        IF todo.due_date AND todo.due_date < date;
            temp_overdue_todos.push(todo);
-       ELSIF (todo.due_date == date OR todo.start_date == date);
+       ELSIF (todo.due_date AND todo.due_date == date) OR (todo.start_date AND todo.start_date == date);
            # Strict date match: only include if it explicitly belongs to the viewed date
            temp_today_todos.push(todo);
        END;
@@ -342,6 +342,21 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/todo[% url_hash %]" title="Back to Todo List">📋</a>
         <a href="/todo/day/[% next_date %][% url_hash %]" title="Next Day">→</a>
     </div>
+[% END %]
+
+[% IF debug_mode == 1 %]
+<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">
+    <h4>Debug: Day View Data</h4>
+    <p><strong>Viewing Date:</strong> [% date %]</p>
+    <p><strong>Overdue Todos Count:</strong> [% overdue_todos.size %]</p>
+    <p><strong>Today Todos Count:</strong> [% todos.size %]</p>
+    <p><strong>Raw todos array size:</strong> [% todos.size %]</p>
+    <details>
+        <summary>Show all todos in stash (before filtering)</summary>
+        [% USE Dumper %]
+        <pre>[% Dumper.dump(todos) %]</pre>
+    </details>
+</div>
 [% END %]
 
 [% IF overdue_todos.size > 0 %]
