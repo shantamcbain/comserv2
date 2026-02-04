@@ -1205,7 +1205,8 @@ sub get_all_result_files {
     my ($self, $database) = @_;
     
     my @result_files = ();
-    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    my $lib_path = dirname(dirname(dirname(dirname(__FILE__))));
+    my $base_path = "$lib_path/Comserv/Model/Schema";
     
     if (lc($database) eq 'ency') {
         my $result_dir = "$base_path/Ency/Result";
