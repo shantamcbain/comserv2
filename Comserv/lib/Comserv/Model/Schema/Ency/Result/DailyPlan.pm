@@ -79,6 +79,12 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->has_many(
+    'entries' => 'Comserv::Model::Schema::Ency::Result::DailyPlanEntry',
+    'plan_id',
+    { cascade_delete => 1 }
+);
+
 __PACKAGE__->many_to_many(
     'projects' => 'dailyplan_projects',
     'project'

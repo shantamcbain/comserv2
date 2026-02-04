@@ -221,21 +221,110 @@ sub get_project_tasks :Path('/ai/planning/tasks') :Args(0) {
     };
 }
 
-sub create_daily_plan_entry :Path('/ai/planning/daily_plan') :Args(0) {
+sub get_daily_plan :Path('/ai/planning/daily_plan') :Args(0) {
     my ($self, $c) = @_;
     
     $c->response->content_type('application/json');
     
     my $params = $c->req->params;
-    my $date = $params->{date} || DateTime->now->ymd;
-    my $task_description = $params->{task_description};
-    my $zenflow_task_id = $params->{zenflow_task_id};
+    my $plan_id = $params->{plan_id};
+    my $plan_name = $params->{plan_name};
+    my $sitename = $params->{sitename} || $c->session->{SiteName} || 'CSC';
+    my $include_entries = $params->{include_entries};
     
-    unless ($task_description) {
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my %search = (sitename => $sitename);
+        $search{id} = $plan_id if $plan_id;
+        $search{plan_name} = $plan_name if $plan_name;
+        
+        my @plans = $schema->resultset('DailyPlan')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' } }
+        )->all;
+        
+        my @plans_data;
+        foreach my $plan (@plans) {
+            my $plan_data = {
+                id => $plan->id,
+                plan_name => $plan->plan_name,
+                plan_description => $plan->plan_description,
+                sitename => $plan->sitename,
+                status => $plan->status,
+                start_date => $plan->start_date,
+                due_date => $plan->due_date,
+                priority => $plan->priority,
+                created_by => $plan->created_by,
+                created_at => $plan->created_at->datetime,
+            };
+            
+            if ($include_entries) {
+                my @entries = $plan->entries->search(
+                    {},
+                    { order_by => ['entry_time', 'created_at'] }
+                )->all;
+                
+                my @entries_data;
+                foreach my $entry (@entries) {
+                    push @entries_data, {
+                        id => $entry->id,
+                        entry_type => $entry->entry_type,
+                        entry_time => $entry->entry_time,
+                        title => $entry->title,
+                        description => $entry->description,
+                        zenflow_task_id => $entry->zenflow_task_id,
+                        ai_conversation_id => $entry->ai_conversation_id,
+                        status => $entry->status,
+                        created_at => $entry->created_at->datetime,
+                        created_by => $entry->created_by,
+                        metadata => $entry->get_metadata,
+                    };
+                }
+                $plan_data->{entries} = \@entries_data;
+                $plan_data->{entry_count} = scalar(@entries_data);
+            }
+            
+            push @plans_data, $plan_data;
+        }
+        
+        $c->response->body(encode_json({
+            success => 1,
+            plans => \@plans_data,
+            count => scalar(@plans_data)
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_daily_plan', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to retrieve daily plans: $_"
+        }));
+    };
+}
+
+sub create_plan_entry :Path('/ai/planning/daily_plan/entry') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $params = $c->req->params;
+    my $plan_id = $params->{plan_id};
+    my $entry_type = $params->{entry_type} || 'task';
+    my $title = $params->{title};
+    my $description = $params->{description};
+    my $zenflow_task_id = $params->{zenflow_task_id};
+    my $ai_conversation_id = $params->{ai_conversation_id};
+    my $entry_time = $params->{entry_time};
+    my $status = $params->{status} || 'pending';
+    
+    unless ($plan_id && $title) {
         $c->response->status(400);
         $c->response->body(encode_json({
             success => 0,
-            error => 'task_description required'
+            error => 'plan_id and title required'
         }));
         return;
     }
@@ -243,37 +332,391 @@ sub create_daily_plan_entry :Path('/ai/planning/daily_plan') :Args(0) {
     try {
         my $schema = $c->model('DBEncy')->schema;
         
-        my $daily_plan = $schema->resultset('DailyPlan')->find_or_create({
-            date => $date,
-            user_id => $c->session->{user_id} || 1,
-        });
+        my $plan = $schema->resultset('DailyPlan')->find($plan_id);
+        unless ($plan) {
+            $c->response->status(404);
+            $c->response->body(encode_json({
+                success => 0,
+                error => 'Daily plan not found'
+            }));
+            return;
+        }
         
-        my $current_notes = $daily_plan->notes || '';
-        my $new_entry = "\n\n[" . DateTime->now->hms . "] ";
-        $new_entry .= "(Zenflow: $zenflow_task_id) " if $zenflow_task_id;
-        $new_entry .= $task_description;
+        my $metadata = {};
+        if ($params->{metadata}) {
+            eval {
+                $metadata = decode_json($params->{metadata});
+            };
+        }
         
-        $daily_plan->update({
-            notes => $current_notes . $new_entry
+        my $entry = $schema->resultset('DailyPlanEntry')->create({
+            plan_id => $plan_id,
+            entry_type => $entry_type,
+            entry_time => $entry_time,
+            title => $title,
+            description => $description,
+            zenflow_task_id => $zenflow_task_id,
+            ai_conversation_id => $ai_conversation_id,
+            status => $status,
+            created_by => $c->session->{username} || 'system',
+            metadata => encode_json($metadata),
         });
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'create_daily_plan_entry', "Added entry to daily plan for $date");
+            'create_plan_entry', "Created entry ${\$entry->id} for plan $plan_id");
         
         $c->response->body(encode_json({
             success => 1,
-            daily_plan_id => $daily_plan->id,
-            date => $date,
-            message => "Entry added to daily plan"
+            entry => {
+                id => $entry->id,
+                plan_id => $entry->plan_id,
+                entry_type => $entry->entry_type,
+                entry_time => $entry->entry_time,
+                title => $entry->title,
+                description => $entry->description,
+                zenflow_task_id => $entry->zenflow_task_id,
+                ai_conversation_id => $entry->ai_conversation_id,
+                status => $entry->status,
+                created_at => $entry->created_at->datetime,
+                created_by => $entry->created_by,
+            },
+            message => "Daily plan entry created"
         }));
         
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'create_daily_plan_entry', "Error: $_");
+            'create_plan_entry', "Error: $_");
         $c->response->status(500);
         $c->response->body(encode_json({
             success => 0,
-            error => "Failed to create daily plan entry: $_"
+            error => "Failed to create entry: $_"
+        }));
+    };
+}
+
+sub update_plan_entry :Path('/ai/planning/daily_plan/entry') :Args(1) {
+    my ($self, $c, $entry_id) = @_;
+    
+    return unless $c->req->method eq 'PUT' || $c->req->method eq 'POST';
+    
+    $c->response->content_type('application/json');
+    
+    my $params = $c->req->params;
+    
+    unless ($entry_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({
+            success => 0,
+            error => 'entry_id required'
+        }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $entry = $schema->resultset('DailyPlanEntry')->find($entry_id);
+        unless ($entry) {
+            $c->response->status(404);
+            $c->response->body(encode_json({
+                success => 0,
+                error => 'Entry not found'
+            }));
+            return;
+        }
+        
+        my %update_data;
+        $update_data{title} = $params->{title} if $params->{title};
+        $update_data{description} = $params->{description} if defined $params->{description};
+        $update_data{status} = $params->{status} if $params->{status};
+        $update_data{entry_time} = $params->{entry_time} if $params->{entry_time};
+        $update_data{entry_type} = $params->{entry_type} if $params->{entry_type};
+        
+        if ($params->{metadata}) {
+            my $metadata = {};
+            eval {
+                $metadata = decode_json($params->{metadata});
+            };
+            $update_data{metadata} = encode_json($metadata) if keys %$metadata;
+        }
+        
+        $entry->update(\%update_data);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'update_plan_entry', "Updated entry $entry_id");
+        
+        $c->response->body(encode_json({
+            success => 1,
+            entry => {
+                id => $entry->id,
+                plan_id => $entry->plan_id,
+                entry_type => $entry->entry_type,
+                entry_time => $entry->entry_time,
+                title => $entry->title,
+                description => $entry->description,
+                status => $entry->status,
+            },
+            message => "Entry updated"
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'update_plan_entry', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to update entry: $_"
+        }));
+    };
+}
+
+sub delete_plan_entry :Path('/ai/planning/daily_plan/entry') :Args(1) {
+    my ($self, $c, $entry_id) = @_;
+    
+    return unless $c->req->method eq 'DELETE';
+    
+    $c->response->content_type('application/json');
+    
+    unless ($entry_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({
+            success => 0,
+            error => 'entry_id required'
+        }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $entry = $schema->resultset('DailyPlanEntry')->find($entry_id);
+        unless ($entry) {
+            $c->response->status(404);
+            $c->response->body(encode_json({
+                success => 0,
+                error => 'Entry not found'
+            }));
+            return;
+        }
+        
+        $entry->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'delete_plan_entry', "Deleted entry $entry_id");
+        
+        $c->response->body(encode_json({
+            success => 1,
+            message => "Entry deleted"
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'delete_plan_entry', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to delete entry: $_"
+        }));
+    };
+}
+
+sub get_plan_entries :Path('/ai/planning/daily_plan/entries') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $params = $c->req->params;
+    my $plan_id = $params->{plan_id};
+    my $zenflow_task_id = $params->{zenflow_task_id};
+    my $ai_conversation_id = $params->{ai_conversation_id};
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my %search;
+        $search{plan_id} = $plan_id if $plan_id;
+        $search{zenflow_task_id} = $zenflow_task_id if $zenflow_task_id;
+        $search{ai_conversation_id} = $ai_conversation_id if $ai_conversation_id;
+        
+        my @entries = $schema->resultset('DailyPlanEntry')->search(
+            \%search,
+            { order_by => ['entry_time', 'created_at'] }
+        )->all;
+        
+        my @entries_data;
+        foreach my $entry (@entries) {
+            push @entries_data, {
+                id => $entry->id,
+                plan_id => $entry->plan_id,
+                entry_type => $entry->entry_type,
+                entry_time => $entry->entry_time,
+                title => $entry->title,
+                description => $entry->description,
+                zenflow_task_id => $entry->zenflow_task_id,
+                ai_conversation_id => $entry->ai_conversation_id,
+                status => $entry->status,
+                created_at => $entry->created_at->datetime,
+                created_by => $entry->created_by,
+                metadata => $entry->get_metadata,
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => 1,
+            entries => \@entries_data,
+            count => scalar(@entries_data)
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_plan_entries', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to retrieve entries: $_"
+        }));
+    };
+}
+
+sub create_entry_from_conversation :Path('/ai/planning/daily_plan/entry/from_conversation') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $params = $c->req->params;
+    my $conversation_id = $params->{conversation_id};
+    my $plan_id = $params->{plan_id};
+    my $title = $params->{title};
+    my $description = $params->{description};
+    my $zenflow_task_id = $params->{zenflow_task_id};
+    
+    unless ($conversation_id && $plan_id && $title) {
+        $c->response->status(400);
+        $c->response->body(encode_json({
+            success => 0,
+            error => 'conversation_id, plan_id, and title required'
+        }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $conversation = $schema->resultset('AiConversation')->find($conversation_id);
+        unless ($conversation) {
+            $c->response->status(404);
+            $c->response->body(encode_json({
+                success => 0,
+                error => 'Conversation not found'
+            }));
+            return;
+        }
+        
+        my $plan = $schema->resultset('DailyPlan')->find($plan_id);
+        unless ($plan) {
+            $c->response->status(404);
+            $c->response->body(encode_json({
+                success => 0,
+                error => 'Daily plan not found'
+            }));
+            return;
+        }
+        
+        my $metadata = {
+            source => 'ai_conversation',
+            agent => $params->{agent_id} || 'unknown',
+        };
+        
+        my $entry = $schema->resultset('DailyPlanEntry')->create({
+            plan_id => $plan_id,
+            entry_type => 'ai_action',
+            title => $title,
+            description => $description,
+            zenflow_task_id => $zenflow_task_id,
+            ai_conversation_id => $conversation_id,
+            status => 'pending',
+            created_by => $c->session->{username} || 'ai_system',
+            metadata => encode_json($metadata),
+        });
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'create_entry_from_conversation', 
+            "Created AI entry ${\$entry->id} linked to conversation $conversation_id");
+        
+        $c->response->body(encode_json({
+            success => 1,
+            entry => {
+                id => $entry->id,
+                plan_id => $entry->plan_id,
+                entry_type => $entry->entry_type,
+                title => $entry->title,
+                description => $entry->description,
+                ai_conversation_id => $entry->ai_conversation_id,
+                status => $entry->status,
+            },
+            message => "AI-generated daily plan entry created"
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'create_entry_from_conversation', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to create entry: $_"
+        }));
+    };
+}
+
+sub get_conversation_entries :Path('/ai/planning/daily_plan/entries/by_conversation') :Args(1) {
+    my ($self, $c, $conversation_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($conversation_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({
+            success => 0,
+            error => 'conversation_id required'
+        }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my @entries = $schema->resultset('DailyPlanEntry')->search(
+            { ai_conversation_id => $conversation_id },
+            { order_by => ['created_at'] }
+        )->all;
+        
+        my @entries_data;
+        foreach my $entry (@entries) {
+            push @entries_data, {
+                id => $entry->id,
+                plan_id => $entry->plan_id,
+                entry_type => $entry->entry_type,
+                title => $entry->title,
+                description => $entry->description,
+                status => $entry->status,
+                created_at => $entry->created_at->datetime,
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => 1,
+            entries => \@entries_data,
+            count => scalar(@entries_data),
+            conversation_id => $conversation_id
+        }));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'get_conversation_entries', "Error: $_");
+        $c->response->status(500);
+        $c->response->body(encode_json({
+            success => 0,
+            error => "Failed to retrieve entries: $_"
         }));
     };
 }
