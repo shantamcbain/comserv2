@@ -20,7 +20,8 @@
         currentConversationId: null,
         pageContext: null,
         currentAgent: null,
-        agentsConfig: null
+        agentsConfig: null,
+        selectedProvider: 'ollama'
     };
     
     // Load agents configuration from JSON file
@@ -154,6 +155,15 @@
         welcomeMessage.textContent = 'Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.';
         chatMessages.appendChild(welcomeMessage);
         
+        // Create provider selector
+        const providerSelector = document.createElement('div');
+        providerSelector.className = 'provider-selector';
+        providerSelector.innerHTML = '<label for="ai-provider">AI Model:</label>' +
+                                    '<select id="ai-provider">' +
+                                    '<option value="ollama">Ollama (Local)</option>' +
+                                    '<option value="grok">Grok (xAI)</option>' +
+                                    '</select>';
+        
         // Create chat input area
         const chatInput = document.createElement('div');
         chatInput.className = 'chat-input';
@@ -169,6 +179,7 @@
         // Assemble the chat panel
         chatPanel.appendChild(chatHeader);
         chatPanel.appendChild(chatMessages);
+        chatPanel.appendChild(providerSelector);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
         
@@ -200,6 +211,14 @@
                 e.preventDefault();
                 sendMessage();
             }
+        });
+        
+        // Add provider selector change listener
+        document.getElementById('ai-provider').addEventListener('change', function(e) {
+            state.selectedProvider = e.target.value;
+            console.debug('Provider changed to:', state.selectedProvider);
+            const statusIndicator = document.getElementById('chat-status');
+            statusIndicator.textContent = `AI Ready (${state.selectedProvider === 'grok' ? 'Grok' : 'Ollama'})`;
         });
     }
     
@@ -308,6 +327,7 @@
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
+            provider: state.selectedProvider,
             page_context: state.pageContext.page_type,
             page_path: state.pageContext.page_path,
             page_title: state.pageContext.page_title,
@@ -614,6 +634,30 @@
                 0%, 20% { opacity: 0.2; }
                 50% { opacity: 1; }
                 100% { opacity: 0.2; }
+            }
+            
+            .provider-selector {
+                padding: 8px 15px;
+                background-color: #f5f5f5;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 13px;
+            }
+            
+            .provider-selector label {
+                font-weight: 600;
+                color: #555;
+            }
+            
+            .provider-selector select {
+                flex-grow: 1;
+                padding: 5px 10px;
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                background-color: white;
+                cursor: pointer;
             }
             
             .chat-input {
