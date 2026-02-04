@@ -152,9 +152,85 @@ last_updated = '2026/02/01'
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
 
+        <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
+        <div id="group-infrastructure-ha" class="priority-group-container">
+            <h3 class="group-header">🏗️ Infrastructure Resilience & High Availability</h3>
+
+            <div id="anchor-infrastructure-ha-project" class="nav-anchor"></div>
+            <details id="infrastructure-ha-project" class="priority-container" open>
+                <summary class="priority-summary">🚨 Infrastructure Resilience & HA Project (ACTIVE)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL</p>
+                    <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, establish disaster recovery with external service backup.</p>
+                    <p><strong>Timeline:</strong> 10-14 weeks | <strong>Budget:</strong> ~$10-40/month for external services</p>
+                    
+                    <h4>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h4>
+                    <ul>
+                        <li>✅ Create PRD (requirements.md)</li>
+                        <li>⏳ Create Technical Specification</li>
+                        <li>⏳ Design API endpoints for project/step/todo CRUD</li>
+                        <li>⏳ Build .tt templates for plan visualization</li>
+                        <li>⏳ Integrate with project table structure</li>
+                        <li>⏳ Populate Infrastructure HA project as first use case</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Plan management system tracking infrastructure project in Comserv app</p>
+
+                    <h4>Phase 1: Database Creation & Service Discovery (Week 4-6) - <span class="status-pending">PENDING</span></h4>
+                    <ul>
+                        <li>Create separate production and development databases</li>
+                        <li>Implement service discovery (DNS/ProxySQL/failover pool)</li>
+                        <li>Set up MySQL replication (master-slave or master-master)</li>
+                        <li>Configure connection pooling and retry logic</li>
+                        <li>Document VM vs managed service vs containerized pros/cons</li>
+                        <li>Implement backup automation to cloud storage (~$5-10/month)</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Production + dev databases with automated failover</p>
+
+                    <h4>Phase 2: Gateway, Mail, Catalyst Resilience (Week 7-9) - <span class="status-pending">PENDING</span></h4>
+                    <ul>
+                        <li>OPNsense: Second VM with CARP failover OR low-cost external service ($10/month)</li>
+                        <li>Mail: Implement redundancy or external failover</li>
+                        <li>Catalyst: Deploy multiple instances with load balancing</li>
+                        <li>Redis: Configure cluster for session persistence</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Resilient gateway, mail, and application tier</p>
+
+                    <h4>Phase 3: Orchestration Platform & App HA (Week 9-11) - <span class="status-pending">PENDING</span></h4>
+                    <ul>
+                        <li>Decide: Kubernetes vs Docker Swarm (detailed pros/cons in Tech Spec)</li>
+                        <li>Deploy chosen orchestration platform</li>
+                        <li>Migrate Catalyst to orchestrated containers</li>
+                        <li>Implement health checks and auto-healing</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Container orchestration with HA features</p>
+
+                    <h4>Phase 4: Monitoring & DR (Week 11-13) - <span class="status-pending">PENDING</span></h4>
+                    <ul>
+                        <li>Deploy monitoring stack (Prometheus/Grafana)</li>
+                        <li>Configure alerting (within budget)</li>
+                        <li>Implement external service failover ($10-15/month)</li>
+                        <li>Document DR plan and conduct first drill</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Monitoring operational, DR plan tested</p>
+
+                    <h4>Phase 5: Testing & Validation (Week 13-14) - <span class="status-pending">PENDING</span></h4>
+                    <ul>
+                        <li>Fault injection testing for all services</li>
+                        <li>Performance benchmarking</li>
+                        <li>Verify RTO < 5 min, RPO < 5 min</li>
+                        <li>Final production cutover</li>
+                    </ul>
+                    <p><strong>Deliverable:</strong> Fully resilient infrastructure validated</p>
+
+                    <p><strong>Documentation:</strong> <a href="/Documentation/project/details?project_id=INFRA_HA_2026" style="color: var(--link-color);">View Full Project Details</a></p>
+                    <p><strong>PRD:</strong> <code>.zenflow/tasks/new-task-9cf1/requirements.md</code> (765 lines)</p>
+                </div>
+            </details>
+        </div>
+
         <!-- Group 1: Architecture & Infrastructure -->
         <div id="group-arch" class="priority-group-container">
-            <h3 class="group-header">🏗️ Architecture & Infrastructure</h3>
+            <h3 class="group-header">🏗️ Architecture & Infrastructure (Existing)</h3>
 
             <div id="anchor-priority-11" class="nav-anchor"></div>
             <details id="priority-11" class="priority-container">
