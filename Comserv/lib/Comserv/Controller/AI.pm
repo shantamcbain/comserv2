@@ -2129,11 +2129,18 @@ sub _get_current_ollama_config {
     my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
     my $installed_models = [];
     
-    # For regular users (non-admin/developer/editor), always force 192.168.1.171
+    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
     unless ($can_select_model) {
-        $current_host = '192.168.1.171';
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            '_get_current_ollama_config', "Regular user, forcing host to $current_host (requirement: regular users only see 192.168.1.171)");
+        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+        if ($test_ollama && $test_ollama->check_connection()) {
+            $current_host = 'localhost';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
+        } else {
+            $current_host = '192.168.1.171';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
+        }
     } else {
         # For privileged users, check session preference or test localhost first
         my $preferred_host = $c->session->{ollama_host};
