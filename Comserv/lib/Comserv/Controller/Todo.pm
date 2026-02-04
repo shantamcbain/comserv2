@@ -74,6 +74,12 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
         
+        # Include todos without any dates if they're not completed (for day view of today only)
+        my $today = DateTime->now->ymd;
+        if (!$todo->start_date && !$todo->due_date && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
+            $include_todo = 1;
+        }
+        
         $include_todo;
     } @$todos;
     
@@ -948,8 +954,14 @@ sub day :Path('/todo/day') :Args {
     # Fetch ALL todos for the site for calendar view
     my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
 
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Fetched " . scalar(@$todos) . " total todos for site " . $c->session->{SiteName});
+
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "After date filtering: " . scalar(@$filtered_todos) . " todos remain for date $date");
 
     # Sort todos by time_of_day, then priority, then start_date
     my @sorted_todos = sort { 
@@ -969,6 +981,9 @@ sub day :Path('/todo/day') :Args {
             push @today_todos, $todo;
         }
     }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
 
     # Add the todos to the stash
     $c->stash(
