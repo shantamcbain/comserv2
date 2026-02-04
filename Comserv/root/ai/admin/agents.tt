@@ -1,0 +1,307 @@
+[% META
+   title = "AI Agent Management"
+   description = "Manage AI agents and role-based access"
+   roles = "admin"
+   category = "AI Module"
+%]
+
+<div class="admin-container">
+    <div class="page-header">
+        <h1>AI Agent Management</h1>
+        <div class="header-actions">
+            <a href="/ai/admin/models" class="btn-secondary">Manage Models</a>
+            <a href="/ai" class="btn-secondary">← Back to AI Chat</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Role Definitions</h2>
+        <div class="role-definitions">
+            [% FOREACH role_name IN role_definitions.keys.sort %]
+            <div class="role-card">
+                <div class="role-name">[% role_name %]</div>
+                <div class="role-description">[% role_definitions.$role_name %]</div>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Available Agents</h2>
+        <div class="agents-grid">
+            [% FOREACH agent IN agents %]
+            <div class="agent-card">
+                <div class="agent-icon">[% agent.icon %]</div>
+                <div class="agent-info">
+                    <h3>[% agent.name %]</h3>
+                    <p class="agent-description">[% agent.description %]</p>
+                    <div class="agent-roles">
+                        <strong>Available to:</strong>
+                        <div class="role-tags">
+                            [% FOREACH role IN agent.roles %]
+                            <span class="role-tag">[% role %]</span>
+                            [% END %]
+                        </div>
+                    </div>
+                    <div class="agent-meta">
+                        <span class="agent-id">ID: <code>[% agent.id %]</code></span>
+                    </div>
+                </div>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Agent Access Matrix</h2>
+        <div class="access-matrix">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>User (Guest)</th>
+                        <th>Normal</th>
+                        <th>Developer</th>
+                        <th>Editor</th>
+                        <th>Admin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH agent IN agents %]
+                    <tr>
+                        <td><strong>[% agent.icon %] [% agent.name %]</strong></td>
+                        <td class="access-cell [% agent.roles.grep('user').size ? 'has-access' : 'no-access' %]">
+                            [% agent.roles.grep('user').size ? '✓' : '✗' %]
+                        </td>
+                        <td class="access-cell [% agent.roles.grep('normal').size ? 'has-access' : 'no-access' %]">
+                            [% agent.roles.grep('normal').size ? '✓' : '✗' %]
+                        </td>
+                        <td class="access-cell [% agent.roles.grep('developer').size ? 'has-access' : 'no-access' %]">
+                            [% agent.roles.grep('developer').size ? '✓' : '✗' %]
+                        </td>
+                        <td class="access-cell [% agent.roles.grep('editor').size ? 'has-access' : 'no-access' %]">
+                            [% agent.roles.grep('editor').size ? '✓' : '✗' %]
+                        </td>
+                        <td class="access-cell [% agent.roles.grep('admin').size ? 'has-access' : 'no-access' %]">
+                            [% agent.roles.grep('admin').size ? '✓' : '✗' %]
+                        </td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1400px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-secondary {
+    padding: 8px 16px;
+    background: #6c757d;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.btn-secondary:hover {
+    opacity: 0.8;
+}
+
+.section {
+    margin-bottom: 40px;
+}
+
+.section h2 {
+    color: var(--text-color);
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.role-definitions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.role-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.role-name {
+    font-weight: bold;
+    color: var(--link-color);
+    font-size: 16px;
+    margin-bottom: 8px;
+    text-transform: capitalize;
+}
+
+.role-description {
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.agents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.agent-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    gap: 15px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.agent-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.agent-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+}
+
+.agent-info {
+    flex: 1;
+}
+
+.agent-info h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-color);
+    font-size: 18px;
+}
+
+.agent-description {
+    color: var(--text-color);
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.agent-roles {
+    margin-bottom: 10px;
+}
+
+.agent-roles strong {
+    color: var(--text-color);
+    font-size: 13px;
+}
+
+.role-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+}
+
+.role-tag {
+    padding: 3px 8px;
+    background: var(--link-color);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.agent-meta {
+    font-size: 12px;
+    color: var(--text-color);
+    margin-top: 10px;
+}
+
+.agent-id code {
+    background: var(--background-color);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    color: var(--link-color);
+}
+
+.access-matrix {
+    overflow-x: auto;
+}
+
+.access-matrix table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--secondary-color);
+}
+
+.access-matrix th {
+    background: var(--background-color);
+    padding: 12px;
+    text-align: left;
+    color: var(--text-color);
+    font-weight: bold;
+    border: 1px solid var(--border-color);
+}
+
+.access-matrix td {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.access-cell {
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.access-cell.has-access {
+    color: #28a745;
+}
+
+.access-cell.no-access {
+    color: #dc3545;
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    .agents-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .role-definitions {
+        grid-template-columns: 1fr;
+    }
+    
+    .access-matrix table {
+        font-size: 12px;
+    }
+    
+    .access-matrix th,
+    .access-matrix td {
+        padding: 8px;
+    }
+}
+</style>
