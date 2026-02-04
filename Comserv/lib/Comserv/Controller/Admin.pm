@@ -3961,6 +3961,235 @@ sub update_table_field_from_result {
     return 1;
 }
 
+sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+        "Starting create_table_from_result action");
+    
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $result_class = $c->req->param('result_class');
+    my $database = $c->req->param('database') || 'ency';
+    
+    unless ($result_class) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameter: result_class' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        my $sql_statements = $self->generate_create_table_sql($c, $result_class, $database);
+        
+        my $schema;
+        if (lc($database) eq 'ency') {
+            $schema = $c->model('DBEncy')->schema;
+        } elsif (lc($database) eq 'forager') {
+            $schema = $c->model('DBForager')->schema;
+        } else {
+            die "Invalid database: $database";
+        }
+        
+        unless ($schema) {
+            die "Failed to get database schema for $database";
+        }
+        
+        my $dbh = $schema->storage->dbh;
+        my @executed = ();
+        my @errors = ();
+        
+        foreach my $sql (@$sql_statements) {
+            try {
+                $dbh->do($sql);
+                push @executed, $sql;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                    "Executed SQL: $sql");
+            } catch {
+                my $error = "Failed to execute SQL: $sql - Error: $_";
+                push @errors, $error;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+            };
+        }
+        
+        if (@errors) {
+            $c->stash(json => { 
+                success => 0, 
+                error => 'Some SQL statements failed',
+                executed => \@executed,
+                errors => \@errors,
+                sql_statements => $sql_statements
+            });
+        } else {
+            $c->stash(json => { 
+                success => 1, 
+                message => "Successfully created table from $result_class",
+                executed => \@executed,
+                sql_statements => $sql_statements
+            });
+        }
+        
+    } catch {
+        my $error = "Error creating table from Result: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+sub generate_create_table_sql {
+    my ($self, $c, $result_class, $database) = @_;
+    
+    my $result_file_path = $self->find_result_file($c, $result_class, $database);
+    unless ($result_file_path && -f $result_file_path) {
+        die "Result file not found for $result_class in database $database";
+    }
+    
+    my $schema = $self->parse_result_file_schema($c, $result_file_path);
+    unless ($schema && $schema->{table_name}) {
+        die "Failed to parse schema from Result file: $result_file_path";
+    }
+    
+    my $table_name = $schema->{table_name};
+    my @sql_statements = ();
+    
+    my $create_sql = "CREATE TABLE IF NOT EXISTS `$table_name` (\n";
+    my @column_defs = ();
+    my @indexes = ();
+    my @constraints = ();
+    
+    foreach my $col_name (sort keys %{$schema->{columns}}) {
+        my $col = $schema->{columns}->{$col_name};
+        my $col_def = "  `$col_name` ";
+        
+        my $data_type = uc($col->{data_type});
+        if ($data_type eq 'INTEGER') {
+            $col_def .= 'INT';
+        } elsif ($data_type eq 'VARCHAR') {
+            my $size = $col->{size} || 255;
+            $col_def .= "VARCHAR($size)";
+        } elsif ($data_type eq 'TEXT') {
+            $col_def .= 'TEXT';
+        } elsif ($data_type eq 'TIMESTAMP') {
+            $col_def .= 'TIMESTAMP';
+        } elsif ($data_type eq 'DATETIME') {
+            $col_def .= 'DATETIME';
+        } elsif ($data_type eq 'DATE') {
+            $col_def .= 'DATE';
+        } elsif ($data_type eq 'TIME') {
+            $col_def .= 'TIME';
+        } elsif ($data_type eq 'BOOLEAN') {
+            $col_def .= 'BOOLEAN';
+        } elsif ($data_type eq 'ENUM') {
+            if ($col->{extra} && $col->{extra}->{list}) {
+                my $values = join(',', map { "'$_'" } @{$col->{extra}->{list}});
+                $col_def .= "ENUM($values)";
+            } else {
+                $col_def .= "VARCHAR(50)";
+            }
+        } else {
+            $col_def .= $data_type;
+        }
+        
+        if ($col->{is_nullable} == 0 || !$col->{is_nullable}) {
+            $col_def .= ' NOT NULL';
+        }
+        
+        if ($col->{is_auto_increment}) {
+            $col_def .= ' AUTO_INCREMENT';
+        }
+        
+        if (defined $col->{default_value}) {
+            my $default = $col->{default_value};
+            if (ref($default) eq 'SCALAR') {
+                $col_def .= " DEFAULT $$default";
+            } elsif ($default =~ /^CURRENT_TIMESTAMP$/i) {
+                $col_def .= " DEFAULT CURRENT_TIMESTAMP";
+            } else {
+                $col_def .= " DEFAULT '$default'";
+            }
+        }
+        
+        push @column_defs, $col_def;
+    }
+    
+    if ($schema->{primary_key}) {
+        my @pk_cols = ref($schema->{primary_key}) eq 'ARRAY' 
+            ? @{$schema->{primary_key}} 
+            : ($schema->{primary_key});
+        my $pk_cols_str = join(', ', map { "`$_`" } @pk_cols);
+        push @constraints, "  PRIMARY KEY ($pk_cols_str)";
+    }
+    
+    if ($schema->{unique_constraints}) {
+        foreach my $constraint_name (keys %{$schema->{unique_constraints}}) {
+            my $cols = $schema->{unique_constraints}->{$constraint_name};
+            my $cols_str = join(', ', map { "`$_`" } @$cols);
+            push @constraints, "  UNIQUE KEY `$constraint_name` ($cols_str)";
+        }
+    }
+    
+    if ($schema->{indexes}) {
+        foreach my $index_name (keys %{$schema->{indexes}}) {
+            my $cols = $schema->{indexes}->{$index_name};
+            my $cols_str = join(', ', map { "`$_`" } @$cols);
+            push @indexes, "  KEY `$index_name` ($cols_str)";
+        }
+    }
+    
+    $create_sql .= join(",\n", @column_defs, @constraints, @indexes);
+    $create_sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+    
+    push @sql_statements, $create_sql;
+    
+    if ($schema->{relationships}) {
+        foreach my $rel_name (keys %{$schema->{relationships}}) {
+            my $rel = $schema->{relationships}->{$rel_name};
+            if ($rel->{type} eq 'belongs_to') {
+                my $foreign_key = $rel->{foreign_key};
+                my $foreign_table = $rel->{foreign_table};
+                my $foreign_column = $rel->{foreign_column} || 'id';
+                my $on_delete = $rel->{on_delete} || 'RESTRICT';
+                
+                my $fk_sql = "ALTER TABLE `$table_name` ADD CONSTRAINT `fk_${table_name}_${foreign_key}` ";
+                $fk_sql .= "FOREIGN KEY (`$foreign_key`) REFERENCES `$foreign_table` (`$foreign_column`) ";
+                $fk_sql .= "ON DELETE " . uc($on_delete) . ";";
+                
+                push @sql_statements, $fk_sql;
+            }
+        }
+    }
+    
+    return \@sql_statements;
+}
+
 # AJAX endpoint to create a Result file from a database table
 sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     my ($self, $c) = @_;
