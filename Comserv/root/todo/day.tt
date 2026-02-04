@@ -36,27 +36,34 @@
 
    # If todos contains all todos (like in Documentation.pm), filter it for today
    # and extract overdue todos if not already separated. EXCLUDE COMPLETED (status 3).
-   SET temp_today_todos = [];
-   SET temp_overdue_todos = [];
-   
-   FOREACH todo IN todos;
-       # Skip completed todos everywhere in this view
-       NEXT IF todo.status == 3;
+   # ONLY do this filtering if coming from Documentation.pm (is_daily_plan == 1)
+   # When coming from Todo.pm controller, todos is already pre-filtered
+   IF is_daily_plan;
+       SET temp_today_todos = [];
+       SET temp_overdue_todos = [];
        
-       IF todo.due_date AND todo.due_date < date;
-           temp_overdue_todos.push(todo);
-       ELSIF (todo.due_date AND todo.due_date == date) OR (todo.start_date AND todo.start_date == date);
-           # Strict date match: only include if it explicitly belongs to the viewed date
-           temp_today_todos.push(todo);
+       FOREACH todo IN todos;
+           # Skip completed todos everywhere in this view
+           NEXT IF todo.status == 3;
+           
+           IF todo.due_date AND todo.due_date < date;
+               temp_overdue_todos.push(todo);
+           ELSIF (todo.due_date AND todo.due_date == date) OR (todo.start_date AND todo.start_date == date);
+               # Strict date match: only include if it explicitly belongs to the viewed date
+               temp_today_todos.push(todo);
+           # Also include todos without dates (they're active tasks)
+           ELSIF !todo.due_date AND !todo.start_date;
+               temp_today_todos.push(todo);
+           END;
        END;
-   END;
 
-   # Always apply the strict filter to 'todos' to ensure Today Schedule is accurate
-   todos = temp_today_todos;
-   
-   # Update overdue_todos if we found some in the bulk list
-   IF temp_overdue_todos.size > 0;
-       overdue_todos = temp_overdue_todos;
+       # Apply the filter to 'todos' to ensure Today Schedule is accurate
+       todos = temp_today_todos;
+       
+       # Update overdue_todos if we found some in the bulk list
+       IF temp_overdue_todos.size > 0;
+           overdue_todos = temp_overdue_todos;
+       END;
    END;
 
    IF !previous_date AND prev_date;
