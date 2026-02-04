@@ -1,4 +1,4 @@
-package Comserv::Model::Schema::Ency::Result::UserApiKey;
+package Comserv::Model::Schema::Ency::Result::UserApiKeys;
 use base 'DBIx::Class::Core';
 __PACKAGE__->load_components("InflateColumn::DateTime");
 use warnings FATAL => 'all';
