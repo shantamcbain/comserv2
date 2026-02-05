@@ -2872,6 +2872,59 @@ sub delete_api_key :Local :Args(1) {
     };
 }
 
+=head2 get_user_providers
+
+Get list of user's configured AI providers for chat widget
+
+=cut
+
+sub get_user_providers :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my @providers;
+    
+    # Map service names to display names
+    my %service_display = (
+        grok => 'Grok (xAI)',
+        openai => 'OpenAI',
+        claude => 'Claude',
+        gemini => 'Gemini',
+        anthropic => 'Anthropic',
+        cohere => 'Cohere'
+    );
+    
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @providers, {
+                    service => $key->service,
+                    display_name => $service_display{$key->service} || ucfirst($key->service)
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id");
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'get_user_providers', "Failed to fetch providers: $_");
+        };
+    }
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        providers => \@providers
+    }));
+}
+
 sub reset_conversation :Local :Args(0) {
     my ($self, $c) = @_;
     

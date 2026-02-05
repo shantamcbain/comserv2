@@ -310,9 +310,16 @@ function saveKey(event) {
     const data = {};
     formData.forEach((value, key) => data[key] = value);
     
-    // For edit, allow empty API key
+    // Validate: new keys require api_key, edits can be without it
+    if (!data.id && !data.api_key) {
+        alert('API key is required for new entries');
+        return;
+    }
+    
+    // If editing and no new key provided, skip the update
     if (data.id && !data.api_key) {
-        alert('Please enter a new API key or cancel to keep the existing one');
+        alert('No changes made - API key field is empty');
+        closeModal();
         return;
     }
     
