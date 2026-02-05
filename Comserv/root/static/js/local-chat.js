@@ -187,8 +187,8 @@
         providerSelector.innerHTML = '<label for="ai-provider">AI Model:</label>' +
                                     '<select id="ai-provider">' +
                                     '<option value="ollama">Ollama (Local)</option>' +
-                                    '<option value="grok">Grok (xAI)</option>' +
-                                    '</select>';
+                                    '</select>' +
+                                    '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage your API keys">⚙️</a>';
         
         // Create chat input area
         const chatInput = document.createElement('div');
@@ -331,6 +331,36 @@
         });
     }
     
+    // Load user's available AI providers
+    function loadUserProviders() {
+        fetch('/ai/get_user_providers', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.providers) {
+                const providerSelect = document.getElementById('ai-provider');
+                
+                // Clear existing options except Ollama
+                providerSelect.innerHTML = '<option value="ollama">Ollama (Local)</option>';
+                
+                // Add user's configured providers
+                data.providers.forEach(provider => {
+                    const option = document.createElement('option');
+                    option.value = provider.service;
+                    option.textContent = provider.display_name;
+                    providerSelect.appendChild(option);
+                });
+                
+                console.debug('Loaded', data.providers.length, 'user providers');
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load user providers:', error);
+        });
+    }
+    
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
@@ -341,6 +371,9 @@
         
         // Load conversation list for dropdown
         loadConversationList();
+        
+        // Load user's available providers
+        loadUserProviders();
         
         // Update chat header with selected agent info
         const chatHeader = document.querySelector('.chat-header h3');
@@ -794,6 +827,25 @@
                 border-radius: 4px;
                 background-color: white;
                 cursor: pointer;
+            }
+            
+            .manage-keys-link {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                background: var(--link-color);
+                color: white;
+                border-radius: 4px;
+                text-decoration: none;
+                font-size: 14px;
+                transition: background 0.2s;
+            }
+            
+            .manage-keys-link:hover {
+                background: #0056b3;
+                text-decoration: none;
             }
             
             .chat-input {
