@@ -167,4 +167,30 @@ sub get_system_info {
     };
 }
 
+=head2 get_app_workflow
+
+Returns the name of the application directory (workflow)
+
+=cut
+
+sub get_app_workflow {
+    my ($class, $app_home) = @_;
+    
+    # CRITICAL: Ensure we have a valid app_home
+    return 'Unknown' if !$app_home;
+    
+    my $workflow = 'Unknown';
+    eval {
+        require File::Spec;
+        require File::Basename;
+        
+        # If app_home is /home/shanta/PycharmProjects/comserv2/Comserv
+        # catdir(.., '..') gives /home/shanta/PycharmProjects/comserv2
+        # basename gives 'comserv2'
+        $workflow = File::Basename::basename(File::Spec->catdir($app_home, '..'));
+    };
+    
+    return $workflow || 'Unknown';
+}
+
 1;
