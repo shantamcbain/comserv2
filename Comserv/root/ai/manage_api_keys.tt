@@ -266,7 +266,7 @@
                 
                 <div class="form-group">
                     <label for="api-key">API Key *</label>
-                    <input type="password" id="api-key" name="api_key" required
+                    <input type="password" id="api-key" name="api_key"
                            placeholder="Enter your API key">
                     <small style="color: var(--text-color); opacity: 0.7;">Your key will be encrypted before storage</small>
                 </div>
@@ -310,7 +310,9 @@ function saveKey(event) {
     const data = {};
     formData.forEach((value, key) => data[key] = value);
     
-    // Validate: new keys require api_key, edits can be without it
+    console.log('Saving key with data:', data);
+    
+    // Validate: new keys require api_key
     if (!data.id && !data.api_key) {
         alert('API key is required for new entries');
         return;
@@ -329,6 +331,7 @@ function saveKey(event) {
         data: data,
         dataType: 'json',
         success: function(response) {
+            console.log('Save response:', response);
             if (response.success) {
                 alert('API key saved successfully!');
                 location.reload();
@@ -336,8 +339,9 @@ function saveKey(event) {
                 alert('Error: ' + (response.error || 'Unknown error'));
             }
         },
-        error: function() {
-            alert('Failed to save API key. Please try again.');
+        error: function(xhr, status, error) {
+            console.error('Save failed:', xhr.responseText, status, error);
+            alert('Failed to save API key: ' + (xhr.responseText || error || 'Unknown error'));
         }
     });
 }
