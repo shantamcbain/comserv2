@@ -207,6 +207,8 @@ sub _load_from_env_variables {
             $env_config{$conn_name}->{db_type} = $value;
         } elsif ($field eq 'priority') {
             $env_config{$conn_name}->{priority} = $value;
+        } elsif ($field eq 'environment') {
+            $env_config{$conn_name}->{environment} = $value;
         }
     }
     
@@ -266,12 +268,14 @@ sub get_all_connections {
         my $priority = $conn_config->{priority} // 999;
         my $db_type = $conn_config->{db_type} // 'mysql';
         my $description = $conn_config->{description} // '';
+        my $environment = $conn_config->{environment} // 'unknown';
         
         $connections{$conn_name} = {
             config => $conn_config,
             priority => $priority,
             db_type => $db_type,
             description => $description,
+            environment => $environment,
             connection_name => $conn_name,
         };
     }
