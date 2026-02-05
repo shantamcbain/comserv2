@@ -21,8 +21,34 @@
         pageContext: null,
         currentAgent: null,
         agentsConfig: null,
-        selectedProvider: 'ollama'
+        selectedProvider: 'ollama',
+        conversationMessages: []
     };
+    
+    // Load persisted state from sessionStorage
+    function loadPersistedState() {
+        try {
+            const savedConvId = sessionStorage.getItem('currentConversationId');
+            if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
+                state.currentConversationId = parseInt(savedConvId);
+                console.debug('Restored conversation ID from storage:', state.currentConversationId);
+            }
+        } catch (e) {
+            console.warn('Failed to load persisted state:', e);
+        }
+    }
+    
+    // Save conversation ID to sessionStorage
+    function persistConversationId() {
+        try {
+            if (state.currentConversationId) {
+                sessionStorage.setItem('currentConversationId', state.currentConversationId);
+                console.debug('Persisted conversation ID to storage:', state.currentConversationId);
+            }
+        } catch (e) {
+            console.warn('Failed to persist conversation ID:', e);
+        }
+    }
     
     // Load agents configuration from JSON file
     function loadAgentsConfig() {
@@ -142,7 +168,7 @@
         // Create chat header
         const chatHeader = document.createElement('div');
         chatHeader.className = 'chat-header';
-        chatHeader.innerHTML = '<h3>AI Assistant</h3><div class="chat-header-buttons"><button id="new-chat" class="new-chat-btn" title="Start new conversation">New Chat</button><button id="close-chat">×</button></div>';
+        chatHeader.innerHTML = '<h3>AI Assistant</h3><div class="chat-header-buttons"><select id="conversation-selector" class="conversation-selector" title="Select conversation"><option value="">Current Chat</option></select><button id="new-chat" class="new-chat-btn" title="Start new conversation">New Chat</button><button id="close-chat">×</button></div>';
         
         // Create chat messages area
         const chatMessages = document.createElement('div');
@@ -220,12 +246,101 @@
             const statusIndicator = document.getElementById('chat-status');
             statusIndicator.textContent = `AI Ready (${state.selectedProvider === 'grok' ? 'Grok' : 'Ollama'})`;
         });
+        
+        // Add conversation selector change listener
+        document.getElementById('conversation-selector').addEventListener('change', function(e) {
+            const conversationId = parseInt(e.target.value);
+            if (conversationId) {
+                loadConversation(conversationId);
+            }
+        });
+    }
+    
+    // Load conversation list and populate dropdown
+    function loadConversationList() {
+        fetch('/ai/get_conversation_list', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.conversations) {
+                const selector = document.getElementById('conversation-selector');
+                // Clear existing options except first one
+                selector.innerHTML = '<option value="">Current Chat</option>';
+                
+                // Add conversations to dropdown
+                data.conversations.forEach(conv => {
+                    const option = document.createElement('option');
+                    option.value = conv.id;
+                    option.textContent = `${conv.title} (${conv.message_count} msgs)`;
+                    if (state.currentConversationId && conv.id === state.currentConversationId) {
+                        option.selected = true;
+                    }
+                    selector.appendChild(option);
+                });
+                
+                console.debug('Loaded', data.conversations.length, 'conversations');
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load conversation list:', error);
+        });
+    }
+    
+    // Load a specific conversation's messages
+    function loadConversation(conversationId) {
+        const statusIndicator = document.getElementById('chat-status');
+        statusIndicator.textContent = 'Loading conversation...';
+        
+        fetch(`/ai/get_conversation_messages/${conversationId}`, {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.messages) {
+                // Clear current messages
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.innerHTML = '';
+                
+                // Add conversation messages
+                data.messages.forEach(msg => {
+                    const className = msg.role === 'user' ? 'user-message' : 'ai-message';
+                    addMessage(msg.content, className);
+                });
+                
+                // Update state
+                state.currentConversationId = conversationId;
+                persistConversationId();
+                
+                // Update header
+                const chatHeader = document.querySelector('.chat-header h3');
+                chatHeader.textContent = data.conversation.title;
+                
+                statusIndicator.textContent = `Loaded: ${data.conversation.title}`;
+                console.debug('Loaded conversation', conversationId, 'with', data.messages.length, 'messages');
+            } else {
+                statusIndicator.textContent = 'Error loading conversation';
+                alert(data.error || 'Failed to load conversation');
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load conversation:', error);
+            statusIndicator.textContent = 'Error loading conversation';
+        });
     }
     
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
+        
+        // Load persisted conversation state
+        loadPersistedState();
+        
+        // Load conversation list for dropdown
+        loadConversationList();
         
         // Update chat header with selected agent info
         const chatHeader = document.querySelector('.chat-header h3');
@@ -239,6 +354,13 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
         
+        // Show status if resuming conversation
+        if (state.currentConversationId) {
+            const statusIndicator = document.getElementById('chat-status');
+            statusIndicator.textContent = `Resuming conversation #${state.currentConversationId}`;
+            console.debug('Resuming conversation:', state.currentConversationId);
+        }
+        
         // Focus on the input field
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
@@ -246,7 +368,22 @@
     
     // Reset conversation - clear session and UI
     function resetConversation() {
-        // Call server to clear session conversation_id
+        // Clear client-side conversation state immediately
+        state.currentConversationId = null;
+        sessionStorage.removeItem('currentConversationId');
+        
+        // Clear messages from UI
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.innerHTML = '<div class="message system-message">Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.</div>';
+        
+        // Reset status
+        const statusIndicator = document.getElementById('chat-status');
+        statusIndicator.textContent = 'AI Ready - New Conversation';
+        statusIndicator.className = 'chat-status connected';
+        
+        console.debug('Conversation reset - starting fresh');
+        
+        // Call server to clear session conversation_id (async, don't wait)
         fetch('/ai/reset_conversation', {
             method: 'POST',
             credentials: 'include'
@@ -254,24 +391,11 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Clear client-side conversation state
-                state.currentConversationId = null;
-                
-                // Clear messages from UI
-                const chatMessages = document.getElementById('chat-messages');
-                chatMessages.innerHTML = '<div class="message system-message">Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.</div>';
-                
-                // Reset status
-                const statusIndicator = document.getElementById('chat-status');
-                statusIndicator.textContent = 'AI Ready';
-                statusIndicator.className = 'chat-status connected';
-                
-                console.debug('Conversation reset successfully');
+                console.debug('Server conversation reset confirmed');
             }
         })
         .catch(error => {
-            console.error('Error resetting conversation:', error);
-            alert('Failed to start new conversation');
+            console.error('Error resetting conversation on server:', error);
         });
     }
     
@@ -385,6 +509,7 @@
                 // Store conversation ID ONLY if it was successfully created
                 if (data.conversation_id && data.conversation_id !== null && data.conversation_id !== undefined) {
                     state.currentConversationId = data.conversation_id;
+                    persistConversationId();  // Save to sessionStorage
                     console.debug('Conversation created successfully with ID:', data.conversation_id);
                 } else {
                     console.warn('Warning: Conversation was not saved to database. New chat will be created on next message.');
@@ -525,6 +650,17 @@
                 display: flex;
                 gap: 8px;
                 align-items: center;
+            }
+            
+            .conversation-selector {
+                background: var(--background-color);
+                border: 1px solid var(--border-color);
+                color: var(--text-color);
+                font-size: 12px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                max-width: 200px;
             }
             
             #new-chat {
