@@ -160,7 +160,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h5>Your AI Provider API Keys</h5>
-                        <a href="/admin/schema_compare" class="btn-secondary" style="padding: 6px 12px; text-decoration: none; font-size: 0.9em;">+ Add API Key</a>
+                        <a href="/ai/manage_api_keys" class="btn-secondary" style="padding: 6px 12px; text-decoration: none; font-size: 0.9em;">Manage API Keys</a>
                     </div>
                     <div class="card-body">
                         [% IF user_api_keys.size %]
