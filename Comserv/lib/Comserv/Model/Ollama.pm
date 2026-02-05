@@ -103,8 +103,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'qwen2.5-coder:1.5b-base',
-    documentation => 'Ollama model to use (default: qwen2.5-coder:1.5b-base for low memory systems; alternatives: starcoder2:3b, qwen2.5-coder:7b, llama3.1:8b)'
+    default => 'qwen3-coder:30b',
+    documentation => 'Ollama model to use (default: qwen3-coder:30b; alternatives: starcoder2:3b, deepseek-v3.2:cloud)'
 );
 
 has 'timeout' => (
