@@ -2507,6 +2507,165 @@ sub session_details :Local :Args(0) {
     }));
 }
 
+sub get_conversation_list :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            { user_id => $user_id },
+            { 
+                order_by => { -desc => 'updated_at' },
+                rows => 50
+            }
+        );
+        
+        my @conv_list;
+        foreach my $conv ($conv_rs->all) {
+            if ($is_guest) {
+                my $conv_metadata = {};
+                if ($conv->metadata) {
+                    try {
+                        $conv_metadata = decode_json($conv->metadata);
+                    } catch {};
+                }
+                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+            }
+            
+            my $message_count = $conv->ai_messages->count;
+            my $first_msg = $conv->ai_messages->search({ role => 'user' }, { rows => 1, order_by => { -asc => 'created_at' } })->first;
+            my $preview = $first_msg ? substr($first_msg->content, 0, 60) : 'No messages';
+            
+            push @conv_list, {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                message_count => $message_count,
+                preview => $preview,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S'),
+                updated_at => $conv->updated_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversations => \@conv_list
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_list', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load conversations: $_"
+        }));
+    };
+}
+
+sub get_conversation_messages :Local :Args(1) {
+    my ($self, $c, $conversation_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($conversation_id) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Conversation ID required'
+        }));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+        
+        unless ($conv) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Conversation not found'
+            }));
+            return;
+        }
+        
+        if ($conv->user_id != $user_id) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Access denied'
+            }));
+            return;
+        }
+        
+        if ($is_guest) {
+            my $conv_metadata = {};
+            if ($conv->metadata) {
+                try {
+                    $conv_metadata = decode_json($conv->metadata);
+                } catch {};
+            }
+            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                $c->response->body(encode_json({
+                    success => JSON::false,
+                    error => 'Access denied'
+                }));
+                return;
+            }
+        }
+        
+        my @messages;
+        foreach my $msg ($conv->ai_messages->search({}, { order_by => { -asc => 'created_at' } })->all) {
+            push @messages, {
+                id => $msg->id,
+                role => $msg->role,
+                content => $msg->content,
+                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversation => {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            },
+            messages => \@messages
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_messages', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load messages: $_"
+        }));
+    };
+}
+
 sub reset_conversation :Local :Args(0) {
     my ($self, $c) = @_;
     
