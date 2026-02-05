@@ -82,18 +82,18 @@
         <div class="submenu-item">
             <span class="submenu-header"><a href="/documentation" class="dropbtn"><i class="icon-documentation"></i>Documentation</a></span>
             <div class="submenu">
-                <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
-                <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
                 <a href="/documentation?category=admin_guides"><i class="icon-admin-guide"></i>Admin Guides</a>
-                <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
+                <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
                 <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
+                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
+                <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
+                <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
                 [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin Resources</span>
-                        <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
-                        <a href="/admin/documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
-                        <a href="/admin/documentation/Planning"><i class="icon-planning"></i>Planning</a>
                         <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
+                        <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
                     </div>
                 [% END %]
             </div>
