@@ -465,6 +465,10 @@ sub auto :Private {
         my $db_host = 'Unknown';
         my $system_info = Comserv::Util::SystemInfo::get_system_info();
         
+        # Get application directory name to distinguish between workflows
+        my $app_workflow = Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
+        $c->stash->{app_workflow} = $app_workflow;
+        
         # Validate system_info returned valid data, add defaults if needed
         if (!$system_info || !ref($system_info)) {
             $system_info = {
