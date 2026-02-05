@@ -92,38 +92,42 @@ last_updated = '2026/02/01'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
-                        <strong>🏗️ Arch</strong>: 
-                        <a href="#anchor-priority-11" class="jump-link">Phase 2</a> |
-                        <a href="#anchor-priority-4" class="jump-link">Plan</a> |
-                        <a href="#anchor-priority-schema" class="jump-link">Schema</a> |
-                        <a href="#anchor-priority-ha" class="jump-link">HA/DR</a> |
-                        <a href="#anchor-priority-19" class="jump-link">API Log</a> |
-                        <a href="#anchor-priority-3" class="jump-link">Format</a>
+                        <strong>🏗️ Architecture</strong>: 
+                        <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
+                        <a href="#anchor-priority-4" class="jump-link">MasterPlanRefactor</a> |
+                        <a href="#anchor-priority-schema" class="jump-link">SchemaManagement</a> |
+                        <a href="#anchor-priority-ha" class="jump-link">InfrastructureHA</a> |
+                        <a href="#anchor-priority-19" class="jump-link">UpdatepromptFix</a> |
+                        <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong>📅 Daily</strong>:
-                        <a href="#anchor-dailyplan-improvements" class="jump-link">Improvements</a> |
-                        <a href="#anchor-dynamic-daily" class="jump-link">View</a> |
-                        <a href="#anchor-priority-12" class="jump-link">Sync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">Flag</a> |
-                        <a href="#anchor-priority-6" class="jump-link">Integrate</a> |
-                        <a href="#anchor-todo-plan" class="jump-link">Todo</a>
+                        <strong>📅 DailyPlan</strong>:
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
+                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
+                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a> |
+                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🔄 Sync</strong>: 
-                        <a href="#anchor-priority-16" class="jump-link">IDs</a> |
-                        <a href="#anchor-priority-efficiency" class="jump-link">Efficiency</a> |
-                        <a href="#anchor-priority-17" class="jump-link">Themes</a> |
-                        <a href="#anchor-priority-18" class="jump-link">Cleanup</a> |
-                        <a href="#anchor-priority-9" class="jump-link">Auto-Sync</a>
+                        <strong>🔄 DataSync</strong>: 
+                        <a href="#anchor-priority-16" class="jump-link">ProjectIDs</a> |
+                        <a href="#anchor-priority-efficiency" class="jump-link">ProcessEfficiency</a> |
+                        <a href="#anchor-priority-17" class="jump-link">ThemeConsistency</a> |
+                        <a href="#anchor-priority-18" class="jump-link">RoleSyncCleanup</a> |
+                        <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🛠️ Maint</strong>: 
-                        <a href="#anchor-cleanup" class="jump-link">Cleanup</a> |
-                        <a href="#anchor-improvement" class="jump-link">Layout</a> |
-                        <a href="#anchor-priority-10" class="jump-link">Archive</a> |
-                        <a href="#anchor-priority-8" class="jump-link">API Docs</a> |
-                        <a href="#anchor-priority-7" class="jump-link">Agent Ex</a>
+                        <strong>🤖 AI Systems</strong>: 
+                        <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong>🛠️ Maintenance</strong>: 
+                        <a href="#anchor-cleanup" class="jump-link">DocCleanup</a> |
+                        <a href="#anchor-improvement" class="jump-link">LayoutImprovement</a> |
+                        <a href="#anchor-priority-10" class="jump-link">ArchiveDocumentation</a> |
+                        <a href="#anchor-priority-8" class="jump-link">APIDocUpdate</a> |
+                        <a href="#anchor-priority-7" class="jump-link">AgentExample</a>
                     </div>
                 </div>
             </details>
@@ -143,10 +147,10 @@ last_updated = '2026/02/01'
             <h4>🔧 Active Zenflow Workflows</h4>
             [% SET base_url = c.req.base.replace(':\d+/', ':') %]
             <ul>
-                <li><strong>zenworkflow:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
-                <li><strong>Aichat:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">ai-chat-system-8434</a> <em>(port 4001)</em> - AI Chat System</li>
-                <li><strong>Schema Management:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em></li>
-                <li><strong>Availability Plan:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - Infrastructure HA/DR</li>
+                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
+                <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
+                <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
+                <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
             </ul>
         </div>
     </details>
