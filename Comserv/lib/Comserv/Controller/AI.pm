@@ -1336,6 +1336,35 @@ sub models :Local :Args(0) {
         push @$servers, $server_info;
     }
     
+    # Fetch user's API keys
+    my @user_api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $user_id = $c->session->{user_id};
+        
+        if ($user_id) {
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @user_api_keys, {
+                    id => $key->id,
+                    service => $key->service,
+                    created_at => $key->created_at->strftime('%Y-%m-%d'),
+                    has_key => $key->api_key_encrypted ? 1 : 0
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'models', "Found " . scalar(@user_api_keys) . " API keys for user $username");
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'models', "Failed to fetch user API keys: $_");
+    };
+    
     # Set template variables
     $c->stash(
         template => 'ai/models.tt',
@@ -1343,7 +1372,8 @@ sub models :Local :Args(0) {
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
-        servers_json => encode_json($servers || [])
+        servers_json => encode_json($servers || []),
+        user_api_keys => \@user_api_keys
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
