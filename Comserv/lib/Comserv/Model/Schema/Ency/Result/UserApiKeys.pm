@@ -45,8 +45,8 @@ __PACKAGE__->add_columns(
     },
     updated_at => {
         data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP',
         is_nullable => 0,
+        default_value => 'current_timestamp()',
     },
 );
 
