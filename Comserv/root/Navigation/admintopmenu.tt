@@ -23,10 +23,12 @@
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
             <div class="submenu">
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
-                <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
+                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-log"></i>Git Pull</a>
-                <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
+                <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
+                <a href='/ProxyManager'><i class="icon-log"></i>Proxy Manager</a>
+                <a href='/admin/view_log'><i class="icon-log"></i>View Log</a>
             </div>
         </div>
 
