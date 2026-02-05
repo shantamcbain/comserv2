@@ -7,7 +7,7 @@
 
 <style>
 .api-keys-container {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 20px auto;
     padding: 20px;
 }
@@ -17,16 +17,29 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
-.btn-primary, .btn-secondary, .btn-danger {
+.page-header h1 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    display: inline-block;
     padding: 10px 20px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
     text-decoration: none;
-    display: inline-block;
+    font-size: 14px;
+    transition: opacity 0.2s;
 }
 
 .btn-primary {
@@ -44,8 +57,32 @@
     color: white;
 }
 
-.btn-primary:hover, .btn-secondary:hover, .btn-danger:hover {
+.btn:hover {
     opacity: 0.8;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
 }
 
 .api-keys-list {
@@ -65,6 +102,8 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .key-service {
@@ -101,132 +140,53 @@
     display: flex;
     gap: 10px;
     margin-top: 15px;
-}
-
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-content {
-    background: var(--background-color);
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    padding: 0;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h2 {
-    margin: 0;
-    color: var(--text-color);
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: var(--text-color);
-}
-
-.modal-body {
-    padding: 20px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-    color: var(--text-color);
-}
-
-.form-group input,
-.form-group select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--secondary-color);
-    color: var(--text-color);
-    font-size: 14px;
-}
-
-.modal-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    padding: 20px;
-    border-top: 1px solid var(--border-color);
-}
-
-.alert {
-    padding: 15px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-}
-
-.alert-info {
-    background: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
+    flex-wrap: wrap;
 }
 
 .no-keys {
     text-align: center;
     padding: 40px;
     color: var(--text-color);
+    background: var(--secondary-color);
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+}
+
+.no-keys p {
+    margin: 10px 0;
 }
 </style>
 
 <div class="api-keys-container">
     <div class="page-header">
         <h1>Manage API Keys</h1>
-        <div>
-            <button class="btn-primary" onclick="openAddModal()">+ Add API Key</button>
-            <a href="/ai/models" class="btn-secondary">← Back to Models</a>
+        <div class="header-actions">
+            <a href="[% c.uri_for('/ai/add_api_key') %]" class="btn btn-primary">+ Add API Key</a>
+            <a href="[% c.uri_for('/ai/models') %]" class="btn btn-secondary">← Back to Models</a>
         </div>
     </div>
 
-    [% IF status_msg %]
-    <div class="alert alert-success" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724;">
-        [% status_msg %]
+    [% IF c.flash.status_msg %]
+    <div class="alert alert-success">
+        [% c.flash.status_msg %]
     </div>
     [% END %]
     
-    [% IF error_msg %]
-    <div class="alert alert-danger" style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24;">
-        [% error_msg %]
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">
+        [% c.flash.error_msg %]
     </div>
     [% END %]
 
     <div class="alert alert-info">
-        <strong>Secure Storage:</strong> Your API keys are encrypted using AES-256 and stored securely. They are only decrypted when needed for API requests.
+        <strong>Secure Storage:</strong> Your API keys are encrypted using AES-256 and stored securely. 
+        They are only decrypted when needed for API requests.
     </div>
 
     <div class="api-keys-list">
         [% IF api_keys.size %]
             [% FOREACH key IN api_keys %]
-            <div class="api-key-card" data-key-id="[% key.id %]">
+            <div class="api-key-card">
                 <div class="key-header">
                     <span class="key-service">[% key.service %]</span>
                     <span class="key-status [% key.is_active ? 'status-active' : 'status-inactive' %]">
@@ -234,96 +194,27 @@
                     </span>
                 </div>
                 <div class="key-details">
-                    <div>Created: [% key.created_at %]</div>
-                    <div>Last Updated: [% key.updated_at %]</div>
+                    <div><strong>Created:</strong> [% key.created_at %]</div>
+                    <div><strong>Last Updated:</strong> [% key.updated_at %]</div>
+                    <div><strong>API Key:</strong> ••••••••••••••••••• (encrypted)</div>
                 </div>
                 <div class="key-actions">
-                    <button class="btn-secondary" onclick="editKey([% key.id %], '[% key.service %]')">Edit Key</button>
-                    <form method="POST" action="/ai/delete_api_key/[% key.id %]" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service %]?');">
-                        <button type="submit" class="btn-danger">Delete</button>
+                    <a href="[% c.uri_for('/ai/edit_api_key', key.id) %]" class="btn btn-secondary">Edit Key</a>
+                    <form method="POST" action="[% c.uri_for('/ai/delete_api_key', key.id) %]" style="display: inline;" 
+                          onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service %]?');">
+                        <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
             </div>
             [% END %]
         [% ELSE %]
             <div class="no-keys">
-                <p>No API keys configured yet.</p>
-                <p>Click "Add API Key" to get started.</p>
+                <p><strong>No API keys configured yet.</strong></p>
+                <p>Click "Add API Key" above to configure your first AI provider.</p>
+                <p style="margin-top: 20px;">
+                    <a href="[% c.uri_for('/ai/add_api_key') %]" class="btn btn-primary">+ Add Your First API Key</a>
+                </p>
             </div>
         [% END %]
     </div>
 </div>
-
-<!-- Add/Edit Modal -->
-<div id="key-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="modal-title">Add API Key</h2>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <form id="key-form" method="POST" action="/ai/save_api_key">
-                <input type="hidden" id="key-id" name="id">
-                
-                <div class="form-group">
-                    <label for="service">Service *</label>
-                    <select id="service" name="service" required>
-                        <option value="">Select a service...</option>
-                        <option value="grok">Grok (X.AI)</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="claude">Claude (Anthropic)</option>
-                        <option value="gemini">Gemini (Google)</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="cohere">Cohere</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="api-key">API Key *</label>
-                    <input type="password" id="api-key" name="api_key" required
-                           placeholder="Enter your API key">
-                    <small style="color: var(--text-color); opacity: 0.7;">Your key will be encrypted before storage</small>
-                </div>
-                
-                <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-function openAddModal() {
-    document.getElementById('modal-title').textContent = 'Add API Key';
-    document.getElementById('key-form').reset();
-    document.getElementById('key-id').value = '';
-    document.getElementById('service').disabled = false;
-    document.getElementById('api-key').required = true;
-    document.getElementById('api-key').placeholder = 'Enter your API key';
-    document.getElementById('key-modal').style.display = 'flex';
-}
-
-function editKey(keyId, service) {
-    document.getElementById('modal-title').textContent = 'Edit API Key';
-    document.getElementById('key-id').value = keyId;
-    document.getElementById('service').value = service;
-    document.getElementById('service').disabled = true;
-    document.getElementById('api-key').value = '';
-    document.getElementById('api-key').required = true;
-    document.getElementById('api-key').placeholder = 'Enter new API key';
-    document.getElementById('key-modal').style.display = 'flex';
-}
-
-function closeModal() {
-    document.getElementById('key-modal').style.display = 'none';
-}
-
-// Close modal on outside click
-document.getElementById('key-modal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeModal();
-    }
-});
-</script>
