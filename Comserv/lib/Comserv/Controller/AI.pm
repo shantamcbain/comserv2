@@ -2752,14 +2752,8 @@ Save or update user API key
 sub save_api_key :Local :Args(0) {
     my ($self, $c) = @_;
     
-    $c->response->content_type('application/json');
-    
     unless ($c->session->{username}) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        }));
-        $c->response->status(401);
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
     
@@ -2769,10 +2763,8 @@ sub save_api_key :Local :Args(0) {
     my $key_id = $c->request->params->{id};
     
     unless ($service && $api_key) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => 'Service and API key are required'
-        }));
+        $c->flash->{error_msg} = 'Service and API key are required';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
         return;
     }
     
@@ -2783,10 +2775,8 @@ sub save_api_key :Local :Args(0) {
         if ($key_id) {
             $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
             unless ($key_obj && $key_obj->user_id == $user_id) {
-                $c->response->body(encode_json({
-                    success => JSON::false,
-                    error => 'API key not found or access denied'
-                }));
+                $c->flash->{error_msg} = 'API key not found or access denied';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
                 return;
             }
             $key_obj->set_api_key($api_key);
@@ -2804,19 +2794,14 @@ sub save_api_key :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'save_api_key', "API key saved for service: $service, user: $user_id");
         
-        $c->response->body(encode_json({
-            success => JSON::true,
-            message => 'API key saved successfully',
-            id => $key_obj->id
-        }));
+        $c->flash->{status_msg} = 'API key saved successfully';
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
             'save_api_key', "Failed to save API key: $_");
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => "Failed to save API key: $_"
-        }));
+        $c->flash->{error_msg} = "Failed to save API key: $_";
     };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
 }
 
 =head2 delete_api_key
@@ -2828,14 +2813,8 @@ Delete user API key
 sub delete_api_key :Local :Args(1) {
     my ($self, $c, $key_id) = @_;
     
-    $c->response->content_type('application/json');
-    
     unless ($c->session->{username}) {
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => 'Authentication required'
-        }));
-        $c->response->status(401);
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
     
@@ -2846,30 +2825,25 @@ sub delete_api_key :Local :Args(1) {
         my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
         
         unless ($key_obj && $key_obj->user_id == $user_id) {
-            $c->response->body(encode_json({
-                success => JSON::false,
-                error => 'API key not found or access denied'
-            }));
+            $c->flash->{error_msg} = 'API key not found or access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
             return;
         }
         
+        my $service = $key_obj->service;
         $key_obj->delete;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'delete_api_key', "API key deleted: $key_id, user: $user_id");
         
-        $c->response->body(encode_json({
-            success => JSON::true,
-            message => 'API key deleted successfully'
-        }));
+        $c->flash->{status_msg} = "API key for $service deleted successfully";
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
             'delete_api_key', "Failed to delete API key: $_");
-        $c->response->body(encode_json({
-            success => JSON::false,
-            error => "Failed to delete API key: $_"
-        }));
+        $c->flash->{error_msg} = "Failed to delete API key: $_";
     };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
 }
 
 =head2 get_user_providers
