@@ -139,6 +139,13 @@ last_updated = '2026/02/01'
         <summary>📋 Overview</summary>
         <div class="section-content">
             <p>This document lists priority todos that are blocking development. <a href="#planning">View Priority List</a>.</p>
+            
+            <h4>🔧 Active Zenflow Workflows</h4>
+            <ul>
+                <li><strong>zenworkflow:</strong> new-task-3cda <em>(port 4000)</em></li>
+                <li><strong>Aichat:</strong> ai-chat-system-8434 <em>(port 4001)</em></li>
+                <li><strong>Schema Management:</strong> schema-management-system-7eb3 <em>(port 4002)</em></li>
+            </ul>
         </div>
     </details>
 
