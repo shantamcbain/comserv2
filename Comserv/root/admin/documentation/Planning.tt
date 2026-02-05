@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.40' %]
-[% date_iso = '2026/02/01' %]
-[% formatted_date = 'February 01, 2026' %]
-[% time = '13:05:00' %]
-[% change_log = 'Added Step 5 (Migration & Cleanup) and Step 6 (Data Integrity & Cascade Logic) to ToDo System Update Plan.' %]
+[% version = '0.41' %]
+[% date_iso = '2026/02/05' %]
+[% formatted_date = 'February 05, 2026' %]
+[% time = '17:25:00' %]
+[% change_log = 'Added Infrastructure Resilience & High Availability Architecture workflow to Architecture & Infrastructure section.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -96,6 +96,7 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-11" class="jump-link">Phase 2</a> |
                         <a href="#anchor-priority-4" class="jump-link">Plan</a> |
                         <a href="#anchor-priority-schema" class="jump-link">Schema</a> |
+                        <a href="#anchor-priority-ha" class="jump-link">HA/DR</a> |
                         <a href="#anchor-priority-19" class="jump-link">API Log</a> |
                         <a href="#anchor-priority-3" class="jump-link">Format</a>
                     </div>
@@ -138,6 +139,15 @@ last_updated = '2026/02/01'
         <summary>📋 Overview</summary>
         <div class="section-content">
             <p>This document lists priority todos that are blocking development. <a href="#planning">View Priority List</a>.</p>
+            
+            <h4>🔧 Active Zenflow Workflows</h4>
+            [% SET base_url = c.req.base.replace(':\d+/', ':') %]
+            <ul>
+                <li><strong>zenworkflow:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
+                <li><strong>Aichat:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">ai-chat-system-8434</a> <em>(port 4001)</em> - AI Chat System</li>
+                <li><strong>Schema Management:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em></li>
+                <li><strong>Availability Plan:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - Infrastructure HA/DR</li>
+            </ul>
         </div>
     </details>
 
@@ -180,6 +190,62 @@ last_updated = '2026/02/01'
                 <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                </div>
+            </details>
+
+            <div id="anchor-priority-ha" class="nav-anchor"></div>
+            <details id="priority-ha-infrastructure" class="priority-container">
+                <summary class="priority-summary">🛡️ Infrastructure Resilience & High Availability Architecture</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                    <p><strong>Context:</strong> Recent 3-day outage from single editing mistake exposed critical infrastructure vulnerabilities. Need comprehensive HA/DR strategy.</p>
+                    
+                    <h4>📋 Objectives</h4>
+                    <ul>
+                        <li>Eliminate single points of failure for Tier 1 services (OPNsense, Mail Gateway, Production DB)</li>
+                        <li>Reduce RTO from 3 days to &lt;1 hour for critical services</li>
+                        <li>Implement automated database failover and multi-environment access strategy</li>
+                        <li>Establish off-site DR capabilities with tested recovery procedures</li>
+                        <li>Define clear VM vs Docker/K8s architecture strategy</li>
+                    </ul>
+
+                    <h4>🔑 Critical Services in Scope</h4>
+                    <ul>
+                        <li><strong>Tier 1 (Network/Security):</strong> OPNsense Gateway, Proxmox Mail Gateway</li>
+                        <li><strong>Tier 2 (Data):</strong> Production/Staging/Dev MySQL Databases</li>
+                        <li><strong>Tier 3 (Application):</strong> Catalyst Application Server, Mail Server</li>
+                    </ul>
+
+                    <h4>❓ Key Technical Decisions</h4>
+                    <ul>
+                        <li><strong>VM vs Container Strategy:</strong> When to use Proxmox VMs vs Docker vs K8s (hybrid approach recommended)</li>
+                        <li><strong>Database Access:</strong> DNS-based routing (mysql-prod.local) vs port-based vs IP-based separation</li>
+                        <li><strong>Database Failover:</strong> ProxySQL + MySQL replication vs Galera Cluster vs managed service</li>
+                        <li><strong>Off-site DR:</strong> Cloud replicas, backup location, frequency, retention policies</li>
+                        <li><strong>Migration Path:</strong> Phased rollout strategy, testing approach, rollback procedures</li>
+                    </ul>
+
+                    <h4>📊 Success Metrics</h4>
+                    <ul>
+                        <li>RTO &lt; 1 hour for Tier 1, &lt; 4 hours for Tier 2/3</li>
+                        <li>RPO &lt; 1 hour for all database data</li>
+                        <li>Successful DR drill (simulate host failure) with documented recovery</li>
+                        <li>Zero single points of failure for critical services</li>
+                        <li>Automated failover for database and application layers</li>
+                    </ul>
+
+                    <h4>📁 Documentation</h4>
+                    <p>Full feature specification: <a href="/static/INFRASTRUCTURE_HA_FEATURE.md" target="_blank">INFRASTRUCTURE_HA_FEATURE.md</a></p>
+                    
+                    <h4>🚀 Next Steps</h4>
+                    <ol>
+                        <li>Create dedicated zenflow task for HA/DR planning</li>
+                        <li>Requirements phase: Define RTO/RPO targets, budget, skill requirements</li>
+                        <li>Architecture design: VM/K8s strategy, database failover approach</li>
+                        <li>Proof of concept: Test chosen solutions in lab</li>
+                        <li>Phased implementation: Tier 1 → Tier 2 → Tier 3</li>
+                        <li>Documentation & testing: Runbooks, DR drills</li>
+                    </ol>
                 </div>
             </details>
 

@@ -56,6 +56,10 @@ __PACKAGE__->add_columns(
         default_value => \'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
         is_nullable => 0,
     },
+    allowed_roles => {
+        data_type => 'json',
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -113,6 +117,27 @@ sub is_overdue {
     return 0 unless $self->due_date;
     my $now = DateTime->now->ymd;
     return $self->due_date lt $now && $self->status ne 'completed';
+}
+
+sub get_allowed_roles {
+    my $self = shift;
+    my $roles = $self->allowed_roles;
+    return $roles ? (ref $roles eq 'ARRAY' ? $roles : []) : [];
+}
+
+sub set_allowed_roles {
+    my ($self, $roles) = @_;
+    $roles = [] unless defined $roles;
+    $roles = [$roles] unless ref $roles eq 'ARRAY';
+    $self->allowed_roles($roles);
+    return $self;
+}
+
+sub has_role {
+    my ($self, $role) = @_;
+    return 0 unless $role;
+    my $roles = $self->get_allowed_roles();
+    return grep { $_ eq $role } @$roles;
 }
 
 1;
