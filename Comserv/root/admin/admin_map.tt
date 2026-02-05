@@ -61,6 +61,8 @@
                 <a href="/documentation?category=tutorials" class="map-link"><i class="icon-tutorial"></i> Tutorials</a>
                 <a href="/documentation?category=changelog" class="map-link"><i class="icon-changelog"></i> Changelog</a>
                 <a href="/documentation/linux_commands" class="map-link"><i class="icon-terminal"></i> Linux Commands</a>
+                <a href="/admin/documentation/DailyPlan" class="map-link"><i class="icon-calendar"></i> Daily Plan</a>
+                <a href="/admin/documentation/Planning" class="map-link"><i class="icon-planning"></i> Planning</a>
                 <a href="/admin/edit_documentation" class="map-link"><i class="icon-edit"></i> Edit Documentation</a>
             </div>
         </div>

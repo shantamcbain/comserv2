@@ -91,6 +91,8 @@
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin Resources</span>
                         <a href="/documentation/linux_commands"><i class="icon-terminal"></i>Linux Commands</a>
+                        <a href="/admin/documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                        <a href="/admin/documentation/Planning"><i class="icon-planning"></i>Planning</a>
                         <a href="/admin/edit_documentation"><i class="icon-edit"></i>Edit Documentation</a>
                     </div>
                 [% END %]
