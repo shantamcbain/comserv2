@@ -207,6 +207,18 @@
         </div>
     </div>
 
+    [% IF status_msg %]
+    <div class="alert alert-success" style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724;">
+        [% status_msg %]
+    </div>
+    [% END %]
+    
+    [% IF error_msg %]
+    <div class="alert alert-danger" style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24;">
+        [% error_msg %]
+    </div>
+    [% END %]
+
     <div class="alert alert-info">
         <strong>Secure Storage:</strong> Your API keys are encrypted using AES-256 and stored securely. They are only decrypted when needed for API requests.
     </div>
@@ -227,7 +239,9 @@
                 </div>
                 <div class="key-actions">
                     <button class="btn-secondary" onclick="editKey([% key.id %], '[% key.service %]')">Edit Key</button>
-                    <button class="btn-danger" onclick="deleteKey([% key.id %], '[% key.service %]')">Delete</button>
+                    <form method="POST" action="/ai/delete_api_key/[% key.id %]" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service %]?');">
+                        <button type="submit" class="btn-danger">Delete</button>
+                    </form>
                 </div>
             </div>
             [% END %]
@@ -248,7 +262,7 @@
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <form id="key-form" onsubmit="saveKey(event)">
+            <form id="key-form" method="POST" action="/ai/save_api_key">
                 <input type="hidden" id="key-id" name="id">
                 
                 <div class="form-group">
@@ -266,26 +280,28 @@
                 
                 <div class="form-group">
                     <label for="api-key">API Key *</label>
-                    <input type="password" id="api-key" name="api_key"
+                    <input type="password" id="api-key" name="api_key" required
                            placeholder="Enter your API key">
                     <small style="color: var(--text-color); opacity: 0.7;">Your key will be encrypted before storage</small>
                 </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
             </form>
-        </div>
-        <div class="modal-actions">
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" onclick="document.getElementById('key-form').dispatchEvent(new Event('submit'))">Save</button>
         </div>
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 function openAddModal() {
     document.getElementById('modal-title').textContent = 'Add API Key';
     document.getElementById('key-form').reset();
     document.getElementById('key-id').value = '';
     document.getElementById('service').disabled = false;
+    document.getElementById('api-key').required = true;
+    document.getElementById('api-key').placeholder = 'Enter your API key';
     document.getElementById('key-modal').style.display = 'flex';
 }
 
@@ -295,78 +311,13 @@ function editKey(keyId, service) {
     document.getElementById('service').value = service;
     document.getElementById('service').disabled = true;
     document.getElementById('api-key').value = '';
-    document.getElementById('api-key').placeholder = 'Enter new API key (leave blank to keep existing)';
+    document.getElementById('api-key').required = true;
+    document.getElementById('api-key').placeholder = 'Enter new API key';
     document.getElementById('key-modal').style.display = 'flex';
 }
 
 function closeModal() {
     document.getElementById('key-modal').style.display = 'none';
-}
-
-function saveKey(event) {
-    event.preventDefault();
-    
-    const formData = new FormData(event.target);
-    const data = {};
-    formData.forEach((value, key) => data[key] = value);
-    
-    console.log('Saving key with data:', data);
-    
-    // Validate: new keys require api_key
-    if (!data.id && !data.api_key) {
-        alert('API key is required for new entries');
-        return;
-    }
-    
-    // If editing and no new key provided, skip the update
-    if (data.id && !data.api_key) {
-        alert('No changes made - API key field is empty');
-        closeModal();
-        return;
-    }
-    
-    $.ajax({
-        url: '/ai/save_api_key',
-        method: 'POST',
-        data: data,
-        dataType: 'json',
-        success: function(response) {
-            console.log('Save response:', response);
-            if (response.success) {
-                alert('API key saved successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + (response.error || 'Unknown error'));
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Save failed:', xhr.responseText, status, error);
-            alert('Failed to save API key: ' + (xhr.responseText || error || 'Unknown error'));
-        }
-    });
-}
-
-function deleteKey(keyId, service) {
-    if (!confirm(`Are you sure you want to delete the API key for ${service}?`)) {
-        return;
-    }
-    
-    $.ajax({
-        url: '/ai/delete_api_key/' + keyId,
-        method: 'POST',
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                alert('API key deleted successfully!');
-                location.reload();
-            } else {
-                alert('Error: ' + (response.error || 'Unknown error'));
-            }
-        },
-        error: function() {
-            alert('Failed to delete API key. Please try again.');
-        }
-    });
 }
 
 // Close modal on outside click
