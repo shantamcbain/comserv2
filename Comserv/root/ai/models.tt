@@ -155,6 +155,35 @@
                 [% END %]
             </section>
 
+            <!-- User API Keys Section -->
+            <section id="user-api-keys" style="margin: 20px 0;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Your AI Provider API Keys</h5>
+                        <a href="/admin/schema_compare" class="btn-secondary" style="padding: 6px 12px; text-decoration: none; font-size: 0.9em;">+ Add API Key</a>
+                    </div>
+                    <div class="card-body">
+                        [% IF user_api_keys.size %]
+                        <p style="margin-bottom: 10px; color: var(--text-color);">Configured providers for [% username %]:</p>
+                        <ul class="list-group list-group-flush">
+                            [% FOREACH api_key IN user_api_keys %]
+                            <li class="list-group-item">
+                                <span class="model-name" style="text-transform: capitalize;">[% api_key.service %]</span>
+                                <span class="badge badge-success">🔒 Configured</span>
+                                <small style="color: var(--text-color); opacity: 0.7; margin-left: 10px;">Added: [% api_key.created_at %]</small>
+                            </li>
+                            [% END %]
+                        </ul>
+                        [% ELSE %]
+                        <div style="text-align: center; padding: 20px; color: var(--text-color);">
+                            <p>No API keys configured yet.</p>
+                            <p style="font-size: 0.9em; opacity: 0.8;">Add API keys for services like Grok, OpenAI, Claude, Gemini to use them in the chat.</p>
+                        </div>
+                        [% END %]
+                    </div>
+                </div>
+            </section>
+
             <div class="row">
                 [% FOREACH server IN servers %]
                 <div class="col-md-6 mb-4">
