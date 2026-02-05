@@ -2696,6 +2696,182 @@ sub get_conversation_messages :Local :Args(1) {
     };
 }
 
+=head2 manage_api_keys
+
+Display and manage user API keys for AI providers
+
+=cut
+
+sub manage_api_keys :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    my @api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $keys_rs = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id },
+            { order_by => { -asc => 'service' } }
+        );
+        
+        foreach my $key ($keys_rs->all) {
+            push @api_keys, {
+                id => $key->id,
+                service => $key->service,
+                is_active => $key->is_active,
+                created_at => $key->created_at->strftime('%Y-%m-%d %H:%M'),
+                updated_at => $key->updated_at->strftime('%Y-%m-%d %H:%M')
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'manage_api_keys', "Failed to fetch API keys: $_");
+    };
+    
+    $c->stash(
+        template => 'ai/manage_api_keys.tt',
+        page_title => 'Manage API Keys',
+        username => $username,
+        api_keys => \@api_keys
+    );
+}
+
+=head2 save_api_key
+
+Save or update user API key
+
+=cut
+
+sub save_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($c->session->{username}) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        }));
+        $c->response->status(401);
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $service = $c->request->params->{service};
+    my $api_key = $c->request->params->{api_key};
+    my $key_id = $c->request->params->{id};
+    
+    unless ($service && $api_key) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Service and API key are required'
+        }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $key_obj;
+        if ($key_id) {
+            $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+            unless ($key_obj && $key_obj->user_id == $user_id) {
+                $c->response->body(encode_json({
+                    success => JSON::false,
+                    error => 'API key not found or access denied'
+                }));
+                return;
+            }
+            $key_obj->set_api_key($api_key);
+            $key_obj->update;
+        } else {
+            $key_obj = $schema->resultset('UserApiKeys')->create({
+                user_id => $user_id,
+                service => $service,
+                is_active => 1
+            });
+            $key_obj->set_api_key($api_key);
+            $key_obj->update;
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'save_api_key', "API key saved for service: $service, user: $user_id");
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => 'API key saved successfully',
+            id => $key_obj->id
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'save_api_key', "Failed to save API key: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to save API key: $_"
+        }));
+    };
+}
+
+=head2 delete_api_key
+
+Delete user API key
+
+=cut
+
+sub delete_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($c->session->{username}) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Authentication required'
+        }));
+        $c->response->status(401);
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj && $key_obj->user_id == $user_id) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'API key not found or access denied'
+            }));
+            return;
+        }
+        
+        $key_obj->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'delete_api_key', "API key deleted: $key_id, user: $user_id");
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => 'API key deleted successfully'
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'delete_api_key', "Failed to delete API key: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to delete API key: $_"
+        }));
+    };
+}
+
 sub reset_conversation :Local :Args(0) {
     my ($self, $c) = @_;
     
