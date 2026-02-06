@@ -90,5 +90,8 @@
     </div>
 </details>
 [% ELSE %]
-<p>No todos found for this project. <a href="/todo/addtodo?project_id=[% project.id %]">Add a todo</a></p>
+    [% USE date %]
+    [% current_date = date.format(date.now, '%Y-%m-%d') %]
+    [% current_time = date.format(date.now, '%H:%M:%S') %]
+    <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% project.id %]&start_date=[% current_date %]&start_time=[% current_time %]">Add a todo</a></p>
 [% END %]
