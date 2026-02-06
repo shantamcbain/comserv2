@@ -894,6 +894,37 @@ last_updated = '2026/02/01'
                                         
                                         [%# Include project todos list %]
                                         [% INCLUDE todo/ProjectTodosList.tt project=ollama_project level=0 %]
+                                        
+                                        [%# Ollama sub-projects %]
+                                        [% SET ollama_subprojects = schema.resultset('Project').search({parent_id => 105}, {order_by => 'id'}) %]
+                                        [% FOREACH subproj IN ollama_subprojects %]
+                                            <details style="margin: 15px 0; border: 1px solid #28a745; border-radius: 4px; background: #f9fff9;">
+                                                <summary style="padding: 8px 12px; cursor: pointer; background: linear-gradient(to bottom, #e8f5e9, #c8e6c9); border-bottom: 1px solid #28a745; user-select: none;">
+                                                    <strong>📂 [% subproj.name %] [Project #[% subproj.id %]]</strong>
+                                                    <span style="float: right; margin-right: 10px;">
+                                                        <a href="http://workstation.local:4001/project/details?project_id=[% subproj.id %]" 
+                                                           target="_blank" 
+                                                           onclick="event.stopPropagation();"
+                                                           style="padding: 2px 6px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; margin-left: 5px;">
+                                                            📊 View
+                                                        </a>
+                                                        <a href="http://workstation.local:4001/project/editproject?project_id=[% subproj.id %]" 
+                                                           target="_blank" 
+                                                           onclick="event.stopPropagation();"
+                                                           style="padding: 2px 6px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; margin-left: 5px;">
+                                                            ✏️ Edit
+                                                        </a>
+                                                    </span>
+                                                </summary>
+                                                <div style="padding: 10px;">
+                                                    <p><strong>Description:</strong> [% subproj.description %]</p>
+                                                    [% IF subproj.comments %]
+                                                    <p><strong>Notes:</strong> [% subproj.comments %]</p>
+                                                    [% END %]
+                                                    [% INCLUDE todo/ProjectTodosList.tt project=subproj level=1 %]
+                                                </div>
+                                            </details>
+                                        [% END %]
                                     </div>
                                 </details>
                             [% ELSE %]
