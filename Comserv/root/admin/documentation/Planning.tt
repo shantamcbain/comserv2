@@ -481,10 +481,12 @@ last_updated = '2026/02/01'
                             
                             [%# Sub-project: AI Chat System Enhancement (Project #114) %]
                             <div id="anchor-aichat-system" class="nav-anchor"></div>
+                            [% SET project = schema.resultset('Project').find(114) %]
+                            
+                            [% IF project %]
                             <details id="aichat-system" class="priority-container" style="margin: 20px 0; border: 2px solid #007bff;" open>
                                 <summary class="priority-summary" style="background: linear-gradient(to right, #e3f2fd, #bbdefb);">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
                                 <div class="priority-content">
-                                        [% IF project %]
                             <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                 <div>
                                     <p style="margin: 0;">
