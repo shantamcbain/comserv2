@@ -7,7 +7,7 @@
 [% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
    IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan'));
       is_daily_plan = 1;
-      base_url = '/Documentation/DailyPlan';
+      base_url = '/admin/documentation/DailyPlan';
       planning_hash = '#planning';
       week_hash = '#weekly-view';
       month_hash = '#month-view';
