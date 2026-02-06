@@ -438,8 +438,6 @@ last_updated = '2026/02/01'
 
         <!-- Group 5: AI Systems -->
         <div id="group-ai" class="priority-group-container">
-            <h3 class="group-header">🤖 AI Systems</h3>
-
             <div id="anchor-ai-integration" class="nav-anchor"></div>
             [%# Fetch root project (AI Integration - Project #63) from database %]
             [% TRY %]
@@ -448,31 +446,34 @@ last_updated = '2026/02/01'
                 
                 [% IF root_project %]
                     <details id="ai-integration" class="priority-container" open>
-                        <summary class="priority-summary">🤖 [% root_project.name %] [Project #63]</summary>
+                        <summary class="priority-summary">
+                            🤖 AI Systems [Project #63]
+                            <span style="float: right; margin-right: 10px;">
+                                <a href="http://workstation.local:4001/project/details?project_id=63" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="padding: 4px 8px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; font-size: 0.85em; margin-left: 5px;">
+                                    📊 View Details
+                                </a>
+                                <a href="http://workstation.local:4001/project/editproject?project_id=63" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="padding: 4px 8px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; font-size: 0.85em; margin-left: 5px;">
+                                    ✏️ Edit
+                                </a>
+                            </span>
+                        </summary>
                         <div class="priority-content">
-                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f0f8ff; border-radius: 5px;">
-                                <div>
-                                    <p style="margin: 0;">
-                                        <strong>Status:</strong> 
-                                        <span class="[% root_project.status == 'In-Process' ? 'status-in-progress' : root_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
-                                            [% root_project.status.upper %]
-                                        </span>
-                                    </p>
-                                </div>
-                                <div style="display: flex; gap: 10px;">
-                                    <a href="http://workstation.local:4001/project/details?project_id=63" 
-                                       target="_blank" 
-                                       class="btn-secondary" 
-                                       style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
-                                        📊 View Details
-                                    </a>
-                                    <a href="http://workstation.local:4001/project/editproject?project_id=63" 
-                                       target="_blank" 
-                                       class="btn-primary" 
-                                       style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
-                                        ✏️ Edit Project
-                                    </a>
-                                </div>
+                            <div style="padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+                                <p style="margin: 0;">
+                                    <strong>Description:</strong> [% root_project.description %]
+                                </p>
+                                <p style="margin: 5px 0 0 0;">
+                                    <strong>Status:</strong> 
+                                    <span class="[% root_project.status == 'In-Process' ? 'status-in-progress' : root_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                        [% root_project.status.upper %]
+                                    </span>
+                                </p>
                             </div>
                             
                             [%# Include todos for root project %]
