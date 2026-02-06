@@ -617,7 +617,7 @@
             <div class="priority-section">
                 <h4>📌 Related Links</h4>
                 <p>
-                    <a href="/admin/documentation/DailyPlan">Daily Plan Documentation</a> | 
+                    <a href="/Documentation/DailyPlan">Daily Plan Documentation</a> | 
                     <a href="/todo/day">Daily Todo View</a> | 
                     <a href="/admin/automation">Automation Settings</a>
                 </p>
@@ -730,7 +730,7 @@
             <div class="priority-section">
                 <h4>📌 Related Links</h4>
                 <p>
-                    <a href="/admin/documentation/DailyPlan">Daily Plan</a> | 
+                    <a href="/Documentation/DailyPlan">Daily Plan</a> | 
                     <a href="/todo/day">Today's View</a>
                 </p>
             </div>
