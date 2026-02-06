@@ -96,7 +96,7 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-11" class="jump-link">Phase 2</a> |
                         <a href="#anchor-priority-4" class="jump-link">Plan</a> |
                         <a href="#anchor-priority-schema" class="jump-link">Schema</a> |
-                        <a href="#anchor-priority-ha" class="jump-link">HA/DR</a> |
+                        <a href="#anchor-priority-ha" class="jump-link">HighAvail</a> |
                         <a href="#anchor-priority-19" class="jump-link">API Log</a> |
                         <a href="#anchor-priority-3" class="jump-link">Format</a>
                     </div>
