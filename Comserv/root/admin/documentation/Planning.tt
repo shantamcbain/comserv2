@@ -516,38 +516,33 @@ last_updated = '2026/02/01'
         <div id="group-ai" class="priority-group-container">
             <h3 class="group-header">🤖 AI Systems</h3>
 
-            <div id="anchor-aichat-system" class="nav-anchor"></div>
-            <details id="aichat-system" class="priority-container">
-                <summary class="priority-summary">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
-                <div class="priority-content">
-                    [%# Fetch project data from database %]
-                    [% TRY %]
-                        [% SET schema = c.model('DBEncy').schema %]
-                        [% SET project = schema.resultset('Project').find(114) %]
-                        
-                        [% IF project %]
-                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+            <div id="anchor-ai-integration" class="nav-anchor"></div>
+            [%# Fetch root project (AI Integration - Project #63) from database %]
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET root_project = schema.resultset('Project').find(63) %]
+                
+                [% IF root_project %]
+                    <details id="ai-integration" class="priority-container">
+                        <summary class="priority-summary">🤖 [% root_project.name %] [Project #63]</summary>
+                        <div class="priority-content">
+                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f0f8ff; border-radius: 5px;">
                                 <div>
                                     <p style="margin: 0;">
                                         <strong>Status:</strong> 
-                                        <span class="[% project.status == 'In-Process' ? 'status-in-progress' : project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
-                                            [% project.status.upper %]
+                                        <span class="[% root_project.status == 'In-Process' ? 'status-in-progress' : root_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                            [% root_project.status.upper %]
                                         </span>
-                                        | <strong>Hours:</strong> [% project.estimated_man_hours %]
-                                    </p>
-                                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
-                                        <strong>Timeline:</strong> [% project.start_date %] → [% project.end_date %]
-                                        | <strong>Developer:</strong> [% project.developer_name %]
                                     </p>
                                 </div>
                                 <div style="display: flex; gap: 10px;">
-                                    <a href="http://workstation.local:4001/project/details?project_id=114" 
+                                    <a href="http://workstation.local:4001/project/details?project_id=63" 
                                        target="_blank" 
                                        class="btn-secondary" 
                                        style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
                                         📊 View Details
                                     </a>
-                                    <a href="http://workstation.local:4001/project/editproject?project_id=114" 
+                                    <a href="http://workstation.local:4001/project/editproject?project_id=63" 
                                        target="_blank" 
                                        class="btn-primary" 
                                        style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
@@ -556,48 +551,80 @@ last_updated = '2026/02/01'
                                 </div>
                             </div>
                             
-                            <details style="margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
-                                <summary style="padding: 10px 15px; cursor: pointer; background: linear-gradient(to bottom, #f9f9f9, #efefef); border-bottom: 1px solid #ddd; user-select: none;">
-                                    <strong>📋 Project Code: [% project.project_code %]</strong>
-                                </summary>
-                                <div style="padding: 15px;">
+                            [%# Include todos for root project %]
+                            [% INCLUDE todo/ProjectTodosList.tt project=root_project level=0 %]
                             
-                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
-                                <h4 style="margin-top: 0;">Project Description</h4>
-                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+                            [%# Now show sub-project: AI Chat System Enhancement (Project #114) %]
+                            <div id="anchor-aichat-system" class="nav-anchor"></div>
+                            [% SET project = schema.resultset('Project').find(114) %]
+                            
+                            [% IF project %]
+                                <details id="aichat-system" class="priority-container" style="margin: 20px 0; border: 2px solid #007bff;">
+                                    <summary class="priority-summary" style="background: linear-gradient(to right, #e3f2fd, #bbdefb);">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
+                                    <div class="priority-content">
+                                        <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                            <div>
+                                                <p style="margin: 0;">
+                                                    <strong>Status:</strong> 
+                                                    <span class="[% project.status == 'In-Process' ? 'status-in-progress' : project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                                        [% project.status.upper %]
+                                                    </span>
+                                                    | <strong>Hours:</strong> [% project.estimated_man_hours %]
+                                                </p>
+                                                <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                                    <strong>Timeline:</strong> [% project.start_date %] → [% project.end_date %]
+                                                    | <strong>Developer:</strong> [% project.developer_name %]
+                                                </p>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <a href="http://workstation.local:4001/project/details?project_id=114" 
+                                                   target="_blank" 
+                                                   class="btn-secondary" 
+                                                   style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    📊 View Details
+                                                </a>
+                                                <a href="http://workstation.local:4001/project/editproject?project_id=114" 
+                                                   target="_blank" 
+                                                   class="btn-primary" 
+                                                   style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    ✏️ Edit Project
+                                                </a>
+                                            </div>
+                                        </div>
+                                        
+                                        <details style="margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+                                            <summary style="padding: 10px 15px; cursor: pointer; background: linear-gradient(to bottom, #f9f9f9, #efefef); border-bottom: 1px solid #ddd; user-select: none;">
+                                                <strong>📋 Project Code: [% project.project_code %]</strong>
+                                            </summary>
+                                            <div style="padding: 15px;">
+                                                <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
+                                                    <h4 style="margin-top: 0;">Project Description</h4>
+                                                    <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
 [% project.description %]
-                                </div>
-                            </div>
-                            
-                            [% IF project.comments %]
-                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
-                                <strong>📝 Notes:</strong> [% project.comments %]
-                            </div>
-                            [% END %]
-                            
-                            [%# Include project todos list %]
-                            [% INCLUDE todo/ProjectTodosList.tt project=project level=0 %]
-                                </div>
-                            </details>
-                        [% ELSE %]
-                            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                            <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                            <p><em>Note: Project #114 not found in database. Using static data below.</em></p>
-                        [% END %]
-                    [% CATCH %]
-                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                        <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                        <p><em>Note: Error loading project data: [% error %]. Using static data below.</em></p>
-                    [% END %]
-                    
-                    <details style="margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
-                        <summary style="padding: 10px 15px; cursor: pointer; background: linear-gradient(to bottom, #f9f9f9, #efefef); border-bottom: 1px solid #ddd; user-select: none;">
-                            <strong>📖 Context & Overview</strong>
+                                                    </div>
+                                                </div>
+                                                
+                                                [% IF project.comments %]
+                                                <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                                                    <strong>📝 Notes:</strong> [% project.comments %]
+                                                </div>
+                                                [% END %]
+                                                
+                                                [%# Include project todos list %]
+                                                [% INCLUDE todo/ProjectTodosList.tt project=project level=0 %]
+                                            </div>
+                                        </details>
+                                        
+                                        [%# Future sub-projects of Project #114 (parent_id=114) %]
+                                        <details style="margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+                                            <summary style="padding: 10px 15px; cursor: pointer; background: linear-gradient(to bottom, #f9f9f9, #efefef); border-bottom: 1px solid #ddd; user-select: none;">
+                                                <strong>📖 Context & Overview</strong>
                         </summary>
                         <div style="padding: 15px;">
                             <p><strong>Context:</strong> Enhance AI Chat system with conversation management, API key infrastructure, agent-based architecture, and multi-provider support (Ollama, X.AI, OpenAI, Claude).</p>
-                            [%# Will show todos when this becomes a sub-project %]
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Context & Overview', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Context & Overview', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
                     
@@ -613,7 +640,9 @@ last_updated = '2026/02/01'
                                 <li><strong>Resolution</strong>: Migration SQL created at <code>Comserv/db/migrations/create_user_api_keys_table.sql</code></li>
                                 <li><strong>Full Review</strong>: <code>.zenflow/tasks/aichatsystem-ef4e/branch-review-findings.md</code></li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Branch Review', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Branch Review', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -628,7 +657,9 @@ last_updated = '2026/02/01'
                                 <li><strong>Phase 3 - Advanced Features</strong>: Agent handoff, external providers (Grok/OpenAI/Claude), model enhancements</li>
                                 <li><strong>Phase 4 - Integration & Polish</strong>: Security audit, performance testing, documentation</li>
                             </ol>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Primary Objectives', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Primary Objectives', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -643,7 +674,9 @@ last_updated = '2026/02/01'
                                 <li><strong>⏳ Next</strong>: Add conversation resume dropdown to chat UI</li>
                                 <li><strong>⏳ Next</strong>: Implement X.AI/Grok integration (<code>Comserv::Model::Grok</code>)</li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Phase 1: Foundation', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Phase 1: Foundation', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -660,7 +693,9 @@ last_updated = '2026/02/01'
                                 <li>✅ <strong>Guest Sessions</strong>: Anonymous users can use AI chat without login</li>
                                 <li>✅ <strong>API Key UI</strong>: <code>/ai/manage_api_keys</code> with add/edit/delete forms</li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Existing Features', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Existing Features', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -701,7 +736,9 @@ last_updated = '2026/02/01'
                             </ul>
                         </li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Architecture', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Architecture', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -741,7 +778,9 @@ last_updated = '2026/02/01'
                         <li>E2E integration testing</li>
                         <li>Documentation updates</li>
                             </ol>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Implementation Roadmap', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Implementation Roadmap', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -756,7 +795,9 @@ last_updated = '2026/02/01'
                         <li><strong>Implementation Plan</strong>: <a href="/.zenflow/tasks/aichatsystem-ef4e/plan.md" target="_blank">plan.md</a></li>
                         <li><strong>Branch Review</strong>: <a href="/.zenflow/tasks/aichatsystem-ef4e/branch-review-findings.md" target="_blank">branch-review-findings.md</a></li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Documentation', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Documentation', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -771,7 +812,9 @@ last_updated = '2026/02/01'
                         <strong>Environment Variable:</strong>
                         <pre style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 3px;">export API_KEY_ENCRYPTION_KEY="your-32-character-key"</pre>
                             </div>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Action Required', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Action Required', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
 
@@ -788,11 +831,34 @@ last_updated = '2026/02/01'
                         <li><a href="/ai/admin/agents" target="_blank">Agent Management (Admin)</a></li>
                         <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
                             </ul>
-                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Related Systems', todos=>[]} level=0 %]
+                            [%# Future sub-project with parent_id=114 %]
+                            [% INCLUDE todo/ProjectTodosList.tt project={id=>0, name=>'Related Systems', todos=>[]} level=1 %]
+                            <p style="font-size: 0.85em; color: #666; margin-top: 10px;"><a href="http://workstation.local:4001/project/addproject?parent_id=114" target="_blank">➕ Create as sub-project</a></p>
                         </div>
                     </details>
-                </div>
-            </details>
+                                    </div>
+                                </details>
+                            [% ELSE %]
+                                <p><em>Note: Project #114 not found in database.</em></p>
+                            [% END %]
+                        </div>
+                    </details>
+                [% ELSE %]
+                    <details id="ai-integration" class="priority-container">
+                        <summary class="priority-summary">🤖 AI Integration [Project #63]</summary>
+                        <div class="priority-content">
+                            <p><em>Note: Project #63 not found in database.</em></p>
+                        </div>
+                    </details>
+                [% END %]
+            [% CATCH %]
+                <details id="ai-integration" class="priority-container">
+                    <summary class="priority-summary">🤖 AI Integration [Project #63]</summary>
+                    <div class="priority-content">
+                        <p><em>Error loading project data: [% error %]</em></p>
+                    </div>
+                </details>
+            [% END %]
         </div>
 
         <!-- Group 6: ToDo System Update Plan -->
