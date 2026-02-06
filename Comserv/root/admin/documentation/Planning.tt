@@ -560,11 +560,7 @@ last_updated = '2026/02/01'
                             <details id="aichat-system" class="priority-container" style="margin: 20px 0; border: 2px solid #007bff;" open>
                                 <summary class="priority-summary" style="background: linear-gradient(to right, #e3f2fd, #bbdefb);">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
                                 <div class="priority-content">
-                                    [%# Fetch project data from database %]
-                                    [% TRY %]
-                                        [% SET project = schema.resultset('Project').find(114) %]
-                        
-                        [% IF project %]
+                                        [% IF project %]
                             <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
                                 <div>
                                     <p style="margin: 0;">
@@ -748,9 +744,9 @@ last_updated = '2026/02/01'
                         <li><a href="/ai/admin/agents" target="_blank">Agent Management (Admin)</a></li>
                         <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
                     </ul>
-                                    [% CATCH %]
-                                        <p><em>Error loading project #114 data.</em></p>
-                                    [% END %]
+                                        [% ELSE %]
+                                            <p><em>Project #114 not found in database.</em></p>
+                                        [% END %]
                                 </div>
                             </details>
                             
