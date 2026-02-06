@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.41' %]
+[% version = '0.42' %]
 [% date_iso = '2026/02/05' %]
 [% formatted_date = 'February 05, 2026' %]
-[% time = '17:25:00' %]
-[% change_log = 'Added Infrastructure Resilience & High Availability Architecture workflow to Architecture & Infrastructure section.' %]
+[% time = '18:30:00' %]
+[% change_log = 'Added AI Chat System Enhancement section with agent architecture. Updated workflow names to be more descriptive (AIChatSystem, SchemaManagement, InfrastructureHA, DailyPlanSystem). Enhanced quick jump links with clearer labels.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -512,7 +512,81 @@ last_updated = '2026/02/01'
             </details>
         </div>
 
-        <!-- Group 5: ToDo System Update Plan -->
+        <!-- Group 5: AI Systems -->
+        <div id="group-ai" class="priority-group-container">
+            <h3 class="group-header">🤖 AI Systems</h3>
+
+            <div id="anchor-aichat-system" class="nav-anchor"></div>
+            <details id="aichat-system" class="priority-container" open>
+                <summary class="priority-summary">🤖 AI Chat System Enhancement & Agent Architecture</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
+                    <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001)</p>
+                    <p><strong>Context:</strong> Consolidate AI Chat functionality, implement agent-based architecture for specialized tasks, and enable API key management for external providers.</p>
+                    
+                    <h4>📋 Primary Objectives</h4>
+                    <ol>
+                        <li><strong>Planning Integration</strong>: Add AI Chat workflow to /admin/documentation/planning for browser-based progress tracking</li>
+                        <li><strong>API Key Management</strong>: Enable users to add/manage external API keys (X.AI/Grok, OpenAI, Claude, Gemini) with AES-256 encryption</li>
+                        <li><strong>Agent Development</strong>: Implement specialized agents (Ency, HelpDesk, Docker, Opencence, Database) with distinct roles</li>
+                        <li><strong>Agent Orchestration</strong>: Enable task handoff between agents/models with output selection for further processing</li>
+                    </ol>
+
+                    <h4>🎯 Current Phase: API Key Management</h4>
+                    <ul>
+                        <li><strong>✅ Completed</strong>: Refactored API key management to use TT forms with server-side validation</li>
+                        <li><strong>✅ Completed</strong>: Added comprehensive logging throughout all API key operations</li>
+                        <li><strong>✅ Completed</strong>: Implemented add/edit/delete functionality with flash messages</li>
+                        <li><strong>🔄 Current</strong>: Testing API key management workflow</li>
+                        <li><strong>⏳ Next</strong>: Implement API connectivity testing for external providers</li>
+                    </ul>
+
+                    <h4>🔑 Key Features</h4>
+                    <ul>
+                        <li><strong>Conversation Management</strong>: Resume past conversations via dropdown selector</li>
+                        <li><strong>Model Selection</strong>: Choose between Ollama (local/remote), Grok, OpenAI, Claude models</li>
+                        <li><strong>Role-Based Access</strong>: Configure which roles can access which models/agents</li>
+                        <li><strong>Secure Key Storage</strong>: AES-256 encryption for all API keys stored in <code>user_api_keys</code> table</li>
+                        <li><strong>Agent Routing</strong>: Intelligent task routing to specialized agents based on context</li>
+                    </ul>
+
+                    <h4>🏗️ Architecture</h4>
+                    <ul>
+                        <li><strong>Controllers</strong>: AI.pm, AIAdmin.pm, Chat.pm</li>
+                        <li><strong>Database Tables</strong>: ai_conversations, ai_messages, ai_model_config, user_api_keys</li>
+                        <li><strong>Templates</strong>: ai/chat.tt, ai/manage_api_keys.tt, ai/add_api_key.tt</li>
+                        <li><strong>Models</strong>: UserApiKeys.pm with encryption/decryption methods</li>
+                    </ul>
+
+                    <h4>🚀 Next Steps</h4>
+                    <ol>
+                        <li>Test API key add/edit/delete workflow thoroughly</li>
+                        <li>Implement API connectivity testing (test button in form)</li>
+                        <li>Add model availability detection for external providers</li>
+                        <li>Cherry-pick conversation dropdown from ai-chat-system-8434 branch</li>
+                        <li>Implement agent definition system and routing logic</li>
+                        <li>Add agent-to-agent handoff capabilities</li>
+                        <li>Integrate with documentation search and code search</li>
+                    </ol>
+
+                    <h4>📁 Documentation</h4>
+                    <ul>
+                        <li><strong>Requirements</strong>: <code>.zenflow/tasks/aichatsystem-ef4e/requirements.md</code></li>
+                        <li><strong>Technical Spec</strong>: <code>.zenflow/tasks/aichatsystem-ef4e/spec.md</code></li>
+                        <li><strong>Implementation Plan</strong>: <code>.zenflow/tasks/aichatsystem-ef4e/plan.md</code></li>
+                    </ul>
+
+                    <h4>🔗 Related Systems</h4>
+                    <ul>
+                        <li><a href="/Documentation/AiConfiguration" target="_blank">AI Configuration</a></li>
+                        <li><a href="/Documentation/Chat" target="_blank">Chat System (Legacy)</a></li>
+                        <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
+                    </ul>
+                </div>
+            </details>
+        </div>
+
+        <!-- Group 6: ToDo System Update Plan -->
         <div id="group-todo" class="priority-group-container">
             <h3 class="group-header">📝 ToDo System Update Plan</h3>
 
