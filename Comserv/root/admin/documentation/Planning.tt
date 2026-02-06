@@ -92,7 +92,7 @@ last_updated = '2026/02/01'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
-                        <strong>🏗️ Architecture</strong>: 
+                        <strong>🏗️ Architecture</strong>:
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
                         <a href="#anchor-priority-4" class="jump-link">MasterPlanRefactor</a> |
                         <a href="#anchor-priority-schema" class="jump-link">SchemaManagement</a> |
@@ -110,7 +110,7 @@ last_updated = '2026/02/01'
                         <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🔄 DataSync</strong>: 
+                        <strong>🔄 DataSync</strong>:
                         <a href="#anchor-priority-16" class="jump-link">ProjectIDs</a> |
                         <a href="#anchor-priority-efficiency" class="jump-link">ProcessEfficiency</a> |
                         <a href="#anchor-priority-17" class="jump-link">ThemeConsistency</a> |
@@ -118,11 +118,11 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🤖 AI Systems</strong>: 
+                        <strong>🤖 AI Systems</strong>:
                         <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🛠️ Maintenance</strong>: 
+                        <strong>🛠️ Maintenance</strong>:
                         <a href="#anchor-cleanup" class="jump-link">DocCleanup</a> |
                         <a href="#anchor-improvement" class="jump-link">LayoutImprovement</a> |
                         <a href="#anchor-priority-10" class="jump-link">ArchiveDocumentation</a> |
