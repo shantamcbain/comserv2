@@ -841,6 +841,63 @@ last_updated = '2026/02/01'
                             [% ELSE %]
                                 <p><em>Note: Project #114 not found in database.</em></p>
                             [% END %]
+                            
+                            [%# Now show sub-project: Ollama (Project #105) %]
+                            <div id="anchor-ollama" class="nav-anchor"></div>
+                            [% SET ollama_project = schema.resultset('Project').find(105) %]
+                            
+                            [% IF ollama_project %]
+                                <details id="ollama" class="priority-container" style="margin: 20px 0; border: 2px solid #28a745;">
+                                    <summary class="priority-summary" style="background: linear-gradient(to right, #d4edda, #c3e6cb);">🤖 [% ollama_project.name %] [Project #105]</summary>
+                                    <div class="priority-content">
+                                        <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                            <div>
+                                                <p style="margin: 0;">
+                                                    <strong>Status:</strong> 
+                                                    <span class="[% ollama_project.status == 'In-Process' ? 'status-in-progress' : ollama_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                                        [% ollama_project.status.upper %]
+                                                    </span>
+                                                    | <strong>Hours:</strong> [% ollama_project.estimated_man_hours %]
+                                                </p>
+                                                <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                                    <strong>Timeline:</strong> [% ollama_project.start_date %] → [% ollama_project.end_date %]
+                                                    | <strong>Developer:</strong> [% ollama_project.developer_name %]
+                                                </p>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <a href="http://workstation.local:4001/project/details?project_id=105" 
+                                                   target="_blank" 
+                                                   class="btn-secondary" 
+                                                   style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    📊 View Details
+                                                </a>
+                                                <a href="http://workstation.local:4001/project/editproject?project_id=105" 
+                                                   target="_blank" 
+                                                   class="btn-primary" 
+                                                   style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    ✏️ Edit Project
+                                                </a>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #28a745; margin-bottom: 15px;">
+                                            <h4 style="margin-top: 0;">Project Description</h4>
+                                            <p>[% ollama_project.description %]</p>
+                                        </div>
+                                        
+                                        [% IF ollama_project.comments %]
+                                        <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                                            <strong>📝 Notes:</strong> [% ollama_project.comments %]
+                                        </div>
+                                        [% END %]
+                                        
+                                        [%# Include project todos list %]
+                                        [% INCLUDE todo/ProjectTodosList.tt project=ollama_project level=0 %]
+                                    </div>
+                                </details>
+                            [% ELSE %]
+                                <p><em>Note: Project #105 (Ollama) not found in database.</em></p>
+                            [% END %]
                         </div>
                     </details>
                 [% ELSE %]
