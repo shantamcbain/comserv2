@@ -34,7 +34,7 @@
     <div class="nav-dashboard">
         <h2>Navigation Dashboard</h2>
         <div class="nav-links">
-            <a href="/admin/documentation/DailyPlan" target="_blank" class="nav-btn nav-btn-highlight" title="[% display_date %]Daily Plan for 2026-01-25: Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for focus.">📌 Daily Plan (Today 01-25)</a>
+            <a href="/Documentation/DailyPlan" target="_blank" class="nav-btn nav-btn-highlight" title="[% display_date %]Daily Plan for 2026-01-25: Select a critical item from Master Plan Priorities (A.3, A.2, or B.3) for focus.">📌 Daily Plan (Today 01-25)</a>
             <a href="/Documentation/B3ThemeHandlingAuditReport" class="nav-btn nav-btn-highlight" title="B.3 Theme handling audit report findings">📋 Audit Report</a>
             <a href="/Documentation/DailyWorkflowTutorial" target="_blank" class="nav-btn nav-btn-highlight" title="Tutorial for daily workflow processes and procedures">📚 Workflow Tutorial</a>
             <a href="/Documentation/AiChatSystemMasterAudit" target="_blank" class="nav-btn nav-btn-highlight" title="Master audit of AI Chat System with current status">🤖 AI Chat Audit</a>
