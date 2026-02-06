@@ -120,15 +120,15 @@
             <div class="header-nav-links">
                 <span><strong>Today:</strong> [% current_display %]</span>
                 <span>|</span>
-                <a href="/admin/documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
+                <a href="/Documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
                 <a href="/Documentation/MasterPlanCoordination" target="_blank">Master Plans</a>
                 <a href="/Documentation">All Docs</a>
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                <a href="/admin/documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
+                <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
-                <a href="/admin/documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
+                <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
             </div>
         </div>
     </div>
@@ -371,7 +371,7 @@
                     <li><a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">Master Plan Coordination</a></li>
                     <li><a href="/admin/documentation/PriorityTodos" style="color: var(--primary-color);">Priority Todos (Top 13 Blocking Dependencies)</a></li>
                     <li><a href="/admin/documentation/DailyAuditGuide" style="color: var(--primary-color);">Daily Audit Guide</a></li>
-                    <li><a href="/admin/documentation/DailyPlanSystem" style="color: var(--primary-color);">DailyPlan System Architecture</a></li>
+                    <li><a href="/Documentation/DailyPlanSystem" style="color: var(--primary-color);">DailyPlan System Architecture</a></li>
                 </ul>
             </div>
 
