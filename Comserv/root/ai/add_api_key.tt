@@ -1,0 +1,206 @@
+[% META
+    title = "Add API Key"
+    category = "AI"
+    roles = "user,developer,admin"
+    description = "Add or edit API key for AI provider"
+%]
+
+<style>
+.api-key-form-container {
+    max-width: 700px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.form-section {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.form-section h2 {
+    margin-top: 0;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.form-help {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--text-muted-color);
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.8;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+</style>
+
+<div class="api-key-form-container">
+    <h1>[% IF key_id %]Edit[% ELSE %]Add[% END %] API Key</h1>
+    
+    [% IF status_msg %]
+    <div class="alert alert-success">
+        [% status_msg %]
+    </div>
+    [% END %]
+    
+    [% IF error_msg %]
+    <div class="alert alert-danger">
+        [% error_msg %]
+    </div>
+    [% END %]
+    
+    [% IF c.flash.status_msg %]
+    <div class="alert alert-success">
+        [% c.flash.status_msg %]
+    </div>
+    [% END %]
+    
+    [% IF c.flash.error_msg %]
+    <div class="alert alert-danger">
+        [% c.flash.error_msg %]
+    </div>
+    [% END %]
+    
+    <div class="alert alert-info">
+        <strong>Security:</strong> Your API key will be encrypted using AES-256 before being stored in the database.
+        The encryption key is stored securely in your environment configuration.
+    </div>
+    
+    <div class="form-section">
+        <h2>[% IF key_id %]Update[% ELSE %]Add New[% END %] API Key</h2>
+        
+        <form method="POST" action="[% c.uri_for('/ai/save_api_key') %]">
+            [% IF key_id %]
+            <input type="hidden" name="id" value="[% key_id %]">
+            [% END %]
+            
+            <div class="form-group">
+                <label for="service">AI Service Provider *</label>
+                <select id="service" name="service" required [% IF key_id %]disabled[% END %]>
+                    <option value="">Select a service...</option>
+                    <option value="grok" [% IF service == 'grok' %]selected[% END %]>Grok (X.AI)</option>
+                    <option value="openai" [% IF service == 'openai' %]selected[% END %]>OpenAI</option>
+                    <option value="claude" [% IF service == 'claude' %]selected[% END %]>Claude (Anthropic)</option>
+                    <option value="gemini" [% IF service == 'gemini' %]selected[% END %]>Gemini (Google)</option>
+                    <option value="anthropic" [% IF service == 'anthropic' %]selected[% END %]>Anthropic</option>
+                    <option value="cohere" [% IF service == 'cohere' %]selected[% END %]>Cohere</option>
+                </select>
+                [% IF key_id %]
+                <input type="hidden" name="service" value="[% service %]">
+                <span class="form-help">Service cannot be changed when editing. Delete and create a new key to change service.</span>
+                [% ELSE %]
+                <span class="form-help">Choose the AI service provider for this API key.</span>
+                [% END %]
+            </div>
+            
+            <div class="form-group">
+                <label for="api_key">API Key *</label>
+                <input type="password" id="api_key" name="api_key" required
+                       placeholder="[% IF key_id %]Enter new API key to update[% ELSE %]Enter your API key[% END %]">
+                <span class="form-help">
+                    [% IF key_id %]
+                    Leave blank to keep existing key. Enter a new key to update.
+                    [% ELSE %]
+                    Your API key will be encrypted before storage.
+                    [% END %]
+                </span>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    [% IF key_id %]Update Key[% ELSE %]Save Key[% END %]
+                </button>
+                <a href="[% c.uri_for('/ai/manage_api_keys') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

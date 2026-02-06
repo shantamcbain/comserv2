@@ -2706,12 +2706,17 @@ sub manage_api_keys :Local :Args(0) {
     my ($self, $c) = @_;
     
     unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'manage_api_keys', "Unauthorized access attempt - no session");
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
     
     my $user_id = $c->session->{user_id};
     my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'manage_api_keys', "User $username (ID: $user_id) accessing API keys management");
     
     my @api_keys;
     try {
@@ -2720,6 +2725,10 @@ sub manage_api_keys :Local :Args(0) {
             { user_id => $user_id },
             { order_by => { -asc => 'service' } }
         );
+        
+        my $key_count = $keys_rs->count;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'manage_api_keys', "Found $key_count API keys for user $user_id");
         
         foreach my $key ($keys_rs->all) {
             push @api_keys, {
@@ -2732,7 +2741,8 @@ sub manage_api_keys :Local :Args(0) {
         }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'manage_api_keys', "Failed to fetch API keys: $_");
+            'manage_api_keys', "Failed to fetch API keys for user $user_id: $_");
+        $c->flash->{error_msg} = "Failed to load API keys: $_";
     };
     
     $c->stash(
@@ -2741,6 +2751,99 @@ sub manage_api_keys :Local :Args(0) {
         username => $username,
         api_keys => \@api_keys
     );
+}
+
+=head2 add_api_key
+
+Display form to add a new API key
+
+=cut
+
+sub add_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'add_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'add_api_key', "User $username accessing add API key form");
+    
+    $c->stash(
+        template => 'ai/add_api_key.tt',
+        page_title => 'Add API Key',
+        username => $username
+    );
+}
+
+=head2 edit_api_key
+
+Display form to edit an existing API key
+
+=cut
+
+sub edit_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'edit_api_key', "User $username editing API key ID: $key_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'edit_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'edit_api_key', "Access denied: User $user_id attempted to edit key $key_id owned by user " . $key_obj->user_id);
+            $c->flash->{error_msg} = 'Access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        $c->stash(
+            template => 'ai/add_api_key.tt',
+            page_title => 'Edit API Key',
+            username => $username,
+            key_id => $key_obj->id,
+            service => $key_obj->service
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'edit_api_key', "Error loading API key $key_id: $_");
+        $c->flash->{error_msg} = "Failed to load API key: $_";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    };
 }
 
 =head2 save_api_key
@@ -2753,18 +2856,36 @@ sub save_api_key :Local :Args(0) {
     my ($self, $c) = @_;
     
     unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Unauthorized access attempt - no session");
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
     
     my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
     my $service = $c->request->params->{service};
     my $api_key = $c->request->params->{api_key};
     my $key_id = $c->request->params->{id};
     
-    unless ($service && $api_key) {
-        $c->flash->{error_msg} = 'Service and API key are required';
-        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'save_api_key', "User $username attempting to " . ($key_id ? "update key ID $key_id" : "add new key") . " for service: $service");
+    
+    # Validation
+    unless ($service) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: service missing for user $username");
+        $c->flash->{error_msg} = 'Service is required';
+        $c->response->redirect($c->uri_for($key_id ? '/ai/edit_api_key/' . $key_id : '/ai/add_api_key'));
+        return;
+    }
+    
+    # For new keys, api_key is required. For edits, it's optional (keep existing if blank)
+    if (!$key_id && !$api_key) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: API key missing for new key, user $username");
+        $c->flash->{error_msg} = 'API key is required';
+        $c->response->redirect($c->uri_for('/ai/add_api_key'));
         return;
     }
     
@@ -2773,32 +2894,87 @@ sub save_api_key :Local :Args(0) {
         
         my $key_obj;
         if ($key_id) {
+            # Update existing key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Looking up existing key ID $key_id for user $user_id");
+            
             $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
-            unless ($key_obj && $key_obj->user_id == $user_id) {
+            
+            unless ($key_obj) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Key ID $key_id not found in database");
+                $c->flash->{error_msg} = 'API key not found';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            unless ($key_obj->user_id == $user_id) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Access denied: User $user_id attempted to update key $key_id owned by user " . $key_obj->user_id);
                 $c->flash->{error_msg} = 'API key not found or access denied';
                 $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
                 return;
             }
-            $key_obj->set_api_key($api_key);
+            
+            # Only update api_key if provided
+            if ($api_key && length($api_key) > 0) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "Updating API key for service $service");
+                $key_obj->set_api_key($api_key);
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "No new API key provided, keeping existing key for service $service");
+            }
+            
             $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key ID $key_id updated successfully for service $service, user $username");
+            
+            $c->flash->{status_msg} = "API key for $service updated successfully";
+            
         } else {
+            # Create new key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Creating new API key for service $service, user $user_id");
+            
+            # Check for duplicate
+            my $existing = $schema->resultset('UserApiKeys')->search({
+                user_id => $user_id,
+                service => $service
+            })->first;
+            
+            if ($existing) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'save_api_key', "Duplicate key attempt: User $user_id already has key for service $service");
+                $c->flash->{error_msg} = "You already have an API key for $service. Please edit the existing key instead.";
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
             $key_obj = $schema->resultset('UserApiKeys')->create({
                 user_id => $user_id,
                 service => $service,
                 is_active => 1
             });
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "UserApiKeys record created, ID: " . $key_obj->id . ", now encrypting API key");
+            
             $key_obj->set_api_key($api_key);
             $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key created successfully for service $service, user $username, key ID: " . $key_obj->id);
+            
+            $c->flash->{status_msg} = "API key for $service added successfully";
         }
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'save_api_key', "API key saved for service: $service, user: $user_id");
-        
-        $c->flash->{status_msg} = 'API key saved successfully';
     } catch {
+        my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'save_api_key', "Failed to save API key: $_");
-        $c->flash->{error_msg} = "Failed to save API key: $_";
+            'save_api_key', "Failed to save API key for service $service, user $username: $error");
+        $c->flash->{error_msg} = "Failed to save API key: $error";
     };
     
     $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
@@ -2814,33 +2990,62 @@ sub delete_api_key :Local :Args(1) {
     my ($self, $c, $key_id) = @_;
     
     unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "Unauthorized access attempt - no session");
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
     
     my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'delete_api_key', "User $username attempting to delete API key ID: $key_id");
     
     try {
         my $schema = $c->model('DBEncy')->schema;
         my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
         
-        unless ($key_obj && $key_obj->user_id == $user_id) {
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'delete_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'delete_api_key', "Access denied: User $user_id attempted to delete key $key_id owned by user " . $key_obj->user_id);
             $c->flash->{error_msg} = 'API key not found or access denied';
             $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
             return;
         }
         
         my $service = $key_obj->service;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'delete_api_key', "Deleting API key ID $key_id for service $service, user $username");
+        
         $key_obj->delete;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'delete_api_key', "API key deleted: $key_id, user: $user_id");
+            'delete_api_key', "API key ID $key_id for service $service deleted successfully by user $username");
         
         $c->flash->{status_msg} = "API key for $service deleted successfully";
     } catch {
+        my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'delete_api_key', "Failed to delete API key: $_");
-        $c->flash->{error_msg} = "Failed to delete API key: $_";
+            'delete_api_key', "Failed to delete API key $key_id for user $username: $error");
+        $c->flash->{error_msg} = "Failed to delete API key: $error";
     };
     
     $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
