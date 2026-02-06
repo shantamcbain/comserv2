@@ -142,15 +142,35 @@
         [% END %]
     </div>
 [% END %]
-[% PageVersion = 'todo/projectdetails.tt,v 0.01 2024/03/15 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
-    [% PageVersion %]
+[% PageVersion = 'todo/projectdetails.tt,v 0.02 2026/02/06 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    <div style="background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;">
+        <h4>Debug Info:</h4>
+        <p><strong>PageVersion:</strong> [% PageVersion %]</p>
+        <p><strong>Project defined:</strong> [% project ? 'YES' : 'NO' %]</p>
+        [% IF project %]
+        <p><strong>Project ID:</strong> [% project.id %]</p>
+        <p><strong>Project Name:</strong> [% project.name %]</p>
+        <p><strong>Todos count:</strong> [% project.todos.size || 0 %]</p>
+        <p><strong>Sub-projects count:</strong> [% project.sub_projects.size || 0 %]</p>
+        [% END %]
+        <p><strong>Error message:</strong> [% error_msg || 'None' %]</p>
+        <p><strong>Success message:</strong> [% success_message || 'None' %]</p>
+    </div>
 [% END %]
 
+[% IF !project %]
+<div class="error-message">
+    <h2>No Project Data Available</h2>
+    <p>Unable to load project details. The project variable is empty or undefined.</p>
+    <p><a href="/project">Return to Projects List</a></p>
+</div>
+[% ELSE %]
 <div class="project-container">
     <!-- Display the main project and all its sub-projects recursively -->
     [% display_project_details(project, 0) %]
 </div>
+[% END %]
 
 <!-- Display total accumulated time for all projects -->
 <h3>Total Accumulated Time for All Projects: [% total_accumulated_time %]</h3>
