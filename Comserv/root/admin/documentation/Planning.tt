@@ -514,16 +514,55 @@ last_updated = '2026/02/01'
 
         <!-- Group 5: AI Systems -->
         <div id="group-ai" class="priority-group-container">
-            <h3 class="group-header">🤖 AI Systems</h3>
-
-            <div id="anchor-aichat-system" class="nav-anchor"></div>
-            <details id="aichat-system" class="priority-container">
-                <summary class="priority-summary">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
-                <div class="priority-content">
-                    [%# Fetch project data from database %]
-                    [% TRY %]
-                        [% SET schema = c.model('DBEncy').schema %]
-                        [% SET project = schema.resultset('Project').find(114) %]
+            <div id="anchor-ai-integration" class="nav-anchor"></div>
+            [%# Fetch root project (AI Integration - Project #63) from database %]
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET root_project = schema.resultset('Project').find(63) %]
+                
+                [% IF root_project %]
+                    <details id="ai-integration" class="priority-container" open>
+                        <summary class="priority-summary">
+                            🤖 AI Systems [Project #63]
+                            <span style="float: right; margin-right: 10px;">
+                                <a href="http://workstation.local:4001/project/details?project_id=63" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="padding: 4px 8px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; font-size: 0.85em; margin-left: 5px;">
+                                    📊 View Details
+                                </a>
+                                <a href="http://workstation.local:4001/project/editproject?project_id=63" 
+                                   target="_blank" 
+                                   onclick="event.stopPropagation();"
+                                   style="padding: 4px 8px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; font-size: 0.85em; margin-left: 5px;">
+                                    ✏️ Edit
+                                </a>
+                            </span>
+                        </summary>
+                        <div class="priority-content">
+                            <div style="padding: 10px; background: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+                                <p style="margin: 0;">
+                                    <strong>Description:</strong> [% root_project.description %]
+                                </p>
+                                <p style="margin: 5px 0 0 0;">
+                                    <strong>Status:</strong> 
+                                    <span class="[% root_project.status == 'In-Process' ? 'status-in-progress' : root_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                        [% root_project.status.upper %]
+                                    </span>
+                                </p>
+                            </div>
+                            
+                            [%# Include todos for root project %]
+                            [% INCLUDE todo/ProjectTodosList.tt project=root_project level=0 %]
+                            
+                            [%# Sub-project: AI Chat System Enhancement (Project #114) %]
+                            <div id="anchor-aichat-system" class="nav-anchor"></div>
+                            <details id="aichat-system" class="priority-container" style="margin: 20px 0; border: 2px solid #007bff;" open>
+                                <summary class="priority-summary" style="background: linear-gradient(to right, #e3f2fd, #bbdefb);">🤖 AI Chat System Enhancement & Agent Architecture [Project #114]</summary>
+                                <div class="priority-content">
+                                    [%# Fetch project data from database %]
+                                    [% TRY %]
+                                        [% SET project = schema.resultset('Project').find(114) %]
                         
                         [% IF project %]
                             <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
@@ -709,8 +748,105 @@ last_updated = '2026/02/01'
                         <li><a href="/ai/admin/agents" target="_blank">Agent Management (Admin)</a></li>
                         <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
                     </ul>
-                </div>
-            </details>
+                                    [% CATCH %]
+                                        <p><em>Error loading project #114 data.</em></p>
+                                    [% END %]
+                                </div>
+                            </details>
+                            
+                            [%# Sub-project: Ollama (Project #105) %]
+                            <div id="anchor-ollama" class="nav-anchor"></div>
+                            [% SET ollama_project = schema.resultset('Project').find(105) %]
+                            
+                            [% IF ollama_project %]
+                                <details id="ollama" class="priority-container" style="margin: 20px 0; border: 2px solid #28a745;" open>
+                                    <summary class="priority-summary" style="background: linear-gradient(to right, #d4edda, #c3e6cb);">🤖 [% ollama_project.name %] [Project #105]</summary>
+                                    <div class="priority-content">
+                                        <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                            <div>
+                                                <p style="margin: 0;">
+                                                    <strong>Status:</strong> 
+                                                    <span class="[% ollama_project.status == 'In-Process' ? 'status-in-progress' : ollama_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                                        [% ollama_project.status.upper %]
+                                                    </span>
+                                                    | <strong>Hours:</strong> [% ollama_project.estimated_man_hours %]
+                                                </p>
+                                                <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                                    <strong>Timeline:</strong> [% ollama_project.start_date %] → [% ollama_project.end_date %]
+                                                    | <strong>Developer:</strong> [% ollama_project.developer_name %]
+                                                </p>
+                                            </div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <a href="http://workstation.local:4001/project/details?project_id=105" 
+                                                   target="_blank" 
+                                                   class="btn-secondary" 
+                                                   style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    📊 View Details
+                                                </a>
+                                                <a href="http://workstation.local:4001/project/editproject?project_id=105" 
+                                                   target="_blank" 
+                                                   class="btn-primary" 
+                                                   style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                                    ✏️ Edit Project
+                                                </a>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #28a745; margin-bottom: 15px;">
+                                            <h4 style="margin-top: 0;">Project Description</h4>
+                                            <p>[% ollama_project.description %]</p>
+                                        </div>
+                                        
+                                        [% IF ollama_project.comments %]
+                                        <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                                            <strong>📝 Notes:</strong> [% ollama_project.comments %]
+                                        </div>
+                                        [% END %]
+                                        
+                                        [%# Include project todos list %]
+                                        [% INCLUDE todo/ProjectTodosList.tt project=ollama_project level=0 %]
+                                        
+                                        [%# Ollama sub-projects %]
+                                        [% SET ollama_subprojects = schema.resultset('Project').search({parent_id => 105}, {order_by => 'id'}) %]
+                                        [% FOREACH subproj IN ollama_subprojects %]
+                                            <details style="margin: 15px 0; border: 1px solid #28a745; border-radius: 4px; background: #f9fff9;">
+                                                <summary style="padding: 8px 12px; cursor: pointer; background: linear-gradient(to bottom, #e8f5e9, #c8e6c9); border-bottom: 1px solid #28a745; user-select: none;">
+                                                    <strong>📂 [% subproj.name %] [Project #[% subproj.id %]]</strong>
+                                                    <span style="float: right; margin-right: 10px;">
+                                                        <a href="http://workstation.local:4001/project/details?project_id=[% subproj.id %]" 
+                                                           target="_blank" 
+                                                           onclick="event.stopPropagation();"
+                                                           style="padding: 2px 6px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; margin-left: 5px;">
+                                                            📊 View
+                                                        </a>
+                                                        <a href="http://workstation.local:4001/project/editproject?project_id=[% subproj.id %]" 
+                                                           target="_blank" 
+                                                           onclick="event.stopPropagation();"
+                                                           style="padding: 2px 6px; background: #28a745; color: white; text-decoration: none; border-radius: 3px; font-size: 0.8em; margin-left: 5px;">
+                                                            ✏️ Edit
+                                                        </a>
+                                                    </span>
+                                                </summary>
+                                                <div style="padding: 10px;">
+                                                    <p><strong>Description:</strong> [% subproj.description %]</p>
+                                                    [% IF subproj.comments %]
+                                                    <p><strong>Notes:</strong> [% subproj.comments %]</p>
+                                                    [% END %]
+                                                    [% INCLUDE todo/ProjectTodosList.tt project=subproj level=1 %]
+                                                </div>
+                                            </details>
+                                        [% END %]
+                                    </div>
+                                </details>
+                            [% END %]
+                        </div>
+                    </details>
+                [% ELSE %]
+                    <p><em>Note: Project #63 not found in database.</em></p>
+                [% END %]
+            [% CATCH %]
+                <p><em>Error loading AI Systems projects.</em></p>
+            [% END %]
         </div>
 
         <!-- Group 6: ToDo System Update Plan -->
