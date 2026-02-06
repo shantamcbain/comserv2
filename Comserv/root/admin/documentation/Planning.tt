@@ -528,16 +528,6 @@ last_updated = '2026/02/01'
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]
-                        [% ELSE %]
-                            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                            <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                            <p><em>Note: Project #114 not found in database. Using static data below.</em></p>
-                        [% END %]
-                    [% CATCH %]
-                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                        <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                        <p><em>Note: Error loading project data: [% error %]. Using static data below.</em></p>
-                    [% END %]
                     
                     <p><strong>Context:</strong> Enhance AI Chat system with conversation management, API key infrastructure, agent-based architecture, and multi-provider support (Ollama, X.AI, OpenAI, Claude).</p>
                     
