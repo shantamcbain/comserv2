@@ -147,10 +147,10 @@ last_updated = '2026/02/01'
             <h4>🔧 Active Zenflow Workflows</h4>
             [% SET base_url = c.req.base.replace(':\d+/', ':') %]
             <ul>
-                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/admin/documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
-                <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/admin/documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
-                <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/admin/documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
-                <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/admin/documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
+                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
+                <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
+                <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
+                <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
             </ul>
         </div>
     </details>
@@ -856,7 +856,7 @@ last_updated = '2026/02/01'
                         <li><a href="/Documentation/TodoSystemComprehensive" target="_blank">Todo System Comprehensive</a></li>
                         <li><a href="/Documentation/Todo" target="_blank">Todo Controller Documentation</a></li>
                         <li><a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync" target="_blank">API & Master Plan Sync</a></li>
-                        <li><a href="/admin/documentation/DailyPlanSystem" target="_blank">Daily Plan System</a></li>
+                        <li><a href="/Documentation/DailyPlanSystem" target="_blank">Daily Plan System</a></li>
                         <li><a href="/Documentation/TodoSystemDocumentation" target="_blank">2025-01-20 Todo System Documentation</a></li>
                     </ul>
 
