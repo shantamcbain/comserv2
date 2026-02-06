@@ -574,6 +574,11 @@ last_updated = '2026/02/01'
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]
+                                </div>
+                            </details>
+                            
+                            [%# Include project todos list %]
+                            [% INCLUDE todo/ProjectTodosList.tt project=project level=0 %]
                         [% ELSE %]
                             <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
                             <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
@@ -714,21 +719,6 @@ last_updated = '2026/02/01'
                         <li><a href="/ai/admin/agents" target="_blank">Agent Management (Admin)</a></li>
                         <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
                     </ul>
-                                </div>
-                            </details>
-                            
-                            [%# Include project todos list %]
-                            [% INCLUDE todo/ProjectTodosList.tt project=project level=0 %]
-                        [% ELSE %]
-                            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                            <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                            <p><em>Note: Project #114 not found in database. Showing static fallback data.</em></p>
-                        [% END %]
-                    [% CATCH %]
-                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
-                        <p><strong>Zenflow Task:</strong> <code>aichatsystem-ef4e</code> (port 4001) | <strong>Branch:</strong> <code>aichatsystem-ef4e</code></p>
-                        <p><em>Note: Error loading project data: [% error %]. Showing static fallback data.</em></p>
-                    [% END %]
                     
                     <p><strong>Context:</strong> Enhance AI Chat system with conversation management, API key infrastructure, agent-based architecture, and multi-provider support (Ollama, X.AI, OpenAI, Claude).</p>
                 </div>
