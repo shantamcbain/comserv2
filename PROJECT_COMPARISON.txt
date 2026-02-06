@@ -1,0 +1,114 @@
+=============================================================================
+PROJECT #133 - BEFORE & AFTER COMPARISON
+=============================================================================
+
+CURRENT STATE (Before Update):
+-------------------------------
+ID:                  133
+Name:                Chat with AI
+Description:         This sub-project is the floating that will help users 
+                     with the website, both for general information but also 
+                     for a precursor for HelpDesk system. This Once activated 
+                     this window should be independent of the page.
+Status:              In-Process
+Parent Project:      120 (AIC-003: Chat Interface Development)
+Start Date:          2025-10-13
+End Date:            2025-10-20
+Estimated Hours:     100
+Project Code:        AIC-003
+Developer:           Shanta
+Client:              internal
+Comments:            Our floating AI chat.
+
+
+PROPOSED STATE (After Update):
+-------------------------------
+ID:                  133 (same)
+Name:                AI Chat System with Agent Architecture
+Description:         Enhanced AI Chat system with multi-agent architecture, 
+                     external API integration, and conversation management.
+
+                     **Key Features:**
+                     - Agent-based routing (Ency, HelpDesk, Docker, Database)
+                     - Multi-provider support (Ollama, X.AI/Grok, OpenAI, Claude)
+                     - Conversation persistence and resume functionality
+                     - User-specific API key management with AES-256 encryption
+                     - Role-based access control for models and agents
+                     - Agent handoff capabilities for complex workflows
+
+                     **Implementation Status:**
+                     - Phase 1: Foundation (Current - Database setup, API keys)
+                     - Phase 2: Agent System (Agent routing, configuration)
+                     - Phase 3: Advanced Features (External providers, handoff)
+                     - Phase 4: Integration & Polish (Security, testing, docs)
+
+                     **Technical Stack:**
+                     - Backend: Perl Catalyst (AI.pm, AIAdmin.pm)
+                     - Database: ai_conversations, ai_messages, ai_model_config, user_api_keys
+                     - Frontend: Template Toolkit (ai/index.tt, manage_api_keys.tt)
+                     - Models: Ollama, Grok, OpenAI (planned), Claude (planned)
+
+                     **Branch:** aichatsystem-ef4e (Zenflow port 4001)
+                     **Documentation:** .zenflow/tasks/aichatsystem-ef4e/
+
+Status:              In-Process (unchanged)
+Parent Project:      120 (unchanged)
+Start Date:          2026-02-06 (updated)
+End Date:            2026-02-28 (updated - extended timeline)
+Estimated Hours:     160 (increased from 100)
+Project Code:        AIC-133 (updated)
+Developer:           Shanta (unchanged)
+Client:              internal (unchanged)
+Comments:            Zenflow task: aichatsystem-ef4e (port 4001)
+                     Previous work: ai-chat-system-8434 branch (fully integrated)
+                     Database migration: user_api_keys table required
+                     Documentation: .zenflow/tasks/aichatsystem-ef4e/plan.md
+                     Branch review: .zenflow/tasks/aichatsystem-ef4e/branch-review-findings.md
+                     Planning integration: /admin/documentation/planning#anchor-aichat-system
+
+=============================================================================
+CHANGES SUMMARY:
+=============================================================================
+
+✓ Name:              Expanded to reflect agent architecture
+✓ Description:       Comprehensive 4-phase implementation details
+✓ Start Date:        Updated to today (2026-02-06)
+✓ End Date:          Extended to 2026-02-28 (22 days from today)
+✓ Hours:             +60 hours (100 → 160) to account for agent work
+✓ Project Code:      Changed to AIC-133 for better tracking
+✓ Comments:          Added Zenflow branch, documentation links, migration notes
+
+=============================================================================
+HOW TO APPLY THESE CHANGES:
+=============================================================================
+
+BROWSER PAGE (Recommended):
+  http://localhost:4001/project/editproject?project_id=133
+  
+  1. Click the link above or navigate to it in your browser
+  2. Copy the text from PROJECT_UPDATE_GUIDE.md
+  3. Paste into the form fields
+  4. Click "Update Project" button
+
+COMMAND LINE (Alternative):
+  See create_ai_chat_subproject.sh for curl command template
+  (Requires session cookie - browser method is easier)
+
+=============================================================================
+NEXT STEPS AFTER UPDATE:
+=============================================================================
+
+1. View updated project:
+   http://localhost:4001/project/details?project_id=133
+
+2. Create Phase 1 todos (4 tasks)
+
+3. Update Planning.tt to link to project:
+   Add: project_id=133 to the AI Chat System section
+
+4. Begin Phase 1 work:
+   - Run user_api_keys migration
+   - Add conversation dropdown
+   - Complete Grok integration
+
+=============================================================================
