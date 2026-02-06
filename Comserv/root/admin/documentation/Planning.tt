@@ -731,6 +731,8 @@ last_updated = '2026/02/01'
                     [% END %]
                     
                     <p><strong>Context:</strong> Enhance AI Chat system with conversation management, API key infrastructure, agent-based architecture, and multi-provider support (Ollama, X.AI, OpenAI, Claude).</p>
+                </div>
+            </details>
         </div>
 
         <!-- Group 6: ToDo System Update Plan -->
