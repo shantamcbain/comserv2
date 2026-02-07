@@ -80,6 +80,38 @@ last_updated = '2026/02/01'
         border: 2px solid #007bff;
         box-shadow: 0 0 10px rgba(0,123,255,0.2);
     }
+
+    /* Group container styling */
+    .priority-group-container {
+        margin-bottom: 20px;
+        border: 2px solid #dee2e6;
+        border-radius: 6px;
+        background-color: #f8f9fa;
+    }
+
+    .group-header {
+        font-size: 1.3em;
+        font-weight: bold;
+        padding: 12px 15px;
+        cursor: pointer;
+        background-color: #e9ecef;
+        border-radius: 4px 4px 0 0;
+        color: #495057;
+    }
+
+    .group-header:hover {
+        background-color: #dee2e6;
+    }
+
+    .priority-group-container > .priority-content {
+        padding: 15px;
+    }
+
+    /* Sub-container styling - nested priority containers */
+    .priority-group-container .priority-container {
+        margin-bottom: 10px;
+        border: 1px solid #dee2e6;
+    }
 </style>
 
 <div class="container">
@@ -92,7 +124,7 @@ last_updated = '2026/02/01'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
-                        <strong>🏗️ Architecture</strong>:
+                        <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
                         <a href="#anchor-priority-4" class="jump-link">MasterPlanRefactor</a> |
                         <a href="#anchor-priority-schema" class="jump-link">SchemaManagement</a> |
@@ -101,16 +133,15 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong>📅 DailyPlan</strong>:
+                        <strong><a href="#group-daily" class="jump-link">📅 DailyPlan UI/UX</a></strong>:
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
                         <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
                         <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
                         <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a> |
-                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🔄 DataSync</strong>:
+                        <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
                         <a href="#anchor-priority-16" class="jump-link">ProjectIDs</a> |
                         <a href="#anchor-priority-efficiency" class="jump-link">ProcessEfficiency</a> |
                         <a href="#anchor-priority-17" class="jump-link">ThemeConsistency</a> |
@@ -118,16 +149,20 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🤖 AI Systems</strong>:
+                        <strong><a href="#group-ai" class="jump-link">🤖 AI Systems</a></strong>:
                         <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
                     </div>
                     <div class="jump-line">
-                        <strong>🛠️ Maintenance</strong>:
+                        <strong><a href="#group-maint" class="jump-link">🛠️ Maintenance & Improvements</a></strong>:
                         <a href="#anchor-cleanup" class="jump-link">DocCleanup</a> |
                         <a href="#anchor-improvement" class="jump-link">LayoutImprovement</a> |
                         <a href="#anchor-priority-10" class="jump-link">ArchiveDocumentation</a> |
                         <a href="#anchor-priority-8" class="jump-link">APIDocUpdate</a> |
                         <a href="#anchor-priority-7" class="jump-link">AgentExample</a>
+                    </div>
+                    <div class="jump-line">
+                        <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
+                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
                     </div>
                 </div>
             </details>
@@ -171,8 +206,9 @@ last_updated = '2026/02/01'
         <h2>Planning lists</h2>
 
         <!-- Group 1: Architecture & Infrastructure -->
-        <div id="group-arch" class="priority-group-container">
-            <h3 class="group-header">🏗️ Architecture & Infrastructure</h3>
+        <details id="group-arch" class="priority-group-container" open>
+            <summary class="group-header">🏗️ Architecture & Infrastructure</summary>
+            <div class="priority-content">
 
             <div id="anchor-priority-11" class="nav-anchor"></div>
             <details id="priority-11" class="priority-container">
@@ -272,11 +308,13 @@ last_updated = '2026/02/01'
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
 
         <!-- Group 2: DailyPlan UI/UX Improvement Plan -->
-        <div id="group-daily" class="priority-group-container">
-            <h3 class="group-header">📅 DailyPlan UI/UX Improvement Plan</h3>
+        <details id="group-daily" class="priority-group-container" open>
+            <summary class="group-header">📅 DailyPlan UI/UX Improvement Plan</summary>
+            <div class="priority-content">
 
             <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
             <details id="dailyplan-improvements" class="priority-container">
@@ -347,11 +385,13 @@ last_updated = '2026/02/01'
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
 
         <!-- Group 3: Synchronization & Standards -->
-        <div id="group-sync" class="priority-group-container">
-            <h3 class="group-header">🔄 Synchronization & Standards</h3>
+        <details id="group-sync" class="priority-group-container" open>
+            <summary class="group-header">🔄 Synchronization & Standards</summary>
+            <div class="priority-content">
 
             <div id="anchor-priority-16" class="nav-anchor"></div>
             <details id="priority-16" class="priority-container">
@@ -393,11 +433,13 @@ last_updated = '2026/02/01'
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
 
         <!-- Group 4: Maintenance & Improvements -->
-        <div id="group-maint" class="priority-group-container">
-            <h3 class="group-header">🛠️ Maintenance & Improvements</h3>
+        <details id="group-maint" class="priority-group-container" open>
+            <summary class="group-header">🛠️ Maintenance & Improvements</summary>
+            <div class="priority-content">
 
             <div id="anchor-cleanup" class="nav-anchor"></div>
             <details id="cleanup-todos" class="priority-container">
@@ -438,11 +480,13 @@ last_updated = '2026/02/01'
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
 
         <!-- Group 5: AI Systems -->
-        <div id="group-ai" class="priority-group-container">
-            <h3 class="group-header">🤖 AI Systems</h3>
+        <details id="group-ai" class="priority-group-container" open>
+            <summary class="group-header">🤖 AI Systems</summary>
+            <div class="priority-content">
 
             <div id="anchor-aichat-system" class="nav-anchor"></div>
             <details id="aichat-system" class="priority-container">
@@ -639,11 +683,13 @@ last_updated = '2026/02/01'
                     </ul>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
 
         <!-- Group 6: ToDo System Update Plan -->
-        <div id="group-todo" class="priority-group-container">
-            <h3 class="group-header">📝 ToDo System Update Plan</h3>
+        <details id="group-todo" class="priority-group-container" open>
+            <summary class="group-header">📝 ToDo System Update Plan</summary>
+            <div class="priority-content">
 
             <div id="anchor-todo-plan" class="nav-anchor"></div>
             <details id="todo-update-plan" class="priority-container" open>
@@ -798,7 +844,8 @@ last_updated = '2026/02/01'
                     </ul>
                 </div>
             </details>
-        </div>
+            </div>
+        </details>
     </div>
 
     <div id="advanced-usage" class="doc-section">
