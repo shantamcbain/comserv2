@@ -1336,6 +1336,35 @@ sub models :Local :Args(0) {
         push @$servers, $server_info;
     }
     
+    # Fetch user's API keys
+    my @user_api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $user_id = $c->session->{user_id};
+        
+        if ($user_id) {
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @user_api_keys, {
+                    id => $key->id,
+                    service => $key->service,
+                    created_at => $key->created_at->strftime('%Y-%m-%d'),
+                    has_key => $key->api_key_encrypted ? 1 : 0
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'models', "Found " . scalar(@user_api_keys) . " API keys for user $username");
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'models', "Failed to fetch user API keys: $_");
+    };
+    
     # Set template variables
     $c->stash(
         template => 'ai/models.tt',
@@ -1343,7 +1372,8 @@ sub models :Local :Args(0) {
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
-        servers_json => encode_json($servers || [])
+        servers_json => encode_json($servers || []),
+        user_api_keys => \@user_api_keys
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -2129,11 +2159,18 @@ sub _get_current_ollama_config {
     my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
     my $installed_models = [];
     
-    # For regular users (non-admin/developer/editor), always force 192.168.1.171
+    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
     unless ($can_select_model) {
-        $current_host = '192.168.1.171';
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            '_get_current_ollama_config', "Regular user, forcing host to $current_host (requirement: regular users only see 192.168.1.171)");
+        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+        if ($test_ollama && $test_ollama->check_connection()) {
+            $current_host = 'localhost';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
+        } else {
+            $current_host = '192.168.1.171';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
+        }
     } else {
         # For privileged users, check session preference or test localhost first
         my $preferred_host = $c->session->{ollama_host};
@@ -2497,6 +2534,573 @@ sub session_details :Local :Args(0) {
         conversation_id => $conversation_id,
         hostname => $hostname,
         roles => $c->session->{roles} || [],
+    }));
+}
+
+sub get_conversation_list :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+        unless ($guest_session_id) {
+            use Data::UUID;
+            my $ug = Data::UUID->new;
+            $guest_session_id = $ug->create_str();
+            $c->session->{guest_session_id} = $guest_session_id;
+        }
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv_rs = $schema->resultset('AiConversation')->search(
+            { user_id => $user_id },
+            { 
+                order_by => { -desc => 'updated_at' },
+                rows => 50
+            }
+        );
+        
+        my @conv_list;
+        foreach my $conv ($conv_rs->all) {
+            if ($is_guest) {
+                my $conv_metadata = {};
+                if ($conv->metadata) {
+                    try {
+                        $conv_metadata = decode_json($conv->metadata);
+                    } catch {};
+                }
+                next unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id);
+            }
+            
+            my $message_count = $conv->ai_messages->count;
+            my $first_msg = $conv->ai_messages->search({ role => 'user' }, { rows => 1, order_by => { -asc => 'created_at' } })->first;
+            my $preview = $first_msg ? substr($first_msg->content, 0, 60) : 'No messages';
+            
+            push @conv_list, {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                message_count => $message_count,
+                preview => $preview,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S'),
+                updated_at => $conv->updated_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversations => \@conv_list
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_list', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load conversations: $_"
+        }));
+    };
+}
+
+sub get_conversation_messages :Local :Args(1) {
+    my ($self, $c, $conversation_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    unless ($conversation_id) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Conversation ID required'
+        }));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    my $is_guest = 0;
+    
+    if (!$username) {
+        $is_guest = 1;
+        $user_id = 199;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+        
+        unless ($conv) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Conversation not found'
+            }));
+            return;
+        }
+        
+        if ($conv->user_id != $user_id) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error => 'Access denied'
+            }));
+            return;
+        }
+        
+        if ($is_guest) {
+            my $conv_metadata = {};
+            if ($conv->metadata) {
+                try {
+                    $conv_metadata = decode_json($conv->metadata);
+                } catch {};
+            }
+            unless ($conv_metadata->{guest_session_id} && $conv_metadata->{guest_session_id} eq $guest_session_id) {
+                $c->response->body(encode_json({
+                    success => JSON::false,
+                    error => 'Access denied'
+                }));
+                return;
+            }
+        }
+        
+        my @messages;
+        foreach my $msg ($conv->ai_messages->search({}, { order_by => { -asc => 'created_at' } })->all) {
+            push @messages, {
+                id => $msg->id,
+                role => $msg->role,
+                content => $msg->content,
+                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversation => {
+                id => $conv->id,
+                title => $conv->get_display_title,
+                created_at => $conv->created_at->strftime('%Y-%m-%d %H:%M:%S')
+            },
+            messages => \@messages
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_messages', "Error: $_");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => "Failed to load messages: $_"
+        }));
+    };
+}
+
+=head2 manage_api_keys
+
+Display and manage user API keys for AI providers
+
+=cut
+
+sub manage_api_keys :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'manage_api_keys', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'manage_api_keys', "User $username (ID: $user_id) accessing API keys management");
+    
+    my @api_keys;
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $keys_rs = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id },
+            { order_by => { -asc => 'service' } }
+        );
+        
+        my $key_count = $keys_rs->count;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'manage_api_keys', "Found $key_count API keys for user $user_id");
+        
+        foreach my $key ($keys_rs->all) {
+            push @api_keys, {
+                id => $key->id,
+                service => $key->service,
+                is_active => $key->is_active,
+                created_at => $key->created_at->strftime('%Y-%m-%d %H:%M'),
+                updated_at => $key->updated_at->strftime('%Y-%m-%d %H:%M')
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'manage_api_keys', "Failed to fetch API keys for user $user_id: $_");
+        $c->flash->{error_msg} = "Failed to load API keys: $_";
+    };
+    
+    $c->stash(
+        template => 'ai/manage_api_keys.tt',
+        page_title => 'Manage API Keys',
+        username => $username,
+        api_keys => \@api_keys
+    );
+}
+
+=head2 add_api_key
+
+Display form to add a new API key
+
+=cut
+
+sub add_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'add_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'add_api_key', "User $username accessing add API key form");
+    
+    $c->stash(
+        template => 'ai/add_api_key.tt',
+        page_title => 'Add API Key',
+        username => $username
+    );
+}
+
+=head2 edit_api_key
+
+Display form to edit an existing API key
+
+=cut
+
+sub edit_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'edit_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'edit_api_key', "User $username editing API key ID: $key_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'edit_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'edit_api_key', "Access denied: User $user_id attempted to edit key $key_id owned by user " . $key_obj->user_id);
+            $c->flash->{error_msg} = 'Access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        $c->stash(
+            template => 'ai/add_api_key.tt',
+            page_title => 'Edit API Key',
+            username => $username,
+            key_id => $key_obj->id,
+            service => $key_obj->service
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'edit_api_key', "Error loading API key $key_id: $_");
+        $c->flash->{error_msg} = "Failed to load API key: $_";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    };
+}
+
+=head2 save_api_key
+
+Save or update user API key
+
+=cut
+
+sub save_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    my $service = $c->request->params->{service};
+    my $api_key = $c->request->params->{api_key};
+    my $key_id = $c->request->params->{id};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'save_api_key', "User $username attempting to " . ($key_id ? "update key ID $key_id" : "add new key") . " for service: $service");
+    
+    # Validation
+    unless ($service) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: service missing for user $username");
+        $c->flash->{error_msg} = 'Service is required';
+        $c->response->redirect($c->uri_for($key_id ? '/ai/edit_api_key/' . $key_id : '/ai/add_api_key'));
+        return;
+    }
+    
+    # For new keys, api_key is required. For edits, it's optional (keep existing if blank)
+    if (!$key_id && !$api_key) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'save_api_key', "Validation failed: API key missing for new key, user $username");
+        $c->flash->{error_msg} = 'API key is required';
+        $c->response->redirect($c->uri_for('/ai/add_api_key'));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        my $key_obj;
+        if ($key_id) {
+            # Update existing key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Looking up existing key ID $key_id for user $user_id");
+            
+            $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+            
+            unless ($key_obj) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Key ID $key_id not found in database");
+                $c->flash->{error_msg} = 'API key not found';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            unless ($key_obj->user_id == $user_id) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'save_api_key', "Access denied: User $user_id attempted to update key $key_id owned by user " . $key_obj->user_id);
+                $c->flash->{error_msg} = 'API key not found or access denied';
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            # Only update api_key if provided
+            if ($api_key && length($api_key) > 0) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "Updating API key for service $service");
+                $key_obj->set_api_key($api_key);
+            } else {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'save_api_key', "No new API key provided, keeping existing key for service $service");
+            }
+            
+            $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key ID $key_id updated successfully for service $service, user $username");
+            
+            $c->flash->{status_msg} = "API key for $service updated successfully";
+            
+        } else {
+            # Create new key
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "Creating new API key for service $service, user $user_id");
+            
+            # Check for duplicate
+            my $existing = $schema->resultset('UserApiKeys')->search({
+                user_id => $user_id,
+                service => $service
+            })->first;
+            
+            if ($existing) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'save_api_key', "Duplicate key attempt: User $user_id already has key for service $service");
+                $c->flash->{error_msg} = "You already have an API key for $service. Please edit the existing key instead.";
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            $key_obj = $schema->resultset('UserApiKeys')->create({
+                user_id => $user_id,
+                service => $service,
+                is_active => 1
+            });
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'save_api_key', "UserApiKeys record created, ID: " . $key_obj->id . ", now encrypting API key");
+            
+            $key_obj->set_api_key($api_key);
+            $key_obj->update;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'save_api_key', "API key created successfully for service $service, user $username, key ID: " . $key_obj->id);
+            
+            $c->flash->{status_msg} = "API key for $service added successfully";
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'save_api_key', "Failed to save API key for service $service, user $username: $error");
+        $c->flash->{error_msg} = "Failed to save API key: $error";
+    };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+}
+
+=head2 delete_api_key
+
+Delete user API key
+
+=cut
+
+sub delete_api_key :Local :Args(1) {
+    my ($self, $c, $key_id) = @_;
+    
+    unless ($c->session->{username}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "Unauthorized access attempt - no session");
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username};
+    
+    unless ($key_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'delete_api_key', "No key ID provided by user $username");
+        $c->flash->{error_msg} = 'No API key ID specified';
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'delete_api_key', "User $username attempting to delete API key ID: $key_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->find($key_id);
+        
+        unless ($key_obj) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                'delete_api_key', "API key $key_id not found");
+            $c->flash->{error_msg} = 'API key not found';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        unless ($key_obj->user_id == $user_id) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'delete_api_key', "Access denied: User $user_id attempted to delete key $key_id owned by user " . $key_obj->user_id);
+            $c->flash->{error_msg} = 'API key not found or access denied';
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        my $service = $key_obj->service;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'delete_api_key', "Deleting API key ID $key_id for service $service, user $username");
+        
+        $key_obj->delete;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'delete_api_key', "API key ID $key_id for service $service deleted successfully by user $username");
+        
+        $c->flash->{status_msg} = "API key for $service deleted successfully";
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'delete_api_key', "Failed to delete API key $key_id for user $username: $error");
+        $c->flash->{error_msg} = "Failed to delete API key: $error";
+    };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+}
+
+=head2 get_user_providers
+
+Get list of user's configured AI providers for chat widget
+
+=cut
+
+sub get_user_providers :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my @providers;
+    
+    # Map service names to display names
+    my %service_display = (
+        grok => 'Grok (xAI)',
+        openai => 'OpenAI',
+        claude => 'Claude',
+        gemini => 'Gemini',
+        anthropic => 'Anthropic',
+        cohere => 'Cohere'
+    );
+    
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => 1 },
+                { order_by => { -asc => 'service' } }
+            );
+            
+            foreach my $key ($keys_rs->all) {
+                push @providers, {
+                    service => $key->service,
+                    display_name => $service_display{$key->service} || ucfirst($key->service)
+                };
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id");
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'get_user_providers', "Failed to fetch providers: $_");
+        };
+    }
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        providers => \@providers
     }));
 }
 
