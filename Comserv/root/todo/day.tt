@@ -36,27 +36,34 @@
 
    # If todos contains all todos (like in Documentation.pm), filter it for today
    # and extract overdue todos if not already separated. EXCLUDE COMPLETED (status 3).
-   SET temp_today_todos = [];
-   SET temp_overdue_todos = [];
-   
-   FOREACH todo IN todos;
-       # Skip completed todos everywhere in this view
-       NEXT IF todo.status == 3;
+   # ONLY do this filtering if coming from Documentation.pm (is_daily_plan == 1)
+   # When coming from Todo.pm controller, todos is already pre-filtered
+   IF is_daily_plan;
+       SET temp_today_todos = [];
+       SET temp_overdue_todos = [];
        
-       IF todo.due_date AND todo.due_date < date;
-           temp_overdue_todos.push(todo);
-       ELSIF (todo.due_date == date OR todo.start_date == date);
-           # Strict date match: only include if it explicitly belongs to the viewed date
-           temp_today_todos.push(todo);
+       FOREACH todo IN todos;
+           # Skip completed todos everywhere in this view
+           NEXT IF todo.status == 3;
+           
+           IF todo.due_date AND todo.due_date < date;
+               temp_overdue_todos.push(todo);
+           ELSIF (todo.due_date AND todo.due_date == date) OR (todo.start_date AND todo.start_date == date);
+               # Strict date match: only include if it explicitly belongs to the viewed date
+               temp_today_todos.push(todo);
+           # Also include todos without dates (they're active tasks)
+           ELSIF !todo.due_date AND !todo.start_date;
+               temp_today_todos.push(todo);
+           END;
        END;
-   END;
 
-   # Always apply the strict filter to 'todos' to ensure Today Schedule is accurate
-   todos = temp_today_todos;
-   
-   # Update overdue_todos if we found some in the bulk list
-   IF temp_overdue_todos.size > 0;
-       overdue_todos = temp_overdue_todos;
+       # Apply the filter to 'todos' to ensure Today Schedule is accurate
+       todos = temp_today_todos;
+       
+       # Update overdue_todos if we found some in the bulk list
+       IF temp_overdue_todos.size > 0;
+           overdue_todos = temp_overdue_todos;
+       END;
    END;
 
    IF !previous_date AND prev_date;
@@ -170,6 +177,15 @@
         border-radius: 3px;
         cursor: pointer;
         transition: background-color 0.3s ease;
+    }
+
+    .todo-actions .btn-log {
+        background-color: var(--info-color, #17a2b8);
+        color: white;
+    }
+
+    .todo-actions .btn-log:hover {
+        background-color: var(--info-color-dark, #138496);
     }
 
     .day-schedule-grid {
@@ -344,6 +360,21 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 [% END %]
 
+[% IF debug_mode == 1 %]
+<div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">
+    <h4>Debug: Day View Data</h4>
+    <p><strong>Viewing Date:</strong> [% date %]</p>
+    <p><strong>Overdue Todos Count:</strong> [% overdue_todos.size %]</p>
+    <p><strong>Today Todos Count:</strong> [% todos.size %]</p>
+    <p><strong>Raw todos array size:</strong> [% todos.size %]</p>
+    <details>
+        <summary>Show all todos in stash (before filtering)</summary>
+        [% USE Dumper %]
+        <pre>[% Dumper.dump(todos) %]</pre>
+    </details>
+</div>
+[% END %]
+
 [% IF overdue_todos.size > 0 %]
     <details class="priority-container overdue-container">
         <summary class="priority-header" style="background-color: var(--error-color, #f44336);">
@@ -367,6 +398,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         </form>
                         <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
                             <button type="submit" class="btn">Edit</button>
+                        </form>
+                        <form action="/log/log_form" method="GET" style="display: inline;">
+                            <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                            <button type="submit" class="btn btn-log">Log</button>
                         </form>
                     </div>
                 </div>
@@ -437,6 +472,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </form>
                                     <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
                                         <button type="submit" class="btn">Edit</button>
+                                    </form>
+                                    <form action="/log/log_form" method="GET" style="display: inline;">
+                                        <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                        <button type="submit" class="btn btn-log">Log</button>
                                     </form>
                                 </div>
                             </div>
