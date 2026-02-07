@@ -293,6 +293,18 @@ sub details :Path('details') :Args(0) {
     # Fetch sub-projects and their todos recursively
     my $project_tree = $self->build_project_tree($c, $project);
 
+    # Log what we're putting in the stash
+    if ($project_tree) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', 
+            "Project tree built successfully. Project name: " . ($project_tree->{name} || 'UNDEFINED') . 
+            ", ID: " . ($project_tree->{id} || 'UNDEFINED') . 
+            ", Todos count: " . (scalar(@{$project_tree->{todos} || []}) || 0) .
+            ", Sub-projects count: " . (scalar(@{$project_tree->{sub_projects} || []}) || 0));
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 
+            "Project tree is undefined or empty after build_project_tree call");
+    }
+
     # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
         project => $project_tree,
@@ -630,7 +642,8 @@ sub build_project_tree :Private {
             start_date => $todo->start_date,
             due_date => $todo->due_date,
             status => $todo->status,
-            priority => $todo->priority
+            priority => $todo->priority,
+            accumulated_time => $todo->accumulated_time || 0
         };
     }
     $project_hash->{todos} = \@todo_hashrefs;

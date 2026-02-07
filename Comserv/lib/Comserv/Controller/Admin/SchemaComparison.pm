@@ -8,6 +8,7 @@ use Try::Tiny;
 use JSON qw(decode_json);
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::DatabaseEnv;
 use Data::Dumper;
 use File::Slurp qw(read_file write_file);
 use File::Basename qw(dirname);
@@ -33,6 +34,36 @@ sub admin_auth {
 sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->new();
+}
+
+sub database_env {
+    my ($self) = @_;
+    return Comserv::Util::DatabaseEnv->new();
+}
+
+sub validate_database_environment {
+    my ($self, $c, $database_environment, $allow_production) = @_;
+    
+    $allow_production //= 0;
+    
+    unless ($database_environment) {
+        return { valid => 1, environment => $self->database_env->get_active_environment($c) };
+    }
+    
+    unless ($self->database_env->validate_environment($database_environment)) {
+        return { valid => 0, error => "Invalid database environment: $database_environment" };
+    }
+    
+    if ($database_environment eq 'production' && !$allow_production) {
+        my $metadata = $self->database_env->get_environment_metadata('production');
+        return { 
+            valid => 0, 
+            error => "Production database modifications require explicit confirmation",
+            warning_level => $metadata->{warning_level}
+        };
+    }
+    
+    return { valid => 1, environment => $database_environment };
 }
 
 =head2 sync_table_to_result
@@ -87,6 +118,7 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     my $table_name = $json_data->{table_name};
     my $field_name = $json_data->{field_name};
     my $database = $json_data->{database};
+    my $database_environment = $json_data->{database_environment};
     
     unless ($table_name && $field_name && $database) {
         $c->response->status(400);
@@ -95,14 +127,31 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
         return;
     }
     
+    my $env_validation = $self->validate_database_environment($c, $database_environment, 1);
+    unless ($env_validation->{valid}) {
+        $c->response->status(400);
+        $c->stash(json => { 
+            success => 0, 
+            error => $env_validation->{error}
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $active_env = $env_validation->{environment};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+        "Syncing from database environment: $active_env");
+    
     try {
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
         
         $c->stash(json => {
             success => 1,
-            message => "Successfully synced table field '$field_name' to result file",
-            field_info => $table_field_info
+            message => "Successfully synced table field '$field_name' to result file (from environment: $active_env)",
+            field_info => $table_field_info,
+            database_environment => $active_env
         });
         
     } catch {
@@ -516,6 +565,8 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
     my $table_name = $json_data->{table_name};
     my $field_name = $json_data->{field_name};
     my $database = $json_data->{database};
+    my $database_environment = $json_data->{database_environment};
+    my $allow_production = $json_data->{allow_production} || 0;
     
     unless ($table_name && $field_name && $database) {
         $c->response->status(400);
@@ -524,15 +575,33 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
         return;
     }
     
+    my $env_validation = $self->validate_database_environment($c, $database_environment, $allow_production);
+    unless ($env_validation->{valid}) {
+        $c->response->status(400);
+        $c->stash(json => { 
+            success => 0, 
+            error => $env_validation->{error},
+            warning_level => $env_validation->{warning_level}
+        });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $active_env = $env_validation->{environment};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
+        "Syncing to database environment: $active_env");
+    
     try {
         my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
         my $sql = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
         
         $c->stash(json => {
             success => 1,
-            message => "Successfully synced result field '$field_name' to table",
+            message => "Successfully synced result field '$field_name' to table (environment: $active_env)",
             field_info => $result_field_info,
-            sql => $sql
+            sql => $sql,
+            database_environment => $active_env
         });
         
     } catch {
@@ -1205,7 +1274,8 @@ sub get_all_result_files {
     my ($self, $database) = @_;
     
     my @result_files = ();
-    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    my $lib_path = dirname(dirname(dirname(dirname(__FILE__))));
+    my $base_path = "$lib_path/Comserv/Model/Schema";
     
     if (lc($database) eq 'ency') {
         my $result_dir = "$base_path/Ency/Result";

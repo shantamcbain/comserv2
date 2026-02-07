@@ -1,0 +1,97 @@
+[%# 
+    ProjectTodosList.tt - Reusable component for displaying project todos
+    
+    Expected parameters:
+    - project: Project object with todos array
+    - level: Nesting level (optional, default 0) for displaying sub-project todos
+    
+    Version: 0.01 2026/02/06 shanta - Initial creation
+%]
+
+[% IF project.todos && project.todos.size > 0 %]
+<details class="project-todos-details">
+    <summary class="project-todos-summary"><strong>📋 Todos for [% project.name %] ([% project.todos.size %])</strong></summary>
+    <div class="project-todos-content">
+        <table class="project-details-table">
+            <thead>
+                <tr>
+                    <th>Subject</th>
+                    <th>Description</th>
+                    <th>Start Date</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Accumulated Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% FOREACH todo IN project.todos %]
+                <tr>
+                    <td>[% todo.subject %]</td>
+                    <td>[% todo.description OR 'No description' %]</td>
+                    <td>[% todo.start_date %]</td>
+                    <td>[% todo.due_date %]</td>
+                    <td>
+                        [% IF todo.status == 1 %]
+                            New
+                        [% ELSIF todo.status == 2 %]
+                            In Progress
+                        [% ELSIF todo.status == 3 %]
+                            Completed
+                        [% ELSE %]
+                            [% todo.status %]
+                        [% END %]
+                    </td>
+                    <td>
+                        [% INCLUDE todo/priority_display.tt
+                            priority_value=todo.priority 
+                            build_priority={
+                                '1' = 'Critical',
+                                '2' = 'When we have time',
+                                '3' = 'Urgent',
+                                '4' = 'High',
+                                '5' = 'Medium',
+                                '6' = 'Medium-Low',
+                                '7' = 'Low',
+                                '8' = 'Very Low',
+                                '9' = 'Minimal',
+                                '10' = 'Optional'
+                            }
+                            input_class='priority-display'
+                            label=''
+                        %]
+                    </td>
+                    <td>
+                        [% IF todo.accumulated_time %]
+                            [% hours = todo.accumulated_time / 3600 %][% hours.int %]h 
+                            [% minutes = (todo.accumulated_time % 3600) / 60 %][% minutes.int %]m
+                        [% ELSE %]
+                            0h 0m
+                        [% END %]
+                    </td>
+                    <td>
+                        <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display:inline;">
+                            <button type="submit" class="action-button edit">Edit</button>
+                        </form>
+                        <form action="/todo/details" method="POST" style="display:inline;">
+                            <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                            <button type="submit" class="action-button view">Details</button>
+                        </form>
+                        <form action="/log/log_form" method="POST" style="display:inline;">
+                            <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                            <button type="submit" class="action-button add">Add Log</button>
+                        </form>
+                    </td>
+                </tr>
+                [% END %]
+            </tbody>
+        </table>
+    </div>
+</details>
+[% ELSE %]
+    [% USE date %]
+    [% current_date = date.format(date.now, '%Y-%m-%d') %]
+    [% current_time = date.format(date.now, '%H:%M:%S') %]
+    <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% project.id %]&start_date=[% current_date %]&start_time=[% current_time %]">Add a todo</a></p>
+[% END %]
