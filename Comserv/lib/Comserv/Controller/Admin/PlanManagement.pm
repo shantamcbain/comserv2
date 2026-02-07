@@ -207,8 +207,10 @@ sub create :Path('/admin/plan/create') :Args(0) {
     };
 }
 
-sub update :Path('/admin/plan') :Args(1) :Does('PUT') {
+sub update :Path('/admin/plan') :Args(1) {
     my ($self, $c, $plan_id) = @_;
+    
+    return unless $c->req->method eq 'PUT';
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update', 
         "Updating plan: $plan_id");
@@ -251,8 +253,10 @@ sub update :Path('/admin/plan') :Args(1) :Does('PUT') {
     };
 }
 
-sub delete :Path('/admin/plan') :Args(1) :Does('DELETE') {
+sub delete :Path('/admin/plan') :Args(1) {
     my ($self, $c, $plan_id) = @_;
+    
+    return unless $c->req->method eq 'DELETE';
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
         "Deleting plan: $plan_id");
