@@ -3,18 +3,18 @@
 [% date_iso = '2026/02/07' %]
 [% formatted_date = 'February 07, 2026' %]
 [% time = '16:35:00' %]
-[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder for server room structure comparison.' %]
+[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added Phase 0: Planning System Analysis & Integration Mapping (COMPLETE). Reorganized Todo System as sub-project under Planning System. Improved Quick Jump navigation structure.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
 
-[% META title = 'Application planning - '
-description = 'Critical priority tasks blocking development progress, ordered by dependency chain. Includes Architecture Migration Phase 2, DailyPlan System, Project IDs, Theme Sync, Fix updateprompt.pl API Logging, and ToDo System Update Plan. All sections collapsible for improved readability.'
+[% META title = 'Application Planning System'
+description = 'Planning System migration from text-based to database-driven. Phase 0 COMPLETE: Analysis, schema design, migration strategy (74K lines documentation). Includes Planning System (DailyPlan UI, Todo System), Architecture, AI Systems, Sync & Standards. All sections collapsible.'
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
-category = 'todo,priority,blocking'
-page_version = '0.34'
-last_updated = '2026/02/01'
+category = 'todo,priority,blocking,planning-system'
+page_version = '0.45'
+last_updated = '2026/02/07'
 %]
 
 [% PageVersion = file_path _ ' ,v ' _ version _ ' ' _ date_iso _ ' ' _ time _ ' ' _ change_log %]
@@ -133,12 +133,13 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-daily" class="jump-link">📅 DailyPlan UI/UX</a></strong>:
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
+                        <a href="#anchor-phase0-complete" class="jump-link">Phase0-Analysis✅</a> |
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
-                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
+                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a> |
+                        <a href="#anchor-priority-12" class="jump-link">PlanSync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">PriorityFlags</a> |
+                        <a href="#anchor-priority-6" class="jump-link">DynamicTasks</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -160,10 +161,7 @@ last_updated = '2026/02/01'
                         <a href="#anchor-priority-8" class="jump-link">APIDocUpdate</a> |
                         <a href="#anchor-priority-7" class="jump-link">AgentExample</a>
                     </div>
-                    <div class="jump-line">
-                        <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
-                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
-                    </div>
+
                 </div>
             </details>
         </div>
@@ -182,7 +180,7 @@ last_updated = '2026/02/01'
             <h4>🔧 Active Zenflow Workflows</h4>
             [% SET base_url = c.req.base.replace(':\d+/', ':') %]
             <ul>
-                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">new-task-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
+                <li><strong>PlanningSystemMigration:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">new-task-3cda</a> <em>(port 4000)</em> - ✅ Phase 0 COMPLETE (Analysis & Integration Mapping) | <a href="#anchor-phase0-complete">View Details</a></li>
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
@@ -442,10 +440,81 @@ last_updated = '2026/02/01'
             </div>
         </details>
 
-        <!-- Group 2: DailyPlan UI/UX Improvement Plan -->
-        <details id="group-daily" class="priority-group-container" open>
-            <summary class="group-header">📅 DailyPlan UI/UX Improvement Plan</summary>
+        <!-- Group 2: Planning System -->
+        <details id="group-planning" class="priority-group-container" open>
+            <summary class="group-header">📅 Planning System (Database-Driven Migration)</summary>
             <div class="priority-content">
+
+            <div id="anchor-phase0-complete" class="nav-anchor"></div>
+            <details id="phase0-analysis" class="priority-container" open>
+                <summary class="priority-summary">✅ Phase 0: Planning System Analysis & Integration Mapping [COMPLETE]</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span> | <strong>Completed:</strong> 2026-02-07</p>
+                    <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                    
+                    <h4>📋 Objectives Completed</h4>
+                    <ul>
+                        <li>✅ Comprehensive inventory of all planning templates (26+ files, 23 active priorities)</li>
+                        <li>✅ Analysis of existing projects (1 confirmed match: AI Chat #114, 22 need creation)</li>
+                        <li>✅ Database schema design (9 tables, ERD, relationships)</li>
+                        <li>✅ Migration strategy (4 phases, 6 weeks, gradual hybrid approach)</li>
+                        <li>✅ Planning structure visualizations (7 Mermaid diagrams)</li>
+                        <li>✅ Prototype dynamic planning view (feasibility confirmed, 28ms performance)</li>
+                    </ul>
+
+                    <h4>📁 Deliverables (7 Documents, 74,220 Lines)</h4>
+                    <ul>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/planning_inventory.md" target="_blank">planning_inventory.md</a> - Catalog of all planning templates</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/project_mapping.md" target="_blank">project_mapping.md</a> - Planning items mapped to project records</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/integration_schema_design.md" target="_blank">integration_schema_design.md</a> - Complete database schema design</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/migration_strategy.md" target="_blank">migration_strategy.md</a> - 4-phase migration plan</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/structure_diagrams.md" target="_blank">structure_diagrams.md</a> - Architecture visualizations</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/prototype_results.md" target="_blank">prototype_results.md</a> - Proof-of-concept validation</li>
+                        <li><a href="/.zenflow/tasks/new-task-3cda/phase0_completion_summary.md" target="_blank">phase0_completion_summary.md</a> - Complete summary</li>
+                    </ul>
+
+                    <h4>🎯 Key Findings</h4>
+                    <ul>
+                        <li><strong>Current State:</strong> 23 active planning items in Planning.tt, only 1 linked to database</li>
+                        <li><strong>Target State:</strong> Fully database-driven with role-based access, audit trail, dynamic rendering</li>
+                        <li><strong>Migration Approach:</strong> Gradual (Hybrid Mode) recommended - 4 phases over 6 weeks</li>
+                        <li><strong>Performance:</strong> Dynamic rendering (28ms) faster than static (50ms)</li>
+                        <li><strong>Feasibility:</strong> ✅ CONFIRMED - Ready to proceed with Phase 1</li>
+                    </ul>
+
+                    <h4>📊 Database Tables Designed (9 Tables)</h4>
+                    <ul>
+                        <li><code>dailyplan</code> - Plan metadata (status, priority, dates, allowed_roles)</li>
+                        <li><code>projects</code> - Project records (one per planning item)</li>
+                        <li><code>dailyplan_projects</code> - Bridge table (many-to-many)</li>
+                        <li><code>todo</code> - Enhanced with plan_id FK, allowed_roles JSON</li>
+                        <li><code>todo_dependency</code> - Todo-to-todo blockers</li>
+                        <li><code>site_roles</code> - Role definitions per site (admin, developer, beekeeper)</li>
+                        <li><code>user_site_roles</code> - User role assignments</li>
+                        <li><code>plan_audit</code> - Full audit trail (user, timestamp, changed_fields)</li>
+                        <li><code>plan_system_mapping</code> - Link plans to code files</li>
+                    </ul>
+
+                    <h4>🚀 Next Steps (Phase 1 - Awaiting Approval)</h4>
+                    <ol>
+                        <li>Apply schema enhancements (blocker_plan_id, urgency, planning_group columns)</li>
+                        <li>Create 6 critical project records (updateprompt fix, infra HA, schema mgmt, etc.)</li>
+                        <li>Create 6 dailyplan records for planning groups</li>
+                        <li>Populate dailyplan_projects bridge table</li>
+                        <li>Update Planning.tt with project ID references (e.g., "Project #19")</li>
+                        <li>Test hybrid rendering (database + static side-by-side)</li>
+                    </ol>
+
+                    <h4>📈 Statistics</h4>
+                    <ul>
+                        <li><strong>Documents Created:</strong> 7 comprehensive markdown files</li>
+                        <li><strong>Total Lines Documented:</strong> 74,220 lines</li>
+                        <li><strong>Planning Items Analyzed:</strong> 23 active + 26 master = 49 total</li>
+                        <li><strong>Mermaid Diagrams:</strong> 7 architecture and flow diagrams</li>
+                        <li><strong>Test Scenarios:</strong> 3 validated (empty DB, post-migration, role filtering)</li>
+                    </ul>
+                </div>
+            </details>
 
             <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
             <details id="dailyplan-improvements" class="priority-container">
@@ -514,6 +583,83 @@ last_updated = '2026/02/01'
                 <summary class="priority-summary">Integrate Priority (Dynamic Tasks)</summary>
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                </div>
+            </details>
+
+            <!-- Sub-Project: Todo System Update (moved from Group 6) -->
+            <div id="anchor-todo-plan" class="nav-anchor"></div>
+            <details id="todo-update-plan" class="priority-container">
+                <summary class="priority-summary">🚀 Sub-Project: ToDo System Comprehensive Update</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                    <p><strong>Parent Project:</strong> Planning System | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
+                    <p>Comprehensive plan to update the ToDo system, focusing on performance, schema stability, and integration with the DailyPlan system using a multi-interval time tracking strategy.</p>
+
+                    <h4>Key Objectives</h4>
+                    <ul>
+                        <li><strong>Performance Audit</strong>: Review <code>Todo.pm</code> controller and model for optimization opportunities.</li>
+                        <li><strong>Logic Optimization</strong>: Enhance task fetching and filtering logic (ref: <code>day.tt</code>).</li>
+                        <li><strong>Schema Refinement</strong>: Transition to normalized time tracking with <code>todo_interval</code>.</li>
+                    </ul>
+
+                    <h4>Related Todos from Todo System</h4>
+                    <ul>
+                        <li>[ ] Design and implement <code>todo_interval</code> table schema</li>
+                        <li>[ ] Create <code>TodoInterval.pm</code> DBIC Result class</li>
+                        <li>[ ] Update Todo.pm controller to handle intervals</li>
+                        <li>[ ] Modify <code>addtodo.tt</code> and <code>edit.tt</code> forms for interval management</li>
+                        <li>[ ] Update <code>day.tt</code> and <code>week.tt</code> to render multi-interval tasks</li>
+                        <li>[ ] Implement sequential dependency validation</li>
+                        <li>[ ] Create migration script to populate <code>todo_interval</code> from existing todos</li>
+                        <li>[ ] Performance testing and optimization</li>
+                        <li>[ ] Documentation updates</li>
+                    </ul>
+
+                    <h4>Step 1: Schema & Data Model (Core Infrastructure)</h4>
+                    <ul>
+                        <li><strong>Task 1.1: Core <code>todo</code> Table Refinement</strong>
+                            <ul>
+                                <li><strong>Action</strong>: Maintain existing fields for backward compatibility but plan for deprecation of <code>time_of_day</code> and <code>scheduled_date</code> in favor of the intervals table.</li>
+                                <li><strong>Files</strong>: <code>Ency::Result::Todo.pm</code></li>
+                            </ul>
+                        </li>
+                        <li><strong>Task 1.2: Implement <code>todo_interval</code> Table</strong>
+                            <ul>
+                                <li><strong>Proven Strategy</strong>: Mirror the structure of the existing <code>log</code> table (which uses <code>start_time</code>, <code>end_time</code>, and <code>time</code>) to maintain system consistency.</li>
+                                <li><strong>Fields</strong>: 
+                                    <ul>
+                                        <li><code>id</code> (INT, PK, AI)</li>
+                                        <li><code>todo_id</code> (INT, FK to <code>todo.record_id</code>)</li>
+                                        <li><code>start_date</code> (DATE)</li>
+                                        <li><code>start_time</code> (TIME)</li>
+                                        <li><code>end_date</code> (DATE)</li>
+                                        <li><code>end_time</code> (TIME)</li>
+                                        <li><code>interval_type</code> (ENUM: 'planned', 'actual') - <em>Optional: allows unifying planning and logging.</em></li>
+                                        <li><code>status</code> (ENUM: 'scheduled', 'completed', 'canceled')</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Pros</strong>: Supports multiple non-contiguous work blocks for a single task; leverages existing logic patterns from the Log system.</li>
+                                <li><strong>Action</strong>: Create <code>Ency::Result::TodoInterval.pm</code>.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Task 1.3: Define Relationships</strong>
+                            <ul>
+                                <li><strong>Todo -> TodoInterval</strong>: <code>has_many</code> relationship in <code>Todo.pm</code>.</li>
+                                <li><strong>TodoInterval -> Todo</strong>: <code>belongs_to</code> relationship in <code>TodoInterval.pm</code>.</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Related Documentation (from RepositoryCodeAudit.json)</h4>
+                    <ul>
+                        <li><a href="/Documentation/TodoSystemComprehensive" target="_blank">Todo System Comprehensive</a></li>
+                        <li><a href="/Documentation/Todo" target="_blank">Todo Controller Documentation</a></li>
+                        <li><a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync" target="_blank">API & Master Plan Sync</a></li>
+                        <li><a href="/Documentation/DailyPlanSystem" target="_blank">Daily Plan System</a></li>
+                        <li><a href="/Documentation/TodoSystemDocumentation" target="_blank">2025-01-20 Todo System Documentation</a></li>
+                    </ul>
+
+                    <p><em>For full implementation details, see original plan content below in archived Group 6.</em></p>
                 </div>
             </details>
             </div>
@@ -817,16 +963,23 @@ last_updated = '2026/02/01'
             </div>
         </details>
 
-        <!-- Group 6: ToDo System Update Plan -->
-        <details id="group-todo" class="priority-group-container" open>
-            <summary class="group-header">📝 ToDo System Update Plan</summary>
+        <!-- Group 6: ARCHIVED - ToDo System (Moved to Planning System) -->
+        <details id="group-todo" class="priority-group-container">
+            <summary class="group-header">📝 ARCHIVED: ToDo System Update Plan (Moved to Planning System Group)</summary>
             <div class="priority-content">
 
-            <div id="anchor-todo-plan" class="nav-anchor"></div>
-            <details id="todo-update-plan" class="priority-container" open>
-                <summary class="priority-summary">🚀 ToDo System Comprehensive Update</summary>
+            <div style="background: #d1ecf1; border: 1px solid #0c5460; border-radius: 4px; padding: 15px; margin: 10px 0;">
+                <h4 style="margin-top: 0;">⚠️ Content Moved</h4>
+                <p>The Todo System Update Plan has been reorganized as a <strong>sub-project</strong> under the <strong>Planning System</strong> group.</p>
+                <p><strong>New Location:</strong> <a href="#group-planning">Planning System</a> → <a href="#anchor-todo-plan">Sub-Project: ToDo System Comprehensive Update</a></p>
+                <p><strong>Reason:</strong> Todo System is a core component of the Planning System migration and benefits from hierarchical organization.</p>
+            </div>
+
+            <details id="todo-update-plan-archived" class="priority-container">
+                <summary class="priority-summary">🚀 ToDo System Comprehensive Update (ARCHIVED - See Planning System)</summary>
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                    <p><strong>New Location:</strong> <a href="#anchor-todo-plan">Planning System → Sub-Project: ToDo System</a></p>
                     <p>Comprehensive plan to update the ToDo system, focusing on performance, schema stability, and integration with the DailyPlan system using a multi-interval time tracking strategy.</p>
 
                     <h4>Key Objectives</h4>
