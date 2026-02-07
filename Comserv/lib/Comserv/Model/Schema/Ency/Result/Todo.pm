@@ -139,10 +139,6 @@ __PACKAGE__->add_columns(
         data_type => 'time',
         is_nullable => 1,
     },
-    allowed_roles => {
-        data_type => 'json',
-        is_nullable => 1,
-    },
 );
 
 __PACKAGE__->set_primary_key('record_id');
@@ -230,27 +226,6 @@ sub get_blocking_chain {
     }
     
     return \@chain;
-}
-
-sub get_allowed_roles {
-    my $self = shift;
-    my $roles = $self->allowed_roles;
-    return $roles ? (ref $roles eq 'ARRAY' ? $roles : []) : [];
-}
-
-sub set_allowed_roles {
-    my ($self, $roles) = @_;
-    $roles = [] unless defined $roles;
-    $roles = [$roles] unless ref $roles eq 'ARRAY';
-    $self->allowed_roles($roles);
-    return $self;
-}
-
-sub has_role {
-    my ($self, $role) = @_;
-    return 0 unless $role;
-    my $roles = $self->get_allowed_roles();
-    return grep { $_ eq $role } @$roles;
 }
 
 1;
