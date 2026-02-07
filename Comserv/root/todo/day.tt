@@ -179,6 +179,15 @@
         transition: background-color 0.3s ease;
     }
 
+    .todo-actions .btn-log {
+        background-color: var(--info-color, #17a2b8);
+        color: white;
+    }
+
+    .todo-actions .btn-log:hover {
+        background-color: var(--info-color-dark, #138496);
+    }
+
     .day-schedule-grid {
         display: grid;
         grid-template-columns: 80px 1fr;
@@ -390,6 +399,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
                             <button type="submit" class="btn">Edit</button>
                         </form>
+                        <form action="/log/log_form" method="GET" style="display: inline;">
+                            <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                            <button type="submit" class="btn btn-log">Log</button>
+                        </form>
                     </div>
                 </div>
             [% END %]
@@ -459,6 +472,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </form>
                                     <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
                                         <button type="submit" class="btn">Edit</button>
+                                    </form>
+                                    <form action="/log/log_form" method="GET" style="display: inline;">
+                                        <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                        <button type="submit" class="btn btn-log">Log</button>
                                     </form>
                                 </div>
                             </div>
