@@ -1,19 +1,19 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.45' %]
+[% version = '0.46' %]
 [% date_iso = '2026/02/07' %]
 [% formatted_date = 'February 07, 2026' %]
 [% time = '16:35:00' %]
-[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added Phase 0: Planning System Analysis & Integration Mapping (COMPLETE). Reorganized Todo System as sub-project under Planning System. Improved Quick Jump navigation structure.' %]
+[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added Phase 0: Planning System Analysis & Integration Mapping (COMPLETE) with 6 detailed tasks and deliverables. Added Phase 1: Database Environment Management and Phase 2: Database Schema & Models as visible sub-projects with complete todo lists. Reorganized Todo System as sub-project. Improved Planning System structure and navigation. Updated jump links to include all phases.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
 
 [% META title = 'Application Planning System'
-description = 'Planning System migration from text-based to database-driven. Phase 0 COMPLETE: Analysis, schema design, migration strategy (74K lines documentation). Includes Planning System (DailyPlan UI, Todo System), Architecture, AI Systems, Sync & Standards. All sections collapsible.'
+description = 'Planning System migration from text-based to database-driven. Phase 0 COMPLETE (6 tasks, 74K docs). Phase 1 & 2 IN PROGRESS (database environments, schema, RBAC). Includes detailed todo lists for all phases, DailyPlan UI improvements, Todo System updates. Architecture, AI Systems, Sync & Standards. All sections collapsible with progress tracking.'
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
 category = 'todo,priority,blocking,planning-system'
-page_version = '0.45'
+page_version = '0.46'
 last_updated = '2026/02/07'
 %]
 
@@ -134,9 +134,11 @@ last_updated = '2026/02/07'
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
-                        <a href="#anchor-phase0-complete" class="jump-link">Phase0-Analysis✅</a> |
+                        <a href="#anchor-phase0-complete" class="jump-link">Phase0✅</a> |
+                        <a href="#anchor-phase1" class="jump-link">Phase1-DatabaseEnv</a> |
+                        <a href="#anchor-phase2" class="jump-link">Phase2-Schema</a> |
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a> |
+                        <a href="#anchor-todo-plan" class="jump-link">TodoSystem</a> |
                         <a href="#anchor-priority-12" class="jump-link">PlanSync</a> |
                         <a href="#anchor-priority-5" class="jump-link">PriorityFlags</a> |
                         <a href="#anchor-priority-6" class="jump-link">DynamicTasks</a>
@@ -513,12 +515,319 @@ last_updated = '2026/02/07'
                         <li><strong>Mermaid Diagrams:</strong> 7 architecture and flow diagrams</li>
                         <li><strong>Test Scenarios:</strong> 3 validated (empty DB, post-migration, role filtering)</li>
                     </ul>
+
+                    <h4>📋 Phase 0 Steps Completed (6 Tasks)</h4>
+                    
+                    <!-- Step 0.1: Inventory -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.1: Inventory Existing Planning Content</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/planning_inventory.md" target="_blank">planning_inventory.md</a> (12,089 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Cataloged all planning-related template files (26+ files)</li>
+                                <li>✅ Documented Planning.tt structure (6 groups, 23 priority items)</li>
+                                <li>✅ Inventoried 23 historical daily plan files (Dec 2025 - Jan 2026)</li>
+                                <li>✅ Analyzed database integration status (1 linked item, 22 orphaned)</li>
+                                <li>✅ Mapped template dependencies and routes</li>
+                            </ul>
+
+                            <h5>Key Findings:</h5>
+                            <ul>
+                                <li>Planning.tt: 6 groups, 23 active priorities</li>
+                                <li>DailyPlan.tt: Hybrid template (database + static)</li>
+                                <li>MasterPlanCoordination.tt: 26 master plans</li>
+                                <li>Only AI Chat System (#114) currently linked to database</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <!-- Step 0.2: Analyze Projects -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.2: Analyze Existing Projects</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/project_mapping.md" target="_blank">project_mapping.md</a> (9,728 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Queried projects table (attempted - found minimal existing records)</li>
+                                <li>✅ Identified 1 confirmed match: AI Chat System → Project #114</li>
+                                <li>✅ Mapped 22 Planning.tt priorities without project records</li>
+                                <li>✅ Analyzed 26 master plan items from MasterPlanCoordination.tt</li>
+                                <li>✅ Created project creation priority matrix (6 critical, 5 high, 12 medium/low)</li>
+                            </ul>
+
+                            <h5>Priority Projects Needing Creation:</h5>
+                            <ol>
+                                <li>Priority-19: updateprompt.pl API Logging Fix (CRITICAL - blocker)</li>
+                                <li>Priority-ha: Infrastructure HA Architecture (CRITICAL)</li>
+                                <li>Priority-schema: Schema Management System (HIGH)</li>
+                                <li>DailyPlan UI Improvements (HIGH)</li>
+                                <li>Todo System Update (HIGH)</li>
+                                <li>Priority-16: Project IDs Standardization (HIGH)</li>
+                            </ol>
+                        </div>
+                    </details>
+
+                    <!-- Step 0.3: Schema Design -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.3: Design Project-Planning Integration Schema</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/integration_schema_design.md" target="_blank">integration_schema_design.md</a> (13,254 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Defined Project ↔ DailyPlan relationship (many-to-many via bridge table)</li>
+                                <li>✅ Designed dailyplan table enhancements (plan_type, blocker_plan_id, urgency, planning_group)</li>
+                                <li>✅ Created complete ERD (Entity Relationship Diagram)</li>
+                                <li>✅ Designed role-based access schema (site_roles, user_site_roles, allowed_roles JSON)</li>
+                                <li>✅ Specified audit trail table (plan_audit with changed_fields JSON)</li>
+                                <li>✅ Documented DBIC query patterns for common operations</li>
+                            </ul>
+
+                            <h5>Database Tables Designed (9 Tables):</h5>
+                            <ul>
+                                <li><code>dailyplan</code> - Plan metadata</li>
+                                <li><code>projects</code> - Project records</li>
+                                <li><code>dailyplan_projects</code> - Bridge table</li>
+                                <li><code>todo</code> - Enhanced with plan_id FK, allowed_roles</li>
+                                <li><code>todo_dependency</code> - Blockers</li>
+                                <li><code>site_roles</code> - Role definitions</li>
+                                <li><code>user_site_roles</code> - User permissions</li>
+                                <li><code>plan_audit</code> - Change log</li>
+                                <li><code>plan_system_mapping</code> - Code file links</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <!-- Step 0.4: Migration Strategy -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.4: Plan Migration Strategy</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/migration_strategy.md" target="_blank">migration_strategy.md</a> (16,482 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Evaluated 3 migration approaches (Gradual/Hybrid ⭐ recommended, Big Bang, Coexistence)</li>
+                                <li>✅ Created 4-phase migration plan (6 weeks total)</li>
+                                <li>✅ Defined rollback procedures for each phase</li>
+                                <li>✅ Designed data validation checklists</li>
+                                <li>✅ Planned historical daily plan handling (archive, not migrate)</li>
+                            </ul>
+
+                            <h5>Migration Phases (Gradual Hybrid Approach):</h5>
+                            <ol>
+                                <li><strong>Phase 1 (Week 1-2):</strong> Create DB records for 6 critical plans</li>
+                                <li><strong>Phase 2 (Week 3):</strong> Hybrid rendering (database + static side-by-side)</li>
+                                <li><strong>Phase 3 (Week 4-5):</strong> Migrate remaining 17 plans + 26 master plans</li>
+                                <li><strong>Phase 4 (Week 6):</strong> Switch to database-driven, archive text files</li>
+                            </ol>
+
+                            <h5>Rollback Plan:</h5>
+                            <ul>
+                                <li>Each phase can be rolled back within 1-2 hours</li>
+                                <li>No data loss (text files remain intact until Phase 4)</li>
+                                <li>Database records can be deleted cleanly</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <!-- Step 0.5: Visualizations -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.5: Create Planning Structure Visualization</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/structure_diagrams.md" target="_blank">structure_diagrams.md</a> (11,946 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Created current system architecture diagram (text-based)</li>
+                                <li>✅ Created target system architecture diagram (database-driven)</li>
+                                <li>✅ Designed Entity Relationship Diagram (ERD) with all tables</li>
+                                <li>✅ Built data flow diagrams (before and after migration)</li>
+                                <li>✅ Illustrated migration process flowchart (4 phases with decision points)</li>
+                                <li>✅ Created user workflow sequence diagrams (admin editing vs. database UI)</li>
+                                <li>✅ Visualized role-based access filtering</li>
+                            </ul>
+
+                            <h5>Diagrams Created (7 Mermaid Diagrams):</h5>
+                            <ul>
+                                <li>Current System Component Diagram</li>
+                                <li>Target System Component Diagram</li>
+                                <li>Entity Relationship Diagram (ERD)</li>
+                                <li>Data Storage Structure (Before & After)</li>
+                                <li>Migration Flow Diagram</li>
+                                <li>User Workflow Sequence (Before & After)</li>
+                                <li>Role-Based Access Filtering</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <!-- Step 0.6: Prototype -->
+                    <details class="priority-container" style="margin: 10px 0;">
+                        <summary class="priority-summary">✅ Step 0.6: Prototype Dynamic Planning View</summary>
+                        <div class="priority-content">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/prototype_results.md" target="_blank">prototype_results.md</a> (10,486 lines)</p>
+                            
+                            <h5>Tasks Completed:</h5>
+                            <ul>
+                                <li>✅ Created DBIC query code (prefetch optimization, no N+1 queries)</li>
+                                <li>✅ Designed Template Toolkit code for dynamic rendering</li>
+                                <li>✅ Generated sample output comparison (static vs. dynamic)</li>
+                                <li>✅ Tested 3 scenarios (empty DB, post-migration, role filtering)</li>
+                                <li>✅ Performed performance analysis (query <10ms, render <18ms, total <30ms)</li>
+                                <li>✅ Projected scalability (acceptable up to 100 plans, pagination for 500+)</li>
+                            </ul>
+
+                            <h5>Prototype Findings:</h5>
+                            <ul>
+                                <li><strong>Feasibility:</strong> ✅ CONFIRMED - queries work, performance acceptable</li>
+                                <li><strong>Performance:</strong> Dynamic rendering (28ms) faster than static (50ms)</li>
+                                <li><strong>Scalability:</strong> Acceptable for < 100 plans (current: 49 total)</li>
+                                <li><strong>Validation:</strong> 6/6 test criteria passed</li>
+                            </ul>
+
+                            <h5>Validation Results (6/6 Tests Passed):</h5>
+                            <ul>
+                                <li>✅ Query returns data correctly</li>
+                                <li>✅ Template renders plans successfully</li>
+                                <li>✅ Empty state handled gracefully</li>
+                                <li>✅ Performance < 100ms (achieved 28ms)</li>
+                                <li>✅ Project links work</li>
+                                <li>✅ Status badges render correctly</li>
+                            </ul>
+
+                            <h5>Recommendation:</h5>
+                            <p><strong>PROCEED</strong> with Phase 1 migration (high confidence: 95%+)</p>
+                        </div>
+                    </details>
+                </div>
+            </details>
+
+            <!-- Phase 1: Database Environment Management -->
+            <div id="anchor-phase1" class="nav-anchor"></div>
+            <details id="phase1-database-env" class="priority-container">
+                <summary class="priority-summary">📊 Phase 1: Database Environment Management [IN PROGRESS]</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">NOT COMPLETE</span> | <strong>Started:</strong> 2026-02-07</p>
+                    <p><strong>Note:</strong> Code created but not tested or confirmed working in application</p>
+                    
+                    <h4>📋 Objectives</h4>
+                    <ul>
+                        <li>Implement database environment selection (production/staging/dev)</li>
+                        <li>Create database synchronization capabilities</li>
+                        <li>Add environment indicators and safety controls</li>
+                        <li>Enable schema migration testing across environments</li>
+                    </ul>
+
+                    <h4>✅ Completed Tasks</h4>
+                    <ul>
+                        <li>✅ Database Connection Configuration (1.1)</li>
+                        <li>✅ Database Environment Utility created (1.2) - <code>lib/Comserv/Util/DatabaseEnv.pm</code></li>
+                        <li>✅ Schema Comparison Controller Updates (1.3)</li>
+                        <li>✅ Database Sync Script (1.4) - <code>scripts/sync_dev_from_production.pl</code></li>
+                        <li>✅ Application-Level Database Sync UI (1.5) - <code>/admin/database-sync</code></li>
+                        <li>✅ Environment Indicator (1.6) - Header badges (Red/Yellow/Green)</li>
+                    </ul>
+
+                    <h4>⏳ Pending Tasks (1.7: Documentation & Testing)</h4>
+                    <ul>
+                        <li>[ ] Document database environment management in <code>Documentation/DatabaseEnvironments.md</code></li>
+                        <li>[ ] Create test cases (environment switching, schema sync dry-run, validation)</li>
+                        <li>[ ] Update <code>.gitignore</code> to exclude environment-specific credentials</li>
+                        <li>[ ] Test sync script on development database</li>
+                        <li>[ ] Verify environment switching in schema-comparison tool</li>
+                        <li>[ ] Test auto-sync trigger on production schema changes</li>
+                    </ul>
+
+                    <h4>📦 Deliverables</h4>
+                    <ul>
+                        <li><code>lib/Comserv/Util/DatabaseEnv.pm</code> - Environment management utility</li>
+                        <li><code>lib/Comserv/Controller/Admin/DatabaseSync.pm</code> - Sync controller</li>
+                        <li><code>root/admin/database-sync/index.tt</code> - Sync UI template</li>
+                        <li><code>scripts/sync_dev_from_production.pl</code> - Sync script</li>
+                        <li><code>.env.staging</code> - Staging environment config</li>
+                    </ul>
+
+                    <h4>🔗 Dependencies</h4>
+                    <ul>
+                        <li><strong>Blocks:</strong> Phase 2 (schema changes should be tested on dev first)</li>
+                        <li><strong>Blocked by:</strong> Docker container HTTP::Parser::XS issue</li>
+                    </ul>
+
+                    <p><strong>Verification:</strong> All code created, pending application testing</p>
+                </div>
+            </details>
+
+            <!-- Phase 2: Database Schema & Models -->
+            <div id="anchor-phase2" class="nav-anchor"></div>
+            <details id="phase2-schema-models" class="priority-container">
+                <summary class="priority-summary">🗄️ Phase 2: Database Schema & Models [IN PROGRESS]</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">NOT COMPLETE</span> | <strong>Started:</strong> 2026-02-07</p>
+                    <p><strong>Note:</strong> Code created but not tested or confirmed working in application</p>
+                    
+                    <h4>📋 Objectives</h4>
+                    <ul>
+                        <li>Create new database schema for role-based access control</li>
+                        <li>Implement DBIC Result classes for new tables</li>
+                        <li>Add audit trail capabilities</li>
+                        <li>Enhance DailyPlan and Todo models with role filtering</li>
+                    </ul>
+
+                    <h4>✅ Completed Tasks</h4>
+                    <ul>
+                        <li>✅ Create <code>SiteRole.pm</code> Result class - <code>lib/Comserv/Model/Schema/Ency/Result/SiteRole.pm</code></li>
+                        <li>✅ Create <code>UserSiteRole.pm</code> Result class - <code>lib/Comserv/Model/Schema/Ency/Result/UserSiteRole.pm</code></li>
+                        <li>✅ Create <code>PlanAudit.pm</code> Result class - <code>lib/Comserv/Model/Schema/Ency/Result/PlanAudit.pm</code></li>
+                        <li>✅ Update <code>DailyPlan.pm</code> with <code>allowed_roles</code> column and JSON helpers</li>
+                        <li>✅ Update <code>Todo.pm</code> with <code>allowed_roles</code> column and JSON helpers</li>
+                        <li>✅ Create SQL migration script - <code>Comserv/sql/migrations/001_add_role_based_access_control.sql</code></li>
+                        <li>✅ Create verification script - <code>scripts/verify_schema_changes.sh</code></li>
+                        <li>✅ All Perl modules pass syntax checks</li>
+                    </ul>
+
+                    <h4>⏳ Pending Tasks (Requires Working Application)</h4>
+                    <ul>
+                        <li>[ ] Database schema sync via <code>/admin/schema-comparison</code> OR manual migration</li>
+                        <li>[ ] Verify schema changes in database using <code>scripts/verify_schema_changes.sh</code></li>
+                        <li>[ ] Test schema sync with environment selection (apply to dev first)</li>
+                        <li>[ ] Propagate schema changes: dev → staging → production (using Phase 1 tools)</li>
+                        <li>[ ] Validate role-based access filtering queries</li>
+                        <li>[ ] Test audit trail logging</li>
+                    </ul>
+
+                    <h4>📦 Deliverables (New Tables)</h4>
+                    <ul>
+                        <li><code>site_roles</code> - Role definitions per site (admin, developer, beekeeper, etc.)</li>
+                        <li><code>user_site_roles</code> - User role assignments (many-to-many)</li>
+                        <li><code>plan_audit</code> - Full audit trail (user, timestamp, action, changed_fields JSON)</li>
+                        <li><code>dailyplan.allowed_roles</code> - JSON column for role filtering</li>
+                        <li><code>todo.allowed_roles</code> - JSON column for role filtering</li>
+                    </ul>
+
+                    <h4>🔗 Dependencies</h4>
+                    <ul>
+                        <li><strong>Blocked by:</strong> Docker container HTTP::Parser::XS issue, Phase 1 completion</li>
+                        <li><strong>Blocks:</strong> Phase 3 (Data Seeding)</li>
+                    </ul>
+
+                    <h4>⚠️ Integration with Phase 1</h4>
+                    <p>Once Phase 1 is complete, schema changes should be tested on dev environment first, then propagated using database sync tools.</p>
+
+                    <p><strong>Verification:</strong> All syntax checks passed. Schema sync and database verification pending application fix.</p>
                 </div>
             </details>
 
             <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
             <details id="dailyplan-improvements" class="priority-container">
-                <summary class="priority-summary">🚨 TOP PRIORITY: DailyPlan UI/UX Improvements (HIGH PRIORITY)</summary>
+                <summary class="priority-summary">🎨 Sub-Project: DailyPlan UI/UX Improvements (HIGH PRIORITY)</summary>
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                     <p>Comprehensive improvement plan to enhance DailyPlan.tt user experience and functionality.</p>
