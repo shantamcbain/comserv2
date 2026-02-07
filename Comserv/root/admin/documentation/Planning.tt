@@ -147,11 +147,15 @@ last_updated = '2026/02/01'
             <h4>🔧 Active Zenflow Workflows</h4>
             [% SET base_url = c.req.base.replace(':\d+/', ':') %]
             <ul>
-                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">UpdateDaiyPlan-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
+                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">new-task-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
             </ul>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
+                <strong>⚠️ CRITICAL NAMING REQUIREMENT:</strong> Branch names MUST match worktree directory names. When Zenflow creates a workflow with a task name like "Update daily plan", it generates a directory name (e.g., <code>new-task-3cda</code>) but may create a different branch name (e.g., <code>UpdateDailyPlan-3cda</code>). This mismatch causes merge failures. <strong>Always rename the branch to match the directory name</strong> using <code>git branch -m OldName new-task-XXXX</code> to ensure consistency and successful merges.
+            </div>
         </div>
     </details>
 
