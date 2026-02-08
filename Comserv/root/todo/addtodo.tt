@@ -1,4 +1,4 @@
-[% PageVersion = 'addtodo.tt,v 0.07 2026/02/08 Shanta - Changed time_of_day to 12-hour format with AM/PM' %]
+[% PageVersion = 'addtodo.tt,v 0.08 2026/02/08 Shanta - Added current time default and fixed selection logic' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
@@ -113,7 +113,13 @@
         <select id="time_of_day" name="time_of_day">
             <option value="">-- Select Time --</option>
             [% 
-                SET default_time = time_of_day OR '09:00';
+                USE date;
+                IF time_of_day;
+                    SET default_time = time_of_day;
+                ELSE;
+                    # Default to current system time
+                    SET default_time = date.format(date.now, '%H:%M');
+                END;
                 
                 FOREACH hour IN [0..23];
                     SET hour_24 = hour < 10 ? '0' _ hour : hour;
@@ -136,9 +142,8 @@
                     FOREACH minute IN ['00', '30'];
                         SET time_value_24 = hour_24 _ ':' _ minute;
                         SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
-                        SET is_selected = (default_time == time_value_24) ? 'selected' : '';
             %]
-            <option value="[% time_value_24 %]:00" [% is_selected %]>[% time_display %]</option>
+            <option value="[% time_value_24 %]:00" [% IF default_time == time_value_24 %]selected[% END %]>[% time_display %]</option>
             [%
                     END;
                 END;
