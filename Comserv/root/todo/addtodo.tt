@@ -1,4 +1,4 @@
-[% PageVersion = 'addtodo.tt,v 0.05 2025/01/19 AI_Assistant - Fixed date field display width' %]
+[% PageVersion = 'addtodo.tt,v 0.06 2026/02/08 Shanta - Changed time_of_day to dropdown with 30-minute intervals' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
@@ -110,7 +110,24 @@
     </div>
     <div>
         <label for="time_of_day">Time of Day:</label>
-        <input type="time" id="time_of_day" name="time_of_day" value="[% time_of_day OR '09:00' %]">
+        <select id="time_of_day" name="time_of_day">
+            <option value="">-- Select Time --</option>
+            [% 
+                SET default_time = time_of_day OR '09:00';
+                
+                FOREACH hour IN [0..23];
+                    SET hour_str = hour < 10 ? '0' _ hour : hour;
+                    
+                    FOREACH minute IN ['00', '30'];
+                        SET time_value = hour_str _ ':' _ minute;
+                        SET selected = (default_time == time_value) ? 'selected' : '';
+            %]
+            <option value="[% time_value %]:00" [% selected %]>[% time_value %]</option>
+            [%
+                    END;
+                END;
+            %]
+        </select>
     </div>
     <div>
         <label for="subject">Subject:</label>
