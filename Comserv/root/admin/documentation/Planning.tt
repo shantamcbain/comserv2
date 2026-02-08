@@ -1,20 +1,20 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.47' %]
-[% date_iso = '2026/02/07' %]
-[% formatted_date = 'February 07, 2026' %]
-[% time = '16:35:00' %]
-[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added ALL 15 phases (0-14) as visible sub-projects with complete todo lists and dependencies. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Updated jump links to show all phases (P0-P14). Improved navigation structure with phase shortcuts. All workflow steps now visible in browser for easy tracking.' %]
+[% version = '0.52' %]
+[% date_iso = '2026/02/08' %]
+[% formatted_date = 'February 08, 2026' %]
+[% time = '19:35:00' %]
+[% change_log = 'FINAL: Moved all Planning System (Database-Driven Migration) content UP into main Planning System group header. Group header now reads "Planning System (Database-Driven Migration)". Removed nested container wrapper. All content (project details, all projects list, Phases P0-P14, DailyPlan UI/UX) now direct children of group. Structure correct.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
 
 [% META title = 'Application Planning System'
-description = 'Planning System migration from text-based to database-driven. Complete 15-phase workflow (P0-P14) with all tasks and dependencies visible. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Each phase shows objectives, tasks, dependencies, verification. Includes DailyPlan UI, Todo System, Architecture, AI Systems, Sync & Standards. All sections collapsible with full progress tracking.'
+description = 'Planning System (Database-Driven Migration): Complete 15-phase workflow (P0-P14). Phase 0 COMPLETE. First container: Planning System project details from database. Second container: All existing projects with hierarchy (top → sub → sub-sub). Third: All workflow phases as sub-projects with tasks and todos. Includes database env management, schema design, RBAC, controllers, templates, testing, deployment. Integrated with Project.pm for real-time data. DailyPlan UI, Todo System, Architecture, AI Systems, Sync & Standards sections included.'
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
-category = 'todo,priority,blocking,planning-system,workflow'
-page_version = '0.47'
-last_updated = '2026/02/07'
+category = 'todo,priority,blocking,planning-system,workflow,project-integration,database-driven'
+page_version = '0.52'
+last_updated = '2026/02/08'
 %]
 
 [% PageVersion = file_path _ ' ,v ' _ version _ ' ' _ date_iso _ ' ' _ time _ ' ' _ change_log %]
@@ -133,26 +133,13 @@ last_updated = '2026/02/07'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-planning" class="jump-link">📅 Planning System (Phases 0-14)</a></strong>:
-                        <a href="#anchor-phase0-complete" class="jump-link">P0✅</a> |
-                        <a href="#anchor-phase1" class="jump-link">P1-DB</a> |
-                        <a href="#anchor-phase2" class="jump-link">P2-Schema</a> |
-                        <a href="#anchor-phase3" class="jump-link">P3-Seed</a> |
-                        <a href="#anchor-phase4" class="jump-link">P4-Access</a> |
-                        <a href="#anchor-phase5" class="jump-link">P5-Controller</a> |
-                        <a href="#anchor-phase6" class="jump-link">P6-DailyTT</a> |
-                        <a href="#anchor-phase7" class="jump-link">P7-Views</a> |
-                        <a href="#anchor-phase8" class="jump-link">P8-Projects</a> |
-                        <a href="#anchor-phase9" class="jump-link">P9-Audit</a> |
-                        <a href="#anchor-phase10" class="jump-link">P10-Routes</a> |
-                        <a href="#anchor-phase11" class="jump-link">P11-Todo</a> |
-                        <a href="#anchor-phase12" class="jump-link">P12-Test</a> |
-                        <a href="#anchor-phase13" class="jump-link">P13-Docs</a> |
-                        <a href="#anchor-phase14" class="jump-link">P14-Deploy🚀</a>
-                    </div>
-                    <div class="jump-line" style="padding-left: 20px;">
-                        <em>Other Planning Items:</em>
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
+                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
+                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a> |
+                        <a href="#anchor-planning-phases" class="jump-link">Phases P0-P14</a>
                         <a href="#anchor-todo-plan" class="jump-link">TodoSystem</a> |
                         <a href="#anchor-priority-12" class="jump-link">PlanSync</a> |
                         <a href="#anchor-priority-5" class="jump-link">PriorityFlags</a> |
@@ -178,7 +165,10 @@ last_updated = '2026/02/07'
                         <a href="#anchor-priority-8" class="jump-link">APIDocUpdate</a> |
                         <a href="#anchor-priority-7" class="jump-link">AgentExample</a>
                     </div>
-
+                    <div class="jump-line">
+                        <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
+                        <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
+                    </div>
                 </div>
             </details>
         </div>
@@ -197,7 +187,7 @@ last_updated = '2026/02/07'
             <h4>🔧 Active Zenflow Workflows</h4>
             [% SET base_url = c.req.base.replace(':\d+/', ':') %]
             <ul>
-                <li><strong>PlanningSystemMigration:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">new-task-3cda</a> <em>(port 4000)</em> - ✅ Phase 0 COMPLETE (Analysis & Integration Mapping) | <a href="#anchor-phase0-complete">View Details</a></li>
+                <li><strong>DailyPlanSystem:</strong> <a href="[% base_url %]4000/Documentation/DailyPlan" target="_blank">new-task-3cda</a> <em>(port 4000)</em> - DailyPlan System Update</li>
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
@@ -231,7 +221,7 @@ last_updated = '2026/02/07'
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL</p>
                     <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, establish disaster recovery with external service backup.</p>
                     <p><strong>Timeline:</strong> 10-14 weeks | <strong>Budget:</strong> ~$10-40/month for external services</p>
-                    
+
                     <h4>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h4>
                     <ul>
                         <li>✅ Create PRD (requirements.md)</li>
@@ -468,7 +458,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span> | <strong>Completed:</strong> 2026-02-07</p>
                     <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
-                    
+
                     <h4>📋 Objectives Completed</h4>
                     <ul>
                         <li>✅ Comprehensive inventory of all planning templates (26+ files, 23 active priorities)</li>
@@ -532,14 +522,14 @@ last_updated = '2026/02/07'
                     </ul>
 
                     <h4>📋 Phase 0 Steps Completed (6 Tasks)</h4>
-                    
+
                     <!-- Step 0.1: Inventory -->
                     <details class="priority-container" style="margin: 10px 0;">
                         <summary class="priority-summary">✅ Step 0.1: Inventory Existing Planning Content</summary>
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/planning_inventory.md" target="_blank">planning_inventory.md</a> (12,089 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Cataloged all planning-related template files (26+ files)</li>
@@ -565,7 +555,7 @@ last_updated = '2026/02/07'
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/project_mapping.md" target="_blank">project_mapping.md</a> (9,728 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Queried projects table (attempted - found minimal existing records)</li>
@@ -593,7 +583,7 @@ last_updated = '2026/02/07'
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/integration_schema_design.md" target="_blank">integration_schema_design.md</a> (13,254 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Defined Project ↔ DailyPlan relationship (many-to-many via bridge table)</li>
@@ -625,7 +615,7 @@ last_updated = '2026/02/07'
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/migration_strategy.md" target="_blank">migration_strategy.md</a> (16,482 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Evaluated 3 migration approaches (Gradual/Hybrid ⭐ recommended, Big Bang, Coexistence)</li>
@@ -658,7 +648,7 @@ last_updated = '2026/02/07'
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/structure_diagrams.md" target="_blank">structure_diagrams.md</a> (11,946 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Created current system architecture diagram (text-based)</li>
@@ -689,7 +679,7 @@ last_updated = '2026/02/07'
                         <div class="priority-content">
                             <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
                             <p><strong>Deliverable:</strong> <a href="/.zenflow/tasks/new-task-3cda/prototype_results.md" target="_blank">prototype_results.md</a> (10,486 lines)</p>
-                            
+
                             <h5>Tasks Completed:</h5>
                             <ul>
                                 <li>✅ Created DBIC query code (prefetch optimization, no N+1 queries)</li>
@@ -732,7 +722,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">NOT COMPLETE</span> | <strong>Started:</strong> 2026-02-07</p>
                     <p><strong>Note:</strong> Code created but not tested or confirmed working in application</p>
-                    
+
                     <h4>📋 Objectives</h4>
                     <ul>
                         <li>Implement database environment selection (production/staging/dev)</li>
@@ -787,7 +777,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-in-progress">NOT COMPLETE</span> | <strong>Started:</strong> 2026-02-07</p>
                     <p><strong>Note:</strong> Code created but not tested or confirmed working in application</p>
-                    
+
                     <h4>📋 Objectives</h4>
                     <ul>
                         <li>Create new database schema for role-based access control</li>
@@ -847,7 +837,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Seed initial role data for existing sites (CSC, Bmaster) and assign roles to existing users</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create <code>scripts/seed_site_roles.pl</code> script with default roles (admin, developer, user, custom per site)</li>
@@ -873,7 +863,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Create utility modules for checking user permissions and site access</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create <code>lib/Comserv/Util/PlanAccess.pm</code> with methods:
@@ -912,7 +902,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Create new Plan controller to replace Documentation controller for planning routes</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create <code>lib/Comserv/Controller/Plan.pm</code> with base actions</li>
@@ -940,7 +930,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Create new daily plan template that dynamically renders from database</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create <code>root/admin/plan/daily.tt</code> template with sticky header, date navigation, tab navigation</li>
@@ -967,7 +957,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Create additional view templates for weekly, monthly, and master plan views</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create <code>root/admin/plan/weekly.tt</code> template - 7-day calendar, collapsible sections per day</li>
@@ -993,7 +983,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Implement project linking and documentation mapping features</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Extend Plan controller with <code>projects</code> and <code>project_detail</code> actions</li>
@@ -1020,7 +1010,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Implement audit trail viewing and filtering</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Add audit logging hooks to Plan controller (view events, CRUD operations, todo status changes)</li>
@@ -1046,7 +1036,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Update existing routes and add redirects from old URLs to new controller</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Add redirect in Documentation.pm - <code>/Documentation/DailyPlan</code> → <code>/admin/plan/daily</code></li>
@@ -1072,7 +1062,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Update existing Todo controller to integrate with new planning system</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Update Todo.pm methods to log audit events (via PlanAudit) and respect allowed_roles filtering (via PlanAccess)</li>
@@ -1098,7 +1088,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Comprehensive testing across all implemented features</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] <strong>Permission Testing:</strong> Test as normal user, developer, site admin, super admin (CSC), custom roles</li>
@@ -1125,7 +1115,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Document the new system and clean up obsolete files</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] Create user documentation (how to use daily plan, create todos, link projects, role permissions matrix)</li>
@@ -1152,7 +1142,7 @@ last_updated = '2026/02/07'
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>Objective:</strong> Deploy to production with database migration and monitoring</p>
-                    
+
                     <h4>⏳ Tasks</h4>
                     <ul>
                         <li>[ ] <strong>Pre-deployment:</strong> Backup production database, review checklist, notify users</li>
@@ -1241,6 +1231,530 @@ last_updated = '2026/02/07'
                 </div>
             </details>
 
+                    [%# Try to fetch Planning System project from database %]
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [%# TODO: Update with correct project_id once Planning System project is created %]
+                        [%# Example: SET planning_project = schema.resultset('Project').find(XXX) %]
+                        [% SET planning_project = undef %]
+
+                        [% IF planning_project %]
+                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                <div>
+                                    <p style="margin: 0;">
+                                        <strong>Status:</strong>
+                                        <span class="[% planning_project.status == 'In-Process' ? 'status-in-progress' : planning_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                            [% planning_project.status.upper %]
+                                        </span>
+                                        | <strong>Project Code:</strong> <code>[% planning_project.project_code %]</code>
+                                        | <strong>Hours:</strong> [% planning_project.estimated_man_hours %]
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                        <strong>Timeline:</strong> [% planning_project.start_date %] → [% planning_project.end_date %]
+                                        | <strong>Developer:</strong> [% planning_project.developer_name %]
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <a href="/project/details?project_id=[% planning_project.id %]"
+                                       target="_blank"
+                                       class="btn-secondary"
+                                       style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                        📊 View Details
+                                    </a>
+                                    <a href="/project/editproject?project_id=[% planning_project.id %]"
+                                       target="_blank"
+                                       class="btn-primary"
+                                       style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                        ✏️ Edit Project
+                                    </a>
+                                </div>
+                            </div>
+
+                            [% IF planning_project.description %]
+                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
+                                <h4 style="margin-top: 0;">Project Description</h4>
+                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+[% planning_project.description %]
+                                </div>
+                            </div>
+                            [% END %]
+
+                            [% IF planning_project.comments %]
+                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                                <strong>📝 Notes:</strong> [% planning_project.comments %]
+                            </div>
+                            [% END %]
+                        [% ELSE %]
+                            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
+                        [% END %]
+                    [% CATCH %]
+                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                        <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                        <p><em>Note: Error loading Planning System project data: [% error %]. Using static data below.</em></p>
+                    [% END %]
+
+                    <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Transform the Planning system from static text files into a fully dynamic database-driven application:</p>
+                    <ul>
+                        <li>Role-based access control (Admin, Developer, User roles per site)</li>
+                        <li>Real-time todo management with drag-and-drop scheduling</li>
+                        <li>Multi-environment database support (Production, Staging, Dev)</li>
+                        <li>Comprehensive audit trails for all planning changes</li>
+                        <li>Project-documentation integration and mapping</li>
+                        <li>Dynamic daily, weekly, and monthly views</li>
+                    </ul>
+
+                    <h4>📊 All Projects in Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET project_controller = c.controller('Project') %]
+                        [% SET all_projects = project_controller.fetch_projects_with_subprojects(c) %]
+
+                        [% IF all_projects AND all_projects.size > 0 %]
+                            <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                                    📦 Existing Projects ([% all_projects.size %] top-level projects)
+                                </summary>
+                                <div style="margin-top: 10px;">
+                                    <p><em>All projects from database with hierarchical structure (projects → sub-projects → sub-sub-projects)</em></p>
+                                    [% FOREACH project IN all_projects %]
+                                        <details class="project-item" style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                            <summary style="cursor: pointer; font-weight: bold;">
+                                                📁 [% project.name %]
+                                                <span style="font-size: 0.9em; color: #666;">
+                                                    (ID: [% project.id %], Status: [% project.status || 'Unknown' %])
+                                                </span>
+                                            </summary>
+                                            <div style="margin: 10px 0 0 20px;">
+                                                <p><strong>Developer:</strong> [% project.developer_name || 'Not assigned' %]</p>
+                                                <p><strong>Client:</strong> [% project.client_name || 'N/A' %]</p>
+                                                <p><strong>Timeline:</strong> [% project.start_date || 'Not set' %] → [% project.end_date || 'Not set' %]</p>
+                                                <p>
+                                                    <a href="/project/details?project_id=[% project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                                    <a href="/project/editproject?project_id=[% project.id %]" target="_blank" style="color: #007bff;">Edit</a>
+                                                </p>
+
+                                                [% IF project.sub_projects AND project.sub_projects.size > 0 %]
+                                                    <details style="margin-top: 10px;">
+                                                        <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                            📂 Sub-projects ([% project.sub_projects.size %])
+                                                        </summary>
+                                                        <div style="margin-left: 20px;">
+                                                            [% FOREACH subproject IN project.sub_projects %]
+                                                                <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                                    <summary style="cursor: pointer;">
+                                                                        📄 [% subproject.name %] (ID: [% subproject.id %])
+                                                                    </summary>
+                                                                    <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                                        <p><strong>Developer:</strong> [% subproject.developer_name || 'Not assigned' %]</p>
+                                                                        <p><strong>Status:</strong> [% subproject.status || 'Unknown' %]</p>
+                                                                        <p>
+                                                                            <a href="/project/details?project_id=[% subproject.id %]" target="_blank">View</a> |
+                                                                            <a href="/project/editproject?project_id=[% subproject.id %]" target="_blank">Edit</a>
+                                                                        </p>
+
+                                                                        [% IF subproject.sub_projects AND subproject.sub_projects.size > 0 %]
+                                                                            <details style="margin-top: 8px;">
+                                                                                <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                                    📂 Sub-sub-projects ([% subproject.sub_projects.size %])
+                                                                                </summary>
+                                                                                <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                                    [% FOREACH subsubproject IN subproject.sub_projects %]
+                                                                                        <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                                            📌 [% subsubproject.name %] (ID: [% subsubproject.id %])
+                                                                                            <a href="/project/details?project_id=[% subsubproject.id %]" target="_blank" style="font-size: 0.9em;">View</a>
+                                                                                        </div>
+                                                                                    [% END %]
+                                                                                </div>
+                                                                            </details>
+                                                                        [% END %]
+                                                                    </div>
+                                                                </details>
+                                                            [% END %]
+                                                        </div>
+                                                    </details>
+                                                [% END %]
+                                            </div>
+                                        </details>
+                                    [% END %]
+                                </div>
+                            </details>
+                        [% ELSE %]
+                            <p><em>No projects found in database or unable to fetch projects.</em></p>
+                        [% END %]
+                    [% CATCH %]
+                        <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch projects from database. [% error.info %]</p>
+                    [% END %]
+
+                    <h4>🚀 Implementation Workflow: Phases P0-P14</h4>
+                    <p>Complete 15-phase workflow covering database environment management, schema design, RBAC implementation, UI development, and deployment. Each phase is a sub-project with detailed tasks and todos.</p>
+
+                    <!-- Phase 0: Planning System Analysis & Integration Mapping -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ✅ Phase 0: Planning System Analysis & Integration Mapping (COMPLETE)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-completed">COMPLETE</span></p>
+                            <p><strong>Objective:</strong> Analyze existing text-based planning system and map it to future database-driven Project/Planning structure.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>✅ 0.1: Inventory Existing Planning Content</li>
+                                <li>✅ 0.2: Analyze Existing Projects</li>
+                                <li>✅ 0.3: Design Project-Planning Integration Schema</li>
+                                <li>✅ 0.4: Plan Migration Strategy</li>
+                                <li>✅ 0.5: Create Planning Structure Visualization</li>
+                                <li>✅ 0.6: Prototype Dynamic Planning View</li>
+                            </ul>
+
+                            <p><strong>Deliverables:</strong></p>
+                            <ul>
+                                <li>📄 Planning inventory document (74K bytes)</li>
+                                <li>📄 Project mapping document</li>
+                                <li>📄 Integration schema design</li>
+                                <li>📄 Migration strategy document</li>
+                                <li>📄 Structure diagrams</li>
+                                <li>📄 Prototype results</li>
+                            </ul>
+
+                            <p><strong>Reference:</strong> <code>.zenflow/tasks/new-task-3cda/plan.md</code> (Phase 0)</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 1: Database Environment Management -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 1: Database Environment Management (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Implement database environment selection and synchronization for production, staging, and dev databases.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ 1.1: Database Connection Configuration</li>
+                                <li>⏳ 1.2: Database Environment Utility</li>
+                                <li>⏳ 1.3: Schema Comparison Controller Updates</li>
+                                <li>⏳ 1.4: Database Sync Script</li>
+                                <li>⏳ 1.5: Application-Level Database Sync UI</li>
+                                <li>⏳ 1.6: Environment Indicator</li>
+                                <li>⏳ 1.7: Documentation & Testing</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 0 complete</p>
+                            <p><strong>Verification:</strong> Can add new database environments, switch between them, and sync schema changes</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 2: Database Schema & Models -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 2: Database Schema & Models (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Create new database schema and DBIC Result classes for role-based access control and audit trail.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create SiteRole.pm Result class</li>
+                                <li>⏳ Create UserSiteRole.pm Result class</li>
+                                <li>⏳ Create PlanAudit.pm Result class</li>
+                                <li>⏳ Update DailyPlan.pm with allowed_roles column</li>
+                                <li>⏳ Update Todo.pm with allowed_roles column</li>
+                                <li>⏳ Create SQL migration script</li>
+                                <li>⏳ Run schema sync via /admin/schema-comparison</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 1 complete</p>
+                            <p><strong>Verification:</strong> All syntax checks passed, schema sync pending</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 3: Data Seeding -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 3: Data Seeding (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Seed initial role data for existing sites (CSC, Bmaster) and assign roles to existing users.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create scripts/seed_site_roles.pl script</li>
+                                <li>⏳ Test seeding script on development database</li>
+                                <li>⏳ Verify role data in site_roles and user_site_roles tables</li>
+                                <li>⏳ Document seeding process for future sites</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 2 complete</p>
+                            <p><strong>Verification:</strong> Query database to confirm roles exist for CSC and Bmaster sites</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 4: Access Control Utilities -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 4: Access Control Utilities (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Create utility modules for checking user permissions and site access.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create lib/Comserv/Util/PlanAccess.pm with permission methods</li>
+                                <li>⏳ Add unit tests for PlanAccess utility</li>
+                                <li>⏳ Create lib/Comserv/Util/PlanAudit.pm with audit logging methods</li>
+                                <li>⏳ Add unit tests for PlanAudit utility</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 3 complete</p>
+                            <p><strong>Verification:</strong> Run unit tests, manually test permission checks</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 5: Plan Controller -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 5: Plan Controller (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Create new Plan controller to replace Documentation controller for planning routes.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create lib/Comserv/Controller/Plan.pm with base actions</li>
+                                <li>⏳ Implement daily action</li>
+                                <li>⏳ Implement weekly action</li>
+                                <li>⏳ Implement monthly action</li>
+                                <li>⏳ Add error handling and logging</li>
+                                <li>⏳ Test controller actions with different user roles</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 4 complete</p>
+                            <p><strong>Verification:</strong> Access /admin/plan/daily, verify filtering, check logs</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 6: Daily Plan Template -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 6: Daily Plan Template (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Create new daily plan template that dynamically renders from database.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create root/admin/plan/daily.tt template</li>
+                                <li>⏳ Implement "Today" tab content</li>
+                                <li>⏳ Add checkbox functionality for marking todos complete (AJAX)</li>
+                                <li>⏳ Add "Add Task" button linking to /todo/addtodo</li>
+                                <li>⏳ Test template rendering with various data sets</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 5 complete</p>
+                            <p><strong>Verification:</strong> Visual inspection, test with different dates/sites/roles</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 7: Weekly & Other View Templates -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 7: Weekly & Other View Templates (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Create additional view templates for weekly, monthly, and master plan views.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create root/admin/plan/weekly.tt template</li>
+                                <li>⏳ Create root/admin/plan/monthly.tt template</li>
+                                <li>⏳ Create root/admin/plan/master.tt template</li>
+                                <li>⏳ Test all templates with sample data</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 6 complete</p>
+                            <p><strong>Verification:</strong> Visual inspection, navigate between views</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 8: Project-Documentation Integration -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 8: Project-Documentation Integration (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Implement project linking and documentation mapping features.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Extend lib/Comserv/Controller/Plan.pm with project actions</li>
+                                <li>⏳ Create root/admin/plan/projects.tt template</li>
+                                <li>⏳ Implement auto-match algorithm</li>
+                                <li>⏳ Create root/admin/plan/project_detail.tt template</li>
+                                <li>⏳ Test project-documentation linking workflow</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 7 complete</p>
+                            <p><strong>Verification:</strong> Link projects to docs, verify display on detail page</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 9: Audit Trail Viewer -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 9: Audit Trail Viewer (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Implement audit trail viewing and filtering.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Add audit logging hooks to Plan controller</li>
+                                <li>⏳ Create root/admin/plan/audit.tt template</li>
+                                <li>⏳ Implement audit action</li>
+                                <li>⏳ Test audit logging with various operations</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 8 complete</p>
+                            <p><strong>Verification:</strong> Perform actions, verify audit log entries, test filters</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 10: URL Migration & Routing -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 10: URL Migration & Routing (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Update existing routes and add redirects from old URLs to new controller.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Add redirect in lib/Comserv/Controller/Documentation.pm</li>
+                                <li>⏳ Update navigation links in templates</li>
+                                <li>⏳ Search codebase for hardcoded DailyPlan URLs and update</li>
+                                <li>⏳ Test navigation from various entry points</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 9 complete</p>
+                            <p><strong>Verification:</strong> Click all navigation links, verify no 404 errors, check redirect logs</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 11: Todo Controller Integration -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 11: Todo Controller Integration (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Update existing Todo controller to integrate with new planning system.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Update lib/Comserv/Controller/Todo.pm methods to log audit events</li>
+                                <li>⏳ Respect allowed_roles filtering via PlanAccess</li>
+                                <li>⏳ Update todo templates with new plan view links</li>
+                                <li>⏳ Test todo operations with role-based filtering</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 10 complete</p>
+                            <p><strong>Verification:</strong> Create/update/delete todos, verify audit logs and role filtering</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 12: Testing & Verification -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 12: Testing & Verification (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Comprehensive testing across all implemented features.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Permission Testing (normal user, developer, site admin, super admin)</li>
+                                <li>⏳ Functionality Testing (navigate views, filter, mark complete, link projects)</li>
+                                <li>⏳ Performance Testing (page load time < 2 seconds, < 10 queries per page)</li>
+                                <li>⏳ Browser Testing (Chrome, Firefox, Safari, responsive layout)</li>
+                                <li>⏳ Data Migration (migrate key plans to database, archive old text files)</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 11 complete</p>
+                            <p><strong>Verification:</strong> All tests pass, performance targets met, migration complete</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 13: Documentation & Cleanup -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 13: Documentation & Cleanup (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Document the new system and clean up obsolete files.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Create user documentation</li>
+                                <li>⏳ Create admin documentation</li>
+                                <li>⏳ Update developer documentation</li>
+                                <li>⏳ Archive obsolete files</li>
+                                <li>⏳ Update README.md or project documentation</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 12 complete</p>
+                            <p><strong>Verification:</strong> Documentation reviewed and accessible to users/admins/developers</p>
+                        </div>
+                    </details>
+
+                    <!-- Phase 14: Production Deployment -->
+                    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                            ⏳ Phase 14: Production Deployment (PENDING)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
+                            <p><strong>Objective:</strong> Deploy to production with database migration and monitoring.</p>
+
+                            <h5>📋 Tasks:</h5>
+                            <ul>
+                                <li>⏳ Pre-deployment (backup production database, review checklist, notify users)</li>
+                                <li>⏳ Deployment (deploy code, execute schema sync, run seed script)</li>
+                                <li>⏳ Post-deployment (verify routes, test with real accounts, monitor logs/performance)</li>
+                                <li>⏳ Rollback Plan (document procedure, keep backup available for 7 days)</li>
+                            </ul>
+
+                            <p><strong>Dependencies:</strong> Phase 13 complete</p>
+                            <p><strong>Verification:</strong> Production system functional, no errors in logs, user feedback positive</p>
+                        </div>
+                    </details>
+
+                    <h4>📁 Documentation</h4>
+                    <ul>
+                        <li>Requirements: <code>.zenflow/tasks/new-task-3cda/requirements.md</code></li>
+                        <li>Technical Spec: <code>.zenflow/tasks/new-task-3cda/spec.md</code></li>
+                        <li>Implementation Plan: <code>.zenflow/tasks/new-task-3cda/plan.md</code></li>
+                    </ul>
+                </div>
+            </details>
+
             <!-- Sub-Project: Todo System Update (moved from Group 6) -->
             <div id="anchor-todo-plan" class="nav-anchor"></div>
             <details id="todo-update-plan" class="priority-container">
@@ -1281,7 +1795,7 @@ last_updated = '2026/02/07'
                         <li><strong>Task 1.2: Implement <code>todo_interval</code> Table</strong>
                             <ul>
                                 <li><strong>Proven Strategy</strong>: Mirror the structure of the existing <code>log</code> table (which uses <code>start_time</code>, <code>end_time</code>, and <code>time</code>) to maintain system consistency.</li>
-                                <li><strong>Fields</strong>: 
+                                <li><strong>Fields</strong>:
                                     <ul>
                                         <li><code>id</code> (INT, PK, AI)</li>
                                         <li><code>todo_id</code> (INT, FK to <code>todo.record_id</code>)</li>
@@ -1618,20 +2132,14 @@ last_updated = '2026/02/07'
             </div>
         </details>
 
-        <!-- Group 6: ARCHIVED - ToDo System (Moved to Planning System) -->
-        <details id="group-todo" class="priority-group-container">
-            <summary class="group-header">📝 ARCHIVED: ToDo System Update Plan (Moved to Planning System Group)</summary>
+        <!-- Group 6: ToDo System Update Plan -->
+        <details id="group-todo" class="priority-group-container" open>
+            <summary class="group-header">📝 ToDo System Update Plan</summary>
             <div class="priority-content">
 
-            <div style="background: #d1ecf1; border: 1px solid #0c5460; border-radius: 4px; padding: 15px; margin: 10px 0;">
-                <h4 style="margin-top: 0;">⚠️ Content Moved</h4>
-                <p>The Todo System Update Plan has been reorganized as a <strong>sub-project</strong> under the <strong>Planning System</strong> group.</p>
-                <p><strong>New Location:</strong> <a href="#group-planning">Planning System</a> → <a href="#anchor-todo-plan">Sub-Project: ToDo System Comprehensive Update</a></p>
-                <p><strong>Reason:</strong> Todo System is a core component of the Planning System migration and benefits from hierarchical organization.</p>
-            </div>
-
-            <details id="todo-update-plan-archived" class="priority-container">
-                <summary class="priority-summary">🚀 ToDo System Comprehensive Update (ARCHIVED - See Planning System)</summary>
+            <div id="anchor-todo-plan" class="nav-anchor"></div>
+            <details id="todo-update-plan" class="priority-container" open>
+                <summary class="priority-summary">🚀 ToDo System Comprehensive Update</summary>
                 <div class="priority-content">
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                     <p><strong>New Location:</strong> <a href="#anchor-todo-plan">Planning System → Sub-Project: ToDo System</a></p>
