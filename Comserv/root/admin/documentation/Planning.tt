@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.50' %]
+[% version = '0.51' %]
 [% date_iso = '2026/02/08' %]
 [% formatted_date = 'February 08, 2026' %]
-[% time = '19:20:00' %]
-[% change_log = 'Restructured Planning System section: (1) First container now tries to fetch Planning System project from database (like AI Chat #114 pattern), displays project details if found, fallback to static; (2) Second container shows ALL existing projects from database with hierarchical structure; (3) Then shows all 15 phases (P0-P14) as sub-project containers with tasks and todos. Each phase has objectives, dependencies, verification. Phase 0 COMPLETE. Phases 1-14 PENDING. Structure now matches main branch pattern for consistency.' %]
+[% time = '19:25:00' %]
+[% change_log = 'Fixed TT parse error (removed -like operator). Planning System = Planning System (Database-Driven Migration) - same project, branch uses full descriptive name. Structure: (1) Planning System project details from DB (placeholder until project created); (2) All existing projects with hierarchy; (3) All 15 phases P0-P14 as sub-projects. Phase 0 COMPLETE. Phases 1-14 PENDING. Ready to create Planning System project record in database.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -13,7 +13,7 @@ description = 'Planning System (Database-Driven Migration): Complete 15-phase wo
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
 category = 'todo,priority,blocking,planning-system,workflow,project-integration,database-driven'
-page_version = '0.50'
+page_version = '0.51'
 last_updated = '2026/02/08'
 %]
 
