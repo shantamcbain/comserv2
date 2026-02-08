@@ -1,10 +1,11 @@
 
-[% PageVersion = 'todo/day.tt, v  0.07 2026/02/08 shanta Exp shanta ' %]
+[% PageVersion = 'todo/day.tt, v  0.08 2026/02/08 shanta Exp shanta - Added include_mode for reusable component' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 [% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
+   # OR when included from week.tt/month.tt (include_mode parameter)
    IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan'));
       is_daily_plan = 1;
       base_url = '/Documentation/DailyPlan';
@@ -16,6 +17,11 @@
       planning_hash = '';
       week_hash = '';
       month_hash = '';
+   END;
+   
+   # When included as a component (from week.tt or month.tt), hide navigation
+   IF !include_mode.defined;
+      include_mode = 0;
    END;
    
    # Normalize variables from different controllers (Todo.pm vs Documentation.pm)
@@ -354,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+[% UNLESS include_mode %]
 [% IF is_daily_plan %]
     <div class="view-buttons">
         <a href="/todo[% url_hash %]">List View</a>
@@ -385,6 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/todo[% url_hash %]" title="Back to Todo List">📋</a>
         <a href="/todo/day/[% next_date %][% url_hash %]" title="Next Day">→</a>
     </div>
+[% END %]
 [% END %]
 
 [% IF debug_mode == 1 %]
@@ -470,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="time-slot" onclick="document.getElementById('add-todo-[% display_hour %]').submit();" style="cursor: pointer;" title="Click to add todo at [% display_hour %]:00">
                     [% display_hour %]:00
                 </div>
-                <div class="time-content">
+                <div class="time-content" data-date="[% date %]" data-hour="[% display_hour %]">
                     [% IF time_slots.$display_hour %]
                         [% FOREACH todo IN time_slots.$display_hour %]
                             <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]">
@@ -528,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </details>
 
-[% UNLESS is_daily_plan %]
+[% UNLESS is_daily_plan OR include_mode %]
 <div class="day-navigation view-navigation">
     <a href="/todo/day/[% previous_date %][% url_hash %]" title="Previous Day">←</a>
     <a href="/todo[% url_hash %]" title="Back to Todo List">📋</a>

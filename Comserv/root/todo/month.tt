@@ -1,4 +1,4 @@
-[% PageVersion = 'todo/month.tt,v 0.02 2026/02/08 shanta Exp shanta ' %]
+[% PageVersion = 'todo/month.tt,v 0.03 2026/02/08 shanta Exp shanta - Added data attributes for cross-date drag-and-drop' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -448,15 +448,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 [% SET is_today = 1 %]
             [% END %]
             
-            <div class="calendar-cell [% IF is_today %]today[% END %]" data-day-name="[% day_name %]" [% IF is_today %]id="today-cell"[% END %]>
+            <div class="calendar-cell month-day-cell [% IF is_today %]today[% END %]" data-day-name="[% day_name %]" data-date="[% cell.date %]" [% IF is_today %]id="today-cell"[% END %]>
                 <div class="day-number">
                     <a href="[% IF is_daily_plan %][% base_url %]/[% cell.date %][% planning_hash %][% ELSE %]/todo/day/[% cell.date %][% url_hash %][% END %]" title="View day details for [% cell.date %]">[% cell.day %]</a>
                 </div>
                 
-                <div class="todos-container" style="max-height: 120px; overflow-y: auto;">
+                <div class="todos-container" style="max-height: 120px; overflow-y: auto;" data-date="[% cell.date %]">
                     [% IF cell.todos.size > 0 %]
                         [% FOREACH todo IN cell.todos %]
-                            <div class="todo-item todo-item-shared priority-[% todo.priority %]" title="[% todo.description %]">
+                            <div class="todo-item todo-item-month todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% cell.date %]" title="[% todo.description %]" draggable="true">
                                 <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
                                     <input type="hidden" name="record_id" value="[% todo.record_id %]">
                                     <input type="hidden" name="return_to" value="">
