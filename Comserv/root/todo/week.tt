@@ -26,7 +26,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 <script src="/static/js/todo_drag_drop.js"></script>
 
-[% PageVersion  = '/todo/week.tt, v 0.5 2026/02/08 Shanta Exp Shanta - Refactored to include day.tt for each day column' %]
+[% PageVersion  = '/todo/week.tt, v 0.6 2026/02/08 Shanta Exp Shanta - Merged navigation bars, added anchor, fixed day view links to be context-aware' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -215,36 +215,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<a id="week-view-anchor"></a>
+
 [% IF is_daily_plan %]
-    <div class="view-buttons">
+    <div class="week-navigation view-navigation">
+        <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">◀ Previous Week</a>
         <a href="/todo[% url_hash %]">List View</a>
         <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
         <a href="[% base_url %]/[% date || current_date_str %][% week_hash %]" class="active">Week View</a>
         <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]">Month View</a>
-        <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
-    </div>
-
-    <div class="week-navigation view-navigation">
-        <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">Previous Week</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]" title="Month View">Month</a>
+        <a href="/todo/addtodo">Add New Todo</a>
         <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
-        <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week</a>
+        <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week ▶</a>
     </div>
 [% ELSE %]
     <h1>[% sitename %] Todos for Week: [% start_of_week %] - [% end_of_week %]</h1>
 
-    <div class="view-buttons">
+    <div class="week-navigation view-navigation">
+        <a href="/todo/week/[% prev_week_date %][% url_hash %]">◀ Previous Week</a>
         <a href="/todo[% url_hash %]">List View</a>
         <a href="/todo/day[% IF date %]/[% date %][% ELSIF current_date_str %]/[% current_date_str %][% END %][% url_hash %]">Day View</a>
         <a href="/todo/week[% IF date %]/[% date %][% ELSIF current_date_str %]/[% current_date_str %][% END %][% url_hash %]" class="active">Week View</a>
         <a href="/todo/month[% IF date %]/[% date %][% ELSIF current_date_str %]/[% current_date_str %][% END %][% url_hash %]">Month View</a>
-        <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
-    </div>
-
-    <div class="week-navigation view-navigation">
-        <a href="/todo/week/[% prev_week_date %][% url_hash %]">Previous Week</a>
+        <a href="/todo/addtodo">Add New Todo</a>
         <a href="/todo[% url_hash %]">Back to Todo List</a>
-        <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week</a>
+        <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week ▶</a>
     </div>
 [% END %]
 
@@ -266,7 +261,9 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="week-day-column">
             <div class="week-day-header [% IF day_info.is_today %]today[% END %]">
                 <div>[% day_info.day_name %]</div>
-                <div style="font-size: 1.1em; font-weight: bold;"><a href="/todo/day/[% d_str %]" style="color: inherit; text-decoration: none;">[% day_info.day_num %]</a></div>
+                <div style="font-size: 1.1em; font-weight: bold;">
+                    <a href="[% IF is_daily_plan %][% base_url %]/[% d_str %][% planning_hash %][% ELSE %]/todo/day/[% d_str %][% END %]" style="color: inherit; text-decoration: none;">[% day_info.day_num %]</a>
+                </div>
             </div>
             <div class="week-day-content">
                 [% # Include day.tt for this specific day %]
