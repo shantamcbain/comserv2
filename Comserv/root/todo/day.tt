@@ -236,6 +236,32 @@
         font-size: 0.8em;
     }
 
+    /* Drag and Drop Styles */
+    .todo-item-day {
+        cursor: move;
+    }
+
+    .todo-item-day.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    .time-content.drag-over {
+        background-color: var(--primary-color-light, #c8e6c9);
+        border: 2px dashed var(--primary-color, #4CAF50);
+    }
+
+    .drag-handle {
+        cursor: grab;
+        padding: 0 5px;
+        color: var(--secondary-text, #999);
+        font-size: 1.2em;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
     .view-buttons {
         display: flex;
         gap: 8px;
@@ -324,7 +350,94 @@ document.addEventListener('DOMContentLoaded', function() {
             hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 600);
     }
+
+    // Initialize drag and drop
+    initDragAndDrop();
 });
+
+function initDragAndDrop() {
+    let draggedTodo = null;
+
+    // Make all todo items draggable
+    document.querySelectorAll('.todo-item-day').forEach(item => {
+        item.setAttribute('draggable', 'true');
+        
+        item.addEventListener('dragstart', function(e) {
+            draggedTodo = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        });
+
+        item.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.time-content').forEach(tc => {
+                tc.classList.remove('drag-over');
+            });
+        });
+    });
+
+    // Make time slots accept drops
+    document.querySelectorAll('.time-content').forEach(timeSlot => {
+        timeSlot.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+            return false;
+        });
+
+        timeSlot.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+
+        timeSlot.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            if (draggedTodo) {
+                // Get todo ID from data attribute
+                const todoId = draggedTodo.getAttribute('data-todo-id');
+
+                // Get the new time from the time-slot sibling
+                const timeSlot = this.previousElementSibling;
+                if (timeSlot && timeSlot.classList.contains('time-slot')) {
+                    const timeText = timeSlot.textContent.trim();
+                    const newTime = timeText + ':00'; // Convert "09:00" to "09:00:00"
+
+                    if (todoId && newTime) {
+                        // Send AJAX request to update the todo
+                        updateTodoTime(todoId, newTime);
+                    }
+                }
+            }
+            
+            return false;
+        });
+    });
+}
+
+function updateTodoTime(todoId, newTime) {
+    fetch('/todo/update_time', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'record_id=' + encodeURIComponent(todoId) + '&time_of_day=' + encodeURIComponent(newTime)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated position
+            window.location.reload();
+        } else {
+            alert('Failed to update todo time: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error updating todo time:', error);
+        alert('Failed to update todo time');
+    });
+}
 </script>
 
 [% IF is_daily_plan %]
@@ -446,8 +559,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="time-content">
                     [% IF time_slots.$display_hour %]
                         [% FOREACH todo IN time_slots.$display_hour %]
-                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]">
-                                <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
+                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]">
+                                <div style="display: flex; align-items: flex-start; gap: 5px;">
+                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
+                                    <div style="flex: 1;">
+                                        <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
                                 
                                 <div class="todo-details todo-details-shared">
                                     <span class="todo-status todo-status-shared status-[% todo.status %]">
@@ -464,19 +580,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                     [% END %]
                                 </div>
                                 
-                                <div class="todo-actions todo-actions-shared">
-                                    <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                        <input type="hidden" name="return_to" value="">
-                                        <button type="submit" class="btn">Details</button>
-                                    </form>
-                                    <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                        <button type="submit" class="btn">Edit</button>
-                                    </form>
-                                    <form action="/log/log_form" method="GET" style="display: inline;">
-                                        <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                                        <button type="submit" class="btn btn-log">Log</button>
-                                    </form>
+                                        <div class="todo-actions todo-actions-shared">
+                                            <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                                <input type="hidden" name="return_to" value="">
+                                                <button type="submit" class="btn">Details</button>
+                                            </form>
+                                            <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                                <button type="submit" class="btn">Edit</button>
+                                            </form>
+                                            <form action="/log/log_form" method="GET" style="display: inline;">
+                                                <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                                <button type="submit" class="btn btn-log">Log</button>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         [% END %]
