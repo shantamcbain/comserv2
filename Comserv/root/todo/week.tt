@@ -24,6 +24,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<script src="/static/js/todo_drag_drop.js"></script>
 
 [% PageVersion  = '/todo/week.tt, v 0.4 2026/02/08 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
@@ -171,109 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
             break;
         }
     }
-
-    // Initialize drag and drop
-    initWeekDragAndDrop();
 });
-
-function initWeekDragAndDrop() {
-    let draggedTodo = null;
-    let draggedTodoId = null;
-
-    // Make all todo buttons draggable
-    document.querySelectorAll('.todo-button').forEach(button => {
-        button.setAttribute('draggable', 'true');
-        
-        button.addEventListener('dragstart', function(e) {
-            draggedTodo = this;
-            // Get todo ID from the hidden input in the parent form
-            const form = this.closest('form');
-            const recordIdInput = form.querySelector('input[name="record_id"]');
-            if (recordIdInput) {
-                draggedTodoId = recordIdInput.value;
-            }
-            
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
-        });
-
-        button.addEventListener('dragend', function(e) {
-            this.classList.remove('dragging');
-            document.querySelectorAll('.week-view-table td').forEach(td => {
-                td.classList.remove('drag-over');
-            });
-        });
-    });
-
-    // Make table cells accept drops
-    document.querySelectorAll('.week-view-table td').forEach(cell => {
-        // Skip the time label cells (first column)
-        if (cell.style.fontWeight === 'bold' && cell.parentElement.children[0] === cell) {
-            return;
-        }
-
-        cell.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            this.classList.add('drag-over');
-            return false;
-        });
-
-        cell.addEventListener('dragleave', function(e) {
-            this.classList.remove('drag-over');
-        });
-
-        cell.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            
-            if (draggedTodoId) {
-                // Get the date from the add todo form in this cell
-                const addForm = this.querySelector('form[action="/todo/addtodo"]');
-                if (addForm) {
-                    const dateInput = addForm.querySelector('input[name="start_date"]');
-                    const timeInput = addForm.querySelector('input[name="time_of_day"]');
-                    
-                    if (dateInput && timeInput) {
-                        const newDate = dateInput.value;
-                        const newTime = timeInput.value + ':00'; // Add seconds
-                        
-                        // Send AJAX request to update the todo
-                        updateTodoTimeAndDate(draggedTodoId, newTime, newDate);
-                    }
-                }
-            }
-            
-            return false;
-        });
-    });
-}
-
-function updateTodoTimeAndDate(todoId, newTime, newDate) {
-    fetch('/todo/update_time_and_date', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'record_id=' + encodeURIComponent(todoId) + 
-              '&time_of_day=' + encodeURIComponent(newTime) +
-              '&start_date=' + encodeURIComponent(newDate)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Reload the page to show updated position
-            window.location.reload();
-        } else {
-            alert('Failed to update todo: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error updating todo:', error);
-        alert('Failed to update todo');
-    });
-}
 </script>
 
 [% IF is_daily_plan %]
