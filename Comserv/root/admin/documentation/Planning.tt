@@ -1,19 +1,19 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.49' %]
+[% version = '0.50' %]
 [% date_iso = '2026/02/08' %]
 [% formatted_date = 'February 08, 2026' %]
-[% time = '19:05:00' %]
-[% change_log = 'Added comprehensive Planning System (Database-Driven Migration) section with ALL 15 phases (P0-P14) visible as collapsible containers. Added dynamic Project Database Integration that fetches all projects from database with hierarchical structure (projects, sub-projects, sub-sub-projects). Each phase shows objectives, tasks, dependencies, and verification criteria. Phase 0 marked COMPLETE. Phases 1-14 marked PENDING. Integrated with Project.pm fetch_projects_with_subprojects() method to display real-time project data. Added links to view/edit projects. All workflow steps now browsable. Anchor #anchor-planning-phases correctly points to new section.' %]
+[% time = '19:20:00' %]
+[% change_log = 'Restructured Planning System section: (1) First container now tries to fetch Planning System project from database (like AI Chat #114 pattern), displays project details if found, fallback to static; (2) Second container shows ALL existing projects from database with hierarchical structure; (3) Then shows all 15 phases (P0-P14) as sub-project containers with tasks and todos. Each phase has objectives, dependencies, verification. Phase 0 COMPLETE. Phases 1-14 PENDING. Structure now matches main branch pattern for consistency.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
 
 [% META title = 'Application Planning System'
-description = 'Planning System migration from text-based to database-driven. Complete 15-phase workflow (P0-P14) with all tasks and dependencies visible. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Each phase shows objectives, tasks, dependencies, verification. Integrated with Project database to display all projects with hierarchical structure (projects, sub-projects, sub-sub-projects). Includes DailyPlan UI, Todo System, Architecture, AI Systems, Sync & Standards. All sections collapsible with full progress tracking.'
+description = 'Planning System (Database-Driven Migration): Complete 15-phase workflow (P0-P14). Phase 0 COMPLETE. First container: Planning System project details from database. Second container: All existing projects with hierarchy (top → sub → sub-sub). Third: All workflow phases as sub-projects with tasks and todos. Includes database env management, schema design, RBAC, controllers, templates, testing, deployment. Integrated with Project.pm for real-time data. DailyPlan UI, Todo System, Architecture, AI Systems, Sync & Standards sections included.'
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
-category = 'todo,priority,blocking,planning-system,workflow,project-integration'
-page_version = '0.49'
+category = 'todo,priority,blocking,planning-system,workflow,project-integration,database-driven'
+page_version = '0.50'
 last_updated = '2026/02/08'
 %]
 
@@ -446,12 +446,75 @@ last_updated = '2026/02/08'
             <details id="planning-database-migration" class="priority-container" open>
                 <summary class="priority-summary">🗄️ Planning System (Database-Driven Migration)</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-                    <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                    [%# Try to fetch Planning System project from database %]
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [%# Search for Planning System project - adjust project_id once created %]
+                        [% SET planning_project = schema.resultset('Project').search(
+                            { name => { -like => '%Planning System%' } }
+                        ).first %]
+                        
+                        [% IF planning_project %]
+                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                <div>
+                                    <p style="margin: 0;">
+                                        <strong>Status:</strong> 
+                                        <span class="[% planning_project.status == 'In-Process' ? 'status-in-progress' : planning_project.status == 'Completed' ? 'status-completed' : 'status-pending' %]">
+                                            [% planning_project.status.upper %]
+                                        </span>
+                                        | <strong>Project Code:</strong> <code>[% planning_project.project_code %]</code>
+                                        | <strong>Hours:</strong> [% planning_project.estimated_man_hours %]
+                                    </p>
+                                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                        <strong>Timeline:</strong> [% planning_project.start_date %] → [% planning_project.end_date %]
+                                        | <strong>Developer:</strong> [% planning_project.developer_name %]
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <a href="/project/details?project_id=[% planning_project.id %]" 
+                                       target="_blank" 
+                                       class="btn-secondary" 
+                                       style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                        📊 View Details
+                                    </a>
+                                    <a href="/project/editproject?project_id=[% planning_project.id %]" 
+                                       target="_blank" 
+                                       class="btn-primary" 
+                                       style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                        ✏️ Edit Project
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            [% IF planning_project.description %]
+                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
+                                <h4 style="margin-top: 0;">Project Description</h4>
+                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+[% planning_project.description %]
+                                </div>
+                            </div>
+                            [% END %]
+                            
+                            [% IF planning_project.comments %]
+                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                                <strong>📝 Notes:</strong> [% planning_project.comments %]
+                            </div>
+                            [% END %]
+                        [% ELSE %]
+                            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
+                        [% END %]
+                    [% CATCH %]
+                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                        <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+                        <p><em>Note: Error loading Planning System project data: [% error %]. Using static data below.</em></p>
+                    [% END %]
+                    
                     <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
                     
                     <h4>📋 Overview</h4>
-                    <p>Transform the Planning system from static text files into a fully dynamic database-driven application. This enables:</p>
+                    <p>Transform the Planning system from static text files into a fully dynamic database-driven application:</p>
                     <ul>
                         <li>Role-based access control (Admin, Developer, User roles per site)</li>
                         <li>Real-time todo management with drag-and-drop scheduling</li>
@@ -461,7 +524,7 @@ last_updated = '2026/02/08'
                         <li>Dynamic daily, weekly, and monthly views</li>
                     </ul>
 
-                    <h4>📊 Project Database Integration</h4>
+                    <h4>📊 All Projects in Database</h4>
                     [% TRY %]
                         [% SET schema = c.model('DBEncy').schema %]
                         [% SET project_controller = c.controller('Project') %]
@@ -470,10 +533,10 @@ last_updated = '2026/02/08'
                         [% IF all_projects AND all_projects.size > 0 %]
                             <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
                                 <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                                    📦 Existing Projects in Database ([% all_projects.size %] projects)
+                                    📦 Existing Projects ([% all_projects.size %] top-level projects)
                                 </summary>
                                 <div style="margin-top: 10px;">
-                                    <p><em>Projects from database showing hierarchical structure with todos</em></p>
+                                    <p><em>All projects from database with hierarchical structure (projects → sub-projects → sub-sub-projects)</em></p>
                                     [% FOREACH project IN all_projects %]
                                         <details class="project-item" style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
                                             <summary style="cursor: pointer; font-weight: bold;">
@@ -543,8 +606,8 @@ last_updated = '2026/02/08'
                         <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch projects from database. [% error.info %]</p>
                     [% END %]
 
-                    <h4>🚀 Implementation Phases (P0-P14)</h4>
-                    <p>Complete 15-phase workflow covering database environment management, schema design, RBAC implementation, UI development, and deployment.</p>
+                    <h4>🚀 Implementation Workflow: Phases P0-P14</h4>
+                    <p>Complete 15-phase workflow covering database environment management, schema design, RBAC implementation, UI development, and deployment. Each phase is a sub-project with detailed tasks and todos.</p>
 
                     <!-- Phase 0: Planning System Analysis & Integration Mapping -->
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
