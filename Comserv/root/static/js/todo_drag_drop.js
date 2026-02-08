@@ -75,15 +75,38 @@ function initDayViewDragAndDrop() {
 function initWeekViewDragAndDrop() {
     let draggedTodo = null;
     let draggedTodoId = null;
+    let isDragging = false;
+
+    // Add drag handles click prevention and drag initiation
+    document.querySelectorAll('.drag-handle').forEach(handle => {
+        handle.addEventListener('mousedown', function(e) {
+            isDragging = true;
+        });
+        
+        handle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
 
     // Make all todo buttons draggable
     document.querySelectorAll('.todo-button').forEach(button => {
+        const form = button.closest('form');
+        
+        // Prevent form submission when dragging
+        form.addEventListener('submit', function(e) {
+            if (isDragging) {
+                e.preventDefault();
+                isDragging = false;
+                return false;
+            }
+        });
+        
         button.setAttribute('draggable', 'true');
         
         button.addEventListener('dragstart', function(e) {
             draggedTodo = this;
             // Get todo ID from the hidden input in the parent form
-            const form = this.closest('form');
             const recordIdInput = form.querySelector('input[name="record_id"]');
             if (recordIdInput) {
                 draggedTodoId = recordIdInput.value;
@@ -96,6 +119,7 @@ function initWeekViewDragAndDrop() {
 
         button.addEventListener('dragend', function(e) {
             this.classList.remove('dragging');
+            isDragging = false;
             document.querySelectorAll('.week-view-table td').forEach(td => {
                 td.classList.remove('drag-over');
             });
@@ -152,15 +176,51 @@ function initWeekViewDragAndDrop() {
 function initMonthViewDragAndDrop() {
     let draggedTodo = null;
     let draggedTodoId = null;
+    let isDragging = false;
+
+    // Add drag handles click prevention
+    document.querySelectorAll('.drag-handle-month').forEach(handle => {
+        handle.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            // Find the parent todo-item and start drag
+            const todoItem = this.closest('.todo-item');
+            if (todoItem) {
+                todoItem.setAttribute('draggable', 'true');
+            }
+        });
+        
+        handle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
 
     // Make all todo items draggable
     document.querySelectorAll('.todo-item').forEach(item => {
+        const form = item.querySelector('form');
+        
+        // Prevent form submission when dragging
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    isDragging = false;
+                    return false;
+                }
+            });
+        }
+        
         item.setAttribute('draggable', 'true');
         
         item.addEventListener('dragstart', function(e) {
+            // Only allow drag if started from drag handle
+            if (!isDragging) {
+                e.preventDefault();
+                return false;
+            }
+            
             draggedTodo = this;
             // Get todo ID from the hidden input in the form
-            const form = this.querySelector('form');
             if (form) {
                 const recordIdInput = form.querySelector('input[name="record_id"]');
                 if (recordIdInput) {
@@ -175,6 +235,7 @@ function initMonthViewDragAndDrop() {
 
         item.addEventListener('dragend', function(e) {
             this.classList.remove('dragging');
+            isDragging = false;
             document.querySelectorAll('.calendar-cell').forEach(cell => {
                 cell.classList.remove('drag-over');
             });
@@ -203,7 +264,7 @@ function initMonthViewDragAndDrop() {
             e.preventDefault();
             this.classList.remove('drag-over');
             
-            if (draggedTodoId) {
+            if (draggedTodoId && draggedTodo) {
                 // Get the date from the add todo form in this cell
                 const addForm = this.querySelector('form.add-todo-form');
                 if (addForm) {
@@ -214,8 +275,9 @@ function initMonthViewDragAndDrop() {
                         const newDate = dateInput.value;
                         const newTime = timeInput ? timeInput.value + ':00' : '09:00:00'; // Default to 9am if no time
                         
-                        // Send AJAX request to update the todo
-                        updateTodoTimeAndDate(draggedTodoId, newTime, newDate);
+                        // Month view displays by due_date if present, otherwise start_date
+                        // We need to update both to ensure the todo appears in the new location
+                        updateTodoTimeAndDateBoth(draggedTodoId, newTime, newDate);
                     }
                 }
             }
@@ -263,6 +325,34 @@ function updateTodoTimeAndDate(todoId, newTime, newDate) {
         body: 'record_id=' + encodeURIComponent(todoId) + 
               '&time_of_day=' + encodeURIComponent(newTime) +
               '&start_date=' + encodeURIComponent(newDate)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated position
+            window.location.reload();
+        } else {
+            alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error updating todo:', error);
+        alert('Failed to update todo');
+    });
+}
+
+/**
+ * Update todo time and date for month view (updates both start_date and due_date)
+ */
+function updateTodoTimeAndDateBoth(todoId, newTime, newDate) {
+    fetch('/todo/update_display_date', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'record_id=' + encodeURIComponent(todoId) + 
+              '&time_of_day=' + encodeURIComponent(newTime) +
+              '&display_date=' + encodeURIComponent(newDate)
     })
     .then(response => response.json())
     .then(data => {
