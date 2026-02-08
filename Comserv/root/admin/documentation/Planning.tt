@@ -449,10 +449,9 @@ last_updated = '2026/02/08'
                     [%# Try to fetch Planning System project from database %]
                     [% TRY %]
                         [% SET schema = c.model('DBEncy').schema %]
-                        [%# Search for Planning System project - adjust project_id once created %]
-                        [% SET planning_project = schema.resultset('Project').search(
-                            { name => { -like => '%Planning System%' } }
-                        ).first %]
+                        [%# TODO: Update with correct project_id once Planning System project is created %]
+                        [%# Example: SET planning_project = schema.resultset('Project').find(XXX) %]
+                        [% SET planning_project = undef %]
                         
                         [% IF planning_project %]
                             <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
