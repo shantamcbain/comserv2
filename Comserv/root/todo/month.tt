@@ -1,4 +1,4 @@
-[% PageVersion = 'todo/month.tt,v 0.03 2026/02/08 shanta Exp shanta - Added data attributes for cross-date drag-and-drop' %]
+[% PageVersion = 'todo/month.tt,v 0.04 2026/02/08 shanta Exp shanta - Added day schedule popup on hover' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -164,6 +164,94 @@
     .calendar-container {
         max-width: 100%;
         overflow-x: auto;
+    }
+    
+    /* Day popup on hover for month view cells */
+    .month-day-cell {
+        position: relative;
+    }
+    
+    .month-day-cell .day-schedule-popup {
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: 0;
+        margin-left: 10px;
+        background: var(--background-color, white);
+        border: 3px solid var(--primary-color, #4CAF50);
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        z-index: 2000;
+        min-width: 400px;
+        max-width: 500px;
+        max-height: 600px;
+        overflow-y: auto;
+        white-space: normal;
+    }
+    
+    .month-day-cell:hover .day-schedule-popup {
+        display: block;
+    }
+    
+    .day-schedule-popup .popup-header {
+        font-weight: bold;
+        font-size: 1.2em;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--primary-color, #4CAF50);
+        color: var(--primary-color, #4CAF50);
+    }
+    
+    .day-schedule-popup .popup-todo-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .day-schedule-popup .popup-todo-item {
+        padding: 8px;
+        background: var(--secondary-color, #f9f9f9);
+        border-radius: 4px;
+        border-left: 4px solid var(--primary-color, #4CAF50);
+        font-size: 0.95em;
+    }
+    
+    .day-schedule-popup .popup-todo-item.priority-1 {
+        border-left-color: var(--warning-color, #ff5722);
+    }
+    
+    .day-schedule-popup .popup-todo-item.priority-2 {
+        border-left-color: var(--accent-color, #ff9800);
+    }
+    
+    .day-schedule-popup .popup-todo-item.priority-3 {
+        border-left-color: var(--success-color, #4CAF50);
+    }
+    
+    .day-schedule-popup .popup-todo-subject {
+        font-weight: bold;
+        margin-bottom: 4px;
+        color: var(--text-color, #333);
+    }
+    
+    .day-schedule-popup .popup-todo-time {
+        font-size: 0.9em;
+        color: var(--secondary-text, #666);
+        font-weight: bold;
+    }
+    
+    .day-schedule-popup .popup-todo-details {
+        font-size: 0.85em;
+        color: var(--secondary-text, #666);
+        margin-top: 4px;
+    }
+    
+    .day-schedule-popup .popup-no-todos {
+        color: var(--secondary-text, #999);
+        font-style: italic;
+        text-align: center;
+        padding: 20px;
     }
     
     /* Adjust calendar for browser window sizing */
@@ -477,6 +565,35 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="hidden" name="return_to" value="">
                     <button type="submit" class="add-todo-shared">+</button>
                 </form>
+                
+                <!-- Day schedule popup on hover -->
+                <div class="day-schedule-popup">
+                    <div class="popup-header">[% cell.day_name %] [% cell.date %]</div>
+                    [% IF cell.todos.size > 0 %]
+                        <div class="popup-todo-list">
+                            [% FOREACH todo IN cell.todos %]
+                                <div class="popup-todo-item priority-[% todo.priority %]">
+                                    <div class="popup-todo-subject">[% todo.subject %]</div>
+                                    [% IF todo.time_of_day %]
+                                        <div class="popup-todo-time">⏰ [% todo.time_of_day.substr(0, 5) %][% IF todo.end_time %] - [% todo.end_time.substr(0, 5) %][% END %]</div>
+                                    [% END %]
+                                    <div class="popup-todo-details">
+                                        [% IF todo.description %]<div>[% todo.description %]</div>[% END %]
+                                        <div>Priority: [% todo.priority %] | Status: 
+                                            [% IF todo.status == 1 %]New
+                                            [% ELSIF todo.status == 2 %]In Progress
+                                            [% ELSIF todo.status == 3 %]Completed
+                                            [% ELSE %]Unknown[% END %]
+                                        </div>
+                                        [% IF todo.developer %]<div>Developer: [% todo.developer %]</div>[% END %]
+                                    </div>
+                                </div>
+                            [% END %]
+                        </div>
+                    [% ELSE %]
+                        <div class="popup-no-todos">No todos for this day</div>
+                    [% END %]
+                </div>
             </div>
         [% END %]
         
