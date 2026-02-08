@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.51' %]
+[% version = '0.52' %]
 [% date_iso = '2026/02/08' %]
 [% formatted_date = 'February 08, 2026' %]
-[% time = '19:25:00' %]
-[% change_log = 'Fixed TT parse error (removed -like operator). Planning System = Planning System (Database-Driven Migration) - same project, branch uses full descriptive name. Structure: (1) Planning System project details from DB (placeholder until project created); (2) All existing projects with hierarchy; (3) All 15 phases P0-P14 as sub-projects. Phase 0 COMPLETE. Phases 1-14 PENDING. Ready to create Planning System project record in database.' %]
+[% time = '19:35:00' %]
+[% change_log = 'FINAL: Moved all Planning System (Database-Driven Migration) content UP into main Planning System group header. Group header now reads "Planning System (Database-Driven Migration)". Removed nested container wrapper. All content (project details, all projects list, Phases P0-P14, DailyPlan UI/UX) now direct children of group. Structure correct.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -13,7 +13,7 @@ description = 'Planning System (Database-Driven Migration): Complete 15-phase wo
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
 category = 'todo,priority,blocking,planning-system,workflow,project-integration,database-driven'
-page_version = '0.51'
+page_version = '0.52'
 last_updated = '2026/02/08'
 %]
 
@@ -369,7 +369,7 @@ last_updated = '2026/02/08'
 
         <!-- Group 2: Planning System -->
         <details id="group-planning" class="priority-group-container" open>
-            <summary class="group-header">📅 Planning System</summary>
+            <summary class="group-header">📅 Planning System (Database-Driven Migration)</summary>
             <div class="priority-content">
 
             <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
@@ -442,10 +442,6 @@ last_updated = '2026/02/08'
                 </div>
             </details>
 
-            <div id="anchor-planning-phases" class="nav-anchor"></div>
-            <details id="planning-database-migration" class="priority-container" open>
-                <summary class="priority-summary">🗄️ Planning System (Database-Driven Migration)</summary>
-                <div class="priority-content">
                     [%# Try to fetch Planning System project from database %]
                     [% TRY %]
                         [% SET schema = c.model('DBEncy').schema %]
