@@ -26,35 +26,59 @@
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 <script src="/static/js/todo_drag_drop.js"></script>
 
-[% PageVersion  = '/todo/week.tt, v 0.4 2026/02/08 Shanta Exp Shanta' %]
+[% PageVersion  = '/todo/week.tt, v 0.5 2026/02/08 Shanta Exp Shanta - Refactored to include day.tt for each day column' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <style>
-    /* Week View Specific Styles */
+    /* Week View Grid Layout - 7 columns for 7 days */
+    .week-grid-container {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+        margin-top: 20px;
+        width: 100%;
+    }
+    
+    .week-day-column {
+        border: 1px solid var(--border-color, #ddd);
+        border-radius: 4px;
+        background-color: var(--background-color, white);
+        overflow: hidden;
+        min-width: 0; /* Allow columns to shrink */
+    }
+    
+    .week-day-header {
+        background-color: var(--primary-color, #4CAF50);
+        color: var(--nav-text, white);
+        text-align: center;
+        padding: 8px 4px;
+        font-weight: bold;
+        font-size: 0.9em;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .week-day-header.today {
+        background-color: var(--accent-color, #ff9800);
+    }
+    
+    .week-day-content {
+        padding: 5px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    /* Old table styles (keep for backward compatibility or remove if not needed) */
     .week-view-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
         background-color: var(--background-color, white);
         border: 1px solid var(--border-color, #ddd);
-    }
-
-    .week-view-table th, .week-view-table td {
-        border: 1px solid var(--border-color, #ddd);
-        padding: 10px;
-        vertical-align: top;
-        width: 14.28%;
-        height: 100px;
-    }
-
-    .week-view-table th {
-        background-color: var(--primary-color, #4CAF50);
-        color: var(--nav-text, white);
-        text-align: center;
-        height: auto;
-        font-weight: bold;
+        display: none; /* Hide old table */
     }
 
     .todo-button {
@@ -121,10 +145,20 @@
     }
 
     /* Responsive design for week view */
+    @media (max-width: 1200px) {
+        .week-grid-container {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    
     @media (max-width: 768px) {
-        .week-view-table th, .week-view-table td {
-            padding: 5px;
+        .week-grid-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .week-day-header {
             font-size: 0.8em;
+            padding: 6px 3px;
         }
         
         .todo-button {
@@ -135,6 +169,12 @@
         .add-button {
             font-size: 0.7em;
             padding: 2px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .week-grid-container {
+            grid-template-columns: 1fr;
         }
     }
 </style>
@@ -208,74 +248,40 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 [% END %]
 
-[% # Process todos into a grid: hour -> date_str -> [todos] %]
-[% SET grid = {} %]
-[% SET start_hour = 5 %]
-[% SET end_hour = 17 %]
-
+[% # Process todos by date for each day column %]
+[% SET todos_by_date = {} %]
 [% FOREACH todo IN todos %]
-    [% SET t_time = todo.time_of_day || '09:00:00' %]
-    [% SET h = t_time.substr(0, 2) * 1 %]
-    [% IF h < start_hour %][% SET start_hour = h %][% END %]
-    [% IF h > end_hour %][% SET end_hour = h %][% END %]
-    
-    [% SET d = todo.start_date %]
-    [% UNLESS grid.$h %][% grid.$h = {} %][% END %]
-    [% UNLESS grid.$h.$d %][% grid.$h.$d = [] %][% END %]
-    [% grid.$h.$d.push(todo) %]
+    [% SET todo_date = todo.start_date || todo.due_date %]
+    [% IF todo_date %]
+        [% UNLESS todos_by_date.$todo_date %]
+            [% todos_by_date.$todo_date = [] %]
+        [% END %]
+        [% todos_by_date.$todo_date.push(todo) %]
+    [% END %]
 [% END %]
 
-<table class="week-view-table">
-    <tr>
-        <th>Time</th>
-        <th>Sunday</th>
-        <th>Monday</th>
-        <th>Tuesday</th>
-        <th>Wednesday</th>
-        <th>Thursday</th>
-        <th>Friday</th>
-        <th>Saturday</th>
-    </tr>
-
-    [% FOREACH hour IN [start_hour .. end_hour] %]
-        [% SET display_hour = hour < 10 ? '0' _ hour : hour %]
-        <tr>
-            <td style="font-weight: bold; text-align: center; vertical-align: middle; background-color: #f9f9f9; height: auto;">
-                [% display_hour %]:00
-            </td>
-            [% FOREACH day_info IN week_dates %]
-                [% SET d_str = day_info.date_str %]
-                <td style="[% IF day_info.is_today %]background-color: #e6f7ff;[% END %] position: relative; height: auto; min-height: 60px;">
-                    [% IF hour == start_hour %]
-                        <div style="font-weight: bold; text-align: right; font-size: 0.8em; margin-bottom: 2px; border-bottom: 1px solid #eee;">
-                            <a href="/todo/day/[% d_str %]">[% day_info.day_num %]</a>
-                        </div>
-                    [% END %]
-
-                    [% IF grid.$hour.$d_str %]
-                        [% FOREACH todo IN grid.$hour.$d_str %]
-                            <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                <input type="hidden" name="return_to" value="">
-                                <button type="submit" class="todo-button todo-item-shared priority-[% todo.priority %]" title="[% todo.description %]" style="font-size: 0.75em; padding: 2px; margin-bottom: 2px;">
-                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
-                                    [% IF todo.time_of_day %]<span style="font-weight: normal; font-size: 0.8em;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
-                                    [% todo.subject %]
-                                </button>
-                            </form>
-                        [% END %]
-                    [% END %]
-
-                    <form action="/todo/addtodo" method="post" style="opacity: 0.3;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.3">
-                        <input type="hidden" name="start_date" value="[% d_str %]">
-                        <input type="hidden" name="time_of_day" value="[% display_hour %]:00">
-                        <button type="submit" class="add-button" style="border: 1px dashed #ccc; background: none; color: #999; cursor: pointer;">+</button>
-                    </form>
-                </td>
-            [% END %]
-        </tr>
+<div class="week-grid-container">
+    [% FOREACH day_info IN week_dates %]
+        [% SET d_str = day_info.date_str %]
+        <div class="week-day-column">
+            <div class="week-day-header [% IF day_info.is_today %]today[% END %]">
+                <div>[% day_info.day_name %]</div>
+                <div style="font-size: 1.1em; font-weight: bold;"><a href="/todo/day/[% d_str %]" style="color: inherit; text-decoration: none;">[% day_info.day_num %]</a></div>
+            </div>
+            <div class="week-day-content">
+                [% # Include day.tt for this specific day %]
+                [% INCLUDE 'todo/day.tt'
+                    include_mode = 1
+                    date = d_str
+                    todos = todos_by_date.$d_str || []
+                    overdue_todos = []
+                    previous_date = day_info.prev_date
+                    next_date = day_info.next_date
+                %]
+            </div>
+        </div>
     [% END %]
-</table>
+</div>
 
 [% IF is_daily_plan %]
     <div class="week-navigation view-navigation">
