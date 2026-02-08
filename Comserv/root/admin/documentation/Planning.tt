@@ -1,20 +1,20 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.45' %]
+[% version = '0.47' %]
 [% date_iso = '2026/02/07' %]
 [% formatted_date = 'February 07, 2026' %]
 [% time = '16:35:00' %]
-[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder for server room structure comparison.' %]
+[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added ALL 15 phases (0-14) as visible sub-projects with complete todo lists and dependencies. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Updated jump links to show all phases (P0-P14). Improved navigation structure with phase shortcuts. All workflow steps now visible in browser for easy tracking.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
 
-[% META title = 'Application planning - '
-description = 'Critical priority tasks blocking development progress, ordered by dependency chain. Includes Architecture Migration Phase 2, DailyPlan System, Project IDs, Theme Sync, Fix updateprompt.pl API Logging, and ToDo System Update Plan. All sections collapsible for improved readability.'
+[% META title = 'Application Planning System'
+description = 'Planning System migration from text-based to database-driven. Complete 15-phase workflow (P0-P14) with all tasks and dependencies visible. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Each phase shows objectives, tasks, dependencies, verification. Includes DailyPlan UI, Todo System, Architecture, AI Systems, Sync & Standards. All sections collapsible with full progress tracking.'
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
-category = 'todo,priority,blocking'
-page_version = '0.34'
-last_updated = '2026/02/01'
+category = 'todo,priority,blocking,planning-system,workflow'
+page_version = '0.47'
+last_updated = '2026/02/07'
 %]
 
 [% PageVersion = file_path _ ' ,v ' _ version _ ' ' _ date_iso _ ' ' _ time _ ' ' _ change_log %]
