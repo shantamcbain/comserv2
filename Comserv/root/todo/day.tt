@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.08 2026/02/08 shanta Exp shanta - Added include_mode for reusable component' %]
+[% PageVersion = 'todo/day.tt, v  0.09 2026/02/08 shanta Exp shanta - Added todo popup on hover with full details' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -152,9 +152,10 @@
     }
 
     .todo-subject {
-        font-size: 0.9em;
+        font-size: 1.1em;
         font-weight: bold;
         color: var(--text-color, #333);
+        line-height: 1.4;
     }
 
     .todo-details {
@@ -204,12 +205,13 @@
     }
 
     .time-slot {
-        font-weight: bold;
+        font-weight: normal;
         padding: 10px;
         border-right: 2px solid var(--primary-color, #4CAF50);
         border-bottom: 1px solid var(--border-color, #eee);
         text-align: right;
-        font-size: 0.85em;
+        font-size: 0.75em;
+        color: var(--secondary-text, #888);
         background-color: var(--secondary-color, #f9f9f9);
         display: flex;
         align-items: center;
@@ -267,6 +269,57 @@
 
     .drag-handle:active {
         cursor: grabbing;
+    }
+
+    /* Todo item popup/tooltip on hover */
+    .todo-item-day {
+        position: relative;
+    }
+
+    .todo-item-day .todo-popup {
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: 0;
+        margin-left: 10px;
+        background: var(--background-color, white);
+        border: 2px solid var(--primary-color, #4CAF50);
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 1000;
+        min-width: 300px;
+        max-width: 400px;
+        white-space: normal;
+    }
+
+    .todo-item-day:hover .todo-popup {
+        display: block;
+    }
+
+    .todo-popup .popup-subject {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: var(--primary-color, #4CAF50);
+    }
+
+    .todo-popup .popup-description {
+        font-size: 0.95em;
+        margin-bottom: 8px;
+        color: var(--text-color, #333);
+        line-height: 1.5;
+    }
+
+    .todo-popup .popup-details {
+        font-size: 0.85em;
+        color: var(--secondary-text, #666);
+        border-top: 1px solid var(--border-color, #ddd);
+        padding-top: 8px;
+    }
+
+    .todo-popup .popup-details div {
+        margin-bottom: 4px;
     }
 
     .view-buttons {
@@ -439,6 +492,28 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button type="submit" class="btn btn-log">Log</button>
                         </form>
                     </div>
+                    
+                    <!-- Popup on hover -->
+                    <div class="todo-popup">
+                        <div class="popup-subject">[% todo.subject %]</div>
+                        [% IF todo.description %]
+                            <div class="popup-description">[% todo.description %]</div>
+                        [% END %]
+                        <div class="popup-details">
+                            [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
+                            [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
+                            [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
+                            <div><strong>Priority:</strong> [% todo.priority %]</div>
+                            <div><strong>Status:</strong> 
+                                [% IF todo.status == 1 %]New
+                                [% ELSIF todo.status == 2 %]In Progress
+                                [% ELSIF todo.status == 3 %]Completed
+                                [% ELSE %]Unknown[% END %]
+                            </div>
+                            [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
+                            [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
+                        </div>
+                    </div>
                 </div>
             [% END %]
         </div>
@@ -516,6 +591,28 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <button type="submit" class="btn btn-log">Log</button>
                                             </form>
                                         </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Popup on hover -->
+                                <div class="todo-popup">
+                                    <div class="popup-subject">[% todo.subject %]</div>
+                                    [% IF todo.description %]
+                                        <div class="popup-description">[% todo.description %]</div>
+                                    [% END %]
+                                    <div class="popup-details">
+                                        [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
+                                        [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
+                                        [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
+                                        <div><strong>Priority:</strong> [% todo.priority %]</div>
+                                        <div><strong>Status:</strong> 
+                                            [% IF todo.status == 1 %]New
+                                            [% ELSIF todo.status == 2 %]In Progress
+                                            [% ELSIF todo.status == 3 %]Completed
+                                            [% ELSE %]Unknown[% END %]
+                                        </div>
+                                        [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
+                                        [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
                                     </div>
                                 </div>
                             </div>
