@@ -930,6 +930,78 @@ sub create :Local {
     $c->response->redirect($redirect_url);
 }
 
+=head2 update_time
+
+POST /todo/update_time - Update the time_of_day for a todo item (AJAX endpoint for drag-and-drop)
+
+=cut
+
+sub update_time :Path('/todo/update_time') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and time_of_day'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update the time_of_day
+    eval {
+        $todo->update({ time_of_day => $time_of_day });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
+            "Updated time_of_day for todo $record_id to $time_of_day");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time',
+            "Failed to update time_of_day for todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day
+        }
+    );
+    $c->forward('View::JSON');
+}
+
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
