@@ -1,4 +1,4 @@
-[% PageVersion  = 'todo/edit.tt,v 0.03 2026/02/08 Shanta Exp shanta - Added time_of_day field'; %]
+[% PageVersion  = 'todo/edit.tt,v 0.04 2026/02/08 Shanta Exp shanta - Changed time_of_day to dropdown with 30-minute intervals'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -136,7 +136,27 @@
         
         <div class="form-group">
             <label for="time_of_day">Time of Day:</label>
-            <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
+            <select id="time_of_day" name="time_of_day">
+                <option value="">-- Select Time --</option>
+                [% 
+                    SET current_time = record.get_column('time_of_day');
+                    IF current_time;
+                        SET current_time_short = current_time.substr(0, 5);
+                    END;
+                    
+                    FOREACH hour IN [0..23];
+                        SET hour_str = hour < 10 ? '0' _ hour : hour;
+                        
+                        FOREACH minute IN ['00', '30'];
+                            SET time_value = hour_str _ ':' _ minute;
+                            SET selected = (current_time_short == time_value) ? 'selected' : '';
+                %]
+                <option value="[% time_value %]:00" [% selected %]>[% time_value %]</option>
+                [%
+                        END;
+                    END;
+                %]
+            </select>
         </div>
         
         <div class="form-group">
