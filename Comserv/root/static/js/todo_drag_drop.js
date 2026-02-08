@@ -1,7 +1,8 @@
 /**
  * Todo Drag and Drop Functionality
  * Shared across day.tt, week.tt, and month.tt views
- * Version: 1.0
+ * Supports cross-date dragging in week and month views
+ * Version: 2.0
  * Date: 2026-02-08
  */
 
@@ -51,6 +52,14 @@ function initDayViewDragAndDrop() {
                 // Get todo ID from data attribute
                 const todoId = draggedTodo.getAttribute('data-todo-id');
 
+                // Get the target date and hour from drop zone
+                const targetDate = this.getAttribute('data-date');
+                const targetHour = this.getAttribute('data-hour');
+                
+                // Get the source date from dragged todo's container
+                const sourceContainer = draggedTodo.closest('.time-content');
+                const sourceDate = sourceContainer ? sourceContainer.getAttribute('data-date') : null;
+
                 // Get the new time from the time-slot sibling
                 const timeSlot = this.previousElementSibling;
                 if (timeSlot && timeSlot.classList.contains('time-slot')) {
@@ -58,8 +67,14 @@ function initDayViewDragAndDrop() {
                     const newTime = timeText + ':00'; // Convert "09:00" to "09:00:00"
 
                     if (todoId && newTime) {
-                        // Send AJAX request to update the todo
-                        updateTodoTime(todoId, newTime);
+                        // Check if this is a cross-date drag
+                        if (targetDate && sourceDate && targetDate !== sourceDate) {
+                            // Cross-date drag - update both time and date
+                            updateTodoTimeAndDate(todoId, newTime, targetDate);
+                        } else {
+                            // Same-date drag - update only time
+                            updateTodoTime(todoId, newTime);
+                        }
                     }
                 }
             }
@@ -71,8 +86,24 @@ function initDayViewDragAndDrop() {
 
 /**
  * Initialize drag and drop for week view
+ * Week view now uses day.tt includes, so day view drag-and-drop handles most of it
+ * This function is kept for backward compatibility with old table-based week view
  */
 function initWeekViewDragAndDrop() {
+    // Week view now includes day.tt for each day column
+    // The day view drag-and-drop (initDayViewDragAndDrop) handles dragging within and across days
+    // No additional initialization needed for the new grid-based week view
+    
+    // Keep old table-based week view support for backward compatibility
+    if (document.querySelector('.week-view-table')) {
+        initLegacyWeekViewDragAndDrop();
+    }
+}
+
+/**
+ * Legacy week view drag and drop (for old table-based week view)
+ */
+function initLegacyWeekViewDragAndDrop() {
     let draggedTodo = null;
     let draggedTodoId = null;
     let isDragging = false;
@@ -176,27 +207,13 @@ function initWeekViewDragAndDrop() {
 function initMonthViewDragAndDrop() {
     let draggedTodo = null;
     let draggedTodoId = null;
+    let draggedTodoDate = null;
     let isDragging = false;
 
-    // Add drag handles click prevention
-    document.querySelectorAll('.drag-handle-month').forEach(handle => {
-        handle.addEventListener('mousedown', function(e) {
-            isDragging = true;
-            // Find the parent todo-item and start drag
-            const todoItem = this.closest('.todo-item');
-            if (todoItem) {
-                todoItem.setAttribute('draggable', 'true');
-            }
-        });
+    // Make month view todo items draggable
+    document.querySelectorAll('.todo-item-month').forEach(item => {
+        item.setAttribute('draggable', 'true');
         
-        handle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-    });
-
-    // Make all todo items draggable
-    document.querySelectorAll('.todo-item').forEach(item => {
         const form = item.querySelector('form');
         
         // Prevent form submission when dragging
@@ -210,23 +227,11 @@ function initMonthViewDragAndDrop() {
             });
         }
         
-        item.setAttribute('draggable', 'true');
-        
         item.addEventListener('dragstart', function(e) {
-            // Only allow drag if started from drag handle
-            if (!isDragging) {
-                e.preventDefault();
-                return false;
-            }
-            
             draggedTodo = this;
-            // Get todo ID from the hidden input in the form
-            if (form) {
-                const recordIdInput = form.querySelector('input[name="record_id"]');
-                if (recordIdInput) {
-                    draggedTodoId = recordIdInput.value;
-                }
-            }
+            draggedTodoId = this.getAttribute('data-todo-id');
+            draggedTodoDate = this.getAttribute('data-todo-date');
+            isDragging = true;
             
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
@@ -236,14 +241,14 @@ function initMonthViewDragAndDrop() {
         item.addEventListener('dragend', function(e) {
             this.classList.remove('dragging');
             isDragging = false;
-            document.querySelectorAll('.calendar-cell').forEach(cell => {
+            document.querySelectorAll('.month-day-cell').forEach(cell => {
                 cell.classList.remove('drag-over');
             });
         });
     });
 
-    // Make calendar cells accept drops
-    document.querySelectorAll('.calendar-cell').forEach(cell => {
+    // Make month day cells (calendar cells) accept drops
+    document.querySelectorAll('.month-day-cell').forEach(cell => {
         // Skip empty cells
         if (cell.classList.contains('empty-cell')) {
             return;
@@ -264,25 +269,33 @@ function initMonthViewDragAndDrop() {
             e.preventDefault();
             this.classList.remove('drag-over');
             
-            if (draggedTodoId && draggedTodo) {
-                // Get the date from the add todo form in this cell
-                const addForm = this.querySelector('form.add-todo-form');
-                if (addForm) {
-                    const dateInput = addForm.querySelector('input[name="start_date"]');
-                    const timeInput = addForm.querySelector('input[name="time_of_day"]');
+            if (draggedTodoId) {
+                // Get the target date from the cell's data attribute
+                const targetDate = this.getAttribute('data-date');
+                
+                if (targetDate && draggedTodoDate !== targetDate) {
+                    // Cross-date drag in month view
+                    // Default to 9am if no time specified
+                    const newTime = '09:00:00';
                     
-                    if (dateInput) {
-                        const newDate = dateInput.value;
-                        const newTime = timeInput ? timeInput.value + ':00' : '09:00:00'; // Default to 9am if no time
-                        
-                        // Month view displays by due_date if present, otherwise start_date
-                        // We need to update both to ensure the todo appears in the new location
-                        updateTodoTimeAndDateBoth(draggedTodoId, newTime, newDate);
-                    }
+                    // Update the todo's display date
+                    updateTodoTimeAndDateBoth(draggedTodoId, newTime, targetDate);
                 }
             }
             
             return false;
+        });
+    });
+    
+    // Add drag handle support for month view
+    document.querySelectorAll('.drag-handle-month').forEach(handle => {
+        handle.addEventListener('mousedown', function(e) {
+            isDragging = true;
+        });
+        
+        handle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
         });
     });
 }
@@ -374,11 +387,26 @@ function updateTodoTimeAndDateBoth(todoId, newTime, newDate) {
  */
 document.addEventListener('DOMContentLoaded', function() {
     // Detect which view is active and initialize appropriate drag-and-drop
+    
+    // Day view has day-schedule-grid
     if (document.querySelector('.day-schedule-grid')) {
         initDayViewDragAndDrop();
-    } else if (document.querySelector('.week-view-table')) {
+    }
+    
+    // Week view (new grid-based) includes day.tt for each day
+    // So we initialize day view drag-and-drop for the included days
+    if (document.querySelector('.week-grid-container')) {
+        initDayViewDragAndDrop(); // Handles drag-and-drop within and across day columns
+        initWeekViewDragAndDrop(); // Handles any week-specific drag-and-drop (legacy support)
+    }
+    
+    // Week view (old table-based) - kept for backward compatibility
+    if (document.querySelector('.week-view-table')) {
         initWeekViewDragAndDrop();
-    } else if (document.querySelector('.calendar-grid')) {
+    }
+    
+    // Month view has calendar-grid
+    if (document.querySelector('.calendar-grid')) {
         initMonthViewDragAndDrop();
     }
 });
