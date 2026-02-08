@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.47' %]
-[% date_iso = '2026/02/07' %]
-[% formatted_date = 'February 07, 2026' %]
-[% time = '16:35:00' %]
-[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added ALL 15 phases (0-14) as visible sub-projects with complete todo lists and dependencies. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Updated jump links to show all phases (P0-P14). Improved navigation structure with phase shortcuts. All workflow steps now visible in browser for easy tracking.' %]
+[% version = '0.48' %]
+[% date_iso = '2026/02/08' %]
+[% formatted_date = 'February 08, 2026' %]
+[% time = '18:45:00' %]
+[% change_log = 'Updated Infrastructure HA section with recent progress: Dell 710 sub-project added, K8s control plane installed on VM 101, Plan Management System completed. Added Project Table Integration placeholder. Renamed DailyPlan UI/UX group to Planning System. Added ALL 15 phases (0-14) as visible sub-projects with complete todo lists and dependencies. Phase 0 COMPLETE (6 steps, 74K docs). Phases 1-14 PENDING (database env, schema, RBAC, controllers, templates, testing, deployment). Updated jump links to show all phases (P0-P14). Improved navigation structure with phase shortcuts. All workflow steps now visible in browser for easy tracking. Fixed quick jump links: updated anchor from #group-daily to #group-planning and added Phases P0-P14 shortcut.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -13,8 +13,8 @@ description = 'Planning System migration from text-based to database-driven. Com
 roles = 'admin,developer'
 TemplateType = 'PriorityList'
 category = 'todo,priority,blocking,planning-system,workflow'
-page_version = '0.47'
-last_updated = '2026/02/07'
+page_version = '0.48'
+last_updated = '2026/02/08'
 %]
 
 [% PageVersion = file_path _ ' ,v ' _ version _ ' ' _ date_iso _ ' ' _ time _ ' ' _ change_log %]
@@ -133,12 +133,13 @@ last_updated = '2026/02/07'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-daily" class="jump-link">📅 DailyPlan UI/UX</a></strong>:
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
                         <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
                         <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
                         <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a> |
+                        <a href="#anchor-planning-phases" class="jump-link">Phases P0-P14</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -366,9 +367,9 @@ last_updated = '2026/02/07'
             </div>
         </details>
 
-        <!-- Group 2: DailyPlan UI/UX Improvement Plan -->
-        <details id="group-daily" class="priority-group-container" open>
-            <summary class="group-header">📅 DailyPlan UI/UX Improvement Plan</summary>
+        <!-- Group 2: Planning System -->
+        <details id="group-planning" class="priority-group-container" open>
+            <summary class="group-header">📅 Planning System</summary>
             <div class="priority-content">
 
             <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
