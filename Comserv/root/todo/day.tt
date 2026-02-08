@@ -80,6 +80,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<script src="/static/js/todo_drag_drop.js"></script>
 
 <style>
     /* Priority-based Collapsible Container Styles */
@@ -350,94 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 600);
     }
-
-    // Initialize drag and drop
-    initDragAndDrop();
 });
-
-function initDragAndDrop() {
-    let draggedTodo = null;
-
-    // Make all todo items draggable
-    document.querySelectorAll('.todo-item-day').forEach(item => {
-        item.setAttribute('draggable', 'true');
-        
-        item.addEventListener('dragstart', function(e) {
-            draggedTodo = this;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
-        });
-
-        item.addEventListener('dragend', function(e) {
-            this.classList.remove('dragging');
-            document.querySelectorAll('.time-content').forEach(tc => {
-                tc.classList.remove('drag-over');
-            });
-        });
-    });
-
-    // Make time slots accept drops
-    document.querySelectorAll('.time-content').forEach(timeSlot => {
-        timeSlot.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            this.classList.add('drag-over');
-            return false;
-        });
-
-        timeSlot.addEventListener('dragleave', function(e) {
-            this.classList.remove('drag-over');
-        });
-
-        timeSlot.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            
-            if (draggedTodo) {
-                // Get todo ID from data attribute
-                const todoId = draggedTodo.getAttribute('data-todo-id');
-
-                // Get the new time from the time-slot sibling
-                const timeSlot = this.previousElementSibling;
-                if (timeSlot && timeSlot.classList.contains('time-slot')) {
-                    const timeText = timeSlot.textContent.trim();
-                    const newTime = timeText + ':00'; // Convert "09:00" to "09:00:00"
-
-                    if (todoId && newTime) {
-                        // Send AJAX request to update the todo
-                        updateTodoTime(todoId, newTime);
-                    }
-                }
-            }
-            
-            return false;
-        });
-    });
-}
-
-function updateTodoTime(todoId, newTime) {
-    fetch('/todo/update_time', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'record_id=' + encodeURIComponent(todoId) + '&time_of_day=' + encodeURIComponent(newTime)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Reload the page to show updated position
-            window.location.reload();
-        } else {
-            alert('Failed to update todo time: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('Error updating todo time:', error);
-        alert('Failed to update todo time');
-    });
-}
 </script>
 
 [% IF is_daily_plan %]

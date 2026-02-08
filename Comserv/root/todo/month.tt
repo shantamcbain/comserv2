@@ -1,4 +1,4 @@
-[% PageVersion = 'todo/month.tt,v 0.01 2025/03/26 shanta Exp shanta ' %]
+[% PageVersion = 'todo/month.tt,v 0.02 2026/02/08 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -29,6 +29,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<script src="/static/js/todo_drag_drop.js"></script>
 
 <style>
     .calendar-grid {
@@ -310,6 +311,40 @@
             padding: 0px 2px;
         }
     }
+
+    /* Drag and Drop Styles */
+    .todo-item {
+        cursor: move;
+        position: relative;
+    }
+
+    .todo-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    .calendar-cell.drag-over {
+        background-color: var(--primary-color-light, #c8e6c9) !important;
+        border: 2px dashed var(--primary-color, #4CAF50) !important;
+    }
+
+    .drag-handle-month {
+        cursor: grab;
+        padding: 0 2px;
+        color: var(--secondary-text, #999);
+        font-size: 0.8em;
+        display: inline-block;
+    }
+
+    .drag-handle-month:active {
+        cursor: grabbing;
+    }
+
+    .todo-item button {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
 </style>
 
 <script>
@@ -426,6 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <input type="hidden" name="record_id" value="[% todo.record_id %]">
                                     <input type="hidden" name="return_to" value="">
                                     <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:none; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis; font-size: 0.9em;">
+                                        <span class="drag-handle-month" title="Drag to reschedule">⋮⋮</span>
                                         [% IF todo.time_of_day %]<span style="font-weight: bold;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
                                         <span class="todo-subject-shared">[% todo.subject %]</span>
                                     </button>
