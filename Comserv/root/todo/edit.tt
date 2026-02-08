@@ -1,4 +1,4 @@
-[% PageVersion  = 'todo/edit.tt,v 0.04 2026/02/08 Shanta Exp shanta - Changed time_of_day to dropdown with 30-minute intervals'; %]
+[% PageVersion  = 'todo/edit.tt,v 0.05 2026/02/08 Shanta Exp shanta - Changed time_of_day to 12-hour format with AM/PM'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -142,16 +142,34 @@
                     SET current_time = record.get_column('time_of_day');
                     IF current_time;
                         SET current_time_short = current_time.substr(0, 5);
+                    ELSE;
+                        SET current_time_short = '';
                     END;
                     
                     FOREACH hour IN [0..23];
-                        SET hour_str = hour < 10 ? '0' _ hour : hour;
+                        SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                        
+                        # Convert to 12-hour format
+                        IF hour == 0;
+                            SET hour_12 = 12;
+                            SET period = 'AM';
+                        ELSIF hour < 12;
+                            SET hour_12 = hour;
+                            SET period = 'AM';
+                        ELSIF hour == 12;
+                            SET hour_12 = 12;
+                            SET period = 'PM';
+                        ELSE;
+                            SET hour_12 = hour - 12;
+                            SET period = 'PM';
+                        END;
                         
                         FOREACH minute IN ['00', '30'];
-                            SET time_value = hour_str _ ':' _ minute;
-                            SET selected = (current_time_short == time_value) ? 'selected' : '';
+                            SET time_value_24 = hour_24 _ ':' _ minute;
+                            SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
+                            SET is_selected = (current_time_short == time_value_24) ? 'selected' : '';
                 %]
-                <option value="[% time_value %]:00" [% selected %]>[% time_value %]</option>
+                <option value="[% time_value_24 %]:00" [% is_selected %]>[% time_display %]</option>
                 [%
                         END;
                     END;
