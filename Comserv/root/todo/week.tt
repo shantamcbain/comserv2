@@ -25,7 +25,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 
-[% PageVersion  = '/todo/week.tt, v 0.3 2025/12/30 Shanta Exp Shanta' %]
+[% PageVersion  = '/todo/week.tt, v 0.4 2026/02/08 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -91,6 +91,34 @@
         font-size: 0.8em;
     }
 
+    /* Drag and Drop Styles */
+    .todo-button {
+        cursor: move;
+        position: relative;
+    }
+
+    .todo-button.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+    }
+
+    .week-view-table td.drag-over {
+        background-color: var(--primary-color-light, #c8e6c9) !important;
+        border: 2px dashed var(--primary-color, #4CAF50);
+    }
+
+    .drag-handle {
+        cursor: grab;
+        padding: 0 3px;
+        color: var(--secondary-text, #999);
+        font-size: 1em;
+        display: inline-block;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
     /* Responsive design for week view */
     @media (max-width: 768px) {
         .week-view-table th, .week-view-table td {
@@ -143,7 +171,109 @@ document.addEventListener('DOMContentLoaded', function() {
             break;
         }
     }
+
+    // Initialize drag and drop
+    initWeekDragAndDrop();
 });
+
+function initWeekDragAndDrop() {
+    let draggedTodo = null;
+    let draggedTodoId = null;
+
+    // Make all todo buttons draggable
+    document.querySelectorAll('.todo-button').forEach(button => {
+        button.setAttribute('draggable', 'true');
+        
+        button.addEventListener('dragstart', function(e) {
+            draggedTodo = this;
+            // Get todo ID from the hidden input in the parent form
+            const form = this.closest('form');
+            const recordIdInput = form.querySelector('input[name="record_id"]');
+            if (recordIdInput) {
+                draggedTodoId = recordIdInput.value;
+            }
+            
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        });
+
+        button.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.week-view-table td').forEach(td => {
+                td.classList.remove('drag-over');
+            });
+        });
+    });
+
+    // Make table cells accept drops
+    document.querySelectorAll('.week-view-table td').forEach(cell => {
+        // Skip the time label cells (first column)
+        if (cell.style.fontWeight === 'bold' && cell.parentElement.children[0] === cell) {
+            return;
+        }
+
+        cell.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+            return false;
+        });
+
+        cell.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+
+        cell.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            if (draggedTodoId) {
+                // Get the date from the add todo form in this cell
+                const addForm = this.querySelector('form[action="/todo/addtodo"]');
+                if (addForm) {
+                    const dateInput = addForm.querySelector('input[name="start_date"]');
+                    const timeInput = addForm.querySelector('input[name="time_of_day"]');
+                    
+                    if (dateInput && timeInput) {
+                        const newDate = dateInput.value;
+                        const newTime = timeInput.value + ':00'; // Add seconds
+                        
+                        // Send AJAX request to update the todo
+                        updateTodoTimeAndDate(draggedTodoId, newTime, newDate);
+                    }
+                }
+            }
+            
+            return false;
+        });
+    });
+}
+
+function updateTodoTimeAndDate(todoId, newTime, newDate) {
+    fetch('/todo/update_time_and_date', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'record_id=' + encodeURIComponent(todoId) + 
+              '&time_of_day=' + encodeURIComponent(newTime) +
+              '&start_date=' + encodeURIComponent(newDate)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Reload the page to show updated position
+            window.location.reload();
+        } else {
+            alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error updating todo:', error);
+        alert('Failed to update todo');
+    });
+}
 </script>
 
 [% IF is_daily_plan %]
@@ -229,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <input type="hidden" name="record_id" value="[% todo.record_id %]">
                                 <input type="hidden" name="return_to" value="">
                                 <button type="submit" class="todo-button todo-item-shared priority-[% todo.priority %]" title="[% todo.description %]" style="font-size: 0.75em; padding: 2px; margin-bottom: 2px;">
+                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
                                     [% IF todo.time_of_day %]<span style="font-weight: normal; font-size: 0.8em;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
                                     [% todo.subject %]
                                 </button>

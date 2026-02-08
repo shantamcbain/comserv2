@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.06 2026/02/01 shanta Exp shanta ' %]
+[% PageVersion = 'todo/day.tt, v  0.07 2026/02/08 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
