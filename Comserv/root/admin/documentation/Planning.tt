@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.61' %]
+[% version = '0.62' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:36:00' %]
-[% change_log = 'Fixed Quick Jump menu visibility and theming: Reduced top to 50px (below nav only, not welcome banner). All backgrounds now use theme variables (--background-color, --secondary-color, --table-header-bg, --border-color, --nav-hover-bg). Adjusted scroll-margin-top to 180px.' %]
+[% time = '18:40:00' %]
+[% change_log = 'Added URGENT NEXT STEPS to Infrastructure HA: Priority 1 - K8s Management & Monitoring System (192.168.1.50). Priority 2 - Debug Mail Server K8s Pod (192.168.1.175). Both critical and require immediate action.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -246,6 +246,82 @@ last_updated = '2026/02/08'
                     <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL</p>
                     <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, establish disaster recovery with external service backup.</p>
                     <p><strong>Timeline:</strong> 10-14 weeks | <strong>Budget:</strong> ~$10-40/month for external services</p>
+
+                    <h4>🚨 URGENT NEXT STEPS - <span class="status-pending">IMMEDIATE ACTION REQUIRED</span></h4>
+                    <ul>
+                        <li><strong>🔴 PRIORITY 1: K8s Management & Monitoring System (192.168.1.50)</strong>
+                            <ul>
+                                <li><strong>Need:</strong> Management and monitoring system for Kubernetes cluster at 192.168.1.50</li>
+                                <li><strong>Requirements:</strong>
+                                    <ul>
+                                        <li>Dashboard for cluster status (nodes, pods, services, deployments)</li>
+                                        <li>Resource monitoring (CPU, memory, disk, network per pod/node)</li>
+                                        <li>Log aggregation and viewing</li>
+                                        <li>kubectl access via web UI (secure)</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Recommended Tools:</strong>
+                                    <ul>
+                                        <li><strong>Option 1:</strong> Kubernetes Dashboard (official, lightweight) + Prometheus + Grafana</li>
+                                        <li><strong>Option 2:</strong> Rancher (full management platform, heavier but comprehensive)</li>
+                                        <li><strong>Option 3:</strong> Lens Desktop (local GUI tool) + Prometheus operator</li>
+                                        <li><strong>Option 4:</strong> K9s (terminal UI) + Prometheus + Grafana for monitoring</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Next Steps:</strong>
+                                    <ol>
+                                        <li>Evaluate tool options based on team expertise and requirements</li>
+                                        <li>Deploy chosen management solution to K8s cluster</li>
+                                        <li>Configure Prometheus operator for metrics collection</li>
+                                        <li>Set up Grafana dashboards for visualization</li>
+                                        <li>Configure access controls and authentication</li>
+                                        <li>Document access procedures and common operations</li>
+                                    </ol>
+                                </li>
+                                <li><strong>Status:</strong> <span class="status-pending">NOT STARTED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                            </ul>
+                        </li>
+                        <li><strong>🔴 PRIORITY 2: Debug Mail Server in K8s Pod (192.168.1.175)</strong>
+                            <ul>
+                                <li><strong>Context:</strong> New mail server deployed as K8s pod on 192.168.1.175, experiencing issues</li>
+                                <li><strong>Debugging Tasks:</strong>
+                                    <ol>
+                                        <li>Verify pod status: <code>kubectl get pods -n mail-namespace</code></li>
+                                        <li>Check pod logs: <code>kubectl logs &lt;mail-pod-name&gt; -n mail-namespace</code></li>
+                                        <li>Inspect pod events: <code>kubectl describe pod &lt;mail-pod-name&gt; -n mail-namespace</code></li>
+                                        <li>Verify service configuration: <code>kubectl get svc -n mail-namespace</code></li>
+                                        <li>Test network connectivity: Port 25 (SMTP), 587 (submission), 993 (IMAPS), 995 (POP3S)</li>
+                                        <li>Verify DNS records: MX, SPF, DKIM, DMARC</li>
+                                        <li>Check persistent volume claims: <code>kubectl get pvc -n mail-namespace</code></li>
+                                        <li>Review mail server config (Postfix/Dovecot/etc.) inside pod</li>
+                                        <li>Test mail sending/receiving from inside pod</li>
+                                        <li>Verify TLS certificates are valid and accessible</li>
+                                    </ol>
+                                </li>
+                                <li><strong>Common Issues to Check:</strong>
+                                    <ul>
+                                        <li>Pod CrashLoopBackOff: Check logs for startup errors</li>
+                                        <li>Port conflicts: Ensure ports are not already bound</li>
+                                        <li>Volume mount issues: Verify PVCs are bound and accessible</li>
+                                        <li>Network policies blocking traffic</li>
+                                        <li>Firewall rules on 192.168.1.175 blocking mail ports</li>
+                                        <li>Incorrect environment variables or config maps</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Next Steps:</strong>
+                                    <ol>
+                                        <li>Access K8s cluster at 192.168.1.175</li>
+                                        <li>Run diagnostic commands above</li>
+                                        <li>Document findings and error messages</li>
+                                        <li>Fix identified issues</li>
+                                        <li>Test mail delivery end-to-end</li>
+                                        <li>Update documentation with working configuration</li>
+                                    </ol>
+                                </li>
+                                <li><strong>Status:</strong> <span class="status-pending">DEBUGGING NEEDED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                            </ul>
+                        </li>
+                    </ul>
 
                     <h4>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h4>
                     <ul>
