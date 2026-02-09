@@ -2,8 +2,9 @@
  * Todo Drag and Drop Functionality
  * Shared across day.tt, week.tt, and month.tt views
  * Supports cross-date dragging in week and month views
- * Version: 2.0
- * Date: 2026-02-08
+ * Version: 2.1
+ * Date: 2026-02-09
+ * Changes: Added support for dragging overdue todos (.todo-item-shared), improved source date detection
  */
 
 /**
@@ -12,9 +13,18 @@
 function initDayViewDragAndDrop() {
     let draggedTodo = null;
 
-    // Make all todo items draggable
-    document.querySelectorAll('.todo-item-day').forEach(item => {
-        item.setAttribute('draggable', 'true');
+    // Make all todo items draggable (including overdue todos with .todo-item-shared class)
+    document.querySelectorAll('.todo-item-day, .todo-item-shared').forEach(item => {
+        // Only set draggable if not already set in the HTML
+        if (!item.hasAttribute('draggable')) {
+            item.setAttribute('draggable', 'true');
+        }
+        
+        // Skip if already has dragstart listener
+        if (item.dataset.dragListenerAdded) {
+            return;
+        }
+        item.dataset.dragListenerAdded = 'true';
         
         item.addEventListener('dragstart', function(e) {
             draggedTodo = this;
@@ -56,9 +66,12 @@ function initDayViewDragAndDrop() {
                 const targetDate = this.getAttribute('data-date');
                 const targetHour = this.getAttribute('data-hour');
                 
-                // Get the source date from dragged todo's container
-                const sourceContainer = draggedTodo.closest('.time-content');
-                const sourceDate = sourceContainer ? sourceContainer.getAttribute('data-date') : null;
+                // Get the source date from dragged todo's data attribute or container
+                let sourceDate = draggedTodo.getAttribute('data-todo-date');
+                if (!sourceDate) {
+                    const sourceContainer = draggedTodo.closest('.time-content');
+                    sourceDate = sourceContainer ? sourceContainer.getAttribute('data-date') : null;
+                }
 
                 // Get the new time from the time-slot sibling
                 const timeSlot = this.previousElementSibling;
@@ -67,9 +80,12 @@ function initDayViewDragAndDrop() {
                     const newTime = timeText + ':00'; // Convert "09:00" to "09:00:00"
 
                     if (todoId && newTime) {
-                        // Check if this is a cross-date drag
+                        // Check if this is a cross-date drag (or overdue todo being rescheduled)
                         if (targetDate && sourceDate && targetDate !== sourceDate) {
                             // Cross-date drag - update both time and date
+                            updateTodoTimeAndDate(todoId, newTime, targetDate);
+                        } else if (targetDate && !sourceDate) {
+                            // Overdue todo without source date - update both time and date
                             updateTodoTimeAndDate(todoId, newTime, targetDate);
                         } else {
                             // Same-date drag - update only time
