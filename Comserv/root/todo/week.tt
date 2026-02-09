@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 [% END %]
 
-[% # Process todos by date for each day column %]
+[% # Process todos by date for each day column and collect overdue %]
 [% SET todos_by_date = {} %]
 [% SET all_overdue_todos = [] %]
 [% SET first_day_of_week = week_dates.0.date_str %]
@@ -259,32 +259,6 @@ document.addEventListener('DOMContentLoaded', function() {
     [% END %]
 [% END %]
 
-[% # Show overdue todos section if any exist %]
-[% IF all_overdue_todos.size > 0 %]
-<details class="priority-container overdue-container" style="margin-bottom: 15px;" open>
-    <summary class="priority-header" style="background-color: var(--error-color, #f44336); color: white; padding: 10px; cursor: pointer;">
-        <span>Overdue Todos ([% all_overdue_todos.size %]) - Before this week</span>
-        <span class="priority-toggle">▼</span>
-    </summary>
-    <div class="priority-content" style="padding: 10px; background: #fff3cd;">
-        [% FOREACH todo IN all_overdue_todos %]
-            <div class="todo-item-day overdue" style="margin-bottom: 8px; padding: 8px; border-left: 4px solid #f44336; background: white;">
-                <div class="todo-subject">[% todo.task %]</div>
-                <div class="todo-details">
-                    <span>Due: [% todo.due_date %]</span>
-                    <span>Priority: [% todo.priority %]</span>
-                    <span>Status: [% todo.status %]</span>
-                </div>
-                <div class="todo-actions">
-                    <a href="/todo/edittodo?todo_id=[% todo.id %]" class="action-button-shared edit-button">Edit</a>
-                    <a href="/todo/details/[% todo.id %]" class="action-button-shared details-button">Details</a>
-                </div>
-            </div>
-        [% END %]
-    </div>
-</details>
-[% END %]
-
 <div class="week-grid-container">
     [% FOREACH day_info IN week_dates %]
         [% SET d_str = day_info.date_str %]
@@ -296,12 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
             <div class="week-day-content">
-                [% # Include day.tt for this specific day - pass empty overdue since we show them above %]
+                [% # Include day.tt for this specific day - pass overdue todos to first day %]
                 [% INCLUDE 'todo/day.tt'
                     include_mode = 1
                     date = d_str
                     todos = todos_by_date.$d_str || []
-                    overdue_todos = []
+                    overdue_todos = (loop.first ? all_overdue_todos : [])
                     previous_date = day_info.prev_date
                     next_date = day_info.next_date
                 %]

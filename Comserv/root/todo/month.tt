@@ -504,32 +504,6 @@ document.addEventListener('DOMContentLoaded', function() {
     [% END %]
 [% END %]
 
-[% # Show overdue todos section if any exist %]
-[% IF all_overdue_todos.size > 0 %]
-<details class="priority-container overdue-container" style="margin-bottom: 15px;" open>
-    <summary class="priority-header" style="background-color: var(--error-color, #f44336); color: white; padding: 10px; cursor: pointer;">
-        <span>Overdue Todos ([% all_overdue_todos.size %]) - Before this month</span>
-        <span class="priority-toggle">▼</span>
-    </summary>
-    <div class="priority-content" style="padding: 10px; background: #fff3cd;">
-        [% FOREACH todo IN all_overdue_todos %]
-            <div class="todo-item-day overdue" style="margin-bottom: 8px; padding: 8px; border-left: 4px solid #f44336; background: white;">
-                <div class="todo-subject">[% todo.task || todo.subject %]</div>
-                <div class="todo-details">
-                    <span>Due: [% todo.due_date %]</span>
-                    <span>Priority: [% todo.priority %]</span>
-                    <span>Status: [% todo.status %]</span>
-                </div>
-                <div class="todo-actions">
-                    <a href="/todo/edittodo?todo_id=[% todo.record_id %]" class="action-button-shared edit-button">Edit</a>
-                    <a href="/todo/details/[% todo.record_id %]" class="action-button-shared details-button">Details</a>
-                </div>
-            </div>
-        [% END %]
-    </div>
-</details>
-[% END %]
-
 <div class="calendar-container">
     <div class="calendar-grid">
         <!-- Day headers -->
@@ -543,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     <!-- Calendar cells -->
     [% SET day_count = 0 %]
+    [% SET first_day_rendered = 0 %]
     [% FOREACH cell IN calendar %]
         [% SET remainder = day_count % 7 %]
         [% IF remainder == 0 %]
@@ -575,6 +550,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 
                 <div class="todos-container" style="max-height: 120px; overflow-y: auto;" data-date="[% cell.date %]">
+                    [% # Add overdue todos to the first day cell %]
+                    [% IF !first_day_rendered AND all_overdue_todos.size > 0 %]
+                        [% SET first_day_rendered = 1 %]
+                        <div class="overdue-section" style="border-top: 2px solid #ff4444; padding-top: 5px; margin-top: 5px;">
+                            <div style="color: #ff4444; font-weight: bold; font-size: 0.8em; margin-bottom: 3px;">⚠️ Overdue</div>
+                            [% FOREACH todo IN all_overdue_todos %]
+                                <div class="todo-item todo-item-month todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" title="[% todo.description %]" draggable="true" style="background-color: #ffe6e6;">
+                                    <form action="/todo/details" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                        <input type="hidden" name="return_to" value="">
+                                        <button type="submit" style="background:none; border:none; padding:0; color:inherit; text-decoration:none; cursor:pointer; text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis; font-size: 0.9em;">
+                                            <span class="drag-handle-month" title="Drag to reschedule">⋮⋮</span>
+                                            [% IF todo.time_of_day %]<span style="font-weight: bold;">[% todo.time_of_day.substr(0, 5) %]</span> [% END %]
+                                            <span class="todo-subject-shared">[% todo.subject %]</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            [% END %]
+                        </div>
+                    [% END %]
                     [% IF cell.todos.size > 0 %]
                         [% FOREACH todo IN cell.todos %]
                             <div class="todo-item todo-item-month todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% cell.date %]" title="[% todo.description %]" draggable="true">
