@@ -322,11 +322,15 @@ sub details :Path('details') :Args(0) {
 # See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
-    my ($self, $c) = @_;
+    my ($self, $c, $full_data) = @_;
+    
+    # Default to basic data (just names, IDs) unless explicitly requested
+    $full_data //= 0;
+    
     # Log the start of the project-fetching subroutine
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-        'Fetching parent projects with sub-projects'
+        'Fetching parent projects with sub-projects (full_data=' . ($full_data ? 'true' : 'false') . ')'
     );
 
     # Get the schema and SiteName
