@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.56' %]
+[% version = '0.57' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:06:00' %]
-[% change_log = 'Added Planning System project overview (Status, Objective, Overview bullets) before project list. Structure: header → status/objective/overview → All Projects (INCLUDE todo/project.tt) → Phase 0-14. All anchors above containers.' %]
+[% time = '16:10:00' %]
+[% change_log = 'Replaced INCLUDE todo/project.tt with dynamic project fetching code from main branch. Projects now displayed in closed <details> container with hierarchical structure (project → sub-project → sub-sub-project). Added Implementation Workflow heading before Phase 0.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -471,7 +471,89 @@ last_updated = '2026/02/08'
             </ul>
 
             <h4>📊 All Projects in Database</h4>
-            [% INCLUDE todo/project.tt %]
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET project_controller = c.controller('Project') %]
+                [% SET all_projects = project_controller.fetch_projects_with_subprojects(c) %]
+
+                [% IF all_projects AND all_projects.size > 0 %]
+                    <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                            📦 Existing Projects ([% all_projects.size %] top-level projects)
+                        </summary>
+                        <div style="margin-top: 10px;">
+                            <p><em>All projects from database with hierarchical structure (projects → sub-projects → sub-sub-projects)</em></p>
+                            [% FOREACH project IN all_projects %]
+                                <details class="project-item" style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                    <summary style="cursor: pointer; font-weight: bold;">
+                                        📁 [% project.name %]
+                                        <span style="font-size: 0.9em; color: #666;">
+                                            (ID: [% project.id %], Status: [% project.status || 'Unknown' %])
+                                        </span>
+                                    </summary>
+                                    <div style="margin: 10px 0 0 20px;">
+                                        <p><strong>Developer:</strong> [% project.developer_name || 'Not assigned' %]</p>
+                                        <p><strong>Client:</strong> [% project.client_name || 'N/A' %]</p>
+                                        <p><strong>Timeline:</strong> [% project.start_date || 'Not set' %] → [% project.end_date || 'Not set' %]</p>
+                                        <p>
+                                            <a href="/project/details?project_id=[% project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                            <a href="/project/editproject?project_id=[% project.id %]" target="_blank" style="color: #007bff;">Edit</a>
+                                        </p>
+
+                                        [% IF project.sub_projects AND project.sub_projects.size > 0 %]
+                                            <details style="margin-top: 10px;">
+                                                <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                    📂 Sub-projects ([% project.sub_projects.size %])
+                                                </summary>
+                                                <div style="margin-left: 20px;">
+                                                    [% FOREACH subproject IN project.sub_projects %]
+                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                            <summary style="cursor: pointer;">
+                                                                📄 [% subproject.name %] (ID: [% subproject.id %])
+                                                            </summary>
+                                                            <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                                <p><strong>Developer:</strong> [% subproject.developer_name || 'Not assigned' %]</p>
+                                                                <p><strong>Status:</strong> [% subproject.status || 'Unknown' %]</p>
+                                                                <p>
+                                                                    <a href="/project/details?project_id=[% subproject.id %]" target="_blank">View</a> |
+                                                                    <a href="/project/editproject?project_id=[% subproject.id %]" target="_blank">Edit</a>
+                                                                </p>
+
+                                                                [% IF subproject.sub_projects AND subproject.sub_projects.size > 0 %]
+                                                                    <details style="margin-top: 8px;">
+                                                                        <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                            📂 Sub-sub-projects ([% subproject.sub_projects.size %])
+                                                                        </summary>
+                                                                        <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                            [% FOREACH subsubproject IN subproject.sub_projects %]
+                                                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                                    📌 [% subsubproject.name %] (ID: [% subsubproject.id %])
+                                                                                    <a href="/project/details?project_id=[% subsubproject.id %]" target="_blank" style="font-size: 0.9em;">View</a>
+                                                                                </div>
+                                                                            [% END %]
+                                                                        </div>
+                                                                    </details>
+                                                                [% END %]
+                                                            </div>
+                                                        </details>
+                                                    [% END %]
+                                                </div>
+                                            </details>
+                                        [% END %]
+                                    </div>
+                                </details>
+                            [% END %]
+                        </div>
+                    </details>
+                [% ELSE %]
+                    <p><em>No projects found in database or unable to fetch projects.</em></p>
+                [% END %]
+            [% CATCH %]
+                <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch projects from database. [% error.info %]</p>
+            [% END %]
+
+            <h4>🚀 Implementation Workflow: Phases P0-P14</h4>
+            <p>Complete 15-phase workflow covering database environment management, schema design, RBAC implementation, UI development, and deployment. Each phase is a sub-project with detailed tasks and todos.</p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
