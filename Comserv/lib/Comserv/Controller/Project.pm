@@ -596,6 +596,10 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
+        # Safely get accumulated_time (may not exist in all schemas)
+        my $accumulated_time = 0;
+        eval { $accumulated_time = $todo->accumulated_time || 0; };
+        
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,
@@ -605,7 +609,7 @@ sub build_project_tree :Private {
             due_date => $todo->due_date,
             status => $todo->status,
             priority => $todo->priority,
-            accumulated_time => $todo->accumulated_time || 0
+            accumulated_time => $accumulated_time
         };
     }
     $project_hash->{todos} = \@todo_hashrefs;
