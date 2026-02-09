@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.53' %]
+[% version = '0.54' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '15:23:00' %]
-[% change_log = 'Added Planning System project details container and All Projects container at top of Planning System group. Updated quick jump links to include ProjectDetails, AllProjects, Phase0-2. Removed duplicate jump links (TodoSystem, PlanSync, PriorityFlags, DynamicTasks). Structure: 1) Project details from DB, 2) All projects list (includes todo/project.tt), 3) Phases P0-P14 with full details.' %]
+[% time = '15:38:00' %]
+[% change_log = 'Moved Planning System anchor above group header. Added Planning System project details container and All Projects container at top of group. Updated quick jump links to include ProjectDetails, AllProjects, Phase0-2. Removed duplicate jump links.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -448,6 +448,7 @@ last_updated = '2026/02/08'
         </details>
 
         <!-- Group 2: Planning System -->
+        <div id="anchor-planning-system" class="nav-anchor"></div>
         <details id="group-planning" class="priority-group-container" open>
             <summary class="group-header">📅 Planning System (Database-Driven Migration)</summary>
             <div class="priority-content">
