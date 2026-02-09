@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.60' %]
+[% version = '0.61' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:34:00' %]
-[% change_log = 'Fixed Quick Jump menu positioning: Set top: 120px to appear below sticky header, z-index: 1500 (below header 2000 but still visible). Increased scroll-margin-top to 250px to account for both sticky menus.' %]
+[% time = '16:36:00' %]
+[% change_log = 'Fixed Quick Jump menu visibility and theming: Reduced top to 50px (below nav only, not welcome banner). All backgrounds now use theme variables (--background-color, --secondary-color, --table-header-bg, --border-color, --nav-hover-bg). Adjusted scroll-margin-top to 180px.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -39,10 +39,10 @@ last_updated = '2026/02/08'
     /* Sticky/Floating Quick Jump Navigation */
     .nav-jump {
         position: sticky;
-        top: 120px; /* Position below the sticky header */
-        z-index: 1500; /* Below header (2000) but still high */
-        background: white;
-        border: 2px solid #dee2e6;
+        top: 50px; /* Position below the sticky nav menu */
+        z-index: 1500; /* Below nav menu (2000) but still high */
+        background: var(--background-color, white);
+        border: 2px solid var(--border-color, #dee2e6);
         border-radius: 4px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         margin-bottom: 20px;
@@ -52,20 +52,20 @@ last_updated = '2026/02/08'
         padding: 10px 15px;
         font-weight: bold;
         cursor: pointer;
-        background: #e9ecef;
+        background: var(--secondary-color, #e9ecef);
         border-radius: 4px;
         user-select: none;
     }
     
     .nav-jump summary:hover {
-        background: #dee2e6;
+        background: var(--nav-hover-bg, #dee2e6);
     }
 
     /* Ultra-compact horizontal jump links */
     .jump-links-container {
         padding: 8px;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background: var(--table-header-bg, #f8f9fa);
+        border: 1px solid var(--border-color, #dee2e6);
         border-radius: 4px;
         font-size: 0.9em;
         line-height: 1.6;
@@ -97,7 +97,7 @@ last_updated = '2026/02/08'
         display: block;
         position: relative;
         visibility: hidden;
-        scroll-margin-top: 250px; /* Account for sticky header (120px) + Quick Jump menu (~80px) + margin */
+        scroll-margin-top: 180px; /* Account for sticky nav menu (~50px) + Quick Jump menu (~100px) + margin */
     }
 
     /* Target highlight for containers when jump link is used */
