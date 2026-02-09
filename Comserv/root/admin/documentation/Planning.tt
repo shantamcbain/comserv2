@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.52' %]
-[% date_iso = '2026/02/08' %]
-[% formatted_date = 'February 08, 2026' %]
-[% time = '19:35:00' %]
-[% change_log = 'FINAL: Moved all Planning System (Database-Driven Migration) content UP into main Planning System group header. Group header now reads "Planning System (Database-Driven Migration)". Removed nested container wrapper. All content (project details, all projects list, Phases P0-P14, DailyPlan UI/UX) now direct children of group. Structure correct.' %]
+[% version = '0.53' %]
+[% date_iso = '2026/02/09' %]
+[% formatted_date = 'February 09, 2026' %]
+[% time = '15:23:00' %]
+[% change_log = 'Added Planning System project details container and All Projects container at top of Planning System group. Updated quick jump links to include ProjectDetails, AllProjects, Phase0-2. Removed duplicate jump links (TodoSystem, PlanSync, PriorityFlags, DynamicTasks). Structure: 1) Project details from DB, 2) All projects list (includes todo/project.tt), 3) Phases P0-P14 with full details.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -134,16 +134,16 @@ last_updated = '2026/02/08'
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
+                        <a href="#planning-system-project" class="jump-link">ProjectDetails</a> |
+                        <a href="#all-projects-list" class="jump-link">AllProjects</a> |
+                        <a href="#anchor-phase0-complete" class="jump-link">Phase0</a> |
+                        <a href="#anchor-phase1" class="jump-link">Phase1</a> |
+                        <a href="#anchor-phase2" class="jump-link">Phase2</a> |
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
                         <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
                         <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
                         <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a> |
-                        <a href="#anchor-planning-phases" class="jump-link">Phases P0-P14</a>
-                        <a href="#anchor-todo-plan" class="jump-link">TodoSystem</a> |
-                        <a href="#anchor-priority-12" class="jump-link">PlanSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">PriorityFlags</a> |
-                        <a href="#anchor-priority-6" class="jump-link">DynamicTasks</a>
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -451,6 +451,78 @@ last_updated = '2026/02/08'
         <details id="group-planning" class="priority-group-container" open>
             <summary class="group-header">📅 Planning System (Database-Driven Migration)</summary>
             <div class="priority-content">
+
+            <!-- Container 1: Planning System Project Details from Database -->
+            <details id="planning-system-project" class="priority-container" open>
+                <summary class="priority-summary">🎯 Planning System Project (Branch: new-task-3cda)</summary>
+                <div class="priority-content">
+                    [% 
+                        # Query database for Planning System project
+                        # Look for project with name containing "Planning System"
+                        TRY;
+                            planning_proj = schema.resultset('Project').search(
+                                { name => { 'like' => '%Planning System%' } }
+                            ).first;
+                            
+                            IF planning_proj;
+                    %]
+                    <p><strong>Project ID:</strong> [% planning_proj.project_id %]</p>
+                    <p><strong>Name:</strong> [% planning_proj.name %]</p>
+                    <p><strong>Code:</strong> [% planning_proj.code %]</p>
+                    <p><strong>Status:</strong> [% planning_proj.status %]</p>
+                    <p><strong>Description:</strong> [% planning_proj.description %]</p>
+                    <p><strong>Priority:</strong> [% planning_proj.priority %]</p>
+                    
+                    [% IF planning_proj.start_date %]
+                    <p><strong>Start Date:</strong> [% planning_proj.start_date %]</p>
+                    [% END %]
+                    [% IF planning_proj.due_date %]
+                    <p><strong>Due Date:</strong> [% planning_proj.due_date %]</p>
+                    [% END %]
+                    
+                    <h4>Project Todos:</h4>
+                    [% 
+                        proj_todos = schema.resultset('Todo').search(
+                            { project_id => planning_proj.project_id },
+                            { order_by => 'priority DESC' }
+                        );
+                        IF proj_todos.count > 0;
+                    %]
+                    <ul>
+                    [% WHILE (todo_item = proj_todos.next) %]
+                        <li>[% todo_item.task %] - <em>[% todo_item.status %]</em></li>
+                    [% END %]
+                    </ul>
+                    [% ELSE %]
+                    <p><em>No todos assigned to this project yet.</em></p>
+                    [% END %]
+                    
+                    [% 
+                            ELSE; 
+                    %]
+                    <p><em>Planning System project not yet created in database. Will be created in Phase 1.</em></p>
+                    <p><strong>Branch:</strong> new-task-3cda</p>
+                    <p><strong>Zenflow Task:</strong> new-task-3cda</p>
+                    <p><strong>Status:</strong> Phase 0 Complete, Phase 1 In Progress</p>
+                    [% 
+                            END;
+                        CATCH;
+                    %]
+                    <p><em>Error loading project details: [% error.info %]</em></p>
+                    <p><strong>Branch:</strong> new-task-3cda</p>
+                    <p><strong>Zenflow Task:</strong> new-task-3cda</p>
+                    [% END %]
+                </div>
+            </details>
+
+            <!-- Container 2: All Existing Projects -->
+            <details id="all-projects-list" class="priority-container">
+                <summary class="priority-summary">📁 All Projects in Database</summary>
+                <div class="priority-content">
+                    <p>View complete project hierarchy with todos and sub-projects:</p>
+                    [% INCLUDE todo/project.tt %]
+                </div>
+            </details>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <details id="phase0-analysis" class="priority-container" open>
