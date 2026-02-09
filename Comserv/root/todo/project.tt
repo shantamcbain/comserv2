@@ -1,6 +1,6 @@
 
 [% META title = 'Project Management' %]
-[% PageVersion = 'todo/project.tt,v 0.10 2025/10/10 shanta Exp shanta - Compact project summary with time data in headers, collapsed containers by default ' %]
+[% PageVersion = 'todo/project.tt,v 0.11 2026/02/09 shanta Exp shanta - Enhanced project details: Added ID, record#, project code, size labels (Small/Medium/Large/XL), estimated hours, and comments sections' %]
 [% # Note: additional_css is now set in the controller with a timestamp to force reload %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -255,15 +255,30 @@
                 
                 <!-- Card body with project details (collapsed by default) -->
                 <div class="card-body" id="project-body-[% project.id %]">
+                    <!-- Project ID and Record Information -->
+                    <div class="mb-3 p-2 bg-light border-left border-primary">
+                        <strong><i class="fas fa-hashtag"></i> Project ID:</strong> [% project.id %]
+                        [% IF project.record_id %]
+                            | <strong>Record #:</strong> [% project.record_id %]
+                        [% END %]
+                        [% IF project.project_code %]
+                            | <strong>Code:</strong> <span class="badge badge-secondary">[% project.project_code %]</span>
+                        [% END %]
+                    </div>
+                    
                     <!-- Description -->
                     [% IF project.description %]
-                        <p class="card-text">[% project.description.substr(0, 100) %][% IF project.description.length > 100 %]...[% END %]</p>
+                        <div class="mb-3">
+                            <strong><i class="fas fa-align-left"></i> Description:</strong>
+                            <p class="card-text mt-2">[% project.description %]</p>
+                        </div>
                     [% ELSE %]
-                        <p class="card-text text-muted">No description available</p>
+                        <p class="card-text text-muted"><i class="fas fa-align-left"></i> No description available</p>
                     [% END %]
                     
                     <!-- Status badge -->
-                    <div class="mb-2">
+                    <div class="mb-3">
+                        <strong><i class="fas fa-info-circle"></i> Status:</strong>
                         [% SWITCH project.status %]
                             [% CASE 1 %]<span class="badge badge-info">New</span>
                             [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
@@ -272,24 +287,57 @@
                         [% END %]
                     </div>
                     
+                    <!-- Project Sizing and Estimates -->
+                    <div class="mb-3">
+                        <strong><i class="fas fa-chart-bar"></i> Project Metrics:</strong>
+                        <ul class="list-unstyled ml-3 mt-2">
+                            [% IF project.project_size %]
+                                <li>
+                                    <i class="fas fa-ruler-combined"></i> <strong>Size:</strong>
+                                    [% SWITCH project.project_size %]
+                                        [% CASE 1 %]<span class="badge badge-success">Small (< 40 hours)</span>
+                                        [% CASE 2 %]<span class="badge badge-info">Medium (40-160 hours)</span>
+                                        [% CASE 3 %]<span class="badge badge-warning">Large (160-400 hours)</span>
+                                        [% CASE 4 %]<span class="badge badge-danger">Extra Large (> 400 hours)</span>
+                                        [% CASE DEFAULT %]<span class="badge badge-secondary">[% project.project_size %]</span>
+                                    [% END %]
+                                </li>
+                            [% END %]
+                            [% IF project.estimated_man_hours %]
+                                <li><i class="fas fa-hourglass-half"></i> <strong>Estimated Hours:</strong> [% project.estimated_man_hours %]h</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                    
                     <!-- Project details -->
-                    <ul class="list-unstyled">
-                        [% IF project.start_date %]
-                            <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% project.start_date %]</li>
-                        [% END %]
-                        
-                        [% IF project.end_date %]
-                            <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% project.end_date %]</li>
-                        [% END %]
-                        
-                        [% IF project.developer_name %]
-                            <li><i class="fas fa-user-cog"></i> <strong>Dev:</strong> [% project.developer_name %]</li>
-                        [% END %]
-                        
-                        [% IF project.client_name %]
-                            <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
-                        [% END %]
-                    </ul>
+                    <div class="mb-3">
+                        <strong><i class="fas fa-calendar-alt"></i> Timeline & Team:</strong>
+                        <ul class="list-unstyled ml-3 mt-2">
+                            [% IF project.start_date %]
+                                <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% project.start_date %]</li>
+                            [% END %]
+                            
+                            [% IF project.end_date %]
+                                <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% project.end_date %]</li>
+                            [% END %]
+                            
+                            [% IF project.developer_name %]
+                                <li><i class="fas fa-user-cog"></i> <strong>Developer:</strong> [% project.developer_name %]</li>
+                            [% END %]
+                            
+                            [% IF project.client_name %]
+                                <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                    
+                    <!-- Comments -->
+                    [% IF project.comments %]
+                        <div class="mb-3">
+                            <strong><i class="fas fa-comments"></i> Comments:</strong>
+                            <p class="card-text mt-2 p-2 bg-light border-left">[% project.comments %]</p>
+                        </div>
+                    [% END %]
                     
                     <!-- Action buttons -->
                     <div class="d-flex justify-content-between mt-3">
