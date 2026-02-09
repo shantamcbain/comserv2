@@ -1,6 +1,6 @@
 
 
-[% PageVersion = 'root/pagetop.tt,v 0.026.0 2026/02/09 shanta Exp shanta - Made main navigation menu sticky/floating at top' %]
+[% PageVersion = 'root/pagetop.tt,v 0.027.0 2026/02/09 shanta Exp shanta - Fixed sticky positioning: moved from nav to header element to make entire menu float' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -99,13 +99,20 @@
 }
 
 /* Sticky/Floating Main Navigation Menu */
-#main-menu {
+header {
     position: sticky;
     top: 0;
     z-index: 2000;
-    background-color: var(--nav-bg, white);
+    background-color: var(--background-color, white);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 0;
+    padding: 0;
+}
+
+#main-menu {
+    background-color: var(--nav-bg, white);
     border-bottom: 2px solid var(--border-color, #ddd);
+    margin: 0;
 }
 </style>
 
