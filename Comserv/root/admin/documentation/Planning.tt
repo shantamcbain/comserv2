@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.57' %]
+[% version = '0.58' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:10:00' %]
-[% change_log = 'Replaced INCLUDE todo/project.tt with dynamic project fetching code from main branch. Projects now displayed in closed <details> container with hierarchical structure (project → sub-project → sub-sub-project). Added Implementation Workflow heading before Phase 0.' %]
+[% time = '16:22:00' %]
+[% change_log = 'UI improvements: Increased anchor scroll-margin-top to 200px for better jump visibility. Made navigation sticky/floating (position: sticky). Standardized navigation font-size to 1em across all views. Fixed popup positioning to stay within viewport bounds (horizontal and vertical constraints).' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -72,7 +72,7 @@ last_updated = '2026/02/08'
         display: block;
         position: relative;
         visibility: hidden;
-        scroll-margin-top: 140px; /* Leave container header exposed */
+        scroll-margin-top: 200px; /* Leave container header exposed */
     }
 
     /* Target highlight for containers when jump link is used */
