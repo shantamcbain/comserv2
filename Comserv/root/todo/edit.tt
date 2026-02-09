@@ -1,4 +1,4 @@
-[% PageVersion  = 'todo/edit.tt,v 0.02 2025/04/01 Shanta Exp shanta'; %]
+[% PageVersion  = 'todo/edit.tt,v 0.06 2026/02/08 Shanta Exp shanta - Added current time default and fixed selection logic'; %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -132,6 +132,51 @@
         <div class="form-group">
             <label for="start_date">Start Date:</label>
             <input type="date" id="start_date" name="start_date" value="[% record.get_column('start_date') %]" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="time_of_day">Time of Day:</label>
+            <select id="time_of_day" name="time_of_day">
+                <option value="">-- Select Time --</option>
+                [% 
+                    USE date;
+                    SET current_time = record.get_column('time_of_day');
+                    IF current_time;
+                        SET current_time_short = current_time.substr(0, 5);
+                    ELSE;
+                        # Default to current system time if no time in record
+                        SET now_time = date.format(date.now, '%H:%M');
+                        SET current_time_short = now_time;
+                    END;
+                    
+                    FOREACH hour IN [0..23];
+                        SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                        
+                        # Convert to 12-hour format
+                        IF hour == 0;
+                            SET hour_12 = 12;
+                            SET period = 'AM';
+                        ELSIF hour < 12;
+                            SET hour_12 = hour;
+                            SET period = 'AM';
+                        ELSIF hour == 12;
+                            SET hour_12 = 12;
+                            SET period = 'PM';
+                        ELSE;
+                            SET hour_12 = hour - 12;
+                            SET period = 'PM';
+                        END;
+                        
+                        FOREACH minute IN ['00', '30'];
+                            SET time_value_24 = hour_24 _ ':' _ minute;
+                            SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
+                %]
+                <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                [%
+                        END;
+                    END;
+                %]
+            </select>
         </div>
         
         <div class="form-group">

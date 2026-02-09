@@ -1,10 +1,11 @@
 
-[% PageVersion = 'todo/day.tt, v  0.06 2026/02/01 shanta Exp shanta ' %]
+[% PageVersion = 'todo/day.tt, v  0.12 2026/02/09 shanta Exp shanta - Made overdue todos draggable with drag handles for week/month view rescheduling. Added data attributes and todo-item-shared class.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 [% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
+   # OR when included from week.tt/month.tt (include_mode parameter)
    IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan'));
       is_daily_plan = 1;
       base_url = '/Documentation/DailyPlan';
@@ -16,6 +17,11 @@
       planning_hash = '';
       week_hash = '';
       month_hash = '';
+   END;
+   
+   # When included as a component (from week.tt or month.tt), hide navigation
+   IF !include_mode.defined;
+      include_mode = 0;
    END;
    
    # Normalize variables from different controllers (Todo.pm vs Documentation.pm)
@@ -80,6 +86,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
 <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
+<script src="/static/js/todo_drag_drop.js"></script>
 
 <style>
     /* Priority-based Collapsible Container Styles */
@@ -145,9 +152,10 @@
     }
 
     .todo-subject {
-        font-size: 0.9em;
+        font-size: 1.1em;
         font-weight: bold;
         color: var(--text-color, #333);
+        line-height: 1.4;
     }
 
     .todo-details {
@@ -197,12 +205,13 @@
     }
 
     .time-slot {
-        font-weight: bold;
+        font-weight: normal;
         padding: 10px;
         border-right: 2px solid var(--primary-color, #4CAF50);
         border-bottom: 1px solid var(--border-color, #eee);
         text-align: right;
-        font-size: 0.85em;
+        font-size: 0.75em;
+        color: var(--secondary-text, #888);
         background-color: var(--secondary-color, #f9f9f9);
         display: flex;
         align-items: center;
@@ -236,44 +245,86 @@
         font-size: 0.8em;
     }
 
-    .view-buttons {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 15px;
-        font-size: 0.9em;
-        align-items: center;
+    /* Drag and Drop Styles */
+    .todo-item-day {
+        cursor: move;
     }
 
-    .view-buttons a {
-        padding: 5px 10px;
-        background: var(--secondary-color, #f5f5f5);
-        color: var(--primary-color, #4CAF50);
-        text-decoration: none;
-        border-radius: 4px;
-        transition: background-color 0.2s;
+    .todo-item-day.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
     }
 
-    .view-buttons a.active {
-        background-color: var(--primary-color, #4CAF50);
-        color: white;
+    .time-content.drag-over {
+        background-color: var(--primary-color-light, #c8e6c9);
+        border: 2px dashed var(--primary-color, #4CAF50);
     }
 
-    .view-navigation {
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        margin: 10px 0;
-        padding: 5px;
-    }
-
-    .view-navigation a {
-        text-decoration: none;
+    .drag-handle {
+        cursor: grab;
+        padding: 0 5px;
+        color: var(--secondary-text, #999);
         font-size: 1.2em;
-        padding: 5px 15px;
-        background-color: var(--secondary-color, #f5f5f5);
-        border-radius: 4px;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    /* Todo item popup/tooltip on hover */
+    .todo-item-day {
+        position: relative;
+    }
+
+    .todo-item-day .todo-popup {
+        display: none;
+        position: fixed;
+        background: var(--background-color, white);
+        border: 2px solid var(--primary-color, #4CAF50);
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        z-index: 10000;
+        min-width: 300px;
+        max-width: 400px;
+        white-space: normal;
+        pointer-events: none;
+    }
+
+    .todo-item-day:hover .todo-popup {
+        display: block;
+    }
+    
+    .todo-item-day:hover {
+        z-index: 100;
+    }
+
+    .todo-popup .popup-subject {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 8px;
         color: var(--primary-color, #4CAF50);
     }
+
+    .todo-popup .popup-description {
+        font-size: 0.95em;
+        margin-bottom: 8px;
+        color: var(--text-color, #333);
+        line-height: 1.5;
+    }
+
+    .todo-popup .popup-details {
+        font-size: 0.85em;
+        color: var(--secondary-text, #666);
+        border-top: 1px solid var(--border-color, #ddd);
+        padding-top: 8px;
+    }
+
+    .todo-popup .popup-details div {
+        margin-bottom: 4px;
+    }
+
+    /* Navigation styles removed - using shared todo_shared.css styles */
 
     /* Responsive design */
     @media (max-width: 768px) {
@@ -324,40 +375,72 @@ document.addEventListener('DOMContentLoaded', function() {
             hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 600);
     }
+    
+    // Position todo popups on hover
+    document.querySelectorAll('.todo-item-day').forEach(item => {
+        item.addEventListener('mouseenter', function(e) {
+            const popup = this.querySelector('.todo-popup');
+            if (popup) {
+                const rect = this.getBoundingClientRect();
+                const popupWidth = 350; // approximate width
+                const popupHeight = 200; // approximate height
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Calculate horizontal position
+                let leftPos;
+                if (rect.right + popupWidth + 10 < viewportWidth) {
+                    // Position to the right if there's space
+                    leftPos = rect.right + 10;
+                } else if (rect.left - popupWidth - 10 > 0) {
+                    // Position to the left if there's space
+                    leftPos = rect.left - popupWidth - 10;
+                } else {
+                    // Center it within viewport if neither side has space
+                    leftPos = Math.max(10, (viewportWidth - popupWidth) / 2);
+                }
+                
+                // Calculate vertical position
+                let topPos = rect.top;
+                if (rect.top + popupHeight > viewportHeight) {
+                    // If popup would go below viewport, position it above or at bottom
+                    topPos = Math.max(10, viewportHeight - popupHeight - 10);
+                }
+                
+                popup.style.left = leftPos + 'px';
+                popup.style.top = topPos + 'px';
+            }
+        });
+    });
 });
 </script>
 
+<a id="day-view-anchor"></a>
+
+[% UNLESS include_mode %]
 [% IF is_daily_plan %]
-    <div class="view-buttons">
+    <div class="day-navigation view-navigation">
+        <a href="[% base_url %]/[% previous_date %][% planning_hash %]">◀ Previous Day</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date %][% planning_hash %]" class="active">Planning (Day)</a>
         <a href="[% base_url %]/[% date %][% week_hash %]">Week View</a>
         <a href="[% base_url %]/[% date %][% month_hash %]">Month View</a>
-        <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
-    </div>
-
-    <div class="day-navigation view-navigation">
-        <a href="[% base_url %]/[% previous_date %][% planning_hash %]" title="Previous Day">← Previous Day</a>
-        <a href="[% base_url %]/[% date %][% week_hash %]" title="Week View">Week</a>
-        <a href="[% base_url %]/[% date %][% month_hash %]" title="Month View">Month</a>
-        <a href="[% base_url %]/[% next_date %][% planning_hash %]" title="Next Day">Next Day →</a>
+        <a href="/todo/addtodo">Add New Todo</a>
+        <a href="[% base_url %]/[% date %][% planning_hash %]">Back to Planning</a>
+        <a href="[% base_url %]/[% next_date %][% planning_hash %]">Next Day ▶</a>
     </div>
 [% ELSE %]
     <h1>[% sitename %] Todos for [% date %]</h1>
 
-    <div class="view-buttons">
+    <div class="day-navigation view-navigation">
+        <a href="/todo/day/[% previous_date %][% url_hash %]">◀ Previous Day</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="/todo/day[% IF date %]/[% date %][% END %][% url_hash %]" class="active">Day View</a>
         <a href="/todo/week[% IF date %]/[% date %][% END %][% url_hash %]">Week View</a>
         <a href="/todo/month[% IF date %]/[% date %][% END %][% url_hash %]">Month View</a>
-        <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
+        <a href="/todo/addtodo">Add New Todo</a>
+        <a href="/todo[% url_hash %]">Back to Todo List</a>
+        <a href="/todo/day/[% next_date %][% url_hash %]">Next Day ▶</a>
     </div>
-
-    <div class="day-navigation view-navigation">
-        <a href="/todo/day/[% previous_date %][% url_hash %]" title="Previous Day">←</a>
-        <a href="/todo[% url_hash %]" title="Back to Todo List">📋</a>
-        <a href="/todo/day/[% next_date %][% url_hash %]" title="Next Day">→</a>
-    </div>
+[% END %]
 [% END %]
 
 [% IF debug_mode == 1 %]
@@ -383,26 +466,54 @@ document.addEventListener('DOMContentLoaded', function() {
         </summary>
         <div class="priority-content">
             [% FOREACH todo IN overdue_todos %]
-                <div class="todo-item-day overdue">
-                    <div class="todo-subject">[% todo.subject %]</div>
-                        <div class="todo-details">
-                            <span class="status-[% todo.status %]">Overdue</span>
-                            [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
-                            [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
-                            <span>Priority: [% todo.priority %]</span>
+                <div class="todo-item-day todo-item-shared overdue priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" draggable="true">
+                    <div style="display: flex; align-items: flex-start; gap: 5px;">
+                        <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
+                        <div style="flex: 1;">
+                            <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
+                            <div class="todo-details todo-details-shared">
+                                <span class="status-[% todo.status %]">Overdue</span>
+                                [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
+                                [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
+                                <span>Priority: [% todo.priority %]</span>
+                            </div>
+                            <div class="todo-actions todo-actions-shared">
+                                <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                    <input type="hidden" name="return_to" value="">
+                                    <button type="submit" class="btn">Details</button>
+                                </form>
+                                <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
+                                    <button type="submit" class="btn">Edit</button>
+                                </form>
+                                <form action="/log/log_form" method="GET" style="display: inline;">
+                                    <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                    <button type="submit" class="btn btn-log">Log</button>
+                                </form>
+                            </div>
                         </div>
-                    <div class="todo-actions">
-                        <form action="/todo/details" method="POST" style="display: inline;">
-                            <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                            <button type="submit" class="btn">Details</button>
-                        </form>
-                        <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
-                            <button type="submit" class="btn">Edit</button>
-                        </form>
-                        <form action="/log/log_form" method="GET" style="display: inline;">
-                            <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                            <button type="submit" class="btn btn-log">Log</button>
-                        </form>
+                    </div>
+                    
+                    <!-- Popup on hover -->
+                    <div class="todo-popup">
+                        <div class="popup-subject">[% todo.subject %]</div>
+                        [% IF todo.description %]
+                            <div class="popup-description">[% todo.description %]</div>
+                        [% END %]
+                        <div class="popup-details">
+                            [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
+                            [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
+                            [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
+                            <div><strong>Priority:</strong> [% todo.priority %]</div>
+                            <div><strong>Status:</strong> 
+                                [% IF todo.status == 1 %]New
+                                [% ELSIF todo.status == 2 %]In Progress
+                                [% ELSIF todo.status == 3 %]Completed
+                                [% ELSE %]Unknown[% END %]
+                            </div>
+                            [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
+                            [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
+                        </div>
                     </div>
                 </div>
             [% END %]
@@ -443,11 +554,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="time-slot" onclick="document.getElementById('add-todo-[% display_hour %]').submit();" style="cursor: pointer;" title="Click to add todo at [% display_hour %]:00">
                     [% display_hour %]:00
                 </div>
-                <div class="time-content">
+                <div class="time-content" data-date="[% date %]" data-hour="[% display_hour %]">
                     [% IF time_slots.$display_hour %]
                         [% FOREACH todo IN time_slots.$display_hour %]
-                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]">
-                                <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
+                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]">
+                                <div style="display: flex; align-items: flex-start; gap: 5px;">
+                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
+                                    <div style="flex: 1;">
+                                        <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
                                 
                                 <div class="todo-details todo-details-shared">
                                     <span class="todo-status todo-status-shared status-[% todo.status %]">
@@ -464,19 +578,43 @@ document.addEventListener('DOMContentLoaded', function() {
                                     [% END %]
                                 </div>
                                 
-                                <div class="todo-actions todo-actions-shared">
-                                    <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                        <input type="hidden" name="return_to" value="">
-                                        <button type="submit" class="btn">Details</button>
-                                    </form>
-                                    <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                        <button type="submit" class="btn">Edit</button>
-                                    </form>
-                                    <form action="/log/log_form" method="GET" style="display: inline;">
-                                        <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                                        <button type="submit" class="btn btn-log">Log</button>
-                                    </form>
+                                        <div class="todo-actions todo-actions-shared">
+                                            <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                                <input type="hidden" name="return_to" value="">
+                                                <button type="submit" class="btn">Details</button>
+                                            </form>
+                                            <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                                <button type="submit" class="btn">Edit</button>
+                                            </form>
+                                            <form action="/log/log_form" method="GET" style="display: inline;">
+                                                <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                                <button type="submit" class="btn btn-log">Log</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Popup on hover -->
+                                <div class="todo-popup">
+                                    <div class="popup-subject">[% todo.subject %]</div>
+                                    [% IF todo.description %]
+                                        <div class="popup-description">[% todo.description %]</div>
+                                    [% END %]
+                                    <div class="popup-details">
+                                        [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
+                                        [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
+                                        [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
+                                        <div><strong>Priority:</strong> [% todo.priority %]</div>
+                                        <div><strong>Status:</strong> 
+                                            [% IF todo.status == 1 %]New
+                                            [% ELSIF todo.status == 2 %]In Progress
+                                            [% ELSIF todo.status == 3 %]Completed
+                                            [% ELSE %]Unknown[% END %]
+                                        </div>
+                                        [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
+                                        [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
+                                    </div>
                                 </div>
                             </div>
                         [% END %]
@@ -496,7 +634,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </details>
 
-[% UNLESS is_daily_plan %]
+[% UNLESS is_daily_plan OR include_mode %]
 <div class="day-navigation view-navigation">
     <a href="/todo/day/[% previous_date %][% url_hash %]" title="Previous Day">←</a>
     <a href="/todo[% url_hash %]" title="Back to Todo List">📋</a>
