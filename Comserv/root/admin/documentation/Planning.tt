@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.58' %]
+[% version = '0.59' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:22:00' %]
-[% change_log = 'UI improvements: Increased anchor scroll-margin-top to 200px for better jump visibility. Made navigation sticky/floating (position: sticky). Standardized navigation font-size to 1em across all views. Fixed popup positioning to stay within viewport bounds (horizontal and vertical constraints).' %]
+[% time = '16:27:00' %]
+[% change_log = 'Made Quick Jump navigation menu sticky/floating at top (position: sticky, z-index: 1000). Added box shadow and enhanced styling for visibility. Navigation now follows user as they scroll through the page.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -34,6 +34,31 @@ last_updated = '2026/02/08'
         padding: 10px !important;
         visibility: visible !important;
         opacity: 1 !important;
+    }
+
+    /* Sticky/Floating Quick Jump Navigation */
+    .nav-jump {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: white;
+        border: 2px solid #dee2e6;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .nav-jump summary {
+        padding: 10px 15px;
+        font-weight: bold;
+        cursor: pointer;
+        background: #e9ecef;
+        border-radius: 4px;
+        user-select: none;
+    }
+    
+    .nav-jump summary:hover {
+        background: #dee2e6;
     }
 
     /* Ultra-compact horizontal jump links */
