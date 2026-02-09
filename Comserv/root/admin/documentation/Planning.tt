@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.59' %]
+[% version = '0.60' %]
 [% date_iso = '2026/02/09' %]
 [% formatted_date = 'February 09, 2026' %]
-[% time = '16:27:00' %]
-[% change_log = 'Made Quick Jump navigation menu sticky/floating at top (position: sticky, z-index: 1000). Added box shadow and enhanced styling for visibility. Navigation now follows user as they scroll through the page.' %]
+[% time = '16:34:00' %]
+[% change_log = 'Fixed Quick Jump menu positioning: Set top: 120px to appear below sticky header, z-index: 1500 (below header 2000 but still visible). Increased scroll-margin-top to 250px to account for both sticky menus.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -39,8 +39,8 @@ last_updated = '2026/02/08'
     /* Sticky/Floating Quick Jump Navigation */
     .nav-jump {
         position: sticky;
-        top: 0;
-        z-index: 1000;
+        top: 120px; /* Position below the sticky header */
+        z-index: 1500; /* Below header (2000) but still high */
         background: white;
         border: 2px solid #dee2e6;
         border-radius: 4px;
@@ -97,7 +97,7 @@ last_updated = '2026/02/08'
         display: block;
         position: relative;
         visibility: hidden;
-        scroll-margin-top: 200px; /* Leave container header exposed */
+        scroll-margin-top: 250px; /* Account for sticky header (120px) + Quick Jump menu (~80px) + margin */
     }
 
     /* Target highlight for containers when jump link is used */
