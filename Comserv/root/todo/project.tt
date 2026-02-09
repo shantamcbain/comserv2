@@ -286,6 +286,21 @@
                 
                 <!-- Card body with project details (collapsed by default) -->
                 <div class="card-body" id="project-body-[% project.id %]">
+                    <!-- DEBUG: Show what data we have -->
+                    [% IF c.session.debug_mode == 1 %]
+                    <details style="margin-bottom: 1rem; border: 1px solid red; padding: 10px;">
+                        <summary style="color: red; font-weight: bold;">DEBUG: Project Data</summary>
+                        <pre style="font-size: 0.8em; overflow: auto;">
+Name: [% project.name %]
+ID: [% project.id %]
+Status: [% project.status %] (type: [% project.status.defined ? 'defined' : 'UNDEFINED' %])
+Description: [% project.description.defined ? project.description.substr(0, 50) : 'UNDEFINED' %]
+Todos: [% project.todos.defined ? project.todos.size : 'UNDEFINED' %] todos
+Project Code: [% project.project_code %]
+                        </pre>
+                    </details>
+                    [% END %]
+                    
                     <!-- Project ID and Record Information -->
                     <div class="mb-3 p-2 bg-light border-left border-primary">
                         <strong><i class="fas fa-hashtag"></i> Project ID:</strong> [% project.id %]
