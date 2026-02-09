@@ -1,6 +1,6 @@
 
 
-[% PageVersion = 'root/pagetop.tt,v 0.028.0 2026/02/09 shanta Exp shanta - Only nav menu floats, not header/welcome banner. Moved sticky from header to #main-menu.' %]
+[% PageVersion = 'root/pagetop.tt,v 0.029.0 2026/02/09 shanta Exp shanta - Added !important to nav sticky positioning to override external CSS. Fixed nav menu floating.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -99,11 +99,11 @@
 }
 
 /* Sticky/Floating Main Navigation Menu - Only the nav, not the header */
-#main-menu {
-    position: sticky;
-    top: 0;
-    z-index: 2000;
-    background-color: var(--nav-bg, white);
+nav#main-menu {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2000 !important;
+    background-color: var(--nav-bg, white) !important;
     border-bottom: 2px solid var(--border-color, #ddd);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     margin: 0;
