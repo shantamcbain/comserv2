@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.10 2026/02/08 shanta Exp shanta - Merged navigation, fixed popup positioning with JavaScript, removed duplicate styles' %]
+[% PageVersion = 'todo/day.tt, v  0.11 2026/02/09 shanta Exp shanta - Improved popup positioning to stay within viewport bounds (horizontal and vertical). Uses todo_shared.css sticky navigation.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -383,15 +383,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (popup) {
                 const rect = this.getBoundingClientRect();
                 const popupWidth = 350; // approximate width
+                const popupHeight = 200; // approximate height
                 const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
                 
-                // Position to the right if there's space, otherwise to the left
-                if (rect.right + popupWidth < viewportWidth) {
-                    popup.style.left = (rect.right + 10) + 'px';
+                // Calculate horizontal position
+                let leftPos;
+                if (rect.right + popupWidth + 10 < viewportWidth) {
+                    // Position to the right if there's space
+                    leftPos = rect.right + 10;
+                } else if (rect.left - popupWidth - 10 > 0) {
+                    // Position to the left if there's space
+                    leftPos = rect.left - popupWidth - 10;
                 } else {
-                    popup.style.left = (rect.left - popupWidth - 10) + 'px';
+                    // Center it within viewport if neither side has space
+                    leftPos = Math.max(10, (viewportWidth - popupWidth) / 2);
                 }
-                popup.style.top = rect.top + 'px';
+                
+                // Calculate vertical position
+                let topPos = rect.top;
+                if (rect.top + popupHeight > viewportHeight) {
+                    // If popup would go below viewport, position it above or at bottom
+                    topPos = Math.max(10, viewportHeight - popupHeight - 10);
+                }
+                
+                popup.style.left = leftPos + 'px';
+                popup.style.top = topPos + 'px';
             }
         });
     });
