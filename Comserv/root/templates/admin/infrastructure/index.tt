@@ -1,0 +1,468 @@
+[% META title = 'Infrastructure Management' %]
+
+<style>
+.infrastructure-dashboard {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.cluster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.cluster-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.cluster-card.online {
+    border-left: 4px solid #4caf50;
+}
+
+.cluster-card.offline {
+    border-left: 4px solid #f44336;
+}
+
+.cluster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.cluster-name {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.online {
+    background: #4caf50;
+    color: white;
+}
+
+.status-badge.offline {
+    background: #f44336;
+    color: white;
+}
+
+.cluster-info {
+    margin: 10px 0;
+    color: #666;
+}
+
+.cluster-info div {
+    margin: 8px 0;
+}
+
+.cluster-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: #2196f3;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1976d2;
+}
+
+.btn-success {
+    background: #4caf50;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #45a049;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #da190b;
+}
+
+.btn-secondary {
+    background: #757575;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #616161;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.add-cluster-section {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+.monitoring-status {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+    display: none;
+}
+
+.monitoring-status.deployed {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    display: block;
+}
+
+.monitoring-status.not-deployed {
+    display: block;
+}
+
+.deployment-log {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    display: none;
+}
+
+.deployment-log.active {
+    display: block;
+}
+
+.deployment-step {
+    margin: 5px 0;
+    padding: 5px;
+}
+
+.deployment-step.success {
+    color: #4caf50;
+}
+
+.deployment-step.error {
+    color: #f44336;
+}
+
+.kubectl-console {
+    background: #2e3440;
+    color: #d8dee9;
+    padding: 15px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    margin-top: 20px;
+}
+
+.kubectl-console input {
+    width: 100%;
+    background: #3b4252;
+    border: 1px solid #4c566a;
+    color: #d8dee9;
+    padding: 8px;
+    font-family: 'Courier New', monospace;
+}
+
+.kubectl-console .output {
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin-top: 10px;
+    padding: 10px;
+    background: #3b4252;
+    border-radius: 4px;
+}
+
+.info-banner {
+    background: #e3f2fd;
+    border: 1px solid #2196f3;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.error-banner {
+    background: #ffebee;
+    border: 1px solid #f44336;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.success-banner {
+    background: #e8f5e9;
+    border: 1px solid #4caf50;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+</style>
+
+<div class="infrastructure-dashboard">
+    <h1>Infrastructure Management</h1>
+    
+    <div class="info-banner">
+        <p><strong>Purpose</strong>: Manage Kubernetes clusters and deploy monitoring infrastructure from the Comserv application.</p>
+        <p><strong>Access</strong>: Admin and Developer roles only</p>
+    </div>
+    
+    [% IF error_msg %]
+    <div class="error-banner">
+        <strong>❌ Error:</strong> [% error_msg %]
+    </div>
+    [% END %]
+    
+    [% IF success_msg %]
+    <div class="success-banner">
+        <strong>✓ Success:</strong> [% success_msg %]
+    </div>
+    [% END %]
+    
+    <div class="add-cluster-section">
+        <h2>Add Kubernetes Cluster</h2>
+        <form id="add-cluster-form">
+            <div class="form-group">
+                <label for="cluster-name">Cluster Name</label>
+                <input type="text" id="cluster-name" name="name" placeholder="e.g., comserv-k8s-cluster" required>
+            </div>
+            <div class="form-group">
+                <label for="cluster-host">Host/IP</label>
+                <input type="text" id="cluster-host" name="host" placeholder="e.g., 192.168.1.50" required>
+            </div>
+            <div class="form-group">
+                <label for="kubeconfig-path">Kubeconfig Path (optional)</label>
+                <input type="text" id="kubeconfig-path" name="kubeconfig_path" placeholder="Leave empty to use default ~/.kube/config">
+            </div>
+            <button type="submit" class="btn btn-primary">Add Cluster</button>
+        </form>
+    </div>
+    
+    <h2>Registered Clusters</h2>
+    
+    [% IF clusters.size == 0 %]
+    <p style="color: #666; font-style: italic;">No clusters registered yet. Add a cluster above to get started.</p>
+    [% ELSE %]
+    <div class="cluster-grid">
+        [% FOREACH cluster IN clusters %]
+        <div class="cluster-card [% cluster.status %]" data-cluster="[% cluster.name %]">
+            <div class="cluster-header">
+                <div class="cluster-name">[% cluster.name %]</div>
+                <div class="status-badge [% cluster.status %]">[% cluster.status %]</div>
+            </div>
+            
+            <div class="cluster-info">
+                <div><strong>Host:</strong> <code>[% cluster.host %]</code></div>
+                <div><strong>Last Checked:</strong> [% cluster.last_checked %]</div>
+                [% IF cluster.monitoring_deployed %]
+                <div class="monitoring-status deployed">
+                    <strong>✓ Monitoring Stack Deployed</strong><br>
+                    <small>Deployed on [% cluster.monitoring_deployed_at %]</small>
+                </div>
+                [% ELSE %]
+                <div class="monitoring-status not-deployed">
+                    <strong>⚠ Monitoring Not Deployed</strong>
+                </div>
+                [% END %]
+            </div>
+            
+            <div class="cluster-actions">
+                <button class="btn btn-primary" onclick="checkStatus('[% cluster.name %]')">
+                    Check Status
+                </button>
+                [% IF cluster.status == 'online' %]
+                    [% IF cluster.monitoring_deployed %]
+                    <button class="btn btn-secondary" onclick="viewMonitoring('[% cluster.name %]')">
+                        View Monitoring
+                    </button>
+                    [% ELSE %]
+                    <button class="btn btn-success" onclick="deployMonitoring('[% cluster.name %]')">
+                        Deploy Monitoring
+                    </button>
+                    [% END %]
+                    <button class="btn btn-secondary" onclick="openKubectlConsole('[% cluster.name %]')">
+                        kubectl Console
+                    </button>
+                [% END %]
+            </div>
+            
+            <div class="deployment-log" id="log-[% cluster.name %]"></div>
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+
+<script>
+document.getElementById('add-cluster-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    fetch('/admin/infrastructure/cluster/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('Cluster added successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + result.error);
+        }
+    })
+    .catch(error => {
+        alert('Request failed: ' + error);
+    });
+});
+
+function checkStatus(clusterName) {
+    fetch('/admin/infrastructure/monitoring/status/' + clusterName)
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const status = result.deployed ? 'Deployed' : 'Not Deployed';
+            const health = result.health || 'N/A';
+            const pods = result.running_pods + '/' + result.total_pods;
+            alert(`Monitoring Status for ${clusterName}:\n\nDeployed: ${status}\nHealth: ${health}\nPods: ${pods}`);
+        } else {
+            alert('Error checking status: ' + result.error);
+        }
+    })
+    .catch(error => {
+        alert('Request failed: ' + error);
+    });
+}
+
+function deployMonitoring(clusterName) {
+    if (!confirm(`Deploy monitoring stack to ${clusterName}?\n\nThis will:\n- Install Prometheus + Grafana\n- Install Kubernetes Dashboard\n- Create monitoring namespace\n\nThis may take 5-10 minutes.`)) {
+        return;
+    }
+    
+    const logDiv = document.getElementById('log-' + clusterName);
+    logDiv.classList.add('active');
+    logDiv.innerHTML = '<strong>Starting deployment...</strong><br>';
+    
+    fetch('/admin/infrastructure/deploy/monitoring/' + clusterName, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            logDiv.innerHTML += '<strong style="color: #4caf50;">✓ Deployment completed successfully!</strong><br>';
+            if (result.steps) {
+                result.steps.forEach(step => {
+                    const color = step.success ? '#4caf50' : '#f44336';
+                    logDiv.innerHTML += `<div style="color: ${color}">${step.success ? '✓' : '✗'} ${step.step}</div>`;
+                    if (step.output) {
+                        logDiv.innerHTML += `<pre style="margin-left: 20px; color: #666">${step.output}</pre>`;
+                    }
+                });
+            }
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            logDiv.innerHTML += '<strong style="color: #f44336;">✗ Deployment failed!</strong><br>';
+            logDiv.innerHTML += '<pre>' + (result.error || 'Unknown error') + '</pre>';
+        }
+    })
+    .catch(error => {
+        logDiv.innerHTML += '<strong style="color: #f44336;">✗ Request failed!</strong><br>';
+        logDiv.innerHTML += '<pre>' + error + '</pre>';
+    });
+}
+
+function viewMonitoring(clusterName) {
+    alert(`Monitoring Access for ${clusterName}:\n\n` +
+          `Grafana: http://[cluster-ip]:30300\n` +
+          `Default user: admin\n\n` +
+          `Kubernetes Dashboard: kubectl port-forward\n` +
+          `Get token: kubectl -n kubernetes-dashboard create token admin-user\n\n` +
+          `See deployment runbook for details.`);
+}
+
+function openKubectlConsole(clusterName) {
+    const command = prompt(`Enter kubectl command for ${clusterName}:\n(without 'kubectl' prefix)`, 'get pods -A');
+    
+    if (!command) return;
+    
+    fetch('/admin/infrastructure/kubectl', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            cluster: clusterName,
+            command: command
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        const output = result.output || result.error || 'No output';
+        alert(`kubectl ${command}\n\nExit Code: ${result.exit_code}\n\nOutput:\n${output}`);
+    })
+    .catch(error => {
+        alert('Request failed: ' + error);
+    });
+}
+</script>
