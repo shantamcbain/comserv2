@@ -238,6 +238,14 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/infrastructure') %]" class="admin-link">
+                        <i class="fas fa-dharmachakra"></i>
+                        <span>Kubernetes Clusters</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-docker"></i>
+                        <span>Docker Containers</span>
+                    </a>
                     <a href="[% c.uri_for('/proxmox') %]" class="admin-link">
                         <i class="fas fa-server"></i>
                         <span>Proxmox VM Management</span>
