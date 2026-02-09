@@ -182,8 +182,8 @@ sub project :Path('project') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
         "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
 
-    # Use the existing method to fetch projects with sub-projects
-    my $projects = $self->fetch_projects_with_subprojects($c);
+    # Use the existing method to fetch projects with sub-projects (request full data including todos)
+    my $projects = $self->fetch_projects_with_subprojects($c, 1);
     
     # Enhance project data with additional fields needed for filtering
     $projects = $self->enhance_project_data($c, $projects);
@@ -368,10 +368,46 @@ sub fetch_projects_with_subprojects :Private {
 
     # Process each top-level project
     foreach my $project (@top_projects) {
-        # Use build_project_tree to get full project data including todos
-        my $project_hash = $self->build_project_tree($c, $project, 0);
-
-        # build_project_tree already fetches sub-projects recursively
+        my $project_hash;
+        
+        if ($full_data) {
+            # Use build_project_tree to get full project data including todos
+            $project_hash = $self->build_project_tree($c, $project, 0);
+        } else {
+            # Basic data only (for dropdowns, etc.)
+            $project_hash = {
+                id => $project->id,
+                name => $project->name,
+                parent_id => $project->parent_id,
+                status => $project->status || 1,
+                start_date => $project->start_date,
+                end_date => $project->end_date,
+                developer_name => $project->developer_name || '',
+                client_name => $project->client_name || '',
+                priority => 2,
+                sub_projects => []
+            };
+            
+            # Fetch first-level sub-projects (basic data only)
+            my @level1_subprojects;
+            eval {
+                @level1_subprojects = $schema->resultset('Project')->search(
+                    { parent_id => $project->id },
+                    { order_by => { -asc => 'name' } }
+                )->all;
+            };
+            
+            foreach my $subproject1 (@level1_subprojects) {
+                push @{$project_hash->{sub_projects}}, {
+                    id => $subproject1->id,
+                    name => $subproject1->name,
+                    parent_id => $subproject1->parent_id,
+                    status => $subproject1->status || 1,
+                    sub_projects => []
+                };
+            }
+        }
+        
         push @projects, $project_hash;
     }
 
