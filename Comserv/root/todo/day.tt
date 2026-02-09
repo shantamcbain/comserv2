@@ -1,5 +1,5 @@
 
-[% PageVersion = 'todo/day.tt, v  0.11 2026/02/09 shanta Exp shanta - Improved popup positioning to stay within viewport bounds (horizontal and vertical). Uses todo_shared.css sticky navigation.' %]
+[% PageVersion = 'todo/day.tt, v  0.12 2026/02/09 shanta Exp shanta - Made overdue todos draggable with drag handles for week/month view rescheduling. Added data attributes and todo-item-shared class.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -466,26 +466,32 @@ document.addEventListener('DOMContentLoaded', function() {
         </summary>
         <div class="priority-content">
             [% FOREACH todo IN overdue_todos %]
-                <div class="todo-item-day overdue">
-                    <div class="todo-subject">[% todo.subject %]</div>
-                        <div class="todo-details">
-                            <span class="status-[% todo.status %]">Overdue</span>
-                            [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
-                            [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
-                            <span>Priority: [% todo.priority %]</span>
+                <div class="todo-item-day todo-item-shared overdue priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" draggable="true">
+                    <div style="display: flex; align-items: flex-start; gap: 5px;">
+                        <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
+                        <div style="flex: 1;">
+                            <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
+                            <div class="todo-details todo-details-shared">
+                                <span class="status-[% todo.status %]">Overdue</span>
+                                [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
+                                [% IF todo.time_of_day %]<span>Time: [% todo.time_of_day.substr(0, 5) %]</span>[% END %]
+                                <span>Priority: [% todo.priority %]</span>
+                            </div>
+                            <div class="todo-actions todo-actions-shared">
+                                <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
+                                    <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                    <input type="hidden" name="return_to" value="">
+                                    <button type="submit" class="btn">Details</button>
+                                </form>
+                                <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
+                                    <button type="submit" class="btn">Edit</button>
+                                </form>
+                                <form action="/log/log_form" method="GET" style="display: inline;">
+                                    <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
+                                    <button type="submit" class="btn btn-log">Log</button>
+                                </form>
+                            </div>
                         </div>
-                    <div class="todo-actions">
-                        <form action="/todo/details" method="POST" style="display: inline;">
-                            <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                            <button type="submit" class="btn">Details</button>
-                        </form>
-                        <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;">
-                            <button type="submit" class="btn">Edit</button>
-                        </form>
-                        <form action="/log/log_form" method="GET" style="display: inline;">
-                            <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                            <button type="submit" class="btn btn-log">Log</button>
-                        </form>
                     </div>
                     
                     <!-- Popup on hover -->
