@@ -31,15 +31,26 @@
     display: flex;
     justify-content: space-between;
     margin: 20px 0;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background-color: var(--background-color, white);
+    padding: 10px;
+    border-bottom: 2px solid var(--border-color, #ddd);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .view-navigation a {
-    padding: 8px 16px;
+    padding: 4px 10px;
     background-color: var(--button-bg, #f2f2f2);
     color: var(--button-text, #000000);
     text-decoration: none;
     border-radius: 4px;
     border: 1px solid var(--button-border, #cccccc);
+    font-size: 1em;
 }
 
 .view-navigation a:hover {

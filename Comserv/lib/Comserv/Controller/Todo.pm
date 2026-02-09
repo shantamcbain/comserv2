@@ -930,6 +930,250 @@ sub create :Local {
     $c->response->redirect($redirect_url);
 }
 
+=head2 update_time
+
+POST /todo/update_time - Update the time_of_day for a todo item (AJAX endpoint for drag-and-drop)
+
+=cut
+
+sub update_time :Path('/todo/update_time') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and time_of_day'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update the time_of_day
+    eval {
+        $todo->update({ time_of_day => $time_of_day });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
+            "Updated time_of_day for todo $record_id to $time_of_day");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time',
+            "Failed to update time_of_day for todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day
+        }
+    );
+    $c->forward('View::JSON');
+}
+
+=head2 update_time_and_date
+
+POST /todo/update_time_and_date - Update both time_of_day and start_date for a todo item (AJAX endpoint for week view drag-and-drop)
+
+=cut
+
+sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $start_date = $c->request->params->{start_date};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day && $start_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id, time_of_day, and start_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update both time_of_day and start_date
+    eval {
+        $todo->update({ 
+            time_of_day => $time_of_day,
+            start_date => $start_date
+        });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
+            "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time_and_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time and date updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day,
+            new_date => $start_date
+        }
+    );
+    $c->forward('View::JSON');
+}
+
+=head2 update_display_date
+
+POST /todo/update_display_date - Update the display date for a todo (for month view drag-and-drop)
+Month view displays by due_date if present, otherwise start_date.
+This endpoint updates the appropriate field to move the todo to a new date.
+
+=cut
+
+sub update_display_date :Path('/todo/update_display_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $display_date = $c->request->params->{display_date};
+    
+    # Validate parameters
+    unless ($record_id && $display_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and display_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Month view displays by due_date if present, otherwise start_date
+    # Update the field that's being displayed
+    my $update_fields = {};
+    
+    if ($todo->due_date) {
+        # Todo has a due_date, so it's displayed by due_date - update due_date
+        $update_fields->{due_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating due_date to $display_date for todo $record_id (displayed by due_date)");
+    } else {
+        # Todo doesn't have due_date, so it's displayed by start_date - update start_date
+        $update_fields->{start_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating start_date to $display_date for todo $record_id (displayed by start_date)");
+    }
+    
+    # Also update time_of_day if provided
+    if ($time_of_day) {
+        $update_fields->{time_of_day} = $time_of_day;
+    }
+    
+    # Update the todo record
+    eval {
+        $todo->update($update_fields);
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_display_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo display date updated successfully',
+            todo_id => $record_id,
+            display_date => $display_date,
+            updated_field => $todo->due_date ? 'due_date' : 'start_date'
+        }
+    );
+    $c->forward('View::JSON');
+}
+
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
