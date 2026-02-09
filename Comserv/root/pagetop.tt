@@ -1,6 +1,6 @@
 
 
-[% PageVersion = 'root/pagetop.tt,v 0.029.0 2026/02/09 shanta Exp shanta - Added !important to nav sticky positioning to override external CSS. Fixed nav menu floating.' %]
+[% PageVersion = 'root/pagetop.tt,v 0.030.0 2026/02/09 shanta Exp shanta - Fixed sticky nav menu with higher specificity (header nav#main-menu). Set header position:relative, h1 margin/padding.' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -99,14 +99,23 @@
 }
 
 /* Sticky/Floating Main Navigation Menu - Only the nav, not the header */
-nav#main-menu {
+header {
+    position: relative !important;
+}
+
+header nav#main-menu {
     position: sticky !important;
     top: 0 !important;
     z-index: 2000 !important;
     background-color: var(--nav-bg, white) !important;
-    border-bottom: 2px solid var(--border-color, #ddd);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin: 0;
+    border-bottom: 2px solid var(--border-color, #ddd) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    margin: 0 !important;
+}
+
+header h1 {
+    margin: 0 !important;
+    padding: 10px !important;
 }
 </style>
 
