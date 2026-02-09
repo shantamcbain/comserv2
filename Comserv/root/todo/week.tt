@@ -26,7 +26,7 @@
 <link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
 <script src="/static/js/todo_drag_drop.js"></script>
 
-[% PageVersion  = '/todo/week.tt, v 0.7 2026/02/08 Shanta Exp Shanta - Removed self-referencing Week View link' %]
+[% PageVersion  = '/todo/week.tt, v 0.8 2026/02/09 Shanta Exp Shanta - Added overdue todos section (shows todos before week start)' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -243,14 +243,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
 [% # Process todos by date for each day column %]
 [% SET todos_by_date = {} %]
+[% SET all_overdue_todos = [] %]
+[% SET first_day_of_week = week_dates.0.date_str %]
 [% FOREACH todo IN todos %]
     [% SET todo_date = todo.start_date || todo.due_date %]
     [% IF todo_date %]
+        [% # Check if todo is overdue (before the start of this week) and not completed %]
+        [% IF todo_date < first_day_of_week AND todo.status != 3 %]
+            [% all_overdue_todos.push(todo) %]
+        [% END %]
         [% UNLESS todos_by_date.$todo_date %]
             [% todos_by_date.$todo_date = [] %]
         [% END %]
         [% todos_by_date.$todo_date.push(todo) %]
     [% END %]
+[% END %]
+
+[% # Show overdue todos section if any exist %]
+[% IF all_overdue_todos.size > 0 %]
+<details class="priority-container overdue-container" style="margin-bottom: 15px;" open>
+    <summary class="priority-header" style="background-color: var(--error-color, #f44336); color: white; padding: 10px; cursor: pointer;">
+        <span>Overdue Todos ([% all_overdue_todos.size %]) - Before this week</span>
+        <span class="priority-toggle">▼</span>
+    </summary>
+    <div class="priority-content" style="padding: 10px; background: #fff3cd;">
+        [% FOREACH todo IN all_overdue_todos %]
+            <div class="todo-item-day overdue" style="margin-bottom: 8px; padding: 8px; border-left: 4px solid #f44336; background: white;">
+                <div class="todo-subject">[% todo.task %]</div>
+                <div class="todo-details">
+                    <span>Due: [% todo.due_date %]</span>
+                    <span>Priority: [% todo.priority %]</span>
+                    <span>Status: [% todo.status %]</span>
+                </div>
+                <div class="todo-actions">
+                    <a href="/todo/edittodo?todo_id=[% todo.id %]" class="action-button-shared edit-button">Edit</a>
+                    <a href="/todo/details/[% todo.id %]" class="action-button-shared details-button">Details</a>
+                </div>
+            </div>
+        [% END %]
+    </div>
+</details>
 [% END %]
 
 <div class="week-grid-container">
@@ -264,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
             <div class="week-day-content">
-                [% # Include day.tt for this specific day %]
+                [% # Include day.tt for this specific day - pass empty overdue since we show them above %]
                 [% INCLUDE 'todo/day.tt'
                     include_mode = 1
                     date = d_str
