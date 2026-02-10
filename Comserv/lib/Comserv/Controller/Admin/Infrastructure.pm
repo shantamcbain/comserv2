@@ -2,7 +2,7 @@ package Comserv::Controller::Admin::Infrastructure;
 
 use Moose;
 use namespace::autoclean;
-use JSON::MaybeXS;
+use YAML::XS qw(Dump Load);
 use Try::Tiny;
 use File::Slurp qw(read_file write_file);
 use File::Spec;
@@ -258,8 +258,8 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
 sub _load_infrastructure_config {
     my ($self, $c) = @_;
     
-    my $config_file = $c->path_to('infrastructure', 'config.json');
-    
+    my $config_file = $c->path_to('config', 'infrastructure', 'config.yaml');
+
     if (-e $config_file) {
         try {
             my $json = read_file($config_file, { binmode => ':utf8' });
@@ -279,7 +279,7 @@ sub _save_infrastructure_config {
     my $config_dir = $c->path_to('infrastructure');
     make_path($config_dir) unless -d $config_dir;
     
-    my $config_file = $c->path_to('infrastructure', 'config.json');
+    my $config_file = $c->path_to('config', 'infrastructure', 'config.yaml');
     my $json = encode_json($config);
     write_file($config_file, { binmode => ':utf8' }, $json);
     

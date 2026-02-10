@@ -1,0 +1,192 @@
+[% META
+  title = 'Infrastructure Management Dashboard'
+  roles = 'admin,developer'
+  TemplateType = 'Application'
+  category = 'admin,infrastructure'
+  page_version = '1.0'
+  last_updated = '2026-01-14'
+%]
+
+
+<div class="container">
+  <h1>Infrastructure Management Dashboard</h1>
+  <p>Last Updated: [% last_updated %]</p>
+
+  [% IF error %]
+  <div class="alert alert-error">
+    <strong>Error:</strong> [% error %]
+  </div>
+  [% END %]
+
+  [% IF success_message %]
+  <div class="alert alert-success">
+    <strong>Success:</strong> [% success_message %]
+  </div>
+  [% END %]
+
+  <h2>Current Clusters</h2>
+
+  [% IF clusters && clusters.size > 0 %]
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Cluster Name</th>
+        <th>Host</th>
+        <th>Status</th>
+        <th>Monitoring</th>
+        <th>Last Checked</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH cluster IN clusters %]
+      <tr>
+        <td>[% cluster.name %]</td>
+        <td>[% cluster.host %]</td>
+        <td>
+          <span class="label [% IF cluster.status == 'online' %]label-success[% ELSE %]label-danger[% END %]">
+            [% cluster.status %]
+          </span>
+        </td>
+        <td>
+          [% IF cluster.monitoring_deployed %]
+            <span class="label label-success">Deployed</span>
+          [% ELSE %]
+            <span class="label label-warning">Pending</span>
+          [% END %]
+        </td>
+        <td>[% cluster.last_checked %]</td>
+        <td>
+          <button class="btn btn-sm btn-info" onclick="checkStatus('[% cluster.name %]')">Check Status</button>
+          [% IF !cluster.monitoring_deployed %]
+            <button class="btn btn-sm btn-primary" onclick="deployMonitoring('[% cluster.name %]')">Deploy Monitoring</button>
+          [% END %]
+          <button class="btn btn-sm btn-warning" onclick="execKubectl('[% cluster.name %]')">Kubectl</button>
+        </td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+  [% ELSE %]
+  <p>No clusters configured. Add one below.</p>
+  [% END %]
+
+  <h2>Add or Update Cluster</h2>
+  <p>Use defaults for the production K8s cluster, or edit for new ones.</p>
+
+  <form id="addClusterForm" method="POST" action="/admin/infrastructure/cluster/add">
+    <div class="form-group">
+      <label for="name">Cluster Name:</label>
+      <input type="text" id="name" name="name" class="form-control" value="comserv-k8s-cluster" required pattern="[a-zA-Z0-9-]+">
+      <small class="form-text text-muted">Alphanumeric with hyphens (default: production cluster).</small>
+    </div>
+
+    <div class="form-group">
+      <label for="host">Host/IP:</label>
+      <input type="text" id="host" name="host" class="form-control" value="192.168.1.50" required placeholder="e.g., 192.168.1.50">
+      <small class="form-text text-muted">Cluster endpoint (default: production host).</small>
+    </div>
+
+    <div class="form-group">
+      <label for="kubeconfig_path">Kubeconfig Path (optional):</label>
+      <input type="text" id="kubeconfig_path" name="kubeconfig_path" class="form-control" placeholder="/home/shanta/.kube/config">
+      <small class="form-text text-muted">Full path to kubeconfig file.</small>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Add/Update Cluster</button>
+    <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset to Defaults</button>
+  </form>
+
+  <div id="result"></div>
+</div>
+
+
+
+<script>
+function resetForm() {
+  document.getElementById('name').value = 'comserv-k8s-cluster';
+  document.getElementById('host').value = '192.168.1.50';
+  document.getElementById('kubeconfig_path').value = '';
+}
+
+document.getElementById('addClusterForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const resultDiv = document.getElementById('result');
+
+  resultDiv.innerHTML = '<div class="alert alert-info">Submitting...</div>';
+
+  fetch('/admin/infrastructure/cluster/add', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      resultDiv.innerHTML = '<div class="alert alert-success">' + data.message + ' (Clusters now: ' + (data.clusters_count || 0) + ')</div>';
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      resultDiv.innerHTML = '<div class="alert alert-danger">Error: ' + data.error + '</div><p>Check logs/application.log.</p>';
+    }
+  })
+  .catch(err => {
+    console.error('Submit error:', err);
+    resultDiv.innerHTML = '<div class="alert alert-danger">Network error: ' + err.message + '</div>';
+  });
+});
+
+function checkStatus(clusterName) {
+  fetch('/admin/infrastructure/monitoring/status/' + clusterName)
+  .then(res => res.json())
+  .then(data => alert('Status: ' + JSON.stringify(data, null, 2)));
+}
+
+function deployMonitoring(clusterName) {
+  if (confirm('Deploy monitoring to ' + clusterName + '?')) {
+    fetch('/admin/infrastructure/deploy/monitoring/' + clusterName, { method: 'POST' })
+    .then(res => res.json())
+    .then(data => alert(data.message || JSON.stringify(data)));
+  }
+}
+
+function execKubectl(clusterName) {
+  const cmd = prompt('Kubectl command for ' + clusterName + ':', 'get nodes');
+  if (cmd) {
+    fetch('/admin/infrastructure/kubectl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'cluster=' + encodeURIComponent(clusterName) + '&command=' + encodeURIComponent(cmd)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('Output:\n' + data.output);
+      } else {
+        alert('Error (code ' + data.exit_code + '):\n' + data.error);
+      }
+    });
+  }
+}
+</script>
+
+<style>
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.table th, .table td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+.table th { background-color: #f8f9fa; }
+.label { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+.label-success { background: #28a745; color: white; }
+.label-danger { background: #dc3545; color: white; }
+.label-warning { background: #ffc107; color: black; }
+.form-group { margin-bottom: 20px; }
+.form-control { width: 100%; max-width: 400px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.form-text { font-size: 0.875em; color: #6c757d; }
+.btn { padding: 8px 16px; margin: 5px 0; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-primary { background: #007bff; color: white; }
+.btn-secondary { background: #6c757d; color: white; }
+.btn-info, .btn-warning { background: #17a2b8; color: white; }
+.alert { padding: 12px; margin: 10px 0; border-radius: 4px; }
+.alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+.alert-danger { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+.alert-info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+</style>
