@@ -1,4 +1,11 @@
-[% META title = 'Infrastructure Management' %]
+[% META
+  title = 'Infrastructure Management Dashboard'
+  roles = 'admin,developer'
+  TemplateType = 'Application'
+  category = 'admin,infrastructure'
+  page_version = '1.1'
+  last_updated = '2026-02-10'
+%]
 
 <style>
 .infrastructure-dashboard {
@@ -280,15 +287,18 @@
         <form id="add-cluster-form">
             <div class="form-group">
                 <label for="cluster-name">Cluster Name</label>
-                <input type="text" id="cluster-name" name="name" placeholder="e.g., comserv-k8s-cluster" required>
+                <input type="text" id="cluster-name" name="name" value="comserv-k8s-cluster" placeholder="e.g., comserv-k8s-cluster" required pattern="[a-zA-Z0-9-]+">
+                <small style="color: #666; font-size: 0.9em;">Alphanumeric with hyphens (default: production cluster)</small>
             </div>
             <div class="form-group">
                 <label for="cluster-host">Host/IP</label>
-                <input type="text" id="cluster-host" name="host" placeholder="e.g., 192.168.1.50" required>
+                <input type="text" id="cluster-host" name="host" value="192.168.1.50" placeholder="e.g., 192.168.1.50" required>
+                <small style="color: #666; font-size: 0.9em;">Cluster endpoint (default: production host at 192.168.1.50)</small>
             </div>
             <div class="form-group">
                 <label for="kubeconfig-path">Kubeconfig Path (optional)</label>
-                <input type="text" id="kubeconfig-path" name="kubeconfig_path" placeholder="Leave empty to use default ~/.kube/config">
+                <input type="text" id="kubeconfig-path" name="kubeconfig_path" placeholder="/home/shanta/.kube/config">
+                <small style="color: #666; font-size: 0.9em;">Full path to kubeconfig file (leave empty for default)</small>
             </div>
             <button type="submit" class="btn btn-primary">Add Cluster</button>
         </form>
