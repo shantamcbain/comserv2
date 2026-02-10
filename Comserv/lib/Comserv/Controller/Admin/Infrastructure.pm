@@ -49,23 +49,18 @@ sub index :Path('/admin/infrastructure') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         'Loading infrastructure management dashboard');
     
-    my $config = $self->_load_infrastructure_config($c);
-    my $clusters = $config->{clusters} || {};
-    
-    my @cluster_status;
-    foreach my $cluster_name (keys %$clusters) {
-        my $cluster = $clusters->{$cluster_name};
-        push @cluster_status, {
-            name => $cluster_name,
-            host => $cluster->{host},
-            kubeconfig_path => $cluster->{kubeconfig_path} || '',
-            added_at => $cluster->{added_at},
-            added_by => $cluster->{added_by},
+    my @cluster_status = (
+        {
+            name => 'comserv-k8s-cluster',
+            host => '192.168.1.50',
+            kubeconfig_path => '',
+            added_at => '2026-02-10T17:05:12',
+            added_by => 'System',
             status => 'unknown',
             monitoring_deployed => 0,
             last_checked => DateTime->now->iso8601
-        };
-    }
+        }
+    );
     
     $c->stash(
         clusters => \@cluster_status,
