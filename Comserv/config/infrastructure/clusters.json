@@ -1,1 +1,10 @@
-{"clusters":{"comserv-k8s-cluster":{"added_at":"2026-02-10T17:05:12","added_by":"Shanta","host":"192.168.1.50","kubeconfig_path":""}}}
+{
+  "clusters": {
+    "comserv-k8s-cluster": {
+      "host": "192.168.1.50",
+      "kubeconfig_path": "/home/shanta/.kube/comserv-k8s-config",
+      "added_at": "2026-02-10T17:05:12",
+      "added_by": "Shanta"
+    }
+  }
+}
