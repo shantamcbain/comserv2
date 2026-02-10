@@ -485,8 +485,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function updateClusterStatus(clusterName) {
-    fetch('/admin/infrastructure/cluster/status/' + clusterName)
-    .then(response => response.json())
+    fetch('/admin/infrastructure/cluster/status/' + clusterName, {
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        return response.json();
+    })
     .then(result => {
         if (result.success) {
             const card = document.getElementById('cluster-' + clusterName);
@@ -501,6 +508,10 @@ function updateClusterStatus(clusterName) {
             // Update badge
             badge.className = 'status-badge ' + status;
             badge.textContent = statusText;
+        } else {
+            const badge = document.getElementById('status-' + clusterName);
+            badge.textContent = 'error';
+            badge.className = 'status-badge offline';
         }
     })
     .catch(error => {
