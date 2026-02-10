@@ -24,13 +24,11 @@ sub begin :Private {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
         "User accessing path: " . $c->req->uri);
     
-    # Skip auth check for API endpoints if they're being called with valid session cookie
+    # Skip role check for API endpoints - just need valid session
     my $path = $c->req->path;
-    if ($path =~ m{^admin/infrastructure/(cluster/status|monitoring/status)}) {
-        # Just check if user has ANY session
-        if ($c->session->{username}) {
-            return; # Allow authenticated users
-        }
+    if ($path =~ m{/infrastructure/(cluster/status|monitoring/status|kubectl|deploy)}) {
+        # Just check if user is logged in
+        return if $c->session->{username};
     }
     
     my $roles = $c->session->{roles} || [];
