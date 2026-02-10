@@ -1,0 +1,26 @@
+# Comserv Config Directory - Git Ignore Rules
+# Protects sensitive configuration files from being committed
+
+# API Credentials (HIGH SECURITY)
+api/api_credentials.json
+api/ai_assistants.json
+
+# Database Credentials (HIGH SECURITY)
+database/*.json
+!database/*.template.json
+
+# Infrastructure Cluster Configs (may contain sensitive paths)
+infrastructure/clusters.json
+
+# Backup files
+*.bak
+*.backup
+*.old
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Keep directory structure
+!.gitkeep

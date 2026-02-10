@@ -258,7 +258,7 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
 sub _load_infrastructure_config {
     my ($self, $c) = @_;
     
-    my $config_file = $c->path_to('infrastructure', 'config.json');
+    my $config_file = $c->path_to('config', 'infrastructure', 'clusters.json');
     
     if (-e $config_file) {
         try {
@@ -276,10 +276,10 @@ sub _load_infrastructure_config {
 sub _save_infrastructure_config {
     my ($self, $c, $config) = @_;
     
-    my $config_dir = $c->path_to('infrastructure');
+    my $config_dir = $c->path_to('config', 'infrastructure');
     make_path($config_dir) unless -d $config_dir;
     
-    my $config_file = $c->path_to('infrastructure', 'config.json');
+    my $config_file = $c->path_to('config', 'infrastructure', 'clusters.json');
     my $json = encode_json($config);
     write_file($config_file, { binmode => ':utf8' }, $json);
     
