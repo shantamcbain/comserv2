@@ -55,14 +55,15 @@ sub index :Path('/admin/infrastructure') :Args(0) {
     my @cluster_status;
     foreach my $cluster_name (keys %$clusters) {
         my $cluster = $clusters->{$cluster_name};
-        my $status = $self->_check_cluster_status($c, $cluster);
         push @cluster_status, {
             name => $cluster_name,
             host => $cluster->{host},
-            status => $status->{connected} ? 'online' : 'offline',
-            monitoring_deployed => $status->{monitoring_deployed} || 0,
-            last_checked => DateTime->now->iso8601,
-            %$status
+            kubeconfig_path => $cluster->{kubeconfig_path} || '',
+            added_at => $cluster->{added_at},
+            added_by => $cluster->{added_by},
+            status => 'unknown',
+            monitoring_deployed => 0,
+            last_checked => DateTime->now->iso8601
         };
     }
     
@@ -171,6 +172,30 @@ sub deploy_monitoring :Path('/admin/infrastructure/deploy/monitoring') :Args(1) 
         $c->stash->{json} = { success => 0, error => "Error deploying monitoring: $_" };
     };
     
+    $c->forward('View::JSON');
+}
+
+sub cluster_status :Path('/admin/infrastructure/cluster/status') :Args(1) {
+    my ($self, $c, $cluster_name) = @_;
+    
+    my $config = $self->_load_infrastructure_config($c);
+    my $cluster = $config->{clusters}{$cluster_name};
+    
+    unless ($cluster) {
+        $c->stash->{json} = { success => 0, error => 'Cluster not found' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $status = $self->_check_cluster_status($c, $cluster);
+    
+    $c->stash->{json} = {
+        success => 1,
+        cluster => $cluster_name,
+        connected => $status->{connected},
+        message => $status->{message},
+        monitoring_deployed => $status->{monitoring_deployed}
+    };
     $c->forward('View::JSON');
 }
 

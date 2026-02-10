@@ -311,15 +311,15 @@
     [% ELSE %]
     <div class="cluster-grid">
         [% FOREACH cluster IN clusters %]
-        <div class="cluster-card [% cluster.status %]" data-cluster="[% cluster.name %]">
+        <div class="cluster-card [% cluster.status %]" data-cluster="[% cluster.name %]" id="cluster-[% cluster.name %]">
             <div class="cluster-header">
                 <div class="cluster-name">[% cluster.name %]</div>
-                <div class="status-badge [% cluster.status %]">[% cluster.status %]</div>
+                <div class="status-badge [% cluster.status %]" id="status-[% cluster.name %]">checking...</div>
             </div>
             
             <div class="cluster-info">
                 <div><strong>Host:</strong> <code>[% cluster.host %]</code></div>
-                <div><strong>Last Checked:</strong> [% cluster.last_checked %]</div>
+                <div><strong>Added:</strong> [% cluster.added_at %] by [% cluster.added_by %]</div>
                 [% IF cluster.monitoring_deployed %]
                 <div class="monitoring-status deployed">
                     <strong>✓ Monitoring Stack Deployed</strong><br>
@@ -473,6 +473,41 @@ function openKubectlConsole(clusterName) {
     })
     .catch(error => {
         alert('Request failed: ' + error);
+    });
+}
+
+// Auto-check cluster status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-cluster]').forEach(function(card) {
+        const clusterName = card.dataset.cluster;
+        updateClusterStatus(clusterName);
+    });
+});
+
+function updateClusterStatus(clusterName) {
+    fetch('/admin/infrastructure/cluster/status/' + clusterName)
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const card = document.getElementById('cluster-' + clusterName);
+            const badge = document.getElementById('status-' + clusterName);
+            
+            const status = result.connected ? 'online' : 'offline';
+            const statusText = result.connected ? 'online' : 'offline';
+            
+            // Update card styling
+            card.className = 'cluster-card ' + status;
+            
+            // Update badge
+            badge.className = 'status-badge ' + status;
+            badge.textContent = statusText;
+        }
+    })
+    .catch(error => {
+        console.error('Error checking cluster status:', error);
+        const badge = document.getElementById('status-' + clusterName);
+        badge.textContent = 'error';
+        badge.className = 'status-badge offline';
     });
 }
 </script>
