@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.62' %]
-[% date_iso = '2026/02/09' %]
-[% formatted_date = 'February 09, 2026' %]
-[% time = '18:40:00' %]
-[% change_log = 'Added URGENT NEXT STEPS to Infrastructure HA: Priority 1 - K8s Management & Monitoring System (192.168.1.50). Priority 2 - Debug Mail Server K8s Pod (192.168.1.175). Both critical and require immediate action.' %]
+[% version = '0.63' %]
+[% date_iso = '2026/02/11' %]
+[% formatted_date = 'February 11, 2026' %]
+[% time = '05:42:00' %]
+[% change_log = 'Added API System Setup & Domain Migration project (api-bc05) - Project ID 157 with 7 phases and 30 tasks. Phase 0 complete. Quick jump link added to Architecture & Infrastructure section.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -150,6 +150,7 @@ last_updated = '2026/02/08'
                 <div class="jump-links-container">
                     <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
+                        <a href="#anchor-api-bc05" class="jump-link">ApiSystemBC05</a> |
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
                         <a href="#anchor-priority-4" class="jump-link">MasterPlanRefactor</a> |
                         <a href="#anchor-priority-schema" class="jump-link">SchemaManagement</a> |
@@ -527,6 +528,119 @@ last_updated = '2026/02/08'
                         <li><strong>Phase 4</strong>: Monitoring & Disaster Recovery (Weeks 11-13)</li>
                         <li><strong>Phase 5</strong>: Testing & Validation (Weeks 13-14)</li>
                     </ol>
+                </div>
+            </details>
+
+            <div id="anchor-api-bc05" class="nav-anchor"></div>
+            <details id="api-bc05-project" class="priority-container" open>
+                <summary class="priority-summary">🚀 API System Setup & Domain Migration (api-bc05)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> HIGH</p>
+                    <p><strong>Project ID:</strong> 157 | <strong>Parent:</strong> Server Room (ID 78) | <strong>Code:</strong> api-bc05</p>
+                    <p><strong>Timeline:</strong> 2026-02-10 to 2026-03-31 (7 weeks) | <strong>Estimated Hours:</strong> 160</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Setup API system for domain-based authentication replacing IP-based access. Migrate from <code>api.workstation.local</code> (IP-based bypass) to <code>api.domain.name</code> (token-based authentication) with Cloudflare DNS, OPNsense port forwarding, middleware implementation, CLI tool, and comprehensive documentation.</p>
+
+                    <h4>🎯 Key Deliverables</h4>
+                    <ul>
+                        <li>Domain detection middleware (<code>ApiDomainDetector.pm</code>)</li>
+                        <li>Environment-specific domain configuration (<code>config/api_domains.json</code>)</li>
+                        <li>Refactored API controller (domain-based auth instead of IP-based)</li>
+                        <li>Cloudflare DNS + OPNsense port forwarding configuration</li>
+                        <li>CLI tool for API operations (<code>script/comserv-api-cli</code>)</li>
+                        <li>Comprehensive documentation (PascalCase .tt files)</li>
+                    </ul>
+
+                    <h4>📊 Implementation Phases (7 Phases, 30 Tasks)</h4>
+                    <ol>
+                        <li><strong>Phase 0: Project Setup & Tracking</strong> (ID 158) - ✅ <span class="status-completed">COMPLETE</span>
+                            <ul>
+                                <li>✅ Create database entries for project/sub-projects/todos</li>
+                                <li>✅ Update Planning.tt with api-bc05 section</li>
+                                <li>⏳ Verify database entries and Planning.tt rendering</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create domain configuration file</li>
+                                <li>Implement ApiDomainDetector middleware</li>
+                                <li>Register middleware in Catalyst</li>
+                                <li>Write unit tests</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Refactor Api.pm to use domain detection</li>
+                                <li>Remove old IP-based code</li>
+                                <li>Test controller changes</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 3: Network & DNS Configuration</strong> (ID 161) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Configure Cloudflare DNS (A record, SSL)</li>
+                                <li>Configure OPNsense port forwarding</li>
+                                <li>Verify Docker configuration</li>
+                                <li>Test external access</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create CLI script structure</li>
+                                <li>Implement CLI commands</li>
+                                <li>Add authentication support</li>
+                                <li>Implement output formatting and error handling</li>
+                                <li>Test all CLI commands</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 5: Documentation</strong> (ID 163) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Create ApiDomainConfiguration.tt</li>
+                                <li>Create ApiCliUsageGuide.tt</li>
+                                <li>Create ApiDomainMigrationGuide.tt</li>
+                                <li>Update ApiTokenReferenceGuide.tt</li>
+                                <li>Verify documentation URLs and theme compatibility</li>
+                            </ul>
+                        </li>
+                        <li><strong>Phase 6: Testing & Deployment</strong> (ID 164) - <span class="status-pending">PENDING</span>
+                            <ul>
+                                <li>Run comprehensive tests</li>
+                                <li>End-to-end testing</li>
+                                <li>Security review</li>
+                                <li>Performance testing</li>
+                                <li>Deploy to production</li>
+                                <li>Update project tracking</li>
+                            </ul>
+                        </li>
+                    </ol>
+
+                    <h4>📁 Documentation & Resources</h4>
+                    <ul>
+                        <li>Zenflow Task: <code>api-bc05</code></li>
+                        <li>Requirements: <code>.zenflow/tasks/api-bc05/requirements.md</code></li>
+                        <li>Technical Spec: <code>.zenflow/tasks/api-bc05/spec.md</code></li>
+                        <li>Implementation Plan: <code>.zenflow/tasks/api-bc05/plan.md</code></li>
+                        <li>Database Script: <code>Comserv/script/setup_api_project_tracking.pl</code></li>
+                    </ul>
+
+                    <h4>✅ Success Criteria</h4>
+                    <ul>
+                        <li>Local domain (<code>*.local</code>) bypasses token authentication</li>
+                        <li>External domain requires valid bearer token</li>
+                        <li>Middleware adds <code>is_local_domain</code> flag to request context</li>
+                        <li>Cloudflare SSL/TLS proxy configured and working</li>
+                        <li>OPNsense port forwarding (WAN:443 → SERVER:5000) functional</li>
+                        <li>CLI tool successfully performs all operations</li>
+                        <li>All documentation follows PascalCase naming and theme compatibility</li>
+                        <li>All tests passing (unit, integration, end-to-end)</li>
+                        <li>Production deployment successful with monitoring</li>
+                    </ul>
+
+                    <h4>🔗 Related Projects</h4>
+                    <ul>
+                        <li><a href="/project/details?project_id=78">Server Room Infrastructure (ID 78)</a></li>
+                        <li><a href="/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
+                    </ul>
                 </div>
             </details>
 
