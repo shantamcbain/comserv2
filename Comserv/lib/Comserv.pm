@@ -117,7 +117,7 @@ sub psgi_app {
 
     my $app = $self->SUPER::psgi_app(@_);
 
-    return sub {
+    my $wrapped_app = sub {
         my $env = shift;
 
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
@@ -125,6 +125,26 @@ sub psgi_app {
 
         return $app->($env);
     };
+    
+    use Plack::Builder;
+    use Comserv::Middleware::ApiDomainDetector;
+    
+    return builder {
+        enable "+Comserv::Middleware::ApiDomainDetector";
+        $wrapped_app;
+    };
+}
+
+sub prepare_action {
+    my $c = shift;
+    
+    my $env = $c->req->env;
+    if (exists $env->{'comserv.api.is_local_domain'}) {
+        $c->stash->{is_local_domain} = $env->{'comserv.api.is_local_domain'};
+        $c->stash->{request_domain} = $env->{'comserv.api.request_domain'};
+    }
+    
+    return $c->next::method(@_);
 }
 
 # Auto-fix for missing modules - attempt to load modules with fallbacks
