@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.63' %]
+[% version = '0.64' %]
 [% date_iso = '2026/02/11' %]
 [% formatted_date = 'February 11, 2026' %]
-[% time = '05:42:00' %]
-[% change_log = 'Added API System Setup & Domain Migration project (api-bc05) - Project ID 157 with 7 phases and 30 tasks. Phase 0 complete. Quick jump link added to Architecture & Infrastructure section.' %]
+[% time = '06:02:00' %]
+[% change_log = 'Added database-driven API project display - fetches Project ID 157 with all sub-projects and todos dynamically from database. Removed standalone script reference. Planning.tt now uses application controllers/models per standards.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -542,6 +542,91 @@ last_updated = '2026/02/08'
                     <h4>📋 Overview</h4>
                     <p>Setup API system for domain-based authentication replacing IP-based access. Migrate from <code>api.workstation.local</code> (IP-based bypass) to <code>api.domain.name</code> (token-based authentication) with Cloudflare DNS, OPNsense port forwarding, middleware implementation, CLI tool, and comprehensive documentation.</p>
 
+                    <h4>📊 API Project from Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET api_project = schema.resultset('Project').find(157) %]
+                        
+                        [% IF api_project %]
+                            <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                                    📦 API System Project (ID 157) - [% api_project.sub_projects.count %] Sub-projects
+                                </summary>
+                                <div style="margin-top: 10px;">
+                                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                        <p><strong>Name:</strong> [% api_project.name %]</p>
+                                        <p><strong>Status:</strong> [% api_project.status || 'Unknown' %]</p>
+                                        <p><strong>Developer:</strong> [% api_project.developer_name || 'Not assigned' %]</p>
+                                        <p><strong>Timeline:</strong> [% api_project.start_date || 'Not set' %] → [% api_project.end_date || 'Not set' %]</p>
+                                        <p><strong>Estimated Hours:</strong> [% api_project.estimated_man_hours || 'Not set' %]</p>
+                                        <p>
+                                            <a href="/project/details?project_id=157" target="_blank" style="color: #007bff;">View Details</a> |
+                                            <a href="/project/editproject?project_id=157" target="_blank" style="color: #007bff;">Edit Project</a>
+                                        </p>
+
+                                        [% SET sub_projects = api_project.sub_projects.search({}, { order_by => 'id' }) %]
+                                        [% IF sub_projects.count > 0 %]
+                                            <details style="margin-top: 10px;" open>
+                                                <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                    📂 Implementation Phases ([% sub_projects.count %] sub-projects)
+                                                </summary>
+                                                <div style="margin-left: 20px;">
+                                                    [% FOREACH phase IN sub_projects.all %]
+                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                            <summary style="cursor: pointer;">
+                                                                [% IF phase.status == 'In-Process' %]⏳[% ELSIF phase.status == 'Completed' %]✅[% ELSE %]📄[% END %]
+                                                                [% phase.name %] (ID: [% phase.id %]) - <span style="color: #666;">[% phase.status %]</span>
+                                                            </summary>
+                                                            <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                                <p><strong>Description:</strong> [% phase.description || 'No description' %]</p>
+                                                                <p><strong>Timeline:</strong> [% phase.start_date %] → [% phase.end_date %]</p>
+                                                                <p><strong>Estimated Hours:</strong> [% phase.estimated_man_hours || 0 %]</p>
+                                                                <p>
+                                                                    <a href="/project/details?project_id=[% phase.id %]" target="_blank">View Phase</a> |
+                                                                    <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit Phase</a>
+                                                                </p>
+
+                                                                [% SET todos = phase.todos.search({}, { order_by => 'sort_order' }) %]
+                                                                [% IF todos.count > 0 %]
+                                                                    <details style="margin-top: 8px;">
+                                                                        <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                            📋 Tasks ([% todos.count %])
+                                                                        </summary>
+                                                                        <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                            <ul style="list-style-type: none; padding-left: 0;">
+                                                                                [% FOREACH task IN todos.all %]
+                                                                                    <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                                        [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                                                        [% task.subject %]
+                                                                                        <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                                        <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                                                        <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                                                    </li>
+                                                                                [% END %]
+                                                                            </ul>
+                                                                        </div>
+                                                                    </details>
+                                                                [% ELSE %]
+                                                                    <p><em>No tasks assigned to this phase yet.</em></p>
+                                                                [% END %]
+                                                            </div>
+                                                        </details>
+                                                    [% END %]
+                                                </div>
+                                            </details>
+                                        [% ELSE %]
+                                            <p><em>No sub-projects found.</em></p>
+                                        [% END %]
+                                    </div>
+                                </div>
+                            </details>
+                        [% ELSE %]
+                            <p><em>Project ID 157 not found in database. Create project via <a href="/project/addproject?parent_id=78" target="_blank">Add Project form</a>.</em></p>
+                        [% END %]
+                    [% CATCH %]
+                        <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch API project from database. [% error.info %]</p>
+                    [% END %]
+
                     <h4>🎯 Key Deliverables</h4>
                     <ul>
                         <li>Domain detection middleware (<code>ApiDomainDetector.pm</code>)</li>
@@ -620,7 +705,6 @@ last_updated = '2026/02/08'
                         <li>Requirements: <code>.zenflow/tasks/api-bc05/requirements.md</code></li>
                         <li>Technical Spec: <code>.zenflow/tasks/api-bc05/spec.md</code></li>
                         <li>Implementation Plan: <code>.zenflow/tasks/api-bc05/plan.md</code></li>
-                        <li>Database Script: <code>Comserv/script/setup_api_project_tracking.pl</code></li>
                     </ul>
 
                     <h4>✅ Success Criteria</h4>
