@@ -90,6 +90,7 @@ requires 'Try::Tiny';
 requires 'Text::Markdown';
 requires 'YAML::Tiny';
 requires 'IPC::Run';
+requires 'IPC::Run3';
 
 # Development and testing
 requires 'Term::ReadPassword';
