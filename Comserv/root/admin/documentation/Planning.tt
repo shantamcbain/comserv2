@@ -774,122 +774,47 @@ last_updated = '2026/02/08'
                 [% SET planning_project = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
                 [% SET planning_project_id = planning_project.id IF planning_project %]
                 
-                [% IF planning_project %]
-                    <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                [% IF planning_project_id %]
+                    [%# Save current stashed project if any %]
+                    [% SET saved_project = c.stash.project %]
+                    [% SET saved_todos = c.stash.todos %]
+                    
+                    [%# Build project tree using Project controller method %]
+                    [% SET project_controller = c.controller('Project') %]
+                    [% SET project_tree = project_controller.build_project_tree(c, planning_project) %]
+                    
+                    [%# Set up stash for projectdetails.tt %]
+                    [% c.stash.project = project_tree %]
+                    [% c.stash.todos = planning_project.todos.search({}, { order_by => { -asc => 'start_date' } }).all %]
+                    
+                    <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;" open>
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                            📦 Planning System Project (ID [% planning_project_id %]) - [% planning_project.sub_projects.count %] Sub-projects
+                            📦 Planning System Project (ID [% planning_project_id %]) - Full Details
                         </summary>
                         <div style="margin-top: 10px;">
-                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
-                                <p><strong>Name:</strong> [% planning_project.name %]</p>
-                                <p><strong>Status:</strong> [% planning_project.status || 'Unknown' %]</p>
-                                <p><strong>Developer:</strong> [% planning_project.developer_name || 'Not assigned' %]</p>
-                                <p><strong>Timeline:</strong> [% planning_project.start_date || 'Not set' %] → [% planning_project.end_date || 'Not set' %]</p>
-                                <p><strong>Estimated Hours:</strong> [% planning_project.estimated_man_hours || 'Not set' %]</p>
-                                <p>
-                                    <a href="/project/details?project_id=[% planning_project_id %]" target="_blank" style="color: #007bff;">View Details</a> |
-                                    <a href="/project/editproject?project_id=[% planning_project_id %]" target="_blank" style="color: #007bff;">Edit Project</a>
-                                </p>
-
-                                [% SET sub_projects = planning_project.sub_projects.search({}, { order_by => 'id' }) %]
-                                [% IF sub_projects.count > 0 %]
-                                    <details style="margin-top: 10px;" open>
-                                        <summary style="cursor: pointer; font-weight: bold; color: #555;">
-                                            📂 Implementation Phases ([% sub_projects.count %] sub-projects)
-                                        </summary>
-                                        <div style="margin-left: 20px;">
-                                            [% FOREACH phase IN sub_projects.all %]
-                                                <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
-                                                    <summary style="cursor: pointer;">
-                                                        [% IF phase.status == 'In-Process' %]⏳[% ELSIF phase.status == 'Completed' %]✅[% ELSE %]📄[% END %]
-                                                        [% phase.name %] (ID: [% phase.id %]) - <span style="color: #666;">[% phase.status %]</span>
-                                                    </summary>
-                                                    <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
-                                                        <p><strong>Description:</strong> [% phase.description || 'No description' %]</p>
-                                                        <p><strong>Timeline:</strong> [% phase.start_date %] → [% phase.end_date %]</p>
-                                                        <p><strong>Estimated Hours:</strong> [% phase.estimated_man_hours || 0 %]</p>
-                                                        <p>
-                                                            <a href="/project/details?project_id=[% phase.id %]" target="_blank">View Phase</a> |
-                                                            <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit Phase</a>
-                                                        </p>
-
-                                                        [% SET todos = phase.todos.search({}, { order_by => 'sort_order' }) %]
-                                                        [% IF todos.count > 0 %]
-                                                            <details style="margin-top: 8px;">
-                                                                <summary style="cursor: pointer; font-size: 0.9em;">
-                                                                    📋 Tasks ([% todos.count %])
-                                                                </summary>
-                                                                <div style="margin-left: 15px; font-size: 0.85em;">
-                                                                    <ul style="list-style-type: none; padding-left: 0;">
-                                                                        [% FOREACH task IN todos.all %]
-                                                                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
-                                                                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
-                                                                                [% task.subject %]
-                                                                                <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
-                                                                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
-                                                                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
-                                                                            </li>
-                                                                        [% END %]
-                                                                    </ul>
-                                                                </div>
-                                                            </details>
-                                                        [% ELSE %]
-                                                            <p><em>No tasks assigned to this phase yet.</em></p>
-                                                        [% END %]
-                                                    </div>
-                                                </details>
-                                            [% END %]
-                                        </div>
-                                    </details>
-                                [% ELSE %]
-                                    <p><em>No sub-projects found.</em></p>
-                                [% END %]
-                            </div>
+                            [% INCLUDE 'todo/projectdetails.tt' %]
                         </div>
                     </details>
+                    
+                    [%# Restore original stashed values %]
+                    [% c.stash.project = saved_project %]
+                    [% c.stash.todos = saved_todos %]
                 [% ELSE %]
                     <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
-                        <p><strong>⚠️ TODO:</strong> Planning System project not yet created in database.</p>
-                        <p><strong>Action Required:</strong> Create project record via <a href="/project/addproject" target="_blank" style="color: #007bff;">Add Project form</a>.</p>
+                        <p><strong>⚠️ Project Not Found:</strong> Planning System project with code "Planning" not found in database.</p>
+                        <p><strong>Action Required:</strong> Create the Planning project via <a href="/project/addproject" target="_blank" style="color: #007bff;">Add Project form</a> with project_code "Planning".</p>
                         <p><strong>Next Steps:</strong></p>
                         <ol>
                             <li>Create main project: "Planning System Migration"</li>
                             <li>Create 15 sub-projects for Phases 0-14 (P0 already complete)</li>
                             <li>Link todos to each phase sub-project</li>
-                            <li>Update <code>planning_project_id</code> variable above (line 758) with new project ID</li>
                         </ol>
-                        <p><strong>Reference:</strong> See API System Project (ID 157) above for example structure.</p>
+                        <p><strong>For reference:</strong> See <a href="/project/details?project_id=157" target="_blank" style="color: #007bff;">API System Project (ID 157)</a> for example structure.</p>
                     </div>
                 [% END %]
             [% CATCH %]
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
-
-            <h4>📦 Project Details View (Full View)</h4>
-            <details class="sub-container" style="margin: 15px 0; border: 1px solid #4CAF50; padding: 10px; background: #f0f8f0;">
-                <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                    🔍 Planning System Project Details (from /project/details)
-                </summary>
-                <div style="margin-top: 10px;">
-                    [% TRY %]
-                        [% IF planning_project_id AND planning_project_id > 0 %]
-                            <p><em>Full project details view for Planning System project (ID [% planning_project_id %]):</em></p>
-                            <div style="border: 2px solid #4CAF50; padding: 15px; background: white; margin: 10px 0;">
-                                <p><strong>View Full Details:</strong> <a href="/project/details?project_id=[% planning_project_id %]" target="_blank" style="color: #4CAF50; font-weight: bold; font-size: 1.1em;">Open Planning Project Details Page →</a></p>
-                                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">The details page shows complete project hierarchy with all sub-projects (phases), tasks (todos), timelines, and status tracking.</p>
-                            </div>
-                        [% ELSE %]
-                            <div style="background: #e3f2fd; border: 1px solid #2196F3; border-radius: 4px; padding: 15px; margin: 10px 0;">
-                                <p><strong>ℹ️ Project Not Found:</strong> Planning System project with code "Planning" not found in database.</p>
-                                <p><strong>Action Required:</strong> Create the Planning project via <a href="/project/addproject" target="_blank" style="color: #2196F3;">Add Project form</a> with project_code "Planning".</p>
-                                <p><strong>For reference example:</strong> See <a href="/project/details?project_id=157" target="_blank" style="color: #2196F3;">API System Project (ID 157)</a> to see what this will look like.</p>
-                            </div>
-                        [% END %]
-                    [% CATCH %]
-                        <p style="color: #ff9800;"><strong>Error:</strong> Unable to load project details. [% error.info %]</p>
-                    [% END %]
-                </div>
-            </details>
 
             <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
             <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
