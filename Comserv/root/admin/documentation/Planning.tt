@@ -246,33 +246,42 @@ last_updated = '2026/02/08'
                 <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
                 [% TRY %]
                     [% SET schema = c.model('DBEncy').schema %]
-                    [% SET all_top_projects = schema.resultset('Project').search(
-                        { parent_id => undef },
-                        { order_by => 'name' }
+                    [% SET all_projects = schema.resultset('Project').search(
+                        {},
+                        { order_by => 'id' }
                     ) %]
                     
-                    [% IF all_top_projects.count > 0 %]
-                        [% FOREACH top_project IN all_top_projects.all %]
+                    <!-- Debug: Total projects found = [% all_projects.count || 0 %] -->
+                    
+                    [% IF all_projects.count > 0 %]
+                        [% FOREACH proj IN all_projects.all %]
+                            [% UNLESS proj.parent_id %]
                             <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
                                 <summary style="cursor: pointer; font-weight: bold;">
-                                    📁 [% top_project.name %] (ID: [% top_project.id %])
+                                    📁 [% proj.name %] (ID: [% proj.id %], Parent: [% proj.parent_id || 'NONE' %])
                                 </summary>
                                 <div style="margin: 10px 0 0 20px;">
-                                    <p><strong>Status:</strong> [% top_project.status || 'Unknown' %] | <strong>Code:</strong> [% top_project.project_code || 'N/A' %]</p>
-                                    <p><strong>Developer:</strong> [% top_project.developer_name || 'Not assigned' %] | <strong>Client:</strong> [% top_project.client_name || 'N/A' %]</p>
+                                    <p><strong>Status:</strong> [% proj.status || 'Unknown' %] | <strong>Code:</strong> [% proj.project_code || 'N/A' %]</p>
+                                    <p><strong>Developer:</strong> [% proj.developer_name || 'Not assigned' %] | <strong>Client:</strong> [% proj.client_name || 'N/A' %]</p>
                                     <p>
-                                        <a href="/project/details?project_id=[% top_project.id %]" target="_blank" style="color: #007bff;">View Full Details</a> |
-                                        <a href="/project/editproject?project_id=[% top_project.id %]" target="_blank" style="color: #007bff;">Edit</a>
+                                        <a href="/project/details?project_id=[% proj.id %]" target="_blank" style="color: #007bff;">View Full Details</a> |
+                                        <a href="/project/editproject?project_id=[% proj.id %]" target="_blank" style="color: #007bff;">Edit</a>
                                     </p>
                                     
-                                    [% SET top_subs = top_project.sub_projects.search({}, { order_by => 'id' }) %]
-                                    [% IF top_subs.count > 0 %]
+                                    [% SET proj_subs = [] %]
+                                    [% FOREACH check_sub IN all_projects.all %]
+                                        [% IF check_sub.parent_id == proj.id %]
+                                            [% proj_subs.push(check_sub) %]
+                                        [% END %]
+                                    [% END %]
+                                    
+                                    [% IF proj_subs.size > 0 %]
                                         <details style="margin-top: 8px;">
                                             <summary style="cursor: pointer; font-weight: bold; color: #555;">
-                                                📂 Sub-projects ([% top_subs.count %])
+                                                📂 Sub-projects ([% proj_subs.size %])
                                             </summary>
                                             <div style="margin-left: 15px; font-size: 0.95em;">
-                                                [% FOREACH sub IN top_subs.all %]
+                                                [% FOREACH sub IN proj_subs %]
                                                     <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #f9f9f9;">
                                                         📄 [% sub.name %] (ID: [% sub.id %]) - [% sub.status || 'Unknown' %]
                                                         <br><a href="/project/details?project_id=[% sub.id %]" target="_blank" style="font-size: 0.9em;">View</a>
@@ -283,6 +292,7 @@ last_updated = '2026/02/08'
                                     [% END %]
                                 </div>
                             </details>
+                            [% END %]
                         [% END %]
                     [% ELSE %]
                         <p><em>No projects found in database.</em></p>
@@ -871,21 +881,23 @@ last_updated = '2026/02/08'
                                 <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% planning_project.id %]">Add a todo</a></p>
                             [% END %]
 
-                            [% TRY %]
-                                [% SET sub_projects = planning_project.sub_projects.search({}, { order_by => 'id' }) %]
-                            [% CATCH %]
-                                <p style="color: red;">Error fetching sub-projects: [% error.info %]</p>
+                            [% SET planning_subs = [] %]
+                            [% SET all_projects_for_subs = schema.resultset('Project').search({}, { order_by => 'id' }) %]
+                            [% FOREACH check_sub IN all_projects_for_subs.all %]
+                                [% IF check_sub.parent_id == planning_project.id %]
+                                    [% planning_subs.push(check_sub) %]
+                                [% END %]
                             [% END %]
                             
-                            <!-- Debug: sub_projects count = [% sub_projects.count || 0 %] -->
+                            <!-- Debug: planning_subs size = [% planning_subs.size || 0 %], Planning project ID = [% planning_project.id %] -->
                             
-                            [% IF sub_projects AND sub_projects.count > 0 %]
+                            [% IF planning_subs.size > 0 %]
                                 <details style="margin-top: 10px;" open>
                                     <summary style="cursor: pointer; font-weight: bold; color: #555;">
-                                        📂 Sub-Projects ([% sub_projects.count %])
+                                        📂 Sub-Projects ([% planning_subs.size %])
                                     </summary>
                                     <div style="margin-left: 20px;">
-                                        [% FOREACH subproject IN sub_projects.all %]
+                                        [% FOREACH subproject IN planning_subs %]
                                             <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
                                                 <summary style="cursor: pointer;">
                                                     [% IF subproject.status == 'In-Process' %]⏳[% ELSIF subproject.status == 'Completed' %]✅[% ELSE %]📄[% END %]
