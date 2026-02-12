@@ -244,7 +244,46 @@ last_updated = '2026/02/08'
             </summary>
             <div style="margin-top: 10px;">
                 <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
-                <p><strong>Link:</strong> <a href="/project" target="_blank">View All Projects</a></p>
+                [% SET all_db_projects = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
+                [% IF all_db_projects.count > 0 %]
+                    [% FOREACH proj IN all_db_projects.all %]
+                        [% UNLESS proj.parent_id %]
+                        <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <summary style="cursor: pointer; font-weight: bold;">
+                                📁 [% proj.name %] (ID: [% proj.id %])
+                            </summary>
+                            <div style="margin: 10px 0 0 20px;">
+                                <p><strong>Status:</strong> [% proj.status || 'Unknown' %] | <strong>Code:</strong> [% proj.project_code || 'N/A' %]</p>
+                                <p><a href="/project/details?project_id=[% proj.id %]" target="_blank">View Full Details</a></p>
+                                
+                                [% SET proj_subs = [] %]
+                                [% FOREACH check_sub IN all_db_projects.all %]
+                                    [% IF check_sub.parent_id == proj.id %]
+                                        [% proj_subs.push(check_sub) %]
+                                    [% END %]
+                                [% END %]
+                                
+                                [% IF proj_subs.size > 0 %]
+                                    <details style="margin-top: 8px;">
+                                        <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                            📂 Sub-projects ([% proj_subs.size %])
+                                        </summary>
+                                        <div style="margin-left: 15px; font-size: 0.95em;">
+                                            [% FOREACH sub IN proj_subs %]
+                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #f9f9f9;">
+                                                    📄 [% sub.name %] (ID: [% sub.id %]) - [% sub.status || 'Unknown' %]
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </details>
+                                [% END %]
+                            </div>
+                        </details>
+                        [% END %]
+                    [% END %]
+                [% ELSE %]
+                    <p><em>No projects found.</em></p>
+                [% END %]
             </div>
         </details>
 
@@ -826,14 +865,12 @@ last_updated = '2026/02/08'
                             [% END %]
 
                             [% SET planning_subs = [] %]
-                            [% SET all_projects_for_subs = schema.resultset('Project').search({}, { order_by => 'id' }) %]
-                            [% FOREACH check_sub IN all_projects_for_subs.all %]
+                            [% SET all_projs_for_planning = c.model('DBEncy').resultset('Project').search({}, { order_by => 'id' }) %]
+                            [% FOREACH check_sub IN all_projs_for_planning.all %]
                                 [% IF check_sub.parent_id == planning_project.id %]
                                     [% planning_subs.push(check_sub) %]
                                 [% END %]
                             [% END %]
-                            
-                            <!-- Debug: planning_subs size = [% planning_subs.size || 0 %], Planning project ID = [% planning_project.id %] -->
                             
                             [% IF planning_subs.size > 0 %]
                                 <details style="margin-top: 10px;" open>
