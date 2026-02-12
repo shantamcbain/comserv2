@@ -865,6 +865,30 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
+            <h4>📦 Project Details View (Reference)</h4>
+            <details class="sub-container" style="margin: 15px 0; border: 1px solid #4CAF50; padding: 10px; background: #f0f8f0;">
+                <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                    🔍 Preview: How Projects Will Display in Database-Driven System
+                </summary>
+                <div style="margin-top: 10px;">
+                    <p><em>This shows how the Planning System project will be displayed once created in the database using the /project/details view.</em></p>
+                    [% TRY %]
+                        [% IF planning_project_id AND planning_project_id > 0 %]
+                            [% SET c.request.query_parameters.project_id = planning_project_id %]
+                            [% INCLUDE 'todo/projectdetails.tt' project_id=planning_project_id %]
+                        [% ELSE %]
+                            <div style="background: #e3f2fd; border: 1px solid #2196F3; border-radius: 4px; padding: 15px; margin: 10px 0;">
+                                <p><strong>ℹ️ Preview Unavailable:</strong> Planning System project not yet created in database.</p>
+                                <p>Once you create the Planning System project and update <code>planning_project_id</code> (line 774), this section will display the full project details view with all sub-projects, todos, and timeline information.</p>
+                                <p><strong>For reference example:</strong> See <a href="/project/details?project_id=157" target="_blank" style="color: #2196F3;">API System Project (ID 157)</a> to see what this will look like.</p>
+                            </div>
+                        [% END %]
+                    [% CATCH %]
+                        <p style="color: #ff9800;"><strong>Note:</strong> Project details view will appear here once project is created. [% error.info %]</p>
+                    [% END %]
+                </div>
+            </details>
+
             <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
             <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
 
