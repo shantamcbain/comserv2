@@ -865,8 +865,8 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based - Migration to Database Pending)</h4>
-            <p><em>Note: These phases are currently text-based. Once Planning System project is created in database, they will be replaced with database-driven sub-projects as shown above.</em></p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
+            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
