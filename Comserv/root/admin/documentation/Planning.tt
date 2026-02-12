@@ -771,8 +771,8 @@ last_updated = '2026/02/08'
             <h4>📊 Planning System Project from Database</h4>
             [% TRY %]
                 [% SET schema = c.model('DBEncy').schema %]
-                [% SET planning_project_id = 0 %]
-                [% SET planning_project = schema.resultset('Project').find(planning_project_id) IF planning_project_id %]
+                [% SET planning_project = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
+                [% SET planning_project_id = planning_project.id IF planning_project %]
                 
                 [% IF planning_project %]
                     <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
@@ -865,26 +865,28 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>📦 Project Details View (Reference)</h4>
+            <h4>📦 Project Details View (Full View)</h4>
             <details class="sub-container" style="margin: 15px 0; border: 1px solid #4CAF50; padding: 10px; background: #f0f8f0;">
                 <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                    🔍 Preview: How Projects Will Display in Database-Driven System
+                    🔍 Planning System Project Details (from /project/details)
                 </summary>
                 <div style="margin-top: 10px;">
-                    <p><em>This shows how the Planning System project will be displayed once created in the database using the /project/details view.</em></p>
                     [% TRY %]
                         [% IF planning_project_id AND planning_project_id > 0 %]
-                            [% SET c.request.query_parameters.project_id = planning_project_id %]
-                            [% INCLUDE 'todo/projectdetails.tt' project_id=planning_project_id %]
+                            <p><em>Full project details view for Planning System project (ID [% planning_project_id %]):</em></p>
+                            <div style="border: 2px solid #4CAF50; padding: 15px; background: white; margin: 10px 0;">
+                                <p><strong>View Full Details:</strong> <a href="/project/details?project_id=[% planning_project_id %]" target="_blank" style="color: #4CAF50; font-weight: bold; font-size: 1.1em;">Open Planning Project Details Page →</a></p>
+                                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">The details page shows complete project hierarchy with all sub-projects (phases), tasks (todos), timelines, and status tracking.</p>
+                            </div>
                         [% ELSE %]
                             <div style="background: #e3f2fd; border: 1px solid #2196F3; border-radius: 4px; padding: 15px; margin: 10px 0;">
-                                <p><strong>ℹ️ Preview Unavailable:</strong> Planning System project not yet created in database.</p>
-                                <p>Once you create the Planning System project and update <code>planning_project_id</code> (line 774), this section will display the full project details view with all sub-projects, todos, and timeline information.</p>
+                                <p><strong>ℹ️ Project Not Found:</strong> Planning System project with code "Planning" not found in database.</p>
+                                <p><strong>Action Required:</strong> Create the Planning project via <a href="/project/addproject" target="_blank" style="color: #2196F3;">Add Project form</a> with project_code "Planning".</p>
                                 <p><strong>For reference example:</strong> See <a href="/project/details?project_id=157" target="_blank" style="color: #2196F3;">API System Project (ID 157)</a> to see what this will look like.</p>
                             </div>
                         [% END %]
                     [% CATCH %]
-                        <p style="color: #ff9800;"><strong>Note:</strong> Project details view will appear here once project is created. [% error.info %]</p>
+                        <p style="color: #ff9800;"><strong>Error:</strong> Unable to load project details. [% error.info %]</p>
                     [% END %]
                 </div>
             </details>
