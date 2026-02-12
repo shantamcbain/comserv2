@@ -775,30 +775,17 @@ last_updated = '2026/02/08'
                 [% SET planning_project_id = planning_project.id IF planning_project %]
                 
                 [% IF planning_project_id %]
-                    [%# Save current stashed project if any %]
-                    [% SET saved_project = c.stash.project %]
-                    [% SET saved_todos = c.stash.todos %]
-                    
-                    [%# Build project tree using Project controller method %]
-                    [% SET project_controller = c.controller('Project') %]
-                    [% SET project_tree = project_controller.build_project_tree(c, planning_project) %]
-                    
-                    [%# Set up stash for projectdetails.tt %]
-                    [% c.stash.project = project_tree %]
-                    [% c.stash.todos = planning_project.todos.search({}, { order_by => { -asc => 'start_date' } }).all %]
-                    
                     <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;" open>
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
                             📦 Planning System Project (ID [% planning_project_id %]) - Full Details
                         </summary>
                         <div style="margin-top: 10px;">
-                            [% INCLUDE 'todo/projectdetails.tt' %]
+                            <div style="border: 2px solid #4CAF50; padding: 15px; background: white; margin: 10px 0;">
+                                <p><strong>View Full Project Details:</strong> <a href="/project/details?project_id=[% planning_project_id %]" target="_blank" style="color: #4CAF50; font-weight: bold; font-size: 1.1em;">Open Planning Project Details Page →</a></p>
+                                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">The details page shows complete project hierarchy with all sub-projects (phases), tasks (todos), timelines, and status tracking - exactly as shown in the API System example above.</p>
+                            </div>
                         </div>
                     </details>
-                    
-                    [%# Restore original stashed values %]
-                    [% c.stash.project = saved_project %]
-                    [% c.stash.todos = saved_todos %]
                 [% ELSE %]
                     <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
                         <p><strong>⚠️ Project Not Found:</strong> Planning System project with code "Planning" not found in database.</p>
