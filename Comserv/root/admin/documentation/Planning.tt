@@ -247,7 +247,7 @@ last_updated = '2026/02/08'
                 [% TRY %]
                     [% SET schema = c.model('DBEncy').schema %]
                     [% SET all_top_projects = schema.resultset('Project').search(
-                        { parent_id => undef, sitename => c.session.SiteName || 'CSC' },
+                        { parent_id => undef },
                         { order_by => 'name' }
                     ) %]
                     
