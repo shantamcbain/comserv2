@@ -772,18 +772,115 @@ last_updated = '2026/02/08'
             [% TRY %]
                 [% SET schema = c.model('DBEncy').schema %]
                 [% SET planning_project = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
-                [% SET planning_project_id = planning_project.id IF planning_project %]
                 
-                [% IF planning_project_id %]
+                [% IF planning_project %]
+                    [% BLOCK render_planning_project %]
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <h3>[% planning_project.name %]</h3>
+                            <ul>
+                                <li><strong>Description:</strong> [% planning_project.description || 'No description' %]</li>
+                                <li><strong>Start Date:</strong> [% planning_project.start_date %]</li>
+                                <li><strong>End Date:</strong> [% planning_project.end_date %]</li>
+                                <li><strong>Status:</strong> [% planning_project.status %]</li>
+                                <li><strong>Project Code:</strong> [% planning_project.project_code %]</li>
+                                <li><strong>Project Size:</strong> [% planning_project.project_size %]</li>
+                                <li><strong>Estimated Man Hours:</strong> [% planning_project.estimated_man_hours %]</li>
+                                <li><strong>Developer Name:</strong> [% planning_project.developer_name %]</li>
+                                <li><strong>Client Name:</strong> [% planning_project.client_name %]</li>
+                                <li><strong>Comments:</strong> [% planning_project.comments || 'No comments' %]</li>
+                            </ul>
+
+                            <p>
+                                <a href="/project/details?project_id=[% planning_project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                <a href="/project/editproject?project_id=[% planning_project.id %]" target="_blank" style="color: #007bff;">Edit Project</a>
+                            </p>
+
+                            [% SET planning_todos = planning_project.todos.search({}, { order_by => 'sort_order' }) %]
+                            [% IF planning_todos.count > 0 %]
+                                <h4>📋 Todos for [% planning_project.name %] ([% planning_todos.count %])</h4>
+                                <ul style="list-style-type: none; padding-left: 0;">
+                                    [% FOREACH todo IN planning_todos.all %]
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                            [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                            [% todo.subject %]
+                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                            <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                        </li>
+                                    [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% planning_project.id %]">Add a todo</a></p>
+                            [% END %]
+
+                            [% SET sub_projects = planning_project.sub_projects.search({}, { order_by => 'id' }) %]
+                            [% IF sub_projects.count > 0 %]
+                                <details style="margin-top: 10px;" open>
+                                    <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                        📂 Sub-Projects ([% sub_projects.count %])
+                                    </summary>
+                                    <div style="margin-left: 20px;">
+                                        [% FOREACH subproject IN sub_projects.all %]
+                                            <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                <summary style="cursor: pointer;">
+                                                    [% IF subproject.status == 'In-Process' %]⏳[% ELSIF subproject.status == 'Completed' %]✅[% ELSE %]📄[% END %]
+                                                    Sub-Project: [% subproject.name %] (ID: [% subproject.id %]) - <span style="color: #666;">[% subproject.status %]</span>
+                                                </summary>
+                                                <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
+                                                    <ul>
+                                                        <li><strong>Description:</strong> [% subproject.description || 'No description' %]</li>
+                                                        <li><strong>Timeline:</strong> [% subproject.start_date %] → [% subproject.end_date %]</li>
+                                                        <li><strong>Status:</strong> [% subproject.status %]</li>
+                                                        <li><strong>Project Code:</strong> [% subproject.project_code %]</li>
+                                                        <li><strong>Estimated Hours:</strong> [% subproject.estimated_man_hours || 0 %]</li>
+                                                        <li><strong>Developer:</strong> [% subproject.developer_name || 'Not assigned' %]</li>
+                                                        <li><strong>Client:</strong> [% subproject.client_name || 'N/A' %]</li>
+                                                    </ul>
+                                                    <p>
+                                                        <a href="/project/details?project_id=[% subproject.id %]" target="_blank">View Details</a> |
+                                                        <a href="/project/editproject?project_id=[% subproject.id %]" target="_blank">Edit</a>
+                                                    </p>
+
+                                                    [% SET sub_todos = subproject.todos.search({}, { order_by => 'sort_order' }) %]
+                                                    [% IF sub_todos.count > 0 %]
+                                                        <details style="margin-top: 8px;">
+                                                            <summary style="cursor: pointer; font-size: 0.9em;">
+                                                                📋 Todos ([% sub_todos.count %])
+                                                            </summary>
+                                                            <div style="margin-left: 15px; font-size: 0.85em;">
+                                                                <ul style="list-style-type: none; padding-left: 0;">
+                                                                    [% FOREACH task IN sub_todos.all %]
+                                                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                            [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                                            [% task.subject %]
+                                                                            <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                            <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                                            <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                                        </li>
+                                                                    [% END %]
+                                                                </ul>
+                                                            </div>
+                                                        </details>
+                                                    [% ELSE %]
+                                                        <p><em>No todos for this sub-project. <a href="/todo/addtodo?project_id=[% subproject.id %]">Add a todo</a></em></p>
+                                                    [% END %]
+                                                </div>
+                                            </details>
+                                        [% END %]
+                                    </div>
+                                </details>
+                            [% ELSE %]
+                                <p>No sub-projects found. <a href="/project/addproject?parent_id=[% planning_project.id %]">Add a sub-project</a></p>
+                            [% END %]
+                        </div>
+                    [% END %]
+
                     <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;" open>
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
-                            📦 Planning System Project (ID [% planning_project_id %]) - Full Details
+                            📦 Planning System Project (ID [% planning_project.id %]) - Full Details
                         </summary>
                         <div style="margin-top: 10px;">
-                            <div style="border: 2px solid #4CAF50; padding: 15px; background: white; margin: 10px 0;">
-                                <p><strong>View Full Project Details:</strong> <a href="/project/details?project_id=[% planning_project_id %]" target="_blank" style="color: #4CAF50; font-weight: bold; font-size: 1.1em;">Open Planning Project Details Page →</a></p>
-                                <p style="margin-top: 10px; font-size: 0.9em; color: #666;">The details page shows complete project hierarchy with all sub-projects (phases), tasks (todos), timelines, and status tracking - exactly as shown in the API System example above.</p>
-                            </div>
+                            [% PROCESS render_planning_project %]
                         </div>
                     </details>
                 [% ELSE %]
