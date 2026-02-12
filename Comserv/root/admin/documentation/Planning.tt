@@ -813,7 +813,7 @@ last_updated = '2026/02/08'
                                 <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% planning_project.id %]">Add a todo</a></p>
                             [% END %]
 
-                            [% SET sub_projects = planning_project.sub_projects.search({}, { order_by => 'id' }) %]
+                            [% SET sub_projects = schema.resultset('Project').search({ parent_id => planning_project.id }, { order_by => 'id' }) %]
                             [% IF sub_projects.count > 0 %]
                                 <details style="margin-top: 10px;" open>
                                     <summary style="cursor: pointer; font-weight: bold; color: #555;">
