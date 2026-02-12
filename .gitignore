@@ -51,6 +51,10 @@ Comserv/local/
 /Comserv/db_config.json
 /Comserv/db_config.json.template
 /Comserv/config/api_credentials.json
+/Comserv/config/api/api_credentials.json
+/Comserv/config/api/ai_assistants.json
+/Comserv/config/database/*.json
+/config/dbi_config.json
 /Comserv/comserv.psgi
 # Environment variable files (NEVER commit these - contain secrets)
 .env
