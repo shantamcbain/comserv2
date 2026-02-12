@@ -236,6 +236,63 @@ last_updated = '2026/02/08'
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
 
+        <!-- All Projects List from Database -->
+        <div id="anchor-all-projects-list" class="nav-anchor"></div>
+        <details class="sub-container" style="margin: 15px 0; border: 1px solid #2196F3; padding: 10px; background: #e3f2fd;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
+                📦 All Projects from Database (Reference - Future State Preview)
+            </summary>
+            <div style="margin-top: 10px;">
+                <p><em>This shows all projects with their hierarchy. Eventually, all planning will be driven from the project database structure shown here.</em></p>
+                [% TRY %]
+                    [% SET schema = c.model('DBEncy').schema %]
+                    [% SET all_top_projects = schema.resultset('Project').search(
+                        { parent_id => undef, sitename => c.session.SiteName || 'CSC' },
+                        { order_by => 'name' }
+                    ) %]
+                    
+                    [% IF all_top_projects.count > 0 %]
+                        [% FOREACH top_project IN all_top_projects.all %]
+                            <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                <summary style="cursor: pointer; font-weight: bold;">
+                                    📁 [% top_project.name %] (ID: [% top_project.id %])
+                                </summary>
+                                <div style="margin: 10px 0 0 20px;">
+                                    <p><strong>Status:</strong> [% top_project.status || 'Unknown' %] | <strong>Code:</strong> [% top_project.project_code || 'N/A' %]</p>
+                                    <p><strong>Developer:</strong> [% top_project.developer_name || 'Not assigned' %] | <strong>Client:</strong> [% top_project.client_name || 'N/A' %]</p>
+                                    <p>
+                                        <a href="/project/details?project_id=[% top_project.id %]" target="_blank" style="color: #007bff;">View Full Details</a> |
+                                        <a href="/project/editproject?project_id=[% top_project.id %]" target="_blank" style="color: #007bff;">Edit</a>
+                                    </p>
+                                    
+                                    [% SET top_subs = top_project.sub_projects.search({}, { order_by => 'id' }) %]
+                                    [% IF top_subs.count > 0 %]
+                                        <details style="margin-top: 8px;">
+                                            <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                📂 Sub-projects ([% top_subs.count %])
+                                            </summary>
+                                            <div style="margin-left: 15px; font-size: 0.95em;">
+                                                [% FOREACH sub IN top_subs.all %]
+                                                    <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #f9f9f9;">
+                                                        📄 [% sub.name %] (ID: [% sub.id %]) - [% sub.status || 'Unknown' %]
+                                                        <br><a href="/project/details?project_id=[% sub.id %]" target="_blank" style="font-size: 0.9em;">View</a>
+                                                    </div>
+                                                [% END %]
+                                            </div>
+                                        </details>
+                                    [% END %]
+                                </div>
+                            </details>
+                        [% END %]
+                    [% ELSE %]
+                        <p><em>No projects found in database.</em></p>
+                    [% END %]
+                [% CATCH %]
+                    <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch projects. [% error.info %]</p>
+                [% END %]
+            </div>
+        </details>
+
         <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
         <div id="group-infrastructure-ha" class="priority-group-container">
             <h3 class="group-header">🏗️ Infrastructure Resilience & High Availability</h3>
@@ -771,7 +828,8 @@ last_updated = '2026/02/08'
             <h4>📊 Planning System Project from Database</h4>
             [% TRY %]
                 [% SET schema = c.model('DBEncy').schema %]
-                [% SET planning_project = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
+                [% SET planning_project_search = schema.resultset('Project').search({ project_code => 'Planning' }).first %]
+                [% SET planning_project = schema.resultset('Project').find(planning_project_search.id) IF planning_project_search %]
                 
                 [% IF planning_project %]
                     [% BLOCK render_planning_project %]
