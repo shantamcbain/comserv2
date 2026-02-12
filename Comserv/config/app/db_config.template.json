@@ -1,0 +1,227 @@
+{
+  "deployment_rules": {
+    "production_server": "Use ONLY on production deployment machines. Database is isolated from other environments.",
+    "workstation": "Development workstation - configure production connection for testing plus local databases for isolation.",
+    "testing_server": "QA/Testing environment - includes failover options and backup connections.",
+    "backup_server": "Backup/Archive server - ONLY backup connections available.",
+    "placeholder_skip": "Connection entries with YOUR_* placeholders are automatically skipped by RemoteDB.pm"
+  },
+  "connection_priority_order": "RemoteDB.pm tries connections in priority order (1-10). First available connection is used. Unreachable hosts are skipped after timeout.",
+  "production_connections": {
+    "production_server": {
+      "priority": 1,
+      "description": "Primary production database server",
+      "db_type": "mariadb",
+      "host": "YOUR_PRODUCTION_HOST",
+      "port": 3306,
+      "database": "comserv_production",
+      "username": "YOUR_PRODUCTION_USER",
+      "password": "YOUR_PRODUCTION_PASSWORD",
+      "enabled": true,
+      "notes": "Production server connection - only configure in production environments"
+    },
+    "production_forager": {
+      "priority": 2,
+      "description": "Production forager database (read replicas/analytics)",
+      "db_type": "mariadb",
+      "host": "YOUR_FORAGER_HOST",
+      "port": 3306,
+      "database": "comserv_forager",
+      "username": "YOUR_FORAGER_USER",
+      "password": "YOUR_FORAGER_PASSWORD",
+      "enabled": false,
+      "notes": "Optional forager database for distributed queries"
+    }
+  },
+  "workstation_connections": {
+    "production_server": {
+      "priority": 1,
+      "description": "Production database for testing (workstation)",
+      "db_type": "mariadb",
+      "host": "192.168.1.198",
+      "port": 3306,
+      "database": "comserv_production",
+      "username": "app_user",
+      "password": "YOUR_PASSWORD_HERE",
+      "enabled": true,
+      "notes": "Production server accessible via local network"
+    },
+    "local_development": {
+      "priority": 3,
+      "description": "Local development database",
+      "db_type": "mariadb",
+      "host": "localhost",
+      "port": 3306,
+      "database": "comserv_dev",
+      "username": "dev_user",
+      "password": "dev_password",
+      "enabled": true,
+      "notes": "Isolated development database for feature testing"
+    },
+    "local_testing": {
+      "priority": 4,
+      "description": "Local testing database (separate schema)",
+      "db_type": "mariadb",
+      "host": "localhost",
+      "port": 3306,
+      "database": "comserv_test",
+      "username": "test_user",
+      "password": "test_password",
+      "enabled": true,
+      "notes": "Isolated test database for unit/integration tests"
+    },
+    "local_sqlite": {
+      "priority": 5,
+      "description": "SQLite offline database (no network required)",
+      "db_type": "sqlite",
+      "database": "/tmp/comserv_offline.db",
+      "enabled": false,
+      "notes": "SQLite mode for testing without network access"
+    },
+    "zerotier_backup": {
+      "priority": 6,
+      "description": "Backup server via ZeroTier network",
+      "db_type": "mariadb",
+      "host": "YOUR_ZEROTIER_BACKUP_IP",
+      "port": 3306,
+      "database": "comserv_backup",
+      "username": "YOUR_BACKUP_USER",
+      "password": "YOUR_BACKUP_PASSWORD",
+      "enabled": false,
+      "notes": "Backup server accessible via ZeroTier VPN"
+    },
+    "zerotier_archive": {
+      "priority": 7,
+      "description": "Archive server via ZeroTier network",
+      "db_type": "mariadb",
+      "host": "YOUR_ZEROTIER_ARCHIVE_IP",
+      "port": 3306,
+      "database": "comserv_archive",
+      "username": "YOUR_ARCHIVE_USER",
+      "password": "YOUR_ARCHIVE_PASSWORD",
+      "enabled": false,
+      "notes": "Historical archive accessible via ZeroTier VPN"
+    }
+  },
+  "testing_server_connections": {
+    "production_server": {
+      "priority": 1,
+      "description": "Production database for QA verification",
+      "db_type": "mariadb",
+      "host": "192.168.1.198",
+      "port": 3306,
+      "database": "comserv_production",
+      "username": "qa_user",
+      "password": "YOUR_QA_PASSWORD",
+      "enabled": true,
+      "notes": "Production data for regression testing"
+    },
+    "testing_local": {
+      "priority": 2,
+      "description": "Local testing database on QA server",
+      "db_type": "mariadb",
+      "host": "localhost",
+      "port": 3306,
+      "database": "comserv_qa",
+      "username": "qa_local_user",
+      "password": "qa_local_password",
+      "enabled": true,
+      "notes": "QA-specific test database"
+    },
+    "zerotier_failover": {
+      "priority": 3,
+      "description": "Failover database via ZeroTier",
+      "db_type": "mariadb",
+      "host": "YOUR_ZEROTIER_FAILOVER_IP",
+      "port": 3306,
+      "database": "comserv_failover",
+      "username": "YOUR_FAILOVER_USER",
+      "password": "YOUR_FAILOVER_PASSWORD",
+      "enabled": false,
+      "notes": "Failover connection for disaster recovery testing"
+    },
+    "backup_verification": {
+      "priority": 4,
+      "description": "Backup server for restore verification",
+      "db_type": "mariadb",
+      "host": "YOUR_BACKUP_HOST",
+      "port": 3306,
+      "database": "comserv_backup",
+      "username": "YOUR_BACKUP_USER",
+      "password": "YOUR_BACKUP_PASSWORD",
+      "enabled": false,
+      "notes": "Backup server for restore testing"
+    }
+  },
+  "backup_server_connections": {
+    "backup_primary": {
+      "priority": 1,
+      "description": "Primary backup database",
+      "db_type": "mariadb",
+      "host": "YOUR_BACKUP_PRIMARY_HOST",
+      "port": 3306,
+      "database": "comserv_backup",
+      "username": "YOUR_BACKUP_PRIMARY_USER",
+      "password": "YOUR_BACKUP_PRIMARY_PASSWORD",
+      "enabled": false,
+      "notes": "Main backup storage server - only configure in backup environments"
+    },
+    "backup_secondary": {
+      "priority": 2,
+      "description": "Secondary backup database (replication target)",
+      "db_type": "mariadb",
+      "host": "YOUR_BACKUP_SECONDARY_HOST",
+      "port": 3306,
+      "database": "comserv_backup",
+      "username": "YOUR_BACKUP_SECONDARY_USER",
+      "password": "YOUR_BACKUP_SECONDARY_PASSWORD",
+      "enabled": false,
+      "notes": "Secondary backup for redundancy"
+    },
+    "archive_long_term": {
+      "priority": 3,
+      "description": "Long-term archive storage",
+      "db_type": "mariadb",
+      "host": "YOUR_ARCHIVE_HOST",
+      "port": 3306,
+      "database": "comserv_archive",
+      "username": "YOUR_ARCHIVE_USER",
+      "password": "YOUR_ARCHIVE_PASSWORD",
+      "enabled": false,
+      "notes": "Historical data archive"
+    }
+  },
+  "environment_guidance": {
+    "production_deployment": {
+      "active_connections": ["production_server", "production_forager"],
+      "skip_connections": ["local_*", "zerotier_*", "testing_*", "backup_*"],
+      "guidance": "On production servers, ONLY configure production connection profiles. Network isolation ensures no accidental connections to test systems.",
+      "timeout_critical": true
+    },
+    "development_workstation": {
+      "active_connections": ["production_server", "local_development", "local_testing", "zerotier_backup", "zerotier_archive"],
+      "skip_connections": ["backup_*", "testing_server_*"],
+      "guidance": "Workstations can have production access plus local isolation for development. ZeroTier VPN connections available for remote testing.",
+      "recommended_priority": "Use local_development as primary (priority 3) to avoid impacting production during normal development"
+    },
+    "qa_testing_server": {
+      "active_connections": ["production_server", "testing_local", "zerotier_failover", "backup_verification"],
+      "skip_connections": ["local_development", "backup_primary", "backup_secondary"],
+      "guidance": "QA servers should test against production data but with isolated test databases. Failover connections test disaster recovery.",
+      "recommended_priority": "Production access (priority 1) for regression testing, local QA (priority 2) for new features"
+    },
+    "backup_archive_server": {
+      "active_connections": ["backup_primary", "backup_secondary", "archive_long_term"],
+      "skip_connections": ["production_*", "testing_*", "workstation_*", "zerotier_*"],
+      "guidance": "Backup servers ONLY have backup/archive connections. No access to production or development systems.",
+      "timeout_optional": true
+    }
+  },
+  "implementation_notes": {
+    "environment_detection": "RemoteDB.pm can auto-detect environment from hostname or ENV variables. Configure COMSERV_DEPLOYMENT_ENV=production|development|testing|backup",
+    "connection_timeout": "5-second timeout applied to MariaDB/MySQL connections (after TASK 1 fix) to prevent indefinite hanging on unreachable hosts",
+    "failover_strategy": "If primary connection fails, RemoteDB.pm automatically tries next priority connection. No manual intervention needed.",
+    "placeholder_handling": "Entries with YOUR_* values are automatically skipped. This allows template to include all possible profiles with defaults.",
+    "credentials_security": "Store actual credentials in environment variables (/tmp/comserv_db_env.conf) rather than in this config file. Use Admin database_config form to manage."
+  }
+}

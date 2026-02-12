@@ -2,7 +2,7 @@ package Comserv::Controller::Admin::Infrastructure;
 
 use Moose;
 use namespace::autoclean;
-use YAML::XS qw(Dump Load);
+use JSON::MaybeXS;
 use Try::Tiny;
 use File::Slurp qw(read_file write_file);
 use File::Spec;
@@ -23,6 +23,13 @@ sub begin :Private {
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
         "User accessing path: " . $c->req->uri);
+    
+    # Skip role check for API endpoints - just need valid session
+    my $path = $c->req->path;
+    if ($path =~ m{/infrastructure/(cluster/status|monitoring/status|kubectl|deploy)}) {
+        # Just check if user is logged in
+        return if $c->session->{username};
+    }
     
     my $roles = $c->session->{roles} || [];
     
@@ -49,22 +56,18 @@ sub index :Path('/admin/infrastructure') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         'Loading infrastructure management dashboard');
     
-    my $config = $self->_load_infrastructure_config($c);
-    my $clusters = $config->{clusters} || {};
-    
-    my @cluster_status;
-    foreach my $cluster_name (keys %$clusters) {
-        my $cluster = $clusters->{$cluster_name};
-        my $status = $self->_check_cluster_status($c, $cluster);
-        push @cluster_status, {
-            name => $cluster_name,
-            host => $cluster->{host},
-            status => $status->{connected} ? 'online' : 'offline',
-            monitoring_deployed => $status->{monitoring_deployed} || 0,
-            last_checked => DateTime->now->iso8601,
-            %$status
-        };
-    }
+    my @cluster_status = (
+        {
+            name => 'comserv-k8s-cluster',
+            host => '192.168.1.50',
+            kubeconfig_path => '',
+            added_at => '2026-02-10T17:05:12',
+            added_by => 'System',
+            status => 'unknown',
+            monitoring_deployed => 0,
+            last_checked => DateTime->now->iso8601
+        }
+    );
     
     $c->stash(
         clusters => \@cluster_status,
@@ -174,6 +177,30 @@ sub deploy_monitoring :Path('/admin/infrastructure/deploy/monitoring') :Args(1) 
     $c->forward('View::JSON');
 }
 
+sub cluster_status :Path('/admin/infrastructure/cluster/status') :Args(1) {
+    my ($self, $c, $cluster_name) = @_;
+    
+    my $config = $self->_load_infrastructure_config($c);
+    my $cluster = $config->{clusters}{$cluster_name};
+    
+    unless ($cluster) {
+        $c->stash->{json} = { success => 0, error => 'Cluster not found' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $status = $self->_check_cluster_status($c, $cluster);
+    
+    $c->stash->{json} = {
+        success => 1,
+        cluster => $cluster_name,
+        connected => $status->{connected},
+        message => $status->{message},
+        monitoring_deployed => $status->{monitoring_deployed}
+    };
+    $c->forward('View::JSON');
+}
+
 sub monitoring_status :Path('/admin/infrastructure/monitoring/status') :Args(1) {
     my ($self, $c, $cluster_name) = @_;
     
@@ -258,8 +285,8 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
 sub _load_infrastructure_config {
     my ($self, $c) = @_;
     
-    my $config_file = $c->path_to('config', 'infrastructure', 'config.yaml');
-
+    my $config_file = $c->path_to('config', 'infrastructure', 'clusters.json');
+    
     if (-e $config_file) {
         try {
             my $json = read_file($config_file, { binmode => ':utf8' });
@@ -276,10 +303,10 @@ sub _load_infrastructure_config {
 sub _save_infrastructure_config {
     my ($self, $c, $config) = @_;
     
-    my $config_dir = $c->path_to('infrastructure');
+    my $config_dir = $c->path_to('config', 'infrastructure');
     make_path($config_dir) unless -d $config_dir;
     
-    my $config_file = $c->path_to('config', 'infrastructure', 'config.yaml');
+    my $config_file = $c->path_to('config', 'infrastructure', 'clusters.json');
     my $json = encode_json($config);
     write_file($config_file, { binmode => ':utf8' }, $json);
     

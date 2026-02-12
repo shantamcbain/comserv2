@@ -1,0 +1,78 @@
+version: '3.9'
+
+services:
+  web-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comserv-web-staging
+    restart: unless-stopped
+    labels:
+      - "description=Staging web server for pre-production testing and validation"
+    environment:
+      CATALYST_ENV: staging
+      CATALYST_DEBUG: 0
+      WEB_PORT: 5000
+      TZ: UTC
+      # Database configuration for staging
+      DB_HOST: ${DB_HOST_STAGING:-db-staging.example.com}
+      DB_PORT: ${DB_PORT_STAGING:-3306}
+      DB_NAME: ${DB_NAME_STAGING:-comserv_staging}
+      DB_USER: ${DB_USER_STAGING:-comserv}
+      DB_PASS: ${DB_PASS_STAGING}
+    ports:
+      - "5000:5000"
+    networks:
+      comserv-staging-network:
+        ipv4_address: 172.21.0.2
+    volumes:
+      # Source code (read-only in staging)
+      - ./lib:/opt/comserv/lib:ro
+      - ./script:/opt/comserv/script:ro
+      - ./root:/opt/comserv/root:ro
+      - ./config:/opt/comserv/config:ro
+      - ./t:/opt/comserv/t:ro
+      # Config (read-only)
+      - ./db_config.json:/opt/comserv/db_config.json:ro
+      # Persistent volumes for logs and sessions
+      - comserv-staging-logs:/opt/comserv/root/log
+      - comserv-staging-sessions:/opt/comserv/root/session
+      - comserv-staging-backups:/opt/comserv/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    # Staging-specific resource limits for cost optimization
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+volumes:
+  comserv-staging-logs:
+    driver: local
+  comserv-staging-sessions:
+    driver: local
+  comserv-staging-backups:
+    driver: local
+
+networks:
+  comserv-staging-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-comserv-staging
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
