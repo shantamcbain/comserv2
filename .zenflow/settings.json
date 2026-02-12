@@ -1,0 +1,10 @@
+{
+  "setup_script": "cd Comserv && cpanm --installdeps .",
+  "dev_script": "./start-dev-server.sh",
+  "verification_script": "perl -cw Comserv/script/comserv_server.pl",
+  "copy_files": [
+    ".env",
+    "Comserv/.env",
+    "Comserv/db_config.json"
+  ]
+}
