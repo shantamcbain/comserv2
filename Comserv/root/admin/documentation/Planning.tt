@@ -149,6 +149,10 @@ last_updated = '2026/02/08'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
+                        <strong><a href="#group-zenflow-config" class="jump-link">⚙️ Zenflow Config & Docker</a></strong>:
+                        <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
                         <a href="#anchor-api-bc05" class="jump-link">ApiSystemBC05</a> |
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
@@ -217,6 +221,7 @@ last_updated = '2026/02/08'
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
+                <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -286,6 +291,97 @@ last_updated = '2026/02/08'
                 [% END %]
             </div>
         </details>
+        <!-- Group -1: Zenflow Configuration & Docker Testing (ACTIVE) -->
+        <div id="group-zenflow-config" class="priority-group-container">
+            <h3 class="group-header">⚙️ Zenflow Configuration & Docker Container Testing</h3>
+
+            <div id="anchor-project-config-test" class="nav-anchor"></div>
+            <details id="project-config-test" class="priority-container" open>
+                <summary class="priority-summary">🔧 Project Configuration & Docker Container Rebuild Testing (ACTIVE)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> HIGH</p>
+                    <p><strong>Zenflow Task:</strong> <code>set-up-project-config-d327</code> (ports 3000, 5000) | <strong>Branch:</strong> <code>set-up-project-config-d327</code></p>
+                    <p><strong>Goal:</strong> Configure Zenflow automation settings and validate Docker container build with updated Perl dependencies.</p>
+
+                    <h4>📋 Current Phase: Docker Container Validation</h4>
+                    <div style="background: #e7f3ff; border: 1px solid #2196f3; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                        <p><strong>Update (Feb 12, 2026):</strong> Added needed modules to <code>Comserv/cpanfile</code>. Now testing Docker container rebuild and application accessibility.</p>
+                    </div>
+
+                    <h4>🎯 Next Steps</h4>
+                    <ol>
+                        <li><strong>Rebuild Docker Container:</strong>
+                            <ul>
+                                <li>Navigate to Comserv directory: <code>cd Comserv</code></li>
+                                <li>Build image: <code>docker build -t comserv-test:latest .</code></li>
+                                <li>Verify build completes without errors</li>
+                                <li>Confirm all cpanfile dependencies install successfully</li>
+                            </ul>
+                        </li>
+                        <li><strong>Test Application Access (Port 3000):</strong>
+                            <ul>
+                                <li>Start container with port 3000 mapped</li>
+                                <li>Test: <code>curl http://localhost:3000/</code></li>
+                                <li>Verify application responds correctly</li>
+                                <li>Check logs for errors: <code>docker logs [container-id]</code></li>
+                            </ul>
+                        </li>
+                        <li><strong>Test Application Access (Port 5000):</strong>
+                            <ul>
+                                <li>Start container with port 5000 mapped (alternative configuration)</li>
+                                <li>Test: <code>curl http://localhost:5000/</code></li>
+                                <li>Verify application responds correctly</li>
+                                <li>Document port configuration differences</li>
+                            </ul>
+                        </li>
+                        <li><strong>Validate Zenflow Settings:</strong>
+                            <ul>
+                                <li>Verify <code>.zenflow/settings.json</code> configuration</li>
+                                <li>Test setup_script: <code>cd Comserv && cpanm --installdeps .</code></li>
+                                <li>Test verification_script: <code>perl -cw Comserv/script/comserv_server.pl</code></li>
+                                <li>Confirm copy_files patterns work correctly</li>
+                            </ul>
+                        </li>
+                        <li><strong>Integration Testing:</strong>
+                            <ul>
+                                <li>Test full Zenflow workflow in fresh worktree</li>
+                                <li>Verify setup script runs successfully</li>
+                                <li>Verify dev server starts on configured port</li>
+                                <li>Test verification script catches syntax errors</li>
+                            </ul>
+                        </li>
+                    </ol>
+
+                    <h4>📝 Completed Tasks</h4>
+                    <ul>
+                        <li>✅ Analyzed repository structure and dependencies</li>
+                        <li>✅ Created <code>.zenflow/settings.json</code> with configuration:
+                            <ul>
+                                <li>setup_script: Install Perl CPAN dependencies</li>
+                                <li>dev_script: Start development server via <code>start-dev-server.sh</code></li>
+                                <li>verification_script: Syntax check for Catalyst server</li>
+                                <li>copy_files: Environment files and database config</li>
+                            </ul>
+                        </li>
+                        <li>✅ Added required modules to <code>Comserv/cpanfile</code></li>
+                    </ul>
+
+                    <h4>⚠️ Issues & Blockers</h4>
+                    <ul>
+                        <li><strong>Port Configuration:</strong> Need to determine dynamic port assignment per branch (Planning.tt shows 4000-4003 for other workflows, this task uses 3000/5000)</li>
+                        <li><strong>Docker Build Time:</strong> First build may take ~5 minutes for CPAN module installation</li>
+                    </ul>
+
+                    <h4>📚 References</h4>
+                    <ul>
+                        <li><strong>Docker Guide:</strong> <code>DOCKER_QUICKSTART.txt</code></li>
+                        <li><strong>Makefile:</strong> <code>Makefile.docker</code> (shortcuts for Docker commands)</li>
+                        <li><strong>Dockerfile:</strong> <code>Comserv/Dockerfile</code></li>
+                        <li><strong>Dependencies:</strong> <code>Comserv/cpanfile</code></li>
+                    </ul>
+                </div>
+            </details>
+        </div>
 
         <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
         <div id="group-infrastructure-ha" class="priority-group-container">
