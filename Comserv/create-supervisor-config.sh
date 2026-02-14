@@ -32,7 +32,7 @@ chmod 755 ${CATALYST_HOME}/root/log
 # Build environment variables for supervisor
 ENV_VARS="PATH=/opt/comserv/local/bin:/opt/comserv/script:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ENV_VARS="$ENV_VARS,PERL_LOCAL_LIB_ROOT=/opt/comserv/local"
-ENV_VARS="$ENV_VARS,PERL5LIB=/opt/comserv/local/lib/perl5"
+ENV_VARS="$ENV_VARS,PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5"
 ENV_VARS="$ENV_VARS,CATALYST_ENV=$CATALYST_ENV"
 ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
