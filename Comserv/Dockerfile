@@ -23,7 +23,7 @@ RUN curl -L https://cpanmin.us | perl - App::cpanminus
 # Create application directory
 WORKDIR /opt/comserv
 ENV PERL_LOCAL_LIB_ROOT=/opt/comserv/local
-ENV PERL5LIB=/opt/comserv/local/lib/perl5:$PERL5LIB
+ENV PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5:$PERL5LIB
 ENV PATH=/opt/comserv/local/bin:$PATH
 
 # Copy application files
@@ -69,7 +69,7 @@ COPY --from=builder --chown=comserv:comserv /opt/comserv /opt/comserv
 
 # Set environment
 ENV PERL_LOCAL_LIB_ROOT=/opt/comserv/local
-ENV PERL5LIB=/opt/comserv/local/lib/perl5:$PERL5LIB
+ENV PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5:$PERL5LIB
 ENV PATH=/opt/comserv/local/bin:/opt/comserv/script:$PATH
 ENV CATALYST_ENV=production CATALYST_DEBUG=0
 ENV CPANM_HOME=/opt/comserv/.cpanm
