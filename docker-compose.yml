@@ -66,6 +66,7 @@ services:
       - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
+      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -116,6 +117,7 @@ services:
       - ${APP_MOUNT:-.}/Comserv/config:/opt/comserv/config:delegated
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro
+      - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
     depends_on:
       redis:
         condition: service_healthy
