@@ -36,6 +36,7 @@ ENV_VARS="$ENV_VARS,PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5"
 ENV_VARS="$ENV_VARS,CATALYST_ENV=$CATALYST_ENV"
 ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
+ENV_VARS="$ENV_VARS,COMSERV_LOG_DIR=/opt/comserv"
 
 # Pass through all COMSERV_DB_* environment variables from container env
 if env | grep -q '^COMSERV_DB_'; then
