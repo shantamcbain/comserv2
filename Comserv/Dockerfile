@@ -73,6 +73,7 @@ ENV PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5:$PERL5LIB
 ENV PATH=/opt/comserv/local/bin:/opt/comserv/script:$PATH
 ENV CATALYST_ENV=production CATALYST_DEBUG=0
 ENV CPANM_HOME=/opt/comserv/.cpanm
+ENV COMSERV_LOG_DIR=/opt/comserv
 
 # Create directories
 RUN mkdir -p /opt/comserv/root/log /opt/comserv/root/session \
