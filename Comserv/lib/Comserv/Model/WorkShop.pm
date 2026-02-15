@@ -26,7 +26,10 @@ sub get_active_workshops {
                     { share => 'private', sitename => $c->session->{SiteName} }
                 ]
             },
-            { order_by => { -asc => 'date' } }
+            { 
+                order_by => { -asc => 'date' },
+                prefetch => 'creator'
+            }
         );
     };
     if ($@) {
@@ -73,7 +76,10 @@ sub get_past_workshops {
                     { share => 'private', sitename => $c->session->{SiteName} }
                 ]
             },
-            { order_by => { -desc => 'date' } }
+            { 
+                order_by => { -desc => 'date' },
+                prefetch => 'creator'
+            }
         );
     };
     if ($@) {
