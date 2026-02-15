@@ -107,7 +107,10 @@ sub dashboard :Local {
 
     my @my_workshops = $schema->resultset('WorkShop')->search(
         $search_filter,
-        { order_by => { -desc => 'created_at' } }
+        { 
+            order_by => { -desc => 'created_at' },
+            prefetch => 'creator'
+        }
     )->all;
 
     $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
@@ -124,7 +127,8 @@ sub dashboard :Local {
             {
                 id => { -in => \@workshop_leader_ids },
                 created_by => { '!=' => $user_id }
-            }
+            },
+            { prefetch => 'creator' }
         )->all;
         push @my_workshops, @leader_workshops;
     }
