@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.67' %]
+[% version = '0.68' %]
 [% date_iso = '2026/02/15' %]
 [% formatted_date = 'February 15, 2026' %]
-[% time = '15:50:00' %]
-[% change_log = 'WorkShops: Created 9 phase sub-projects in database (IDs 165-173). Converted phase display to database-driven normally closed containers showing "What/Why", database details, and todos per phase. Included via _workshops_phases.tt.' %]
+[% time = '16:04:00' %]
+[% change_log = 'WorkShops: Created detailed todos for all 9 phase sub-projects (Phases 0-8). Each phase now has comprehensive task breakdown with descriptions. Sub-projects use IDs 174-182 (corrected from initial 165-173). Total ~50 todos created across all phases.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
