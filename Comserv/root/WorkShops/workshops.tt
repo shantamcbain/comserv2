@@ -1,10 +1,15 @@
-[% PageVersion = 'WorkShops/workshops.tt,v 0.01 2024/01/08 shanta Exp shanta ' %]
+[% PageVersion = 'WorkShops/workshops.tt,v 0.02 2026/02/15 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
 
 <h1>Workshops</h1>
-<a href="/workshop/add">Add Workshop</a>
+<div style="margin-bottom: 15px;">
+    <a href="/workshop/add" style="margin-right: 10px;">Add Workshop</a>
+    [% IF is_admin %]
+    <a href="/workshop/dashboard" style="margin-right: 10px;">My Dashboard</a>
+    [% END %]
+</div>
 <table>
     <tr>
         <th>SiteName</th>
@@ -52,3 +57,54 @@
 [% IF c.flash.success_msg %]
     <p class="success">[% c.flash.success_msg %]</p>
 [% END %]
+
+<details style="margin-top: 30px;">
+    <summary style="cursor: pointer; font-size: 1.2em; font-weight: bold; padding: 10px; background-color: #f0f0f0; border: 1px solid #ccc;">
+        Past Workshops ([% past_workshops.size || 0 %])
+    </summary>
+    <div style="margin-top: 10px;">
+        [% IF past_workshops.size > 0 %]
+        <table>
+            <tr>
+                <th>SiteName</th>
+                <th>Date of Workshop</th>
+                <th>Time</th>
+                <th>End Time</th>
+                <th>Location</th>
+                <th>Title</th>
+                <th>Max Participants</th>
+                <th>Actions</th>
+            </tr>
+            [% FOREACH workshop IN past_workshops %]
+            <tr>
+                <td>[% workshop.sitename %]</td>
+                <td>[% workshop.date.split(' ').0 %]</td>
+                <td>[% workshop.time %]</td>
+                <td>[% workshop.end_time %]</td>
+                <td>[% workshop.location %]</td>
+                <td>[% workshop.title %]</td>
+                <td>[% workshop.max_participants || 'N/A' %]</td>
+                <td>
+                    <form action="/workshop/details" method="GET" style="display:inline;">
+                        <input type="hidden" name="id" value="[% workshop.id %]">
+                        <input type="submit" value="Details">
+                    </form>
+                    [% IF c.session.roles.grep('admin').size %]
+                    <form method="GET" action="/workshop/edit/[% workshop.id %]">
+                        <input type="hidden" name="id" value="[% workshop.id %]">
+                        <input type="submit" value="Edit">
+                    </form>
+                    [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </table>
+        [% ELSE %]
+        <p>No past workshops found.</p>
+        [% END %]
+        
+        [% IF past_error %]
+            <p class="error">[% past_error %]</p>
+        [% END %]
+    </div>
+</details>
