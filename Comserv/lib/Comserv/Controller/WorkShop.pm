@@ -1148,6 +1148,243 @@ sub download :Local :Args(1) {
     $c->response->body($file_data);
 }
 
+sub content :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to view content for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my @content = $c->model('DBEncy::WorkshopContent')->search(
+        { workshop_id => $id },
+        { order_by => { -asc => 'sort_order' } }
+    )->all;
+    
+    $c->stash(
+        workshop => $workshop,
+        content_sections => \@content,
+        template => 'WorkShops/content.tt',
+    );
+}
+
+sub add_content :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to add content to this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    if ($c->request->method eq 'GET') {
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/add_content.tt',
+        );
+        return;
+    }
+    
+    my $params = $c->request->body_parameters;
+    my $title = $params->{title};
+    my $content = $params->{content};
+    my $content_type = $params->{content_type} || 'text';
+    
+    unless ($title) {
+        $c->stash->{error_msg} = 'Title is required.';
+        $c->stash(
+            workshop => $workshop,
+            form_data => $params,
+            template => 'WorkShops/add_content.tt',
+        );
+        return;
+    }
+    
+    my $max_sort_order = $c->model('DBEncy::WorkshopContent')->search(
+        { workshop_id => $id }
+    )->get_column('sort_order')->max || 0;
+    
+    my $content_record;
+    eval {
+        $content_record = $c->model('DBEncy::WorkshopContent')->create({
+            workshop_id => $id,
+            title => $title,
+            content => $content,
+            content_type => $content_type,
+            sort_order => $max_sort_order + 1,
+        });
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to create content: $@");
+        $c->flash->{error_msg} = "Failed to create content: $@";
+    } else {
+        $c->flash->{success_msg} = 'Content added successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('content'), [$id]));
+}
+
+sub edit_content :Local :Args(1) {
+    my ($self, $c, $content_id) = @_;
+    
+    my $content_record = $c->model('DBEncy::WorkshopContent')->find($content_id);
+    
+    unless ($content_record) {
+        $c->flash->{error_msg} = 'Content not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $workshop = $content_record->workshop;
+    my $workshop_id = $workshop->id;
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to edit content for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    if ($c->request->method eq 'GET') {
+        $c->stash(
+            workshop => $workshop,
+            content_record => $content_record,
+            template => 'WorkShops/edit_content.tt',
+        );
+        return;
+    }
+    
+    my $params = $c->request->body_parameters;
+    my $title = $params->{title};
+    my $content = $params->{content};
+    my $content_type = $params->{content_type} || 'text';
+    
+    unless ($title) {
+        $c->stash->{error_msg} = 'Title is required.';
+        $c->stash(
+            workshop => $workshop,
+            content_record => $content_record,
+            form_data => $params,
+            template => 'WorkShops/edit_content.tt',
+        );
+        return;
+    }
+    
+    eval {
+        $content_record->update({
+            title => $title,
+            content => $content,
+            content_type => $content_type,
+        });
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to update content: $@");
+        $c->flash->{error_msg} = "Failed to update content: $@";
+    } else {
+        $c->flash->{success_msg} = 'Content updated successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('content'), [$workshop_id]));
+}
+
+sub delete_content :Local :Args(1) {
+    my ($self, $c, $content_id) = @_;
+    
+    my $content_record = $c->model('DBEncy::WorkshopContent')->find($content_id);
+    
+    unless ($content_record) {
+        $c->flash->{error_msg} = 'Content not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $workshop = $content_record->workshop;
+    my $workshop_id = $workshop->id;
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to delete content from this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $content_record->delete;
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to delete content: $@");
+        $c->flash->{error_msg} = "Failed to delete content: $@";
+    } else {
+        $c->flash->{success_msg} = 'Content deleted successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('content'), [$workshop_id]));
+}
+
+sub reorder_content :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->response->status(404);
+        $c->response->body('Workshop not found');
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->response->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+    
+    my $params = $c->request->body_parameters;
+    my $order = $params->{order};
+    
+    unless ($order) {
+        $c->response->status(400);
+        $c->response->body('Missing order parameter');
+        return;
+    }
+    
+    my @content_ids = split(',', $order);
+    
+    my $sort_order = 1;
+    for my $content_id (@content_ids) {
+        my $content_record = $c->model('DBEncy::WorkshopContent')->find($content_id);
+        if ($content_record && $content_record->workshop_id == $id) {
+            eval {
+                $content_record->update({ sort_order => $sort_order });
+            };
+            if ($@) {
+                $c->log->error("Failed to update sort_order for content $content_id: $@");
+            }
+            $sort_order++;
+        }
+    }
+    
+    $c->response->content_type('application/json');
+    $c->response->body('{"success": true}');
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
