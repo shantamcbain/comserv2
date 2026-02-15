@@ -34,10 +34,12 @@
         <td>[% workshop.title %]</td>
         [% IF is_admin %]
         <td>
-            [% IF workshop.creator %]
-                <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+            [% IF workshop.creator && workshop.created_by %]
+                <a href="/user/edit_user/[% workshop.created_by %]" style="color: #007bff; text-decoration: underline;">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+            [% ELSIF workshop.created_by %]
+                <a href="/user/edit_user/[% workshop.created_by %]" style="color: #007bff; text-decoration: underline;">User ID: [% workshop.created_by %]</a>
             [% ELSE %]
-                [% workshop.instructor || 'N/A' %]
+                <span style="color: #6c757d;">[% workshop.instructor || 'N/A' %]</span>
             [% END %]
         </td>
         [% END %]
@@ -100,10 +102,12 @@
                 <td>[% workshop.title %]</td>
                 [% IF is_admin %]
                 <td>
-                    [% IF workshop.creator %]
-                        <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+                    [% IF workshop.creator && workshop.created_by %]
+                        <a href="/user/edit_user/[% workshop.created_by %]" style="color: #007bff; text-decoration: underline;">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+                    [% ELSIF workshop.created_by %]
+                        <a href="/user/edit_user/[% workshop.created_by %]" style="color: #007bff; text-decoration: underline;">User ID: [% workshop.created_by %]</a>
                     [% ELSE %]
-                        [% workshop.instructor || 'N/A' %]
+                        <span style="color: #6c757d;">[% workshop.instructor || 'N/A' %]</span>
                     [% END %]
                 </td>
                 [% END %]
