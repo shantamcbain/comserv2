@@ -15,6 +15,7 @@
     <tr style="background-color: #f0f0f0;">
         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Title</th>
         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Date</th>
+        <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Leader</th>
         <th style="padding: 10px; border: 1px solid #ccc; text-align: left;">Status</th>
         <th style="padding: 10px; border: 1px solid #ccc; text-align: center;">Participants</th>
         <th style="padding: 10px; border: 1px solid #ccc; text-align: center;">Emails</th>
@@ -31,6 +32,16 @@
         <td style="padding: 10px; border: 1px solid #ccc;">
             [% workshop.date.split(' ').0 %]<br>
             <small>[% workshop.time %] - [% workshop.end_time %]</small>
+        </td>
+        <td style="padding: 10px; border: 1px solid #ccc;">
+            [% IF workshop.creator %]
+                <a href="/user/edit_user/[% workshop.created_by %]" style="color: #007bff; text-decoration: none;">
+                    [% workshop.creator.first_name %] [% workshop.creator.last_name %]
+                </a><br>
+                <small style="color: #6c757d;">[% workshop.creator.username %]</small>
+            [% ELSE %]
+                <span style="color: #6c757d;">[% workshop.instructor || 'N/A' %]</span>
+            [% END %]
         </td>
         <td style="padding: 10px; border: 1px solid #ccc;">
             <span style="padding: 3px 8px; border-radius: 3px; font-size: 0.9em; 

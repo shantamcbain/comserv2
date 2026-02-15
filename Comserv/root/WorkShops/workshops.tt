@@ -1,4 +1,4 @@
-[% PageVersion = 'WorkShops/workshops.tt,v 0.02 2026/02/15 shanta Exp shanta ' %]
+[% PageVersion = 'WorkShops/workshops.tt,v 0.03 2026/02/15 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -18,6 +18,9 @@
         <th>End Time</th>
         <th>Location</th>
         <th>Title</th>
+        [% IF is_admin %]
+        <th>Leader</th>
+        [% END %]
         <th>Max Participants</th>
         <th>Actions</th>
     </tr>
@@ -29,6 +32,15 @@
         <td>[% workshop.end_time %]</td>
         <td>[% workshop.location %]</td>
         <td>[% workshop.title %]</td>
+        [% IF is_admin %]
+        <td>
+            [% IF workshop.creator %]
+                <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+            [% ELSE %]
+                [% workshop.instructor || 'N/A' %]
+            [% END %]
+        </td>
+        [% END %]
         <td>[% workshop.max_participants || 'N/A' %]</td> <!-- Display 'N/A' if undefined -->
         <td>
             <form action="/workshop/details" method="GET" style="display:inline;">
@@ -72,6 +84,9 @@
                 <th>End Time</th>
                 <th>Location</th>
                 <th>Title</th>
+                [% IF is_admin %]
+                <th>Leader</th>
+                [% END %]
                 <th>Max Participants</th>
                 <th>Actions</th>
             </tr>
@@ -83,6 +98,15 @@
                 <td>[% workshop.end_time %]</td>
                 <td>[% workshop.location %]</td>
                 <td>[% workshop.title %]</td>
+                [% IF is_admin %]
+                <td>
+                    [% IF workshop.creator %]
+                        <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
+                    [% ELSE %]
+                        [% workshop.instructor || 'N/A' %]
+                    [% END %]
+                </td>
+                [% END %]
                 <td>[% workshop.max_participants || 'N/A' %]</td>
                 <td>
                     <form action="/workshop/details" method="GET" style="display:inline;">
