@@ -587,6 +587,172 @@ sub cancel :Local :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
 }
 
+sub register :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    unless ($c->user_exists) {
+        $c->flash->{error_msg} = 'You must be logged in to register for a workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($workshop->status eq 'published') {
+        $c->flash->{error_msg} = 'This workshop is not open for registration.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    
+    my $existing = $c->model('DBEncy::Participant')->search({
+        workshop_id => $id,
+        user_id => $user_id,
+        status => { -in => ['registered', 'waitlist'] }
+    })->first;
+    
+    if ($existing) {
+        $c->flash->{error_msg} = 'You are already registered for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    my $email = $user ? $user->email : $c->session->{email};
+    my $sitename = $c->session->{SiteName};
+    
+    my $participant_status;
+    if ($workshop->is_full) {
+        $participant_status = 'waitlist';
+    } else {
+        $participant_status = 'registered';
+    }
+    
+    my $participant;
+    eval {
+        $participant = $c->model('DBEncy::Participant')->create({
+            workshop_id => $id,
+            user_id => $user_id,
+            email => $email,
+            site_affiliation => $sitename,
+            status => $participant_status,
+        });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to register for workshop: ' . $@;
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    if ($email && $email =~ /\@/) {
+        eval {
+            my $from_address = $c->config->{mail_from} || 'noreply@computersystemconsulting.ca';
+            my $reply_to = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
+            
+            my $workshop_url = $c->uri_for($self->action_for('details'), { id => $id });
+            my $base_uri = $c->req->base;
+            my $full_url = $base_uri . $workshop_url;
+            
+            my $formatted_date = $workshop->date ? $workshop->date->strftime('%Y-%m-%d') : 'TBD';
+            my $formatted_time = $workshop->time ? $workshop->time->strftime('%H:%M') : 'TBD';
+            my $formatted_end_time = $workshop->end_time || '';
+            
+            my $user_name = '';
+            if ($user) {
+                $user_name = $user->first_name || $user->username || '';
+                if ($user->last_name) {
+                    $user_name .= ' ' . $user->last_name;
+                }
+            }
+            
+            $c->stash->{email} = {
+                to       => $email,
+                from     => $from_address,
+                reply_to => $reply_to,
+                subject  => 'Workshop Registration Confirmation - ' . $workshop->title,
+                template => 'email/workshop/registration_confirmation.tt',
+                template_vars => {
+                    name => $user_name,
+                    workshop_title => $workshop->title,
+                    workshop_instructor => $workshop->instructor,
+                    workshop_date => $formatted_date,
+                    workshop_time => $formatted_time,
+                    workshop_end_time => $formatted_end_time,
+                    workshop_location => $workshop->location,
+                    workshop_url => $full_url,
+                    status => $participant_status,
+                },
+            };
+            
+            $c->forward($c->view('Email::Template'));
+        };
+        
+        if ($@) {
+            $c->log->warn("Failed to send registration confirmation email: $@");
+        }
+    }
+    
+    if ($participant_status eq 'registered') {
+        $c->flash->{success_msg} = 'You have successfully registered for this workshop. A confirmation email has been sent to your email address.';
+    } else {
+        $c->flash->{success_msg} = 'You have been added to the waitlist for this workshop. You will be notified if a spot becomes available.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub unregister :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    unless ($c->user_exists) {
+        $c->flash->{error_msg} = 'You must be logged in to unregister from a workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    
+    my $participant = $c->model('DBEncy::Participant')->search({
+        workshop_id => $id,
+        user_id => $user_id,
+        status => { -in => ['registered', 'waitlist'] }
+    })->first;
+    
+    unless ($participant) {
+        $c->flash->{error_msg} = 'You are not registered for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+        return;
+    }
+    
+    eval {
+        $participant->update({ status => 'cancelled' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to cancel registration: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Your registration has been cancelled.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
