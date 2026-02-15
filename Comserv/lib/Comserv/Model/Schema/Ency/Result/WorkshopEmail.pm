@@ -1,8 +1,8 @@
-package Comserv::Model::Schema::Ency::Result::Participant;
+package Comserv::Model::Schema::Ency::Result::WorkshopEmail;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components("TimeStamp");
-__PACKAGE__->table('participant');
+__PACKAGE__->table('workshop_emails');
 
 __PACKAGE__->add_columns(
     id => {
@@ -12,33 +12,29 @@ __PACKAGE__->add_columns(
     workshop_id => {
         data_type => 'integer',
     },
-    user_id => {
+    sent_by => {
         data_type => 'integer',
-        is_nullable => 1,
     },
-    name => {
+    subject => {
         data_type => 'varchar',
         size => 255,
     },
-    email => {
-        data_type => 'varchar',
-        size => 255,
-        is_nullable => 1,
+    body => {
+        data_type => 'text',
     },
-    site_affiliation => {
-        data_type => 'varchar',
-        size => 255,
-        is_nullable => 1,
-    },
-    registered_at => {
+    sent_at => {
         data_type => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
     },
+    recipient_count => {
+        data_type => 'integer',
+        default_value => 0,
+    },
     status => {
         data_type => 'enum',
-        default_value => 'registered',
+        default_value => 'draft',
         extra => {
-            list => ['registered', 'waitlist', 'attended', 'cancelled']
+            list => ['draft', 'sent', 'failed']
         },
     },
 );
@@ -51,9 +47,8 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    user => 'Comserv::Model::Schema::Ency::Result::User',
-    { 'foreign.id' => 'self.user_id' },
-    { join_type => 'left' },
+    sender => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.id' => 'self.sent_by' },
 );
 
 1;
