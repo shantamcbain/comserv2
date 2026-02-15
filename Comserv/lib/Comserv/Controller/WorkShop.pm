@@ -927,6 +927,227 @@ sub remove_participant :Local :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('participants'), [$workshop_id]));
 }
 
+sub files :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to view files for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my @files = $c->model('DBEncy::File')->search(
+        { workshop_id => $id },
+        { order_by => { -desc => 'upload_date' } }
+    )->all;
+    
+    $c->stash(
+        workshop => $workshop,
+        files => \@files,
+        template => 'WorkShops/files.tt',
+    );
+}
+
+sub upload :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to upload files to this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    if ($c->request->method eq 'GET') {
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/upload.tt',
+        );
+        return;
+    }
+    
+    my $upload = $c->request->upload('file');
+    
+    unless ($upload) {
+        $c->stash->{error_msg} = 'No file uploaded.';
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/upload.tt',
+        );
+        return;
+    }
+    
+    my $filename = $upload->filename;
+    my $filesize = $upload->size;
+    
+    my @allowed_extensions = ('.ppt', '.pptx', '.pdf', '.PPT', '.PPTX', '.PDF');
+    my $max_size = 50 * 1024 * 1024;
+    
+    my ($file_extension) = $filename =~ /(\.[^.]+)$/;
+    
+    unless ($file_extension && grep { lc($_) eq lc($file_extension) } @allowed_extensions) {
+        $c->stash->{error_msg} = 'Invalid file type. Only PowerPoint (PPT, PPTX) and PDF files are allowed.';
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/upload.tt',
+        );
+        return;
+    }
+    
+    if ($filesize > $max_size) {
+        my $max_mb = $max_size / (1024 * 1024);
+        $c->stash->{error_msg} = "File is too large. Maximum size is ${max_mb}MB.";
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/upload.tt',
+        );
+        return;
+    }
+    
+    my $upload_dir = $c->config->{workshop_upload_dir} || $ENV{HOME} . '/workshop_files';
+    
+    unless (-d $upload_dir) {
+        mkdir $upload_dir or do {
+            $c->log->error("Failed to create upload directory: $!");
+            $c->flash->{error_msg} = 'Failed to create upload directory.';
+            $c->response->redirect($c->uri_for($self->action_for('files'), [$id]));
+            return;
+        };
+    }
+    
+    my $timestamp = time();
+    my $safe_filename = $timestamp . '_' . $filename;
+    $safe_filename =~ s/[^a-zA-Z0-9._-]/_/g;
+    
+    my $filepath = "$upload_dir/$safe_filename";
+    
+    my $file_record;
+    eval {
+        $upload->copy_to($filepath);
+        
+        open my $fh, '<', $filepath or die "Cannot read file: $!";
+        binmode $fh;
+        my $file_data = do { local $/; <$fh> };
+        close $fh;
+        
+        $file_record = $c->model('DBEncy::File')->create({
+            workshop_id => $id,
+            file_name => $filename,
+            file_type => $file_extension,
+            file_size => $filesize,
+            file_path => $filepath,
+            file_data => $file_data,
+            upload_date => DateTime->now,
+            user_id => $c->session->{user_id},
+        });
+    };
+    
+    if ($@) {
+        $c->log->error("File upload failed: $@");
+        $c->flash->{error_msg} = "Failed to upload file: $@";
+    } else {
+        $c->flash->{success_msg} = 'File uploaded successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('files'), [$id]));
+}
+
+sub download :Local :Args(1) {
+    my ($self, $c, $file_id) = @_;
+    
+    my $file = $c->model('DBEncy::File')->find($file_id);
+    
+    unless ($file) {
+        $c->flash->{error_msg} = 'File not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($file->workshop_id) {
+        $c->flash->{error_msg} = 'File is not associated with a workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($file->workshop_id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Associated workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $user_id = $c->session->{user_id};
+    
+    my $is_registered = $c->model('DBEncy::Participant')->search({
+        workshop_id => $workshop->id,
+        user_id => $user_id,
+        status => { -in => ['registered', 'attended'] }
+    })->count > 0;
+    
+    my $is_leader = $self->_is_workshop_leader($c, $workshop);
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
+    
+    unless ($is_registered || $is_leader || $is_admin) {
+        $c->flash->{error_msg} = 'Access denied. You must be registered for this workshop to download files.';
+        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $workshop->id }));
+        return;
+    }
+    
+    my $file_data;
+    if ($file->file_data) {
+        $file_data = $file->file_data;
+    } elsif ($file->file_path && -f $file->file_path) {
+        open my $fh, '<', $file->file_path or do {
+            $c->log->error("Cannot read file: $!");
+            $c->flash->{error_msg} = 'Failed to read file.';
+            $c->response->redirect($c->uri_for($self->action_for('files'), [$workshop->id]));
+            return;
+        };
+        binmode $fh;
+        $file_data = do { local $/; <$fh> };
+        close $fh;
+    } else {
+        $c->flash->{error_msg} = 'File data not available.';
+        $c->response->redirect($c->uri_for($self->action_for('files'), [$workshop->id]));
+        return;
+    }
+    
+    my $content_type = 'application/octet-stream';
+    if ($file->file_type) {
+        my $ext = lc($file->file_type);
+        if ($ext eq '.pdf') {
+            $content_type = 'application/pdf';
+        } elsif ($ext eq '.ppt') {
+            $content_type = 'application/vnd.ms-powerpoint';
+        } elsif ($ext eq '.pptx') {
+            $content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+        }
+    }
+    
+    $c->response->content_type($content_type);
+    $c->response->header('Content-Disposition' => 'attachment; filename="' . $file->file_name . '"');
+    $c->response->body($file_data);
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
