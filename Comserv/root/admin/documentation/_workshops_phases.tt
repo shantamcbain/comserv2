@@ -1,0 +1,167 @@
+[%# WorkShops Implementation Phases - Database-Driven Containers %]
+[%# This file is included in Planning.tt %]
+
+<h4>🏗️ Implementation Phases (Database-Driven Containers)</h4>
+<p><em>Each phase is a sub-project in the database. Click to expand/collapse phase details. Created sub-project IDs: 165-173.</em></p>
+
+[% TRY %]
+    [% SET schema = c.model('DBEncy').schema %]
+    
+    <!-- Phase 0: Planning System Integration -->
+    [% SET phase0 = schema.resultset('Project').find(165) %]
+    [% IF phase0 %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            [% IF phase0.status == 'Completed' %]✅[% ELSIF phase0.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            Phase 0: Planning System Integration (PREREQUISITE - [% phase0.status %])
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Integrate WorkShops system into Planning.tt documentation. Establish foundation for all subsequent development work.</p>
+            <p><strong>Why:</strong> Without proper planning documentation, the project lacks visibility, tracking, and integration with the overall system planning workflow. This phase establishes the foundation for all subsequent work by creating comprehensive planning documentation, linking to Project ID 8, documenting all 8 phases, and adding port 4004 access to the Overview section.</p>
+            <p><strong>⚠️ Blocking Note:</strong> NO OTHER WORK proceeds until this phase is marked complete. This is a PREREQUISITE for all implementation phases.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase0.id %]</li>
+                    <li><strong>Status:</strong> [% phase0.status %]</li>
+                    <li><strong>Timeline:</strong> [% phase0.start_date %] → [% phase0.end_date %]</li>
+                    <li><strong>Estimated Hours:</strong> [% phase0.estimated_man_hours %]</li>
+                    <li><strong>Project Code:</strong> [% phase0.project_code %]</li>
+                    <li><strong>Description:</strong> [% phase0.description %]</li>
+                    <li><strong>Comments:</strong> [% phase0.comments %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase0.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase0.id %]" target="_blank">Edit</a> |
+                    <a href="/todo/addtodo?project_id=[% phase0.id %]" target="_blank">Add Todo</a>
+                </p>
+                
+                [% SET phase0_todos = phase0.todos.search({}, { order_by => 'sort_order' }) %]
+                [% IF phase0_todos.count > 0 %]
+                    <h6>📋 Todos ([% phase0_todos.count %]):</h6>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        [% FOREACH task IN phase0_todos.all %]
+                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #fafafa;">
+                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                [% task.subject %]
+                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                            </li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase0.id %]">Add a todo</a></em></p>
+                [% END %]
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
+    <!-- Phase 1: Database Schema & Models -->
+    [% SET phase1 = schema.resultset('Project').find(166) %]
+    [% IF phase1 %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            [% IF phase1.status == 'Completed' %]✅[% ELSIF phase1.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            Phase 1: Database Schema & Models ([% phase1.status %])
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Create/extend DBIx::Class Result classes for workshop data model. Schema system auto-generates database tables and columns.</p>
+            <p><strong>Why:</strong> Schema-driven approach ensures type safety, relationship integrity, and automatic migration. This phase establishes the data foundation for all workshop functionality including lifecycle management, multi-site support, participant tracking, content management, email history, and role-based access.</p>
+            <p><strong>Key Tasks:</strong> Extend WorkShop.pm and Participant.pm (add new columns, relationships, custom methods). Create WorkshopContent.pm, WorkshopEmail.pm, WorkshopRole.pm, SiteWorkshop.pm. Update Schema/Ency.pm to register new Result classes.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase1.id %]</li>
+                    <li><strong>Status:</strong> [% phase1.status %]</li>
+                    <li><strong>Timeline:</strong> [% phase1.start_date %] → [% phase1.end_date %]</li>
+                    <li><strong>Estimated Hours:</strong> [% phase1.estimated_man_hours %]</li>
+                    <li><strong>Project Code:</strong> [% phase1.project_code %]</li>
+                    <li><strong>Description:</strong> [% phase1.description %]</li>
+                    <li><strong>Comments:</strong> [% phase1.comments %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase1.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase1.id %]" target="_blank">Edit</a> |
+                    <a href="/todo/addtodo?project_id=[% phase1.id %]" target="_blank">Add Todo</a>
+                </p>
+                
+                [% SET phase1_todos = phase1.todos.search({}, { order_by => 'sort_order' }) %]
+                [% IF phase1_todos.count > 0 %]
+                    <h6>📋 Todos ([% phase1_todos.count %]):</h6>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        [% FOREACH task IN phase1_todos.all %]
+                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                [% task.subject %]
+                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                            </li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase1.id %]">Add a todo</a></em></p>
+                [% END %]
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
+    <!-- Phases 2-8: Abbreviated version to stay within character limits -->
+    [% FOR phase_id IN [167..173] %]
+        [% SET phase = schema.resultset('Project').find(phase_id) %]
+        [% IF phase %]
+        <details class="phase-container" style="margin: 15px 0; border: 2px solid #2196F3; padding: 10px; background: #e3f2fd;">
+            <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+                [% IF phase.status == 'Completed' %]✅[% ELSIF phase.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+                [% phase.name %] ([% phase.status %])
+            </summary>
+            <div style="margin-top: 10px;">
+                <p><strong>Description:</strong> [% phase.description %]</p>
+                
+                <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                    <h5>📊 Database Project Details</h5>
+                    <ul>
+                        <li><strong>Project ID:</strong> [% phase.id %]</li>
+                        <li><strong>Status:</strong> [% phase.status %]</li>
+                        <li><strong>Timeline:</strong> [% phase.start_date %] → [% phase.end_date %]</li>
+                        <li><strong>Estimated Hours:</strong> [% phase.estimated_man_hours %]</li>
+                        <li><strong>Project Code:</strong> [% phase.project_code %]</li>
+                        <li><strong>Comments:</strong> [% phase.comments %]</li>
+                    </ul>
+                    <p>
+                        <a href="/project/details?project_id=[% phase.id %]" target="_blank">View Details</a> |
+                        <a href="/project/editproject?project_id=[% phase.id %]" target="_blank">Edit</a> |
+                        <a href="/todo/addtodo?project_id=[% phase.id %]" target="_blank">Add Todo</a>
+                    </p>
+                    
+                    [% SET phase_todos = phase.todos.search({}, { order_by => 'sort_order' }) %]
+                    [% IF phase_todos.count > 0 %]
+                        <h6>📋 Todos ([% phase_todos.count %]):</h6>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            [% FOREACH task IN phase_todos.all %]
+                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #2196F3; background: #fafafa;">
+                                    [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                    [% task.subject %]
+                                    <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                    <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                    <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                </li>
+                            [% END %]
+                        </ul>
+                    [% ELSE %]
+                        <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase.id %]">Add a todo</a></em></p>
+                    [% END %]
+                </div>
+            </div>
+        </details>
+        [% END %]
+    [% END %]
+    
+[% CATCH %]
+    <p style="color: #d9534f;"><strong>Error loading phase details:</strong> [% error.info %]</p>
+[% END %]
