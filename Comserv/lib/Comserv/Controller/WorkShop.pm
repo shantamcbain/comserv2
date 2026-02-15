@@ -2,6 +2,7 @@ package Comserv::Controller::WorkShop;
 use Moose;
 use namespace::autoclean;
 use Data::FormValidator;
+use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # In Workshop Controller
@@ -240,7 +241,80 @@ sub edit :Path('/workshop/edit') :Args(1) {
     }
 }
 
+sub _check_workshop_access {
+    my ($self, $c, $workshop, $required_level) = @_;
+    
+    $required_level ||= 'view';
+    
+    return 0 unless $c->user_exists;
+    
+    my $user_id = $c->session->{user_id};
+    my $sitename = $c->session->{SiteName};
+    my $roles = $c->session->{roles} || [];
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    
+    if ($admin_type eq 'csc' || $admin_type eq 'special') {
+        return 1;
+    }
+    
+    if ($required_level eq 'view') {
+        if ($workshop->share eq 'public') {
+            return 1;
+        }
+        
+        if ($sitename && $sitename eq $workshop->sitename) {
+            return 1;
+        }
+        
+        my $is_participant = $c->model('DBEncy::Participant')->search({
+            workshop_id => $workshop->id,
+            user_id => $user_id,
+            status => { -in => ['registered', 'attended'] }
+        })->count > 0;
+        
+        return 1 if $is_participant;
+    }
+    
+    if ($required_level eq 'leader' || $required_level eq 'edit') {
+        if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
+            return 1;
+        }
+        
+        if ($self->_is_workshop_leader($c, $workshop)) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
 
+sub _is_workshop_leader {
+    my ($self, $c, $workshop) = @_;
+    
+    return 0 unless $c->user_exists;
+    
+    my $user_id = $c->session->{user_id};
+    
+    if ($workshop->created_by && $workshop->created_by == $user_id) {
+        return 1;
+    }
+    
+    my $has_leader_role = $c->model('DBEncy::WorkshopRole')->search({
+        workshop_id => $workshop->id,
+        user_id => $user_id,
+        role => 'workshop_leader'
+    })->count > 0;
+    
+    return $has_leader_role;
+}
+
+sub _can_edit_workshop {
+    my ($self, $c, $workshop) = @_;
+    
+    return $self->_check_workshop_access($c, $workshop, 'edit');
+}
 
 
 __PACKAGE__->meta->make_immutable;
