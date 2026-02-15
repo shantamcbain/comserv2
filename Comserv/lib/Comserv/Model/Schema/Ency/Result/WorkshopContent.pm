@@ -1,8 +1,8 @@
-package Comserv::Model::Schema::Ency::Result::Participant;
+package Comserv::Model::Schema::Ency::Result::WorkshopContent;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components("TimeStamp");
-__PACKAGE__->table('participant');
+__PACKAGE__->table('workshop_content');
 
 __PACKAGE__->add_columns(
     id => {
@@ -12,34 +12,36 @@ __PACKAGE__->add_columns(
     workshop_id => {
         data_type => 'integer',
     },
-    user_id => {
+    content_type => {
+        data_type => 'enum',
+        default_value => 'text',
+        extra => {
+            list => ['text', 'powerpoint', 'embedded']
+        },
+    },
+    title => {
+        data_type => 'varchar',
+        size => 255,
+    },
+    content => {
+        data_type => 'text',
+        is_nullable => 1,
+    },
+    file_id => {
         data_type => 'integer',
         is_nullable => 1,
     },
-    name => {
-        data_type => 'varchar',
-        size => 255,
+    sort_order => {
+        data_type => 'integer',
+        default_value => 0,
     },
-    email => {
-        data_type => 'varchar',
-        size => 255,
-        is_nullable => 1,
-    },
-    site_affiliation => {
-        data_type => 'varchar',
-        size => 255,
-        is_nullable => 1,
-    },
-    registered_at => {
+    created_at => {
         data_type => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
     },
-    status => {
-        data_type => 'enum',
-        default_value => 'registered',
-        extra => {
-            list => ['registered', 'waitlist', 'attended', 'cancelled']
-        },
+    updated_at => {
+        data_type => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
     },
 );
 
@@ -51,8 +53,8 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    user => 'Comserv::Model::Schema::Ency::Result::User',
-    { 'foreign.id' => 'self.user_id' },
+    file => 'Comserv::Model::Schema::Ency::Result::File',
+    { 'foreign.id' => 'self.file_id' },
     { join_type => 'left' },
 );
 
