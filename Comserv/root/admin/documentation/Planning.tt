@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.68' %]
+[% version = '0.69' %]
 [% date_iso = '2026/02/15' %]
 [% formatted_date = 'February 15, 2026' %]
-[% time = '16:04:00' %]
-[% change_log = 'WorkShops: Created detailed todos for all 9 phase sub-projects (Phases 0-8). Each phase now has comprehensive task breakdown with descriptions. Sub-projects use IDs 174-182 (corrected from initial 165-173). Total ~50 todos created across all phases.' %]
+[% time = '16:35:00' %]
+[% change_log = 'WorkShops: CORRECTED parent_id to 73 (CSC workshop advertising system) from incorrect 8 (BMaster). Updated all phase sub-projects (174-182) to proper parent. Fixed visibility issue.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -1571,11 +1571,11 @@ last_updated = '2026/02/08'
             <h4>📊 WorkShops Project from Database</h4>
             [% TRY %]
                 [% SET schema = c.model('DBEncy').schema %]
-                [% SET workshop_project = schema.resultset('Project').find(8) %]
+                [% SET workshop_project = schema.resultset('Project').find(73) %]
                 
                 [% IF workshop_project %]
                     <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
-                            <h3>[% workshop_project.name %] (Project ID: 8)</h3>
+                            <h3>[% workshop_project.name %] (Project ID: 73)</h3>
                             <ul>
                                 <li><strong>Description:</strong> [% workshop_project.description || 'Workshop module for managing and advertising educational workshops across multiple sites' %]</li>
                                 <li><strong>Start Date:</strong> [% workshop_project.start_date || '2024-01-01' %]</li>
