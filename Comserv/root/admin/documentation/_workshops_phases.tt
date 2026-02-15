@@ -2,13 +2,13 @@
 [%# This file is included in Planning.tt %]
 
 <h4>🏗️ Implementation Phases (Database-Driven Containers)</h4>
-<p><em>Each phase is a sub-project in the database. Click to expand/collapse phase details. Created sub-project IDs: 165-173.</em></p>
+<p><em>Each phase is a sub-project in the database with detailed todos. Click to expand/collapse phase details. Sub-project IDs: 174-182 (~50 todos total).</em></p>
 
 [% TRY %]
     [% SET schema = c.model('DBEncy').schema %]
     
     <!-- Phase 0: Planning System Integration -->
-    [% SET phase0 = schema.resultset('Project').find(165) %]
+    [% SET phase0 = schema.resultset('Project').find(174) %]
     [% IF phase0 %]
     <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
@@ -60,7 +60,7 @@
     [% END %]
     
     <!-- Phase 1: Database Schema & Models -->
-    [% SET phase1 = schema.resultset('Project').find(166) %]
+    [% SET phase1 = schema.resultset('Project').find(175) %]
     [% IF phase1 %]
     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
@@ -112,7 +112,7 @@
     [% END %]
     
     <!-- Phases 2-8: Abbreviated version to stay within character limits -->
-    [% FOR phase_id IN [167..173] %]
+    [% FOR phase_id IN [176..182] %]
         [% SET phase = schema.resultset('Project').find(phase_id) %]
         [% IF phase %]
         <details class="phase-container" style="margin: 15px 0; border: 2px solid #2196F3; padding: 10px; background: #e3f2fd;">
