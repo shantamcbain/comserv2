@@ -55,6 +55,34 @@ sub get_workshop_by_id {
 
     return ($workshop, undef);
 }
+
+sub get_past_workshops {
+    my ($self, $c) = @_;
+
+    my $schema = $c->model('DBEncy');
+    my $rs = $schema->resultset('WorkShop');
+
+    my @workshops;
+    my $error;
+    eval {
+        @workshops = $rs->search(
+            {
+                date => { '<' => DateTime->today->ymd },
+                 -or => [
+                    { share => 'public' },
+                    { share => 'private', sitename => $c->session->{SiteName} }
+                ]
+            },
+            { order_by => { -desc => 'date' } }
+        );
+    };
+    if ($@) {
+        $error = "Error fetching past workshops: $@";
+    }
+
+    return (\@workshops, $error);
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

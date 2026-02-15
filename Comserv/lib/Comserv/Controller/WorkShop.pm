@@ -9,37 +9,107 @@ BEGIN { extends 'Catalyst::Controller'; }
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
-  # Try to get the active workshops and catch any exceptions
-my ($workshops, $error);
-
+    my ($workshops, $error);
     ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
 
-
-
-# Continue with the rest of your code...
-    # Get the file for each workshop and convert each workshop to a hash
     my @workshops_hash;
     for my $workshop (@$workshops) {
         my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
 
-        # Convert the workshop object to a hash
         my %workshop_hash = $workshop->get_columns;
         $workshop_hash{file} = \@file;
 
         push @workshops_hash, \%workshop_hash;
     }
 
-    # Pass the workshops and the error message to the view
+    my ($past_workshops, $past_error);
+    ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
+
+    my @past_workshops_hash;
+    for my $workshop (@$past_workshops) {
+        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+
+        my %workshop_hash = $workshop->get_columns;
+        $workshop_hash{file} = \@file;
+
+        push @past_workshops_hash, \%workshop_hash;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
+
     $c->stash(
         workshops => \@workshops_hash,
+        past_workshops => \@past_workshops_hash,
         error => $error,
+        past_error => $past_error,
         sitename => $c->session->{SiteName},
+        is_admin => $is_admin,
         template => 'WorkShops/workshops.tt',
     );
     if ($@) {
     $c->stash(error => "Error fetching active workshops: $@");
 }
 }
+sub dashboard :Local {
+    my ( $self, $c ) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'workshop_dashboard')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $user_id = $c->session->{user_id};
+    my $schema = $c->model('DBEncy');
+
+    my @my_workshops = $schema->resultset('WorkShop')->search(
+        {
+            -or => [
+                { created_by => $user_id },
+            ]
+        },
+        { order_by => { -desc => 'created_at' } }
+    )->all;
+
+    my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
+        {
+            user_id => $user_id,
+            role => 'workshop_leader'
+        }
+    )->get_column('workshop_id')->all;
+
+    if (@workshop_leader_ids) {
+        my @leader_workshops = $schema->resultset('WorkShop')->search(
+            {
+                id => { -in => \@workshop_leader_ids },
+                created_by => { '!=' => $user_id }
+            }
+        )->all;
+        push @my_workshops, @leader_workshops;
+    }
+
+    my @workshops_with_stats;
+    for my $workshop (@my_workshops) {
+        my $participant_count = $workshop->participants->search({ status => 'registered' })->count;
+        my $email_count = $workshop->emails->count;
+        my $file_count = $workshop->files->count;
+
+        push @workshops_with_stats, {
+            workshop => $workshop,
+            participant_count => $participant_count,
+            email_count => $email_count,
+            file_count => $file_count,
+        };
+    }
+
+    $c->stash(
+        workshops => \@workshops_with_stats,
+        template => 'WorkShops/dashboard.tt',
+    );
+}
+
 sub add :Local {
     my ( $self, $c ) = @_;
 
