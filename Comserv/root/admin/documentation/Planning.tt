@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.65' %]
-[% date_iso = '2026/02/14' %]
-[% formatted_date = 'February 14, 2026' %]
-[% time = '17:15:00' %]
-[% change_log = 'Added WorkShops Advertising System (Project ID 8) - port 4004 integration, full 8-phase workflow documentation, multi-site support, participant management, PowerPoint integration, email system, and role-based access control.' %]
+[% version = '0.67' %]
+[% date_iso = '2026/02/15' %]
+[% formatted_date = 'February 15, 2026' %]
+[% time = '15:50:00' %]
+[% change_log = 'WorkShops: Created 9 phase sub-projects in database (IDs 165-173). Converted phase display to database-driven normally closed containers showing "What/Why", database details, and todos per phase. Included via _workshops_phases.tt.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -1624,70 +1624,7 @@ last_updated = '2026/02/08'
                 </div>
             [% END %]
 
-            <h4>🏗️ Implementation Phases (8 Phases)</h4>
-            <ol>
-                <li><strong>Phase 0: Planning System Integration</strong> (PREREQUISITE) - <span class="status-completed">COMPLETE</span>
-                    <ul>
-                        <li>✅ Update Planning.tt with workshop project section</li>
-                        <li>✅ Add port 4004 link to Overview section</li>
-                        <li>✅ Document all workflow phases</li>
-                        <li>✅ Link to Project ID 8 in database</li>
-                    </ul>
-                    <p><strong>Blocking Note:</strong> This phase MUST complete before any other implementation work</p>
-                </li>
-                <li><strong>Phase 1: Database Schema & Models</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 1A: Extend existing tables (workshop, participant)</li>
-                        <li>Phase 1B: Create new tables (workshop_content, workshop_emails, workshop_roles, site_workshop)</li>
-                        <li>Phase 1C: Create/extend DBIx::Class Result classes</li>
-                        <li>Phase 1D: Execute migration SQL script</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 2: Core Controller Extensions</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 2A: Authorization helper methods (CSC admin god-level, site-scoped access)</li>
-                        <li>Phase 2B: Workshop lifecycle management (publish, close, start, complete, cancel)</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 3: Registration & Participant Management</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 3A: User registration workflow (capacity limits, waitlist)</li>
-                        <li>Phase 3B: Participant CRUD operations (leaders/admins)</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 4: Content Management</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 4A: PowerPoint file integration (upload/download, whitelist PPT/PPTX/PDF)</li>
-                        <li>Phase 4B: Online content development (rich text editor, sections)</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 5: Email & Communication</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 5A: Email templates (confirmation, announcement, reminder)</li>
-                        <li>Phase 5B: Email sending & history tracking</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 6: Multi-Site Support</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Site-scoped filtering (CSC admin sees all, site admin sees own site + public)</li>
-                        <li>Cross-site workshop discovery</li>
-                        <li>Public vs. private workshop visibility</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 7: UI Templates</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 7A: Update existing templates (workshops.tt, addworkshop.tt, edit.tt, details.tt)</li>
-                        <li>Phase 7B: Create new templates (dashboard.tt, participants.tt, compose_email.tt, files.tt, content.tt)</li>
-                    </ul>
-                </li>
-                <li><strong>Phase 8: Testing & Documentation</strong> - <span class="status-pending">PENDING</span>
-                    <ul>
-                        <li>Phase 8A: Controller unit tests</li>
-                        <li>Phase 8B: Integration tests & final verification</li>
-                        <li>Phase 8C: Production readiness (deployment, smoke tests, monitoring)</li>
-                    </ul>
-                </li>
-            </ol>
+            [% INCLUDE admin/documentation/_workshops_phases.tt %]
 
             <h4>📁 Documentation & Resources</h4>
             <ul>
