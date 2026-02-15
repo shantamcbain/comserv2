@@ -753,6 +753,180 @@ sub unregister :Local :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
 }
 
+sub participants :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to view participants for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my @registered = $c->model('DBEncy::Participant')->search(
+        {
+            workshop_id => $id,
+            status => 'registered'
+        },
+        {
+            order_by => { -asc => 'registered_at' },
+            prefetch => 'user'
+        }
+    )->all;
+    
+    my @waitlist = $c->model('DBEncy::Participant')->search(
+        {
+            workshop_id => $id,
+            status => 'waitlist'
+        },
+        {
+            order_by => { -asc => 'registered_at' },
+            prefetch => 'user'
+        }
+    )->all;
+    
+    $c->stash(
+        workshop => $workshop,
+        registered_participants => \@registered,
+        waitlist_participants => \@waitlist,
+        template => 'WorkShops/participants.tt',
+    );
+}
+
+sub add_participant :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to add participants to this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    if ($c->request->method eq 'GET') {
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/add_participant.tt',
+        );
+        return;
+    }
+    
+    my $params = $c->request->body_parameters;
+    my $name = $params->{name};
+    my $email = $params->{email};
+    my $site_affiliation = $params->{site_affiliation};
+    
+    unless ($name && $email) {
+        $c->stash->{error_msg} = 'Name and email are required.';
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/add_participant.tt',
+        );
+        return;
+    }
+    
+    unless ($email =~ /\@/) {
+        $c->stash->{error_msg} = 'Invalid email address.';
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/add_participant.tt',
+        );
+        return;
+    }
+    
+    my $existing = $c->model('DBEncy::Participant')->search({
+        workshop_id => $id,
+        email => $email,
+        status => { -in => ['registered', 'waitlist'] }
+    })->first;
+    
+    if ($existing) {
+        $c->stash->{error_msg} = 'A participant with this email address is already registered.';
+        $c->stash(
+            workshop => $workshop,
+            template => 'WorkShops/add_participant.tt',
+        );
+        return;
+    }
+    
+    my $participant_status;
+    if ($workshop->is_full) {
+        $participant_status = 'waitlist';
+    } else {
+        $participant_status = 'registered';
+    }
+    
+    my $participant;
+    eval {
+        $participant = $c->model('DBEncy::Participant')->create({
+            workshop_id => $id,
+            name => $name,
+            email => $email,
+            site_affiliation => $site_affiliation,
+            status => $participant_status,
+        });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to add participant: ' . $@;
+    } else {
+        if ($participant_status eq 'registered') {
+            $c->flash->{success_msg} = "Participant added successfully.";
+        } else {
+            $c->flash->{success_msg} = "Participant added to waitlist (workshop is full).";
+        }
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+}
+
+sub remove_participant :Local :Args(1) {
+    my ($self, $c, $participant_id) = @_;
+    
+    my $participant = $c->model('DBEncy::Participant')->find($participant_id);
+    
+    unless ($participant) {
+        $c->flash->{error_msg} = 'Participant not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $workshop = $participant->workshop;
+    my $workshop_id = $workshop->id;
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to remove participants from this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $participant->update({ status => 'cancelled' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to remove participant: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Participant removed successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('participants'), [$workshop_id]));
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
