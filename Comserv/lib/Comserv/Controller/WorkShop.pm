@@ -309,14 +309,21 @@ sub edit :Path('/workshop/edit') :Args(1) {
     # Find the workshop in the database
     my $workshop = $c->model('DBEncy::WorkShop')->find($id);
 
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Authorization check using helper method
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to edit this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
     # For GET requests, display the edit form
     if ($c->request->method eq 'GET') {
-        if (!$workshop) {
-            $c->stash->{error_msg} = 'Workshop not found';
-            $c->stash->{template} = 'WorkShops/error.tt'; # Ensure you have an error template
-            return;
-        }
-
         # Format the date to 'YYYY-MM-DD'
         my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
 
@@ -428,6 +435,156 @@ sub _can_edit_workshop {
     my ($self, $c, $workshop) = @_;
     
     return $self->_check_workshop_access($c, $workshop, 'edit');
+}
+
+sub publish :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to publish this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $workshop->update({ status => 'published' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to publish workshop: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Workshop published successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub close_registration :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to close registration for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $workshop->update({ status => 'registration_closed' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to close registration: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Workshop registration closed successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub start :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to start this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $workshop->update({ status => 'in_progress' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to start workshop: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Workshop started successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub complete :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to complete this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $workshop->update({ status => 'completed' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to complete workshop: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Workshop marked as completed.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub cancel :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to cancel this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    eval {
+        $workshop->update({ status => 'cancelled' });
+    };
+    
+    if ($@) {
+        $c->flash->{error_msg} = 'Failed to cancel workshop: ' . $@;
+    } else {
+        $c->flash->{success_msg} = 'Workshop cancelled successfully.';
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
 }
 
 
