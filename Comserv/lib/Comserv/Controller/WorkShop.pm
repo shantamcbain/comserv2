@@ -68,22 +68,31 @@ sub dashboard :Local {
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
 
-    my $search_filter = {
-        -or => [
-            { created_by => $user_id },
-        ]
-    };
+    $c->log->debug("Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
+
+    my $search_filter;
 
     if ($is_csc_admin) {
         $search_filter = {};
-    } elsif ($sitename) {
-        push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+        $c->log->debug("Dashboard: CSC admin - showing ALL workshops");
+    } else {
+        $search_filter = {
+            -or => [
+                { created_by => $user_id },
+            ]
+        };
+        if ($sitename) {
+            push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+        }
+        $c->log->debug("Dashboard: Regular admin filter applied");
     }
 
     my @my_workshops = $schema->resultset('WorkShop')->search(
         $search_filter,
         { order_by => { -desc => 'created_at' } }
     )->all;
+
+    $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
 
     my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
         {
