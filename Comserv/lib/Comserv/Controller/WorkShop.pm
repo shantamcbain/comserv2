@@ -18,6 +18,15 @@ sub index :Path :Args(0) {
 
         my %workshop_hash = $workshop->get_columns;
         $workshop_hash{file} = \@file;
+        
+        if ($workshop->creator) {
+            $workshop_hash{creator} = {
+                id => $workshop->creator->id,
+                username => $workshop->creator->username,
+                first_name => $workshop->creator->first_name,
+                last_name => $workshop->creator->last_name,
+            };
+        }
 
         push @workshops_hash, \%workshop_hash;
     }
@@ -31,6 +40,15 @@ sub index :Path :Args(0) {
 
         my %workshop_hash = $workshop->get_columns;
         $workshop_hash{file} = \@file;
+        
+        if ($workshop->creator) {
+            $workshop_hash{creator} = {
+                id => $workshop->creator->id,
+                username => $workshop->creator->username,
+                first_name => $workshop->creator->first_name,
+                last_name => $workshop->creator->last_name,
+            };
+        }
 
         push @past_workshops_hash, \%workshop_hash;
     }
