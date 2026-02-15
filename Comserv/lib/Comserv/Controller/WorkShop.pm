@@ -62,14 +62,26 @@ sub dashboard :Local {
     }
 
     my $user_id = $c->session->{user_id};
+    my $sitename = $c->session->{SiteName};
     my $schema = $c->model('DBEncy');
 
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    my $search_filter = {
+        -or => [
+            { created_by => $user_id },
+        ]
+    };
+
+    if ($is_csc_admin) {
+        $search_filter = {};
+    } elsif ($sitename) {
+        push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+    }
+
     my @my_workshops = $schema->resultset('WorkShop')->search(
-        {
-            -or => [
-                { created_by => $user_id },
-            ]
-        },
+        $search_filter,
         { order_by => { -desc => 'created_at' } }
     )->all;
 
@@ -164,6 +176,7 @@ sub addworkshop :Local {
             share            => $params->{share},
             end_time         => $params->{end_time},
             time             => $time,
+            created_by       => $c->session->{user_id},
         });
     };
 
