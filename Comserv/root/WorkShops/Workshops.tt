@@ -4,11 +4,11 @@
    roles = "admin,user"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.05"
+   page_version = "0.06"
    last_updated = "2026-02-16"
 %]
 
-[% PageVersion = 'WorkShops/Workshops.tt,v 0.05 2026/02/16 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/Workshops.tt,v 0.06 2026/02/16 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -67,6 +67,22 @@
                             </div>
                         </div>
                         
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="date_from">Date From:</label>
+                                <input type="date" name="date_from" id="date_from" value="[% c.request.params.date_from || '' %]" class="form-input">
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="date_to">Date To:</label>
+                                <input type="date" name="date_to" id="date_to" value="[% c.request.params.date_to || '' %]" class="form-input">
+                            </div>
+                            
+                            <div class="form-field" style="align-self: flex-end;">
+                                <button type="submit" class="btn btn-primary">Apply Date Filter</button>
+                            </div>
+                        </div>
+                        
                         <noscript>
                             <div class="form-actions">
                                 <button type="submit" class="btn btn-primary">Apply Filters</button>
@@ -93,7 +109,7 @@
                                 [% IF is_admin %]
                                 <th>Leader</th>
                                 [% END %]
-                                <th>Max Participants</th>
+                                <th>Participants</th>
                                 <th>Status</th>
                                 <th>Visibility</th>
                                 <th>Actions</th>
@@ -119,7 +135,24 @@
                                     [% END %]
                                 </td>
                                 [% END %]
-                                <td>[% workshop.max_participants || 'N/A' %]</td>
+                                <td>
+                                    [% 
+                                        current = workshop.current_participants || 0;
+                                        max = workshop.max_participants || 0;
+                                        is_full = max > 0 && current >= max;
+                                    %]
+                                    [% IF max > 0 %]
+                                        [% IF is_full %]
+                                            <span class="badge badge-danger">🔴 Full ([% current %]/[% max %])</span>
+                                        [% ELSIF current >= (max * 0.8) %]
+                                            <span class="badge badge-warning">⚠️ Almost Full ([% current %]/[% max %])</span>
+                                        [% ELSE %]
+                                            <span class="badge badge-success">✓ [% current %]/[% max %]</span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        [% current %] (Unlimited)
+                                    [% END %]
+                                </td>
                                 <td>
                                     [% IF workshop.status == 'draft' %]
                                         <span class="badge badge-secondary">Draft</span>
@@ -149,6 +182,19 @@
                                         <input type="hidden" name="id" value="[% workshop.id %]">
                                         <button type="submit" class="btn btn-sm">Details</button>
                                     </form>
+                                    [% IF c.user_exists && workshop.status == 'published' && !workshop.is_user_registered %]
+                                        [% IF is_full %]
+                                        <form action="/workshop/register" method="POST" style="display:inline;">
+                                            <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                                            <button type="submit" class="btn btn-sm btn-warning">Join Waitlist</button>
+                                        </form>
+                                        [% ELSE %]
+                                        <form action="/workshop/register" method="POST" style="display:inline;">
+                                            <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                                            <button type="submit" class="btn btn-sm btn-primary">Register</button>
+                                        </form>
+                                        [% END %]
+                                    [% END %]
                                     [% IF c.session.roles.grep('admin').size %]
                                     <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
                                         <button type="submit" class="btn btn-sm btn-edit">Edit</button>
@@ -193,7 +239,7 @@
                                     [% IF is_admin %]
                                     <th>Leader</th>
                                     [% END %]
-                                    <th>Max Participants</th>
+                                    <th>Participants</th>
                                     <th>Status</th>
                                     <th>Visibility</th>
                                     <th>Actions</th>
@@ -219,7 +265,17 @@
                                         [% END %]
                                     </td>
                                     [% END %]
-                                    <td>[% workshop.max_participants || 'N/A' %]</td>
+                                    <td>
+                                        [% 
+                                            current = workshop.current_participants || 0;
+                                            max = workshop.max_participants || 0;
+                                        %]
+                                        [% IF max > 0 %]
+                                            [% current %]/[% max %]
+                                        [% ELSE %]
+                                            [% current %] (Unlimited)
+                                        [% END %]
+                                    </td>
                                     <td>
                                         [% IF workshop.status == 'draft' %]
                                             <span class="badge badge-secondary">Draft</span>

@@ -4,11 +4,11 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.03"
+   page_version = "0.04"
    last_updated = "2026-02-16"
 %]
 
-[% PageVersion = 'WorkShops/AddWorkshop.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/AddWorkshop.tt,v 0.04 2026/02/16 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -106,6 +106,27 @@
                                     <option value="public" [% IF form_data.share == 'public' %]selected[% END %]>Public (All Sites)</option>
                                 </select>
                                 <small>Private workshops will only be visible to your site.</small>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="status">Status:</label>
+                                <select id="status" name="status" class="form-input">
+                                    <option value="draft" [% IF (form_data.status || 'draft') == 'draft' %]selected[% END %]>Draft</option>
+                                    <option value="published" [% IF form_data.status == 'published' %]selected[% END %]>Published</option>
+                                    <option value="registration_closed" [% IF form_data.status == 'registration_closed' %]selected[% END %]>Registration Closed</option>
+                                    <option value="in_progress" [% IF form_data.status == 'in_progress' %]selected[% END %]>In Progress</option>
+                                    <option value="completed" [% IF form_data.status == 'completed' %]selected[% END %]>Completed</option>
+                                    <option value="cancelled" [% IF form_data.status == 'cancelled' %]selected[% END %]>Cancelled</option>
+                                </select>
+                                <small>Draft workshops are not visible to users.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="registration_deadline">Registration Deadline:</label>
+                                <input type="date" id="registration_deadline" name="registration_deadline" value="[% form_data.registration_deadline || '' | html %]" class="form-input">
+                                <small>Optional: Last date for participant registration.</small>
                             </div>
                         </div>
                     </div>
