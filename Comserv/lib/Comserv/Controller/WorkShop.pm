@@ -11,6 +11,33 @@ sub index :Path :Args(0) {
 
     my ($workshops, $error);
     ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+    
+    # Apply client-side filters based on query parameters
+    my $site_filter = $c->request->params->{site_filter} || '';
+    my $status_filter = $c->request->params->{status_filter} || '';
+    
+    if ($site_filter || $status_filter) {
+        my @filtered_workshops;
+        for my $workshop (@$workshops) {
+            my $include = 1;
+            
+            # Apply site filter
+            if ($site_filter eq 'public') {
+                $include = 0 unless $workshop->share eq 'public';
+            } elsif ($site_filter eq 'my_site') {
+                my $sitename = $c->session->{SiteName};
+                $include = 0 unless $workshop->sitename eq $sitename;
+            }
+            
+            # Apply status filter
+            if ($status_filter && $include) {
+                $include = 0 unless $workshop->status eq $status_filter;
+            }
+            
+            push @filtered_workshops, $workshop if $include;
+        }
+        $workshops = \@filtered_workshops;
+    }
 
     my @workshops_hash;
     for my $workshop (@$workshops) {
@@ -33,6 +60,28 @@ sub index :Path :Args(0) {
 
     my ($past_workshops, $past_error);
     ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
+    
+    # Apply filters to past workshops too
+    if ($site_filter || $status_filter) {
+        my @filtered_past;
+        for my $workshop (@$past_workshops) {
+            my $include = 1;
+            
+            if ($site_filter eq 'public') {
+                $include = 0 unless $workshop->share eq 'public';
+            } elsif ($site_filter eq 'my_site') {
+                my $sitename = $c->session->{SiteName};
+                $include = 0 unless $workshop->sitename eq $sitename;
+            }
+            
+            if ($status_filter && $include) {
+                $include = 0 unless $workshop->status eq $status_filter;
+            }
+            
+            push @filtered_past, $workshop if $include;
+        }
+        $past_workshops = \@filtered_past;
+    }
 
     my @past_workshops_hash;
     for my $workshop (@$past_workshops) {
@@ -193,22 +242,50 @@ sub addworkshop :Local {
     # Convert the start_time string to a DateTime object
     my $time = $strp->parse_datetime($start_time_str);
 
+    # Get creator's site_id from session
+    my $creator_sitename = $c->session->{SiteName} || $params->{sitename};
+    my $creator_site = $schema->resultset('Site')->search({ name => $creator_sitename })->first;
+    my $creator_site_id = $creator_site ? $creator_site->id : undef;
+    
     # Try to create a new workshop record
     my $workshop;
     eval {
         $workshop = $rs->create({
-            sitename         => $params->{sitename},
+            sitename         => $creator_sitename,
             title            => $params->{title},
             description      => $params->{description},
             date             => $params->{dateOfWorkshop},
             location         => $params->{location},
             instructor       => $params->{instructor},
             max_participants => $params->{maxMinAttendees},
-            share            => $params->{share},
+            share            => $params->{share} || 'private',
             end_time         => $params->{end_time},
             time             => $time,
             created_by       => $c->session->{user_id},
+            site_id          => $creator_site_id,
         });
+        
+        # Create site_workshop records based on share setting
+        if ($workshop) {
+            if ($params->{share} && $params->{share} eq 'public') {
+                # Create site_workshop records for all sites
+                my @all_sites = $schema->resultset('Site')->all;
+                for my $site (@all_sites) {
+                    $schema->resultset('SiteWorkshop')->create({
+                        site_id => $site->id,
+                        workshop_id => $workshop->id,
+                    });
+                }
+            } else {
+                # Create site_workshop record only for creator's site
+                if ($creator_site_id) {
+                    $schema->resultset('SiteWorkshop')->create({
+                        site_id => $creator_site_id,
+                        workshop_id => $workshop->id,
+                    });
+                }
+            }
+        }
     };
 
     if ($@) {
@@ -289,6 +366,13 @@ sub details :Path('/workshop/details') :Args(0) {
         return;
     }
 
+    # Check if user has view access to this workshop
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to view this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
     # Assuming $workshop->date is a DateTime object
     my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
 
@@ -338,6 +422,9 @@ sub edit :Path('/workshop/edit') :Args(1) {
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
         my $params = $c->request->body_parameters;
+        my $old_share = $workshop->share;
+        my $new_share = $params->{share};
+        
         eval {
             $workshop->update({
                 title            => $params->{title},
@@ -348,8 +435,38 @@ sub edit :Path('/workshop/edit') :Args(1) {
                 location         => $params->{location},
                 instructor       => $params->{instructor},
                 max_participants => $params->{max_participants},
-                share            => $params->{share},
+                share            => $new_share,
             });
+            
+            # Update site_workshop records if share setting changed
+            if ($old_share ne $new_share) {
+                my $schema = $c->model('DBEncy');
+                
+                # Delete existing site_workshop records
+                $schema->resultset('SiteWorkshop')->search({
+                    workshop_id => $workshop->id
+                })->delete;
+                
+                # Create new records based on new share setting
+                if ($new_share eq 'public') {
+                    # Create records for all sites
+                    my @all_sites = $schema->resultset('Site')->all;
+                    for my $site (@all_sites) {
+                        $schema->resultset('SiteWorkshop')->create({
+                            site_id => $site->id,
+                            workshop_id => $workshop->id,
+                        });
+                    }
+                } else {
+                    # Create record only for workshop's site
+                    if ($workshop->site_id) {
+                        $schema->resultset('SiteWorkshop')->create({
+                            site_id => $workshop->site_id,
+                            workshop_id => $workshop->id,
+                        });
+                    }
+                }
+            }
         };
 
         if ($@) {
@@ -376,19 +493,32 @@ sub _check_workshop_access {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     
+    # CSC admin has god-level access
     if ($admin_type eq 'csc' || $admin_type eq 'special') {
         return 1;
     }
     
     if ($required_level eq 'view') {
+        # Public workshops are visible to everyone
         if ($workshop->share eq 'public') {
             return 1;
         }
         
-        if ($sitename && $sitename eq $workshop->sitename) {
-            return 1;
+        # Check if user's site has access via site_workshop table
+        if ($sitename) {
+            my $schema = $c->model('DBEncy');
+            my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+            if ($site) {
+                my $site_access = $schema->resultset('SiteWorkshop')->search({
+                    site_id => $site->id,
+                    workshop_id => $workshop->id
+                })->count > 0;
+                
+                return 1 if $site_access;
+            }
         }
         
+        # Check if user is a registered participant
         my $is_participant = $c->model('DBEncy::Participant')->search({
             workshop_id => $workshop->id,
             user_id => $user_id,
