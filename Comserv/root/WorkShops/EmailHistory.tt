@@ -1,4 +1,14 @@
-[% PageVersion = 'WorkShops/EmailHistory.tt,v 0.02 2026/02/16 shanta Exp shanta ' %]
+[% META 
+   title = "Email History"
+   description = "View workshop email history"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/EmailHistory.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     <div class="debug-info">PageVersion: [% PageVersion %]</div>
 [% END %]

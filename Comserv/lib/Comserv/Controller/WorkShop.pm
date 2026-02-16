@@ -112,7 +112,7 @@ sub index :Path :Args(0) {
         past_error => $past_error,
         sitename => $c->session->{SiteName},
         is_admin => $is_admin,
-        template => 'WorkShops/workshops.tt',
+        template => 'WorkShops/Workshops.tt',
     );
     if ($@) {
     $c->stash(error => "Error fetching active workshops: $@");
@@ -198,7 +198,7 @@ sub dashboard :Local {
 
     $c->stash(
         workshops => \@workshops_with_stats,
-        template => 'WorkShops/dashboard.tt',
+        template => 'WorkShops/Dashboard.tt',
     );
 }
 
@@ -206,7 +206,7 @@ sub add :Local {
     my ( $self, $c ) = @_;
 
     # Set the TT template to use
-    $c->stash->{template} = 'WorkShops/addworkshop.tt';
+    $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
@@ -220,7 +220,7 @@ sub addworkshop :Local {
         # If validation fails, return to the form with errors
         $c->stash->{error_msg} = 'Invalid form data: ' . join(', ', map { "$_: $errors->{$_}" } keys %$errors);
         $c->stash->{form_data} = $params; # Add the form data to the stash
-        $c->stash->{template} = 'WorkShops/addworkshop.tt';
+        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
         return;
     }
 
@@ -292,7 +292,7 @@ sub addworkshop :Local {
         # If creation fails, return to the form with an error message
         $c->stash->{error_msg} = 'Failed to create workshop: ' . $@;
         $c->stash->{form_data} = $params; # Add the form data to the stash
-        $c->stash->{template} = 'WorkShops/addworkshop.tt';
+        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
         return;
     }
 
@@ -362,7 +362,7 @@ sub details :Path('/workshop/details') :Args(0) {
 
     if ($@ || !$workshop) {
         $c->stash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
-        $c->stash->{template} = 'WorkShops/error.tt'; # Ensure you have an error template
+        $c->stash->{template} = 'WorkShops/Error.tt'; # Ensure you have an error template
         return;
     }
 
@@ -380,7 +380,7 @@ sub details :Path('/workshop/details') :Args(0) {
     $c->stash(
         workshop => $workshop,
         formatted_date => $formatted_date,
-        template => 'WorkShops/details.tt',
+        template => 'WorkShops/Details.tt',
     );
 }
 
@@ -414,7 +414,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $c->stash(
             workshop => $workshop,
             formatted_date => $formatted_date,
-            template => 'WorkShops/edit.tt'
+            template => 'WorkShops/Edit.tt'
         );
         return;
     }
@@ -926,7 +926,7 @@ sub participants :Local :Args(1) {
         workshop => $workshop,
         registered_participants => \@registered,
         waitlist_participants => \@waitlist,
-        template => 'WorkShops/participants.tt',
+        template => 'WorkShops/Participants.tt',
     );
 }
 
@@ -950,7 +950,7 @@ sub add_participant :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/add_participant.tt',
+            template => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
@@ -964,7 +964,7 @@ sub add_participant :Local :Args(1) {
         $c->stash->{error_msg} = 'Name and email are required.';
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/add_participant.tt',
+            template => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
@@ -973,7 +973,7 @@ sub add_participant :Local :Args(1) {
         $c->stash->{error_msg} = 'Invalid email address.';
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/add_participant.tt',
+            template => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
@@ -988,7 +988,7 @@ sub add_participant :Local :Args(1) {
         $c->stash->{error_msg} = 'A participant with this email address is already registered.';
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/add_participant.tt',
+            template => 'WorkShops/AddParticipant.tt',
         );
         return;
     }
@@ -1082,7 +1082,7 @@ sub files :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         files => \@files,
-        template => 'WorkShops/files.tt',
+        template => 'WorkShops/Files.tt',
     );
 }
 
@@ -1106,7 +1106,7 @@ sub upload :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/upload.tt',
+            template => 'WorkShops/Upload.tt',
         );
         return;
     }
@@ -1117,7 +1117,7 @@ sub upload :Local :Args(1) {
         $c->stash->{error_msg} = 'No file uploaded.';
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/upload.tt',
+            template => 'WorkShops/Upload.tt',
         );
         return;
     }
@@ -1134,7 +1134,7 @@ sub upload :Local :Args(1) {
         $c->stash->{error_msg} = 'Invalid file type. Only PowerPoint (PPT, PPTX) and PDF files are allowed.';
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/upload.tt',
+            template => 'WorkShops/Upload.tt',
         );
         return;
     }
@@ -1144,7 +1144,7 @@ sub upload :Local :Args(1) {
         $c->stash->{error_msg} = "File is too large. Maximum size is ${max_mb}MB.";
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/upload.tt',
+            template => 'WorkShops/Upload.tt',
         );
         return;
     }
@@ -1303,7 +1303,7 @@ sub content :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         content_sections => \@content,
-        template => 'WorkShops/content.tt',
+        template => 'WorkShops/Content.tt',
     );
 }
 
@@ -1327,7 +1327,7 @@ sub add_content :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
-            template => 'WorkShops/add_content.tt',
+            template => 'WorkShops/AddContent.tt',
         );
         return;
     }
@@ -1342,7 +1342,7 @@ sub add_content :Local :Args(1) {
         $c->stash(
             workshop => $workshop,
             form_data => $params,
-            template => 'WorkShops/add_content.tt',
+            template => 'WorkShops/AddContent.tt',
         );
         return;
     }
