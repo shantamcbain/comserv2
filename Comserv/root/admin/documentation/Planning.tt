@@ -149,6 +149,10 @@ last_updated = '2026/02/08'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
+                        <strong><a href="#group-dockerbug" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
+                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
                         <a href="#anchor-api-bc05" class="jump-link">ApiSystemBC05</a> |
                         <a href="#anchor-priority-11" class="jump-link">ArchMigrationPhase2</a> |
@@ -235,6 +239,138 @@ last_updated = '2026/02/08'
 
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
+
+        <!-- Group -1: Docker Bug Fix (COMPLETED) -->
+        <div id="group-dockerbug" class="priority-group-container">
+            <h3 class="group-header">✅ Docker Container Startup - COMPLETED</h3>
+
+            <div id="anchor-dockerbug-completed" class="nav-anchor"></div>
+            <details id="dockerbug-completed" class="priority-container">
+                <summary class="priority-summary">✅ Docker Container Startup Bug - COMPLETED (Feb 14-16, 2026)</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-completed">COMPLETED</span> | <strong>Priority:</strong> CRITICAL</p>
+                    <p><strong>Zenflow Task:</strong> <code>dockerbug-ee56</code> | <strong>Branch:</strong> <code>dockerbug-ee56</code></p>
+                    <p><strong>Resolution Date:</strong> February 16, 2026</p>
+
+                    <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                        <p><strong>✅ RESOLVED:</strong> Docker containers now start successfully on both development (port 3000) and production (port 5000). Database connections to 192.168.1.198:3306 working correctly.</p>
+                    </div>
+
+                    <h4>🐛 Problems Fixed</h4>
+                    <ol>
+                        <li><strong>Missing IPC::Run3 Module:</strong> Added <code>requires 'IPC::Run3';</code> to cpanfile (line 94)</li>
+                        <li><strong>Incorrect Secrets Mount Path:</strong> Updated docker-compose.yml to mount <code>~/.comserv/secrets:/home/comserv/.comserv/secrets:ro</code></li>
+                        <li><strong>Missing Hardcoded Secrets Path:</strong> Added <code>/home/comserv/.comserv/secrets</code> to RemoteDB.pm @secret_paths (line 119)</li>
+                        <li><strong>Wrong Database Driver:</strong> Changed DSN from <code>dbi:mysql:</code> to <code>dbi:MariaDB:</code> (RemoteDB.pm lines 314, 580)</li>
+                        <li><strong>Missing HTTP::Parser::XS:</strong> Added explicit dependency to cpanfile (line 100) - transitive dep issue</li>
+                        <li><strong>Disabled db_config.json Mount:</strong> Commented out in docker-compose.yml (contained placeholder passwords)</li>
+                    </ol>
+
+                    <h4>✅ Verification</h4>
+                    <ul>
+                        <li><strong>Port 3000 (Dev):</strong> <code>curl http://localhost:3000/health</code> → <code>{"status":"ok"}</code></li>
+                        <li><strong>Port 5000 (Prod):</strong> <code>curl http://localhost:5000/health</code> → <code>{"status":"ok"}</code></li>
+                        <li><strong>Database:</strong> Connected to MariaDB 192.168.1.198:3306 successfully</li>
+                        <li><strong>Containers:</strong> All healthy (comserv-redis, comserv-web-dev, comserv-web-prod)</li>
+                    </ul>
+
+                    <h4>📚 Documentation</h4>
+                    <ul>
+                        <li><strong>Investigation:</strong> <code>.zenflow/tasks/dockerbug-ee56/investigation.md</code></li>
+                        <li><strong>Completion Report:</strong> <code>.zenflow/tasks/dockerbug-ee56/DOCKER_BUG_COMPLETED.md</code></li>
+                        <li><strong>Reorganization Proposal:</strong> <code>.zenflow/tasks/dockerbug-ee56/PROJECT_REORGANIZATION_PROPOSAL.md</code></li>
+                        <li><strong>Task Plan:</strong> <code>.zenflow/tasks/dockerbug-ee56/plan.md</code></li>
+                    </ul>
+
+                    <details style="margin: 10px 0;">
+                        <summary style="cursor: pointer; font-weight: bold;">🏗️ Project Reorganization Proposal (Click to Expand)</summary>
+                        <div style="margin: 10px 0 0 15px;">
+                            <h5>PascalCase Naming Convention</h5>
+                            <p>Proposed standard for directories, files, and containers:</p>
+                            <ul>
+                                <li><strong>Directories:</strong> .Infrastructure/, Documentation/, Comserv/</li>
+                                <li><strong>Container Names:</strong> <code>CSC-Comserv-Web-dev</code>, <code>CSC-Comserv-Web-prod</code>, <code>CSC-Comserv-Redis-prod</code></li>
+                                <li><strong>Format:</strong> <code>{Org}-{Application}-{Component}-{environment}</code></li>
+                            </ul>
+
+                            <h5>Proposed .Infrastructure/ Directory</h5>
+                            <ul>
+                                <li><code>.Infrastructure/Docker/DockerComposeProduction.yml</code></li>
+                                <li><code>.Infrastructure/Kubernetes/DeploymentProduction.yaml</code></li>
+                                <li><code>.Infrastructure/Scripts/DeployToProduction.sh</code></li>
+                            </ul>
+
+                            <h5>Database Schema Enhancements</h5>
+                            <p>Proposed tables: project_categories, project_environments, infrastructure_assets, deployment_history</p>
+                            <p><strong>See:</strong> PROJECT_REORGANIZATION_PROPOSAL.md for complete details</p>
+                        </div>
+                    </details>
+
+                    <details style="margin: 10px 0;">
+                        <summary style="cursor: pointer; font-weight: bold;">💻 Development Workflow - PyCharm + Zencoder + Zenflow + Docker (Click to Expand)</summary>
+                        <div style="margin: 10px 0 0 15px;">
+                            <h5>Component Roles</h5>
+                            <ul>
+                                <li><strong>PyCharm:</strong> IDE / Code Editor (main workspace)</li>
+                                <li><strong>Zencoder:</strong> AI assistant plugin inside PyCharm</li>
+                                <li><strong>Zenflow:</strong> Task/workflow management tool (creates git worktrees in <code>~/.zenflow/worktrees/</code>)</li>
+                                <li><strong>Docker:</strong> Container runtime (runs from PyCharm or command line)</li>
+                            </ul>
+
+                            <h5>Workflow</h5>
+                            <ol>
+                                <li>Zenflow creates task → Git worktree in <code>~/.zenflow/worktrees/{task-id}</code></li>
+                                <li>Zencoder works in worktree → AI assistance</li>
+                                <li>Docker containers run → Testing</li>
+                                <li>Commit changes in worktree branch</li>
+                                <li>Zenflow merges back to main</li>
+                            </ol>
+
+                            <h5>Docker Development Strategy</h5>
+                            <p><strong>Primary Use:</strong> Production container deployment</p>
+                            <p><strong>Recommended:</strong> Hybrid development - code on workstation, test in container, deploy to production</p>
+
+                            <h5>Zenflow Worktree Visibility</h5>
+                            <p><strong>Current Worktrees:</strong> api-bc05, dockerbug-ee56, new-task-3cda, new-task-9cf1, set-up-project-config-8993, set-up-project-config-d327, workshops-7d21</p>
+                            <p><strong>Check with:</strong> <code>ls -la ~/.zenflow/worktrees/</code> or <code>git worktree list</code></p>
+
+                            <h5>Key Questions Answered</h5>
+                            <ul>
+                                <li><strong>Can Zenflow be used as VS Code?</strong> No - Zenflow is task management, not an editor</li>
+                                <li><strong>Development location?</strong> Workstation (PyCharm), then push containers to production server</li>
+                                <li><strong>Multiple developers?</strong> Each developer: own branches, own containers (different ports), shared database</li>
+                                <li><strong>Option 3 (Remote Container)?</strong> Works with PyCharm (has better Docker integration than VS Code)</li>
+                            </ul>
+                            <p><strong>See:</strong> PROJECT_REORGANIZATION_PROPOSAL.md lines 569-829 for complete workflow details</p>
+                        </div>
+                    </details>
+
+                    <h4>🎯 Deployment Commands</h4>
+                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 0.9em;">
+cd ~/PycharmProjects/comserv2
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+
+# Check health
+docker compose ps
+curl http://localhost:3000/health
+curl http://localhost:5000/health
+
+# View logs
+docker compose logs web-dev --follow
+docker compose logs web-prod --follow</pre>
+
+                    <h4>🔍 Lessons Learned</h4>
+                    <ul>
+                        <li><strong>Explicit Dependencies:</strong> Always declare all modules in cpanfile (transitive deps can change between builds)</li>
+                        <li><strong>Environment Variables:</strong> $ENV{HOME} resolves differently per user (root vs comserv) - use hardcoded paths when needed</li>
+                        <li><strong>Database Drivers:</strong> DBD::MariaDB ≠ DBD::mysql - DSN must match installed driver</li>
+                        <li><strong>Secrets Management:</strong> Mount secrets to user home directory, not app directory</li>
+                    </ul>
+                </div>
+            </details>
+        </div>
 
         <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
         <div id="group-infrastructure-ha" class="priority-group-container">
