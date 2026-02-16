@@ -1,0 +1,129 @@
+[% META 
+   title = "Workshop Leader Dashboard"
+   description = "Dashboard for workshop leaders to manage their workshops"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.02"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Dashboard.tt,v 0.02 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshop Leader Dashboard</h1>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            <div class="form-actions">
+                <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
+                <a href="/workshop/add" class="btn btn-primary">Create New Workshop</a>
+            </div>
+            
+            <div class="data-container">
+                <h2>My Workshops</h2>
+                
+                [% IF workshops.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Date</th>
+                                <th>Leader</th>
+                                <th>Status</th>
+                                <th>Participants</th>
+                                <th>Emails</th>
+                                <th>Files</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH item IN workshops %]
+                            [% workshop = item.workshop %]
+                            <tr>
+                                <td>
+                                    <strong>[% workshop.title | html %]</strong><br>
+                                    <small>[% workshop.sitename | html %]</small>
+                                </td>
+                                <td>
+                                    [% workshop.date.split(' ').0 %]<br>
+                                    <small>[% workshop.time %] - [% workshop.end_time %]</small>
+                                </td>
+                                <td>
+                                    [% IF workshop.creator && workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">
+                                            [% workshop.creator.first_name %] [% workshop.creator.last_name %]
+                                        </a><br>
+                                        <small>[% workshop.creator.username %]</small>
+                                    [% ELSIF workshop.created_by %]
+                                        <a href="/user/edit_user/[% workshop.created_by %]">User ID: [% workshop.created_by %]</a>
+                                    [% ELSE %]
+                                        [% workshop.instructor || 'N/A' | html %]
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF workshop.status == 'published' %]
+                                        <span class="badge badge-success">Published</span>
+                                    [% ELSIF workshop.status == 'draft' %]
+                                        <span class="badge badge-secondary">Draft</span>
+                                    [% ELSIF workshop.status == 'completed' %]
+                                        <span class="badge badge-info">Completed</span>
+                                    [% ELSIF workshop.status == 'cancelled' %]
+                                        <span class="badge badge-danger">Cancelled</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-secondary">[% workshop.status %]</span>
+                                    [% END %]
+                                </td>
+                                <td>[% item.participant_count %] / [% workshop.max_participants || 'N/A' %]</td>
+                                <td>[% item.email_count %]</td>
+                                <td>[% item.file_count %]</td>
+                                <td class="action-cell">
+                                    <form action="/workshop/details" method="GET" style="display:inline;">
+                                        <input type="hidden" name="id" value="[% workshop.id %]">
+                                        <button type="submit" class="btn btn-sm">View</button>
+                                    </form>
+                                    <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
+                                        <button type="submit" class="btn btn-sm btn-edit">Edit</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="content-section">
+                    <h3>Quick Stats</h3>
+                    <p><strong>Total Workshops:</strong> [% workshops.size %]</p>
+                </div>
+                
+                [% ELSE %]
+                <div class="empty-state">
+                    <p><strong>No workshops found.</strong></p>
+                    <p>You haven't created any workshops yet. <a href="/workshop/add">Create your first workshop</a> to get started!</p>
+                </div>
+                [% END %]
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
