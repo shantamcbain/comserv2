@@ -84,6 +84,7 @@ requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
 requires 'LWP::Protocol::https';
 requires 'HTTP::Request';
+requires 'HTTP::Parser::XS';
 requires 'WWW::Form::UrlEncoded';
 requires 'HTTP::Entity::Parser';
 requires 'Try::Tiny';
