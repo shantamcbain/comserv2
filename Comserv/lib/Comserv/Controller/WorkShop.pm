@@ -1385,6 +1385,224 @@ sub reorder_content :Local :Args(1) {
     $c->response->body('{"success": true}');
 }
 
+sub compose_email :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to send emails for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $registered_count = $c->model('DBEncy::Participant')->search({
+        workshop_id => $id,
+        status => 'registered'
+    })->count;
+    
+    $c->stash(
+        workshop => $workshop,
+        recipient_count => $registered_count,
+        template => 'WorkShops/compose_email.tt',
+    );
+}
+
+sub send_email :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to send emails for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my $params = $c->request->body_parameters;
+    my $subject = $params->{subject};
+    my $body = $params->{body};
+    
+    unless ($subject && $body) {
+        $c->stash->{error_msg} = 'Subject and body are required.';
+        my $registered_count = $c->model('DBEncy::Participant')->search({
+            workshop_id => $id,
+            status => 'registered'
+        })->count;
+        $c->stash(
+            workshop => $workshop,
+            recipient_count => $registered_count,
+            form_data => $params,
+            template => 'WorkShops/compose_email.tt',
+        );
+        return;
+    }
+    
+    my @registered_participants = $c->model('DBEncy::Participant')->search(
+        {
+            workshop_id => $id,
+            status => 'registered'
+        },
+        { prefetch => 'user' }
+    )->all;
+    
+    unless (@registered_participants) {
+        $c->flash->{error_msg} = 'No registered participants to email.';
+        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+        return;
+    }
+    
+    my @recipient_emails;
+    for my $participant (@registered_participants) {
+        if ($participant->email && $participant->email =~ /\@/) {
+            push @recipient_emails, $participant->email;
+        }
+    }
+    
+    unless (@recipient_emails) {
+        $c->flash->{error_msg} = 'No valid email addresses found for registered participants.';
+        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+        return;
+    }
+    
+    my $from_address = $c->config->{mail_from} || 'noreply@computersystemconsulting.ca';
+    my $reply_to = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
+    
+    my $workshop_url = $c->uri_for($self->action_for('details'), { id => $id });
+    my $base_uri = $c->req->base;
+    my $full_url = $base_uri . $workshop_url;
+    
+    my $formatted_date = $workshop->date ? $workshop->date->strftime('%Y-%m-%d') : 'TBD';
+    my $formatted_time = $workshop->time ? $workshop->time->strftime('%H:%M') : 'TBD';
+    my $formatted_end_time = $workshop->end_time || '';
+    
+    my $sent_count = 0;
+    my $failed_count = 0;
+    my @failed_emails;
+    
+    for my $participant (@registered_participants) {
+        my $email = $participant->email;
+        next unless $email && $email =~ /\@/;
+        
+        my $user_name = '';
+        if ($participant->user) {
+            $user_name = $participant->user->first_name || $participant->user->username || '';
+            if ($participant->user->last_name) {
+                $user_name .= ' ' . $participant->user->last_name;
+            }
+        } elsif ($participant->name) {
+            $user_name = $participant->name;
+        }
+        
+        eval {
+            $c->stash->{email} = {
+                to       => $email,
+                from     => $from_address,
+                reply_to => $reply_to,
+                subject  => $subject,
+                template => 'email/workshop/workshop_announcement.tt',
+                template_vars => {
+                    name => $user_name,
+                    workshop_title => $workshop->title,
+                    workshop_instructor => $workshop->instructor,
+                    workshop_date => $formatted_date,
+                    workshop_time => $formatted_time,
+                    workshop_end_time => $formatted_end_time,
+                    workshop_location => $workshop->location,
+                    workshop_url => $full_url,
+                    message_body => $body,
+                },
+            };
+            
+            $c->forward($c->view('Email::Template'));
+            $sent_count++;
+        };
+        
+        if ($@) {
+            $c->log->warn("Failed to send email to $email: $@");
+            $failed_count++;
+            push @failed_emails, $email;
+        }
+    }
+    
+    my $email_status = 'sent';
+    if ($failed_count > 0 && $sent_count == 0) {
+        $email_status = 'failed';
+    } elsif ($failed_count > 0) {
+        $email_status = 'partial';
+    }
+    
+    my $email_record;
+    eval {
+        $email_record = $c->model('DBEncy::WorkshopEmail')->create({
+            workshop_id => $id,
+            subject => $subject,
+            body => $body,
+            sent_by => $c->session->{user_id},
+            sent_at => DateTime->now,
+            recipient_count => $sent_count,
+            status => $email_status,
+        });
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to record email in database: $@");
+    }
+    
+    if ($failed_count > 0) {
+        my $failed_list = join(', ', @failed_emails);
+        $c->flash->{warning_msg} = "Email sent to $sent_count participant(s). Failed to send to $failed_count: $failed_list";
+    } else {
+        $c->flash->{success_msg} = "Email sent successfully to $sent_count participant(s).";
+    }
+    
+    $c->response->redirect($c->uri_for($self->action_for('email_history'), [$id]));
+}
+
+sub email_history :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to view email history for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    my @emails = $c->model('DBEncy::WorkshopEmail')->search(
+        { workshop_id => $id },
+        {
+            order_by => { -desc => 'sent_at' },
+            prefetch => 'sender'
+        }
+    )->all;
+    
+    $c->stash(
+        workshop => $workshop,
+        emails => \@emails,
+        template => 'WorkShops/email_history.tt',
+    );
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
