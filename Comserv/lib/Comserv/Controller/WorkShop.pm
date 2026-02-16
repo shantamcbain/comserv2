@@ -1410,7 +1410,7 @@ sub compose_email :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         recipient_count => $registered_count,
-        template => 'WorkShops/compose_email.tt',
+        template => 'WorkShops/ComposeEmail.tt',
     );
 }
 
@@ -1445,7 +1445,7 @@ sub send_email :Local :Args(1) {
             workshop => $workshop,
             recipient_count => $registered_count,
             form_data => $params,
-            template => 'WorkShops/compose_email.tt',
+            template => 'WorkShops/ComposeEmail.tt',
         );
         return;
     }
@@ -1599,7 +1599,7 @@ sub email_history :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         emails => \@emails,
-        template => 'WorkShops/email_history.tt',
+        template => 'WorkShops/EmailHistory.tt',
     );
 }
 
