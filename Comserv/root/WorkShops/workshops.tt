@@ -1,4 +1,4 @@
-[% PageVersion = 'WorkShops/workshops.tt,v 0.03 2026/02/15 shanta Exp shanta ' %]
+[% PageVersion = 'WorkShops/workshops.tt,v 0.04 2026/02/16 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -9,6 +9,33 @@
     [% IF is_admin %]
     <a href="/workshop/dashboard" style="margin-right: 10px;">My Dashboard</a>
     [% END %]
+</div>
+
+<!-- Site filter section -->
+<div style="margin-bottom: 15px; padding: 10px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">
+    <form method="GET" action="/workshop" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <label for="site_filter" style="font-weight: bold;">Filter by Site:</label>
+        <select name="site_filter" id="site_filter" onchange="this.form.submit()" style="padding: 5px 10px;">
+            <option value="">All Sites</option>
+            <option value="public" [% IF c.request.params.site_filter == 'public' %]selected[% END %]>Public Workshops Only</option>
+            <option value="my_site" [% IF c.request.params.site_filter == 'my_site' %]selected[% END %]>My Site ([% sitename || 'N/A' %])</option>
+        </select>
+        
+        <label for="status_filter" style="font-weight: bold; margin-left: 20px;">Filter by Status:</label>
+        <select name="status_filter" id="status_filter" onchange="this.form.submit()" style="padding: 5px 10px;">
+            <option value="">All Statuses</option>
+            <option value="draft" [% IF c.request.params.status_filter == 'draft' %]selected[% END %]>Draft</option>
+            <option value="published" [% IF c.request.params.status_filter == 'published' %]selected[% END %]>Published</option>
+            <option value="registration_closed" [% IF c.request.params.status_filter == 'registration_closed' %]selected[% END %]>Registration Closed</option>
+            <option value="in_progress" [% IF c.request.params.status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
+            <option value="completed" [% IF c.request.params.status_filter == 'completed' %]selected[% END %]>Completed</option>
+            <option value="cancelled" [% IF c.request.params.status_filter == 'cancelled' %]selected[% END %]>Cancelled</option>
+        </select>
+        
+        <noscript>
+            <input type="submit" value="Apply Filters" style="padding: 5px 15px;">
+        </noscript>
+    </form>
 </div>
 <table>
     <tr>
@@ -22,6 +49,8 @@
         <th>Leader</th>
         [% END %]
         <th>Max Participants</th>
+        <th>Status</th>
+        <th>Visibility</th>
         <th>Actions</th>
     </tr>
     [% FOREACH workshop IN workshops %]
@@ -44,6 +73,30 @@
         </td>
         [% END %]
         <td>[% workshop.max_participants || 'N/A' %]</td> <!-- Display 'N/A' if undefined -->
+        <td>
+            [% IF workshop.status == 'draft' %]
+                <span style="padding: 3px 8px; background-color: #e0e0e0; color: #333; border-radius: 3px; font-size: 0.9em;">Draft</span>
+            [% ELSIF workshop.status == 'published' %]
+                <span style="padding: 3px 8px; background-color: #28a745; color: white; border-radius: 3px; font-size: 0.9em;">Published</span>
+            [% ELSIF workshop.status == 'registration_closed' %]
+                <span style="padding: 3px 8px; background-color: #ffc107; color: #333; border-radius: 3px; font-size: 0.9em;">Reg. Closed</span>
+            [% ELSIF workshop.status == 'in_progress' %]
+                <span style="padding: 3px 8px; background-color: #17a2b8; color: white; border-radius: 3px; font-size: 0.9em;">In Progress</span>
+            [% ELSIF workshop.status == 'completed' %]
+                <span style="padding: 3px 8px; background-color: #6c757d; color: white; border-radius: 3px; font-size: 0.9em;">Completed</span>
+            [% ELSIF workshop.status == 'cancelled' %]
+                <span style="padding: 3px 8px; background-color: #dc3545; color: white; border-radius: 3px; font-size: 0.9em;">Cancelled</span>
+            [% ELSE %]
+                <span style="padding: 3px 8px; background-color: #e0e0e0; color: #333; border-radius: 3px; font-size: 0.9em;">[% workshop.status || 'Unknown' %]</span>
+            [% END %]
+        </td>
+        <td>
+            [% IF workshop.share == 'public' %]
+                <span style="padding: 3px 8px; background-color: #007bff; color: white; border-radius: 3px; font-size: 0.9em;">🌐 Public</span>
+            [% ELSE %]
+                <span style="padding: 3px 8px; background-color: #6c757d; color: white; border-radius: 3px; font-size: 0.9em;">🔒 Private</span>
+            [% END %]
+        </td>
         <td>
             <form action="/workshop/details" method="GET" style="display:inline;">
                 <input type="hidden" name="id" value="[% workshop.id %]">
@@ -90,6 +143,8 @@
                 <th>Leader</th>
                 [% END %]
                 <th>Max Participants</th>
+                <th>Status</th>
+                <th>Visibility</th>
                 <th>Actions</th>
             </tr>
             [% FOREACH workshop IN past_workshops %]
@@ -112,6 +167,30 @@
                 </td>
                 [% END %]
                 <td>[% workshop.max_participants || 'N/A' %]</td>
+                <td>
+                    [% IF workshop.status == 'draft' %]
+                        <span style="padding: 3px 8px; background-color: #e0e0e0; color: #333; border-radius: 3px; font-size: 0.9em;">Draft</span>
+                    [% ELSIF workshop.status == 'published' %]
+                        <span style="padding: 3px 8px; background-color: #28a745; color: white; border-radius: 3px; font-size: 0.9em;">Published</span>
+                    [% ELSIF workshop.status == 'registration_closed' %]
+                        <span style="padding: 3px 8px; background-color: #ffc107; color: #333; border-radius: 3px; font-size: 0.9em;">Reg. Closed</span>
+                    [% ELSIF workshop.status == 'in_progress' %]
+                        <span style="padding: 3px 8px; background-color: #17a2b8; color: white; border-radius: 3px; font-size: 0.9em;">In Progress</span>
+                    [% ELSIF workshop.status == 'completed' %]
+                        <span style="padding: 3px 8px; background-color: #6c757d; color: white; border-radius: 3px; font-size: 0.9em;">Completed</span>
+                    [% ELSIF workshop.status == 'cancelled' %]
+                        <span style="padding: 3px 8px; background-color: #dc3545; color: white; border-radius: 3px; font-size: 0.9em;">Cancelled</span>
+                    [% ELSE %]
+                        <span style="padding: 3px 8px; background-color: #e0e0e0; color: #333; border-radius: 3px; font-size: 0.9em;">[% workshop.status || 'Unknown' %]</span>
+                    [% END %]
+                </td>
+                <td>
+                    [% IF workshop.share == 'public' %]
+                        <span style="padding: 3px 8px; background-color: #007bff; color: white; border-radius: 3px; font-size: 0.9em;">🌐 Public</span>
+                    [% ELSE %]
+                        <span style="padding: 3px 8px; background-color: #6c757d; color: white; border-radius: 3px; font-size: 0.9em;">🔒 Private</span>
+                    [% END %]
+                </td>
                 <td>
                     <form action="/workshop/details" method="GET" style="display:inline;">
                         <input type="hidden" name="id" value="[% workshop.id %]">
