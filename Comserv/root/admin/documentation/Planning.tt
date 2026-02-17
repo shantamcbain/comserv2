@@ -149,11 +149,11 @@ last_updated = '2026/02/08'
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
                     <div class="jump-line">
-                        <strong><a href="#group-zenflow-config" class="jump-link">⚙️ Zenflow Config & Docker</a></strong>:
+                        <strong><a href="#group-docker-k8s" class="jump-link">🐳 Docker and K8s Management</a></strong>:
                         <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-dockerbug" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
+                        <strong><a href="#group-docker-k8s" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
                         <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a>
                     </div>
                     <div class="jump-line">
@@ -300,381 +300,202 @@ last_updated = '2026/02/08'
                 [% END %]
             </div>
         </details>
-        <!-- Group -1: Zenflow Configuration & Docker Testing (ACTIVE) -->
-        <div id="group-zenflow-config" class="priority-group-container">
-            <h3 class="group-header">⚙️ Zenflow Configuration & Docker Container Testing</h3>
+        <!-- Group -1: Docker and K8s Management (ACTIVE) -->
+        <div id="group-docker-k8s" class="nav-anchor"></div>
+        <details id="group-docker-k8s-main" class="priority-group-container" open>
+            <summary class="group-header">🐳 Docker and K8s Management</summary>
+            <div class="priority-content">
+                <h3>🐳 Docker and K8s Management</h3>
+                <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+                <p><strong>Zenflow Task:</strong> <code>set-up-project-config-d327</code> (ports 3000, 5000) | <strong>Branch:</strong> <code>set-up-project-config-d327</code></p>
+                
+                <p><strong>Objective:</strong> Reorganize and enhance Docker and Kubernetes related planning and documentation. Automate deployment process and setup High Availability in the server room.</p>
 
-            <div id="anchor-project-config-test" class="nav-anchor"></div>
-            <details id="project-config-test" class="priority-container" open>
-                <summary class="priority-summary">🔧 Project Configuration & Docker Container Rebuild Testing (ACTIVE)</summary>
-                <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> HIGH</p>
-                    <p><strong>Zenflow Task:</strong> <code>set-up-project-config-d327</code> (ports 3000, 5000) | <strong>Branch:</strong> <code>set-up-project-config-d327</code></p>
-                    <p><strong>Goal:</strong> Configure Zenflow automation settings and validate Docker container build with updated Perl dependencies.</p>
+                <h4>📊 Docker and K8s Project from Database</h4>
+                [% TRY %]
+                    [% SET schema = c.model('DBEncy').schema %]
+                    [% SET k8s_project = schema.resultset('Project').find(137) %]
+                    
+                    [% IF k8s_project %]
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                <h3>[% k8s_project.name %] (Project ID: 137)</h3>
+                                <ul>
+                                    <li><strong>Description:</strong> [% k8s_project.description || 'Our Kurbuntes setup' %]</li>
+                                    <li><strong>Start Date:</strong> [% k8s_project.start_date || '2026-02-06' %]</li>
+                                    <li><strong>Status:</strong> [% k8s_project.status || 'In-Process' %]</li>
+                                    <li><strong>Project Code:</strong> [% k8s_project.project_code || 'k8s' %]</li>
+                                    <li><strong>Developer:</strong> [% k8s_project.developer_name || 'Shanta' %]</li>
+                                </ul>
 
-                    <h4>📋 Current Phase: Docker Container Validation</h4>
-                    <div style="background: #e7f3ff; border: 1px solid #2196f3; border-radius: 4px; padding: 10px; margin: 10px 0;">
-                        <p><strong>Update (Feb 12, 2026):</strong> Added needed modules to <code>Comserv/cpanfile</code>. Now testing Docker container rebuild and application accessibility.</p>
-                    </div>
+                                <p>
+                                    <a href="/project/details?project_id=137" target="_blank" style="color: #007bff;">View Details</a> |
+                                    <a href="/project/editproject?project_id=137" target="_blank" style="color: #007bff;">Edit Project</a>
+                                </p>
 
-                    <h4>🎯 Next Steps</h4>
-                    <ol>
-                        <li><strong>Rebuild Docker Container:</strong>
-                            <ul>
-                                <li>Navigate to Comserv directory: <code>cd Comserv</code></li>
-                                <li>Build image: <code>docker build -t comserv-test:latest .</code></li>
-                                <li>Verify build completes without errors</li>
-                                <li>Confirm all cpanfile dependencies install successfully</li>
-                            </ul>
-                        </li>
-                        <li><strong>Test Application Access (Port 3000):</strong>
-                            <ul>
-                                <li>Start container with port 3000 mapped</li>
-                                <li>Test: <code>curl http://localhost:3000/</code></li>
-                                <li>Verify application responds correctly</li>
-                                <li>Check logs for errors: <code>docker logs [container-id]</code></li>
-                            </ul>
-                        </li>
-                        <li><strong>Test Application Access (Port 5000):</strong>
-                            <ul>
-                                <li>Start container with port 5000 mapped (alternative configuration)</li>
-                                <li>Test: <code>curl http://localhost:5000/</code></li>
-                                <li>Verify application responds correctly</li>
-                                <li>Document port configuration differences</li>
-                            </ul>
-                        </li>
-                        <li><strong>Validate Zenflow Settings:</strong>
-                            <ul>
-                                <li>Verify <code>.zenflow/settings.json</code> configuration</li>
-                                <li>Test setup_script: <code>cd Comserv && cpanm --installdeps .</code></li>
-                                <li>Test verification_script: <code>perl -cw Comserv/script/comserv_server.pl</code></li>
-                                <li>Confirm copy_files patterns work correctly</li>
-                            </ul>
-                        </li>
-                        <li><strong>Integration Testing:</strong>
-                            <ul>
-                                <li>Test full Zenflow workflow in fresh worktree</li>
-                                <li>Verify setup script runs successfully</li>
-                                <li>Verify dev server starts on configured port</li>
-                                <li>Test verification script catches syntax errors</li>
-                            </ul>
-                        </li>
-                    </ol>
-
-                    <h4>📝 Completed Tasks</h4>
-                    <ul>
-                        <li>✅ Analyzed repository structure and dependencies</li>
-                        <li>✅ Created <code>.zenflow/settings.json</code> with configuration:
-                            <ul>
-                                <li>setup_script: Install Perl CPAN dependencies</li>
-                                <li>dev_script: Start development server via <code>start-dev-server.sh</code></li>
-                                <li>verification_script: Syntax check for Catalyst server</li>
-                                <li>copy_files: Environment files and database config</li>
-                            </ul>
-                        </li>
-                        <li>✅ Added required modules to <code>Comserv/cpanfile</code></li>
-                    </ul>
-
-                    <h4>⚠️ Issues & Blockers</h4>
-                    <ul>
-                        <li><strong>Port Configuration:</strong> Need to determine dynamic port assignment per branch (Planning.tt shows 4000-4003 for other workflows, this task uses 3000/5000)</li>
-                        <li><strong>Docker Build Time:</strong> First build may take ~5 minutes for CPAN module installation</li>
-                    </ul>
-
-                    <h4>📚 References</h4>
-                    <ul>
-                        <li><strong>Docker Guide:</strong> <code>DOCKER_QUICKSTART.txt</code></li>
-                        <li><strong>Makefile:</strong> <code>Makefile.docker</code> (shortcuts for Docker commands)</li>
-                        <li><strong>Dockerfile:</strong> <code>Comserv/Dockerfile</code></li>
-                        <li><strong>Dependencies:</strong> <code>Comserv/cpanfile</code></li>
-                    </ul>
-                </div>
-            </details>
-        </div>
-
-        <!-- Group -1: Docker Bug Fix (COMPLETED) -->
-        <div id="group-dockerbug" class="priority-group-container">
-            <h3 class="group-header">✅ Docker Container Startup - COMPLETED</h3>
-
-            <div id="anchor-dockerbug-completed" class="nav-anchor"></div>
-            <details id="dockerbug-completed" class="priority-container">
-                <summary class="priority-summary">✅ Docker Container Startup Bug - COMPLETED (Feb 14-16, 2026)</summary>
-                <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-completed">COMPLETED</span> | <strong>Priority:</strong> CRITICAL</p>
-                    <p><strong>Zenflow Task:</strong> <code>dockerbug-ee56</code> | <strong>Branch:</strong> <code>dockerbug-ee56</code></p>
-                    <p><strong>Resolution Date:</strong> February 16, 2026</p>
-
-                    <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
-                        <p><strong>✅ RESOLVED:</strong> Docker containers now start successfully on both development (port 3000) and production (port 5000). Database connections to 192.168.1.198:3306 working correctly.</p>
-                    </div>
-
-                    <h4>🐛 Problems Fixed</h4>
-                    <ol>
-                        <li><strong>Missing IPC::Run3 Module:</strong> Added <code>requires 'IPC::Run3';</code> to cpanfile (line 94)</li>
-                        <li><strong>Incorrect Secrets Mount Path:</strong> Updated docker-compose.yml to mount <code>~/.comserv/secrets:/home/comserv/.comserv/secrets:ro</code></li>
-                        <li><strong>Missing Hardcoded Secrets Path:</strong> Added <code>/home/comserv/.comserv/secrets</code> to RemoteDB.pm @secret_paths (line 119)</li>
-                        <li><strong>Wrong Database Driver:</strong> Changed DSN from <code>dbi:mysql:</code> to <code>dbi:MariaDB:</code> (RemoteDB.pm lines 314, 580)</li>
-                        <li><strong>Missing HTTP::Parser::XS:</strong> Added explicit dependency to cpanfile (line 100) - transitive dep issue</li>
-                        <li><strong>Disabled db_config.json Mount:</strong> Commented out in docker-compose.yml (contained placeholder passwords)</li>
-                    </ol>
-
-                    <h4>✅ Verification</h4>
-                    <ul>
-                        <li><strong>Port 3000 (Dev):</strong> <code>curl http://localhost:3000/health</code> → <code>{"status":"ok"}</code></li>
-                        <li><strong>Port 5000 (Prod):</strong> <code>curl http://localhost:5000/health</code> → <code>{"status":"ok"}</code></li>
-                        <li><strong>Database:</strong> Connected to MariaDB 192.168.1.198:3306 successfully</li>
-                        <li><strong>Containers:</strong> All healthy (comserv-redis, comserv-web-dev, comserv-web-prod)</li>
-                    </ul>
-
-                    <h4>📚 Documentation</h4>
-                    <ul>
-                        <li><strong>Investigation:</strong> <code>.zenflow/tasks/dockerbug-ee56/investigation.md</code></li>
-                        <li><strong>Completion Report:</strong> <code>.zenflow/tasks/dockerbug-ee56/DOCKER_BUG_COMPLETED.md</code></li>
-                        <li><strong>Reorganization Proposal:</strong> <code>.zenflow/tasks/dockerbug-ee56/PROJECT_REORGANIZATION_PROPOSAL.md</code></li>
-                        <li><strong>Task Plan:</strong> <code>.zenflow/tasks/dockerbug-ee56/plan.md</code></li>
-                    </ul>
-
-                    <details style="margin: 10px 0;">
-                        <summary style="cursor: pointer; font-weight: bold;">🏗️ Project Reorganization Proposal (Click to Expand)</summary>
-                        <div style="margin: 10px 0 0 15px;">
-                            <h5>PascalCase Naming Convention</h5>
-                            <p>Proposed standard for directories, files, and containers:</p>
-                            <ul>
-                                <li><strong>Directories:</strong> .Infrastructure/, Documentation/, Comserv/</li>
-                                <li><strong>Container Names:</strong> <code>CSC-Comserv-Web-dev</code>, <code>CSC-Comserv-Web-prod</code>, <code>CSC-Comserv-Redis-prod</code></li>
-                                <li><strong>Format:</strong> <code>{Org}-{Application}-{Component}-{environment}</code></li>
-                            </ul>
-
-                            <h5>Proposed .Infrastructure/ Directory</h5>
-                            <ul>
-                                <li><code>.Infrastructure/Docker/DockerComposeProduction.yml</code></li>
-                                <li><code>.Infrastructure/Kubernetes/DeploymentProduction.yaml</code></li>
-                                <li><code>.Infrastructure/Scripts/DeployToProduction.sh</code></li>
-                            </ul>
-
-                            <h5>Database Schema Enhancements</h5>
-                            <p>Proposed tables: project_categories, project_environments, infrastructure_assets, deployment_history</p>
-                            <p><strong>See:</strong> PROJECT_REORGANIZATION_PROPOSAL.md for complete details</p>
+                                [% SET k8s_todos = k8s_project.todos.search({}, { order_by => 'sort_order' }) %]
+                                [% IF k8s_todos.count > 0 %]
+                                    <h4>📋 Todos for [% k8s_project.name %] ([% k8s_todos.count %])</h4>
+                                    <ul style="list-style-type: none; padding-left: 0;">
+                                        [% FOREACH todo IN k8s_todos.all %]
+                                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                [% todo.subject %]
+                                                <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            </li>
+                                        [% END %]
+                                    </ul>
+                                [% END %]
                         </div>
-                    </details>
-
-                    <details style="margin: 10px 0;">
-                        <summary style="cursor: pointer; font-weight: bold;">💻 Development Workflow - PyCharm + Zencoder + Zenflow + Docker (Click to Expand)</summary>
-                        <div style="margin: 10px 0 0 15px;">
-                            <h5>Component Roles</h5>
-                            <ul>
-                                <li><strong>PyCharm:</strong> IDE / Code Editor (main workspace)</li>
-                                <li><strong>Zencoder:</strong> AI assistant plugin inside PyCharm</li>
-                                <li><strong>Zenflow:</strong> Task/workflow management tool (creates git worktrees in <code>~/.zenflow/worktrees/</code>)</li>
-                                <li><strong>Docker:</strong> Container runtime (runs from PyCharm or command line)</li>
-                            </ul>
-
-                            <h5>Workflow</h5>
-                            <ol>
-                                <li>Zenflow creates task → Git worktree in <code>~/.zenflow/worktrees/{task-id}</code></li>
-                                <li>Zencoder works in worktree → AI assistance</li>
-                                <li>Docker containers run → Testing</li>
-                                <li>Commit changes in worktree branch</li>
-                                <li>Zenflow merges back to main</li>
-                            </ol>
-
-                            <h5>Docker Development Strategy</h5>
-                            <p><strong>Primary Use:</strong> Production container deployment</p>
-                            <p><strong>Recommended:</strong> Hybrid development - code on workstation, test in container, deploy to production</p>
-
-                            <h5>Zenflow Worktree Visibility</h5>
-                            <p><strong>Current Worktrees:</strong> api-bc05, dockerbug-ee56, new-task-3cda, new-task-9cf1, set-up-project-config-8993, set-up-project-config-d327, workshops-7d21</p>
-                            <p><strong>Check with:</strong> <code>ls -la ~/.zenflow/worktrees/</code> or <code>git worktree list</code></p>
-
-                            <h5>Key Questions Answered</h5>
-                            <ul>
-                                <li><strong>Can Zenflow be used as VS Code?</strong> No - Zenflow is task management, not an editor</li>
-                                <li><strong>Development location?</strong> Workstation (PyCharm), then push containers to production server</li>
-                                <li><strong>Multiple developers?</strong> Each developer: own branches, own containers (different ports), shared database</li>
-                                <li><strong>Option 3 (Remote Container)?</strong> Works with PyCharm (has better Docker integration than VS Code)</li>
-                            </ul>
-                            <p><strong>See:</strong> PROJECT_REORGANIZATION_PROPOSAL.md lines 569-829 for complete workflow details</p>
+                    [% ELSE %]
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                            <strong>Note:</strong> Project ID 137 not found in database.
                         </div>
-                    </details>
+                    [% END %]
+                [% CATCH %]
+                    <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                        <strong>Error loading project:</strong> [% error.info %]
+                    </div>
+                [% END %]
 
-                    <h4>🎯 Deployment Commands</h4>
-                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 0.9em;">
-cd ~/PycharmProjects/comserv2
-docker compose down
-docker compose build --no-cache
-docker compose up -d
+                <h4>📁 Documentation & Resources</h4>
+                <ul>
+                    <li>API Access: <a href="http://api.workstation.local:3000" target="_blank">api.workstation.local:3000</a> (Dev)</li>
+                    <li>API Access: <a href="http://api.workstation.local:5000" target="_blank">api.workstation.local:5000</a> (Prod)</li>
+                    <li><strong>Deployment Guide:</strong> <a href="/Documentation/ProductionDeployment">Production Deployment Guide</a></li>
+                    <li><strong>Docker Guide:</strong> <code>DOCKER_QUICKSTART.txt</code></li>
+                    <li><strong>Dockerfile:</strong> <code>Comserv/Dockerfile</code></li>
+                </ul>
 
-# Check health
-docker compose ps
-curl http://localhost:3000/health
-curl http://localhost:5000/health
+                <!-- Sub-project 1: Configuration & Testing -->
+                <div id="anchor-project-config-test" class="nav-anchor"></div>
+                <details id="project-config-test" class="priority-container" open>
+                    <summary class="priority-summary">🔧 Project Configuration & Docker Container Rebuild Testing (ACTIVE)</summary>
+                    <div class="priority-content">
+                        <p><strong>Goal:</strong> Configure Zenflow automation settings and validate Docker container build with updated Perl dependencies.</p>
+                        
+                        <h4>🎯 Next Steps</h4>
+                        <ol>
+                            <li><strong>Rebuild Docker Container:</strong> <code>docker build -t comserv-test:latest .</code></li>
+                            <li><strong>Test Application Access:</strong> Verify ports 3000 and 5000 respond correctly.</li>
+                            <li><strong>Validate Zenflow Settings:</strong> Check <code>.zenflow/settings.json</code>.</li>
+                        </ol>
 
-# View logs
-docker compose logs web-dev --follow
-docker compose logs web-prod --follow</pre>
+                        <h4>📝 Completed Tasks</h4>
+                        <ul>
+                            <li>✅ Analyzed repository structure and dependencies</li>
+                            <li>✅ Created <code>.zenflow/settings.json</code></li>
+                            <li>✅ Added required modules to <code>Comserv/cpanfile</code></li>
+                        </ul>
+                    </div>
+                </details>
 
-                    <h4>🔍 Lessons Learned</h4>
-                    <ul>
-                        <li><strong>Explicit Dependencies:</strong> Always declare all modules in cpanfile (transitive deps can change between builds)</li>
-                        <li><strong>Environment Variables:</strong> $ENV{HOME} resolves differently per user (root vs comserv) - use hardcoded paths when needed</li>
-                        <li><strong>Database Drivers:</strong> DBD::MariaDB ≠ DBD::mysql - DSN must match installed driver</li>
-                        <li><strong>Secrets Management:</strong> Mount secrets to user home directory, not app directory</li>
-                    </ul>
-                </div>
-            </details>
-        </div>
+                <!-- Sub-project 2: Docker Bug Fix (COMPLETED) -->
+                <div id="anchor-dockerbug-completed" class="nav-anchor"></div>
+                <details id="dockerbug-completed" class="priority-container">
+                    <summary class="priority-summary">✅ Docker Container Startup Bug - COMPLETED (Feb 14-16, 2026)</summary>
+                    <div class="priority-content">
+                        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <p><strong>✅ RESOLVED:</strong> Docker containers now start successfully on both development (port 3000) and production (port 5000).</p>
+                        </div>
+                        <p><strong>Lessons Learned:</strong> Explicit dependencies in cpanfile, correct secrets mount paths, and using <code>DBD::MariaDB</code> instead of <code>DBD::mysql</code>.</p>
+                    </div>
+                </details>
 
-        <!-- Group 0: Infrastructure Resilience & HA Project (NEW - PRIORITY 1) -->
-        <div id="group-infrastructure-ha" class="priority-group-container">
-            <h3 class="group-header">🏗️ Infrastructure Resilience & High Availability</h3>
+                <!-- Sub-project 3: Infrastructure Resilience & HA Architecture (ACTIVE) -->
+                <div id="anchor-priority-ha" class="nav-anchor"></div>
+                <details id="priority-ha-infrastructure" class="priority-container" open>
+                    <summary class="priority-summary">🛡️ Infrastructure Resilience & High Availability Architecture</summary>
+                    <div class="priority-content">
+                        <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+                        <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, and establish HA/DR using Docker and K8s.</p>
+                        <p><strong>Context:</strong> Recent 3-day outage from single editing mistake exposed critical infrastructure vulnerabilities. Need comprehensive HA/DR strategy.</p>
 
-            <div id="anchor-infrastructure-ha-project" class="nav-anchor"></div>
-            <details id="infrastructure-ha-project" class="priority-container" open>
-                <summary class="priority-summary">🚨 Infrastructure Resilience & HA Project (ACTIVE)</summary>
-                <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Priority:</strong> CRITICAL</p>
-                    <p><strong>Goal:</strong> Eliminate single points of failure, implement automated failover, establish disaster recovery with external service backup.</p>
-                    <p><strong>Timeline:</strong> 10-14 weeks | <strong>Budget:</strong> ~$10-40/month for external services</p>
+                        <h4>🚨 URGENT NEXT STEPS - <span class="status-pending">IMMEDIATE ACTION REQUIRED</span></h4>
+                        <ul>
+                            <li><strong>🔴 PRIORITY 1: K8s Management & Monitoring System (192.168.1.50)</strong>
+                                <ul>
+                                    <li><strong>Need:</strong> Management and monitoring system for Kubernetes cluster at 192.168.1.50</li>
+                                    <li><strong>Requirements:</strong> Dashboard for cluster status, resource monitoring, log aggregation, and secure kubectl access via web UI.</li>
+                                    <li><strong>Recommended Tools:</strong> Kubernetes Dashboard + Prometheus + Grafana, Rancher, Lens Desktop, or K9s.</li>
+                                    <li><strong>Status:</strong> <span class="status-pending">NOT STARTED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                                </ul>
+                            </li>
+                            <li><strong>🔴 PRIORITY 2: Debug Mail Server in K8s Pod (192.168.1.175)</strong>
+                                <ul>
+                                    <li><strong>Context:</strong> New mail server deployed as K8s pod on 192.168.1.175, experiencing issues</li>
+                                    <li><strong>Debugging Tasks:</strong> Verify pod status/logs, inspect events, verify service configuration, test network connectivity (Ports 25, 587, 993, 995), verify DNS (MX, SPF, DKIM, DMARC), check PVCs, and review mail server config inside pod.</li>
+                                    <li><strong>Status:</strong> <span class="status-pending">DEBUGGING NEEDED</span> | <strong>Urgency:</strong> CRITICAL</li>
+                                </ul>
+                            </li>
+                        </ul>
 
-                    <h4>🚨 URGENT NEXT STEPS - <span class="status-pending">IMMEDIATE ACTION REQUIRED</span></h4>
-                    <ul>
-                        <li><strong>🔴 PRIORITY 1: K8s Management & Monitoring System (192.168.1.50)</strong>
-                            <ul>
-                                <li><strong>Need:</strong> Management and monitoring system for Kubernetes cluster at 192.168.1.50</li>
-                                <li><strong>Requirements:</strong>
-                                    <ul>
-                                        <li>Dashboard for cluster status (nodes, pods, services, deployments)</li>
-                                        <li>Resource monitoring (CPU, memory, disk, network per pod/node)</li>
-                                        <li>Log aggregation and viewing</li>
-                                        <li>kubectl access via web UI (secure)</li>
-                                    </ul>
-                                </li>
-                                <li><strong>Recommended Tools:</strong>
-                                    <ul>
-                                        <li><strong>Option 1:</strong> Kubernetes Dashboard (official, lightweight) + Prometheus + Grafana</li>
-                                        <li><strong>Option 2:</strong> Rancher (full management platform, heavier but comprehensive)</li>
-                                        <li><strong>Option 3:</strong> Lens Desktop (local GUI tool) + Prometheus operator</li>
-                                        <li><strong>Option 4:</strong> K9s (terminal UI) + Prometheus + Grafana for monitoring</li>
-                                    </ul>
-                                </li>
-                                <li><strong>Next Steps:</strong>
-                                    <ol>
-                                        <li>Evaluate tool options based on team expertise and requirements</li>
-                                        <li>Deploy chosen management solution to K8s cluster</li>
-                                        <li>Configure Prometheus operator for metrics collection</li>
-                                        <li>Set up Grafana dashboards for visualization</li>
-                                        <li>Configure access controls and authentication</li>
-                                        <li>Document access procedures and common operations</li>
-                                    </ol>
-                                </li>
-                                <li><strong>Status:</strong> <span class="status-pending">NOT STARTED</span> | <strong>Urgency:</strong> CRITICAL</li>
-                            </ul>
-                        </li>
-                        <li><strong>🔴 PRIORITY 2: Debug Mail Server in K8s Pod (192.168.1.175)</strong>
-                            <ul>
-                                <li><strong>Context:</strong> New mail server deployed as K8s pod on 192.168.1.175, experiencing issues</li>
-                                <li><strong>Debugging Tasks:</strong>
-                                    <ol>
-                                        <li>Verify pod status: <code>kubectl get pods -n mail-namespace</code></li>
-                                        <li>Check pod logs: <code>kubectl logs &lt;mail-pod-name&gt; -n mail-namespace</code></li>
-                                        <li>Inspect pod events: <code>kubectl describe pod &lt;mail-pod-name&gt; -n mail-namespace</code></li>
-                                        <li>Verify service configuration: <code>kubectl get svc -n mail-namespace</code></li>
-                                        <li>Test network connectivity: Port 25 (SMTP), 587 (submission), 993 (IMAPS), 995 (POP3S)</li>
-                                        <li>Verify DNS records: MX, SPF, DKIM, DMARC</li>
-                                        <li>Check persistent volume claims: <code>kubectl get pvc -n mail-namespace</code></li>
-                                        <li>Review mail server config (Postfix/Dovecot/etc.) inside pod</li>
-                                        <li>Test mail sending/receiving from inside pod</li>
-                                        <li>Verify TLS certificates are valid and accessible</li>
-                                    </ol>
-                                </li>
-                                <li><strong>Common Issues to Check:</strong>
-                                    <ul>
-                                        <li>Pod CrashLoopBackOff: Check logs for startup errors</li>
-                                        <li>Port conflicts: Ensure ports are not already bound</li>
-                                        <li>Volume mount issues: Verify PVCs are bound and accessible</li>
-                                        <li>Network policies blocking traffic</li>
-                                        <li>Firewall rules on 192.168.1.175 blocking mail ports</li>
-                                        <li>Incorrect environment variables or config maps</li>
-                                    </ul>
-                                </li>
-                                <li><strong>Next Steps:</strong>
-                                    <ol>
-                                        <li>Access K8s cluster at 192.168.1.175</li>
-                                        <li>Run diagnostic commands above</li>
-                                        <li>Document findings and error messages</li>
-                                        <li>Fix identified issues</li>
-                                        <li>Test mail delivery end-to-end</li>
-                                        <li>Update documentation with working configuration</li>
-                                    </ol>
-                                </li>
-                                <li><strong>Status:</strong> <span class="status-pending">DEBUGGING NEEDED</span> | <strong>Urgency:</strong> CRITICAL</li>
-                            </ul>
-                        </li>
-                    </ul>
+                        <h4>🏗️ HA Implementation Roadmap</h4>
+                        
+                        <h5>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h5>
+                        <ul>
+                            <li>✅ Create PRD (requirements.md)</li>
+                            <li>⏳ Create Technical Specification</li>
+                            <li>⏳ Design API endpoints for project/step/todo CRUD</li>
+                            <li>⏳ Build .tt templates for plan visualization</li>
+                            <li>⏳ Integrate with project table structure</li>
+                        </ul>
 
-                    <h4>Phase 0: Plan Management System (Week 1-3) - <span class="status-in-progress">IN PROGRESS</span></h4>
-                    <ul>
-                        <li>✅ Create PRD (requirements.md)</li>
-                        <li>⏳ Create Technical Specification</li>
-                        <li>⏳ Design API endpoints for project/step/todo CRUD</li>
-                        <li>⏳ Build .tt templates for plan visualization</li>
-                        <li>⏳ Integrate with project table structure</li>
-                        <li>⏳ Populate Infrastructure HA project as first use case</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Plan management system tracking infrastructure project in Comserv app</p>
+                        <h5>Phase 1: Database HA & Service Discovery (Week 4-6) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Create separate production and development databases</li>
+                            <li>Implement service discovery (DNS/ProxySQL/failover pool)</li>
+                            <li>Set up MySQL replication (master-slave or master-master)</li>
+                            <li>Configure connection pooling and retry logic</li>
+                        </ul>
 
-                    <h4>Phase 1: Database Creation & Service Discovery (Week 4-6) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Create separate production and development databases</li>
-                        <li>Implement service discovery (DNS/ProxySQL/failover pool)</li>
-                        <li>Set up MySQL replication (master-slave or master-master)</li>
-                        <li>Configure connection pooling and retry logic</li>
-                        <li>Document VM vs managed service vs containerized pros/cons</li>
-                        <li>Implement backup automation to cloud storage (~$5-10/month)</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Production + dev databases with automated failover</p>
+                        <h5>Phase 2: Gateway, Mail, Catalyst Resilience (Week 7-9) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>OPNsense: Second VM with CARP failover OR low-cost external service</li>
+                            <li>Mail: Implement redundancy or external failover</li>
+                            <li>Catalyst: Deploy multiple instances with load balancing</li>
+                            <li>Redis: Configure cluster for session persistence</li>
+                        </ul>
 
-                    <h4>Phase 2: Gateway, Mail, Catalyst Resilience (Week 7-9) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>OPNsense: Second VM with CARP failover OR low-cost external service ($10/month)</li>
-                        <li>Mail: Implement redundancy or external failover</li>
-                        <li>Catalyst: Deploy multiple instances with load balancing</li>
-                        <li>Redis: Configure cluster for session persistence</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Resilient gateway, mail, and application tier</p>
+                        <h5>Phase 3: Orchestration Platform Deployment (Week 9-11) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Decide: Kubernetes vs Docker Swarm</li>
+                            <li>Deploy chosen orchestration platform</li>
+                            <li>Migrate Catalyst to orchestrated containers</li>
+                            <li>Implement health checks and auto-healing</li>
+                        </ul>
 
-                    <h4>Phase 3: Orchestration Platform & App HA (Week 9-11) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Decide: Kubernetes vs Docker Swarm (detailed pros/cons in Tech Spec)</li>
-                        <li>Deploy chosen orchestration platform</li>
-                        <li>Migrate Catalyst to orchestrated containers</li>
-                        <li>Implement health checks and auto-healing</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Container orchestration with HA features</p>
+                        <h5>Phase 4: Monitoring & Disaster Recovery (Week 11-13) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Deploy monitoring stack (Prometheus/Grafana)</li>
+                            <li>Configure alerting and implement external service failover</li>
+                            <li>Document DR plan and conduct first drill</li>
+                        </ul>
 
-                    <h4>Phase 4: Monitoring & DR (Week 11-13) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Deploy monitoring stack (Prometheus/Grafana)</li>
-                        <li>Configure alerting (within budget)</li>
-                        <li>Implement external service failover ($10-15/month)</li>
-                        <li>Document DR plan and conduct first drill</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Monitoring operational, DR plan tested</p>
+                        <h5>Phase 5: Testing & Validation (Week 13-14) - <span class="status-pending">PENDING</span></h5>
+                        <ul>
+                            <li>Fault injection testing and performance benchmarking</li>
+                            <li>Verify RTO < 5 min, RPO < 5 min</li>
+                            <li>Final production cutover</li>
+                        </ul>
 
-                    <h4>Phase 5: Testing & Validation (Week 13-14) - <span class="status-pending">PENDING</span></h4>
-                    <ul>
-                        <li>Fault injection testing for all services</li>
-                        <li>Performance benchmarking</li>
-                        <li>Verify RTO < 5 min, RPO < 5 min</li>
-                        <li>Final production cutover</li>
-                    </ul>
-                    <p><strong>Deliverable:</strong> Fully resilient infrastructure validated</p>
+                        <h4>🏗️ Infrastructure Components</h4>
+                        <ul>
+                            <li><strong>Dell 710 Server</strong>: Hardware ready, integration planning phase. Role: Additional compute/storage capacity for HA.</li>
+                            <li><strong>Kubernetes Control Plane (VM 101)</strong>: Installed, ready for configuration. Purpose: Container orchestration for application HA.</li>
+                        </ul>
 
-                    <p><strong>Documentation:</strong> <a href="/Documentation/project/details?project_id=INFRA_HA_2026" style="color: var(--link-color);">View Full Project Details</a></p>
-                    <p><strong>PRD:</strong> <code>.zenflow/tasks/new-task-9cf1/requirements.md</code> (765 lines)</p>
-                </div>
-            </details>
-        </div>
+                        <h4>📊 Success Metrics</h4>
+                        <ul>
+                            <li>RTO < 1 hour for Tier 1, < 4 hours for Tier 2/3</li>
+                            <li>RPO < 1 hour for all database data</li>
+                            <li>Zero single points of failure for critical services</li>
+                            <li>Automated failover for database and application layers</li>
+                        </ul>
+                    </div>
+                </details>
+            </div>
+        </details>
+
 
         <!-- Group 1: Architecture & Infrastructure -->
         <details id="group-arch" class="priority-group-container" open>
@@ -708,116 +529,6 @@ docker compose logs web-prod --follow</pre>
                 </div>
             </details>
 
-            <div id="anchor-priority-ha" class="nav-anchor"></div>
-            <details id="priority-ha-infrastructure" class="priority-container">
-                <summary class="priority-summary">🛡️ Infrastructure Resilience & High Availability Architecture</summary>
-                <div class="priority-content">
-                    [%# TODO: Link to project database record when available %]
-                    [%# TRY %]
-                    [%#     SET schema = c.model('DBEncy').schema %]
-                    [%#     SET project = schema.resultset('Project').find(XXX) %] [% # Replace XXX with project ID %]
-                    [%# END %]
-                    
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-                    <p><strong>Zenflow Task:</strong> <code>new-task-9cf1</code> | <strong>Branch:</strong> <code>new-task-9cf1</code></p>
-                    <p><strong>Context:</strong> Recent 3-day outage from single editing mistake exposed critical infrastructure vulnerabilities. Need comprehensive HA/DR strategy.</p>
-                    
-                    <h4>✅ Recent Progress</h4>
-                    <ul>
-                        <li>✅ <strong>Dell 710 Server Sub-Project Added</strong>: New sub-project created under Infrastructure HA plan</li>
-                        <li>✅ <strong>Kubernetes Control Plane Installed</strong>: Deployed on VM 101, ready for configuration</li>
-                        <li>✅ <strong>Plan Management System Created</strong>: REST API controller and database integration complete</li>
-                        <li>⏳ <strong>Project Table Integration</strong>: Placeholder for comparing existing project structure to improve server room organization</li>
-                    </ul>
-                    
-                    <h4>📋 Objectives</h4>
-                    <ul>
-                        <li>Eliminate single points of failure for Tier 1 services (OPNsense, Mail Gateway, Production DB)</li>
-                        <li>Reduce RTO from 3 days to &lt;1 hour for critical services</li>
-                        <li>Implement automated database failover and multi-environment access strategy</li>
-                        <li>Establish off-site DR capabilities with tested recovery procedures</li>
-                        <li>Define clear VM vs Docker/K8s architecture strategy</li>
-                    </ul>
-
-                    <h4>🔑 Critical Services in Scope</h4>
-                    <ul>
-                        <li><strong>Tier 1 (Network/Security):</strong> OPNsense Gateway, Proxmox Mail Gateway</li>
-                        <li><strong>Tier 2 (Data):</strong> Production/Staging/Dev MySQL Databases</li>
-                        <li><strong>Tier 3 (Application):</strong> Catalyst Application Server, Mail Server</li>
-                        <li><strong>Tier 4 (Infrastructure):</strong> Dell 710 Server, Kubernetes Cluster (VM 101 Control Plane)</li>
-                    </ul>
-
-                    <h4>🏗️ Infrastructure Components</h4>
-                    <ul>
-                        <li><strong>Dell 710 Server</strong>:
-                            <ul>
-                                <li>Sub-project created under Infrastructure HA plan</li>
-                                <li>Role: Additional compute/storage capacity for HA architecture</li>
-                                <li>Status: Hardware ready, integration planning phase</li>
-                            </ul>
-                        </li>
-                        <li><strong>Kubernetes Control Plane (VM 101)</strong>:
-                            <ul>
-                                <li>Status: <span class="status-in-progress">Installed, ready for configuration</span></li>
-                                <li>Next Steps: Configure worker nodes, network policies, storage classes</li>
-                                <li>Purpose: Container orchestration for application HA</li>
-                            </ul>
-                        </li>
-                        <li><strong>Project Structure Comparison (Placeholder)</strong>:
-                            <ul>
-                                <li>📊 <strong>Integration Point</strong>: Connect with existing Project table to analyze server room layout</li>
-                                <li>🎯 <strong>Purpose</strong>: Compare current infrastructure projects with planned HA architecture</li>
-                                <li>💡 <strong>Suggestion</strong>: Consider creating "Server Room Infrastructure" as parent project with sub-projects for each Proxmox host</li>
-                                <li>📝 <strong>Next Step</strong>: Query Project table for infrastructure-related projects, create mapping to HA plan phases</li>
-                            </ul>
-                        </li>
-                    </ul>
-
-                    <h4>❓ Key Technical Decisions</h4>
-                    <ul>
-                        <li><strong>VM vs Container Strategy:</strong> When to use Proxmox VMs vs Docker vs K8s (hybrid approach recommended)</li>
-                        <li><strong>Database Access:</strong> DNS-based routing (mysql-prod.local) vs port-based vs IP-based separation</li>
-                        <li><strong>Database Failover:</strong> ProxySQL + MySQL replication vs Galera Cluster vs managed service</li>
-                        <li><strong>Off-site DR:</strong> Cloud replicas, backup location, frequency, retention policies</li>
-                        <li><strong>Migration Path:</strong> Phased rollout strategy, testing approach, rollback procedures</li>
-                        <li><strong>Server Room Organization:</strong> How to integrate Dell 710 into existing infrastructure hierarchy</li>
-                    </ul>
-
-                    <h4>📊 Success Metrics</h4>
-                    <ul>
-                        <li>RTO &lt; 1 hour for Tier 1, &lt; 4 hours for Tier 2/3</li>
-                        <li>RPO &lt; 1 hour for all database data</li>
-                        <li>Successful DR drill (simulate host failure) with documented recovery</li>
-                        <li>Zero single points of failure for critical services</li>
-                        <li>Automated failover for database and application layers</li>
-                        <li>K8s control plane (VM 101) configured and managing worker nodes</li>
-                    </ul>
-
-                    <h4>📁 Documentation</h4>
-                    <ul>
-                        <li>Full feature specification: <a href="/static/INFRASTRUCTURE_HA_FEATURE.md" target="_blank">INFRASTRUCTURE_HA_FEATURE.md</a></li>
-                        <li>Implementation plan: <code>.zenflow/tasks/new-task-9cf1/plan.md</code></li>
-                        <li>Technical spec: <code>.zenflow/tasks/new-task-9cf1/spec.md</code></li>
-                    </ul>
-                    
-                    <h4>🚀 Current Phase: Phase 0 - Plan Management System</h4>
-                    <ol>
-                        <li>✅ <strong>Step 0.1</strong>: Create Plan Management Controller (COMPLETED)</li>
-                        <li>⏳ <strong>Step 0.2</strong>: Create Plan Management Template (NEXT)</li>
-                        <li>📋 <strong>Step 0.3</strong>: Populate Infrastructure HA Project in database</li>
-                        <li>🧪 <strong>Step 0.4</strong>: Write Integration Tests for Plan Management</li>
-                    </ol>
-                    
-                    <h4>🔜 Upcoming Phases</h4>
-                    <ol>
-                        <li><strong>Phase 1</strong>: Database HA & Service Discovery (Weeks 4-6)</li>
-                        <li><strong>Phase 2</strong>: Gateway, Mail, Catalyst Resilience (Weeks 7-9)</li>
-                        <li><strong>Phase 3</strong>: Orchestration Platform Deployment - Configure K8s cluster (Weeks 9-11)</li>
-                        <li><strong>Phase 4</strong>: Monitoring & Disaster Recovery (Weeks 11-13)</li>
-                        <li><strong>Phase 5</strong>: Testing & Validation (Weeks 13-14)</li>
-                    </ol>
-                </div>
-            </details>
 
             <div id="anchor-api-bc05" class="nav-anchor"></div>
             <details id="api-bc05-project" class="priority-container" open>

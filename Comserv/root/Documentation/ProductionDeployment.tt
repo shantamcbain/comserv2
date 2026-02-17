@@ -1,0 +1,172 @@
+[% META
+   title = "Production Deployment Guide"
+   description = "Guide for deploying Comserv containers from GitHub/DockerDesktop to production"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "deployment"
+   page_version = "0.01"
+   last_updated = "2026-02-17"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/ProductionDeployment.tt,v 0.01 2026/02/17 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Production Deployment Guide</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-02-17 | 
+        Version: 0.01 |
+        Author: Zencoder | 
+        Status: Draft
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#workflow" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Deployment Workflow</a>
+                <a href="#prod-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Production Server Setup</a>
+                <a href="#automation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Automation</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This document outlines the process of moving working Comserv containers from a development environment (GitHub/DockerDesktop) to the production server. It covers both manual and automated deployment strategies.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>GitHub Repository Access</strong>: Permissions to push code and view Actions.</li>
+                <li><strong>DockerDesktop</strong>: Installed on local workstation for container building and testing.</li>
+                <li><strong>Production Server</strong>: SSH access to the production host (e.g., 192.168.1.198).</li>
+                <li><strong>Container Registry</strong>: GitHub Container Registry (ghcr.io) or Docker Hub for image hosting.</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DEPLOYMENT WORKFLOW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="workflow" style="color: var(--text-color); font-family: var(--header-font);">3. Deployment Workflow</h2>
+            
+            <h3 id="local-testing" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Local Testing with DockerDesktop</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Before deploying, always test your changes locally using Docker Compose:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+docker compose build
+docker compose up -d
+# Verify accessibility at http://localhost:3000 (Dev) or http://localhost:5000 (Prod)
+                </code></pre>
+            </div>
+
+            <h3 id="github-actions" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.2 Automated Build via GitHub Actions</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Pushing to the <code>main</code> branch triggers an automated build and push to the container registry:</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Commit and push changes to GitHub.</li>
+                <li>Monitor the "Build and Push" action in the GitHub Actions tab.</li>
+                <li>Verify the new image version is available in the registry.</li>
+            </ol>
+
+            <h3 id="manual-deploy" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.3 Manual Deployment to Production</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">SSH into the production server and pull the latest image:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+ssh user@production-server
+cd /path/to/comserv/deployment
+docker compose pull
+docker compose up -d
+                </code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PRODUCTION SERVER SETUP SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prod-setup" style="color: var(--text-color); font-family: var(--header-font);">4. Production Server Setup</h2>
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current State:</strong> Docker and Kubernetes are NOT yet installed on the production server room hardware.</p>
+            </div>
+            
+            <h3 id="enable-docker" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Enabling Docker</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Install Docker Engine and Docker Compose on the host OS.</li>
+                <li>Configure the Docker daemon to start on boot.</li>
+                <li>Add deployment user to the <code>docker</code> group.</li>
+            </ol>
+
+            <h3 id="enable-k8s" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Enabling Kubernetes (K8s)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">For High Availability, migrate to a K8s cluster setup:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Setup a control plane (already installed on VM 101).</li>
+                <li>Join production nodes to the cluster.</li>
+                <li>Configure persistent storage and load balancing.</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- AUTOMATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="automation" style="color: var(--text-color); font-family: var(--header-font);">5. Automation</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The Comserv application can trigger deployments using its internal management controllers.</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Infrastructure Controller</strong>: Use <code>/admin/infrastructure</code> to manage K8s clusters and deployments.</li>
+                <li><strong>Git Pull Automation</strong>: Use <code>/admin/git_pull</code> for legacy non-containerized updates.</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">6. Troubleshooting</h2>
+            
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue1" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Image Not Found</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> <code>docker compose pull</code> fails with authentication or 404 error.</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Ensure you are logged into the registry (<code>docker login ghcr.io</code>) and the image name in <code>docker-compose.yml</code> matches the registry.</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue2" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Database Connection Fail</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Container starts but app shows 500 error or "DB connection failed".</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Verify <code>db_config.json</code> is correctly mounted or environment variables are set. Check if the production host can reach 192.168.1.198:3306.</p>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
