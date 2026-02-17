@@ -1,0 +1,89 @@
+[% META 
+   title = "Compose Email"
+   description = "Send email to workshop participants"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">PageVersion: [% PageVersion %]</div>
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Send Email to Workshop Participants</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title %]</h2>
+    </div>
+    
+    <div class="content-container">
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+            <div class="error">
+                [% error_msg %]
+            </div>
+            [% END %]
+            
+            <div class="content-section">
+                <p><strong>Recipients:</strong> [% recipient_count %] registered participant(s)</p>
+            </div>
+            
+            [% IF recipient_count == 0 %]
+            <div class="warning">
+                <p>There are no registered participants to email.</p>
+            </div>
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/participants/[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                </div>
+            </div>
+            [% ELSE %]
+            
+            <div class="form-container">
+                <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form">
+                    
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="subject">Subject:</label>
+                                <input type="text" id="subject" name="subject" class="form-input" size="80" 
+                                       value="[% form_data.subject | html OR '' %]" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="body">Message:</label>
+                                <textarea id="body" name="body" rows="15" cols="80" class="form-input" required>[% form_data.body OR '' %]</textarea>
+                                <small>This message will be sent to all registered participants.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Send Email</button>
+                        <a href="/workshop/email_history/[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/email_history/[% workshop.id %]" class="btn btn-secondary">View Email History</a>
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                </div>
+            </div>
+            
+            [% END %]
+            
+        </div>
+    </div>
+    
+</div>

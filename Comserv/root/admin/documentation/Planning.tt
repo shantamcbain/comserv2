@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.64' %]
-[% date_iso = '2026/02/11' %]
-[% formatted_date = 'February 11, 2026' %]
-[% time = '06:02:00' %]
-[% change_log = 'Added database-driven API project display - fetches Project ID 157 with all sub-projects and todos dynamically from database. Removed standalone script reference. Planning.tt now uses application controllers/models per standards.' %]
+[% version = '0.70' %]
+[% date_iso = '2026/02/15' %]
+[% formatted_date = 'February 15, 2026' %]
+[% time = '17:08:00' %]
+[% change_log = 'WorkShops: Phase 1 COMPLETED - All Result classes created/extended, Schema.pm updated, database tables synced via schema_compare. Project 175 and 8 todos marked complete.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -188,6 +188,10 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-workshops" class="jump-link">🎓 WorkShops System</a></strong>:
+                        <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-ai" class="jump-link">🤖 AI Systems</a></strong>:
                         <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
                     </div>
@@ -225,6 +229,7 @@ last_updated = '2026/02/08'
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
+                <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/admin/documentation/Planning" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
             </ul>
             
@@ -1673,6 +1678,299 @@ docker compose logs web-prod --follow</pre>
                     <p><strong>Status:</strong> <span class="status-pending">PENDING</span></p>
                 </div>
             </details>
+            </div>
+        </details>
+
+        <!-- Group 3.5: WorkShops System -->
+        <div id="anchor-workshops-system" class="nav-anchor"></div>
+        <details id="group-workshops" class="priority-group-container" open>
+            <summary class="group-header">🎓 WorkShops Advertising System</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>workshops-7d21</code> (port 4004) | <strong>Branch:</strong> <code>workshops-7d21</code></p>
+
+            <p><strong>Objective:</strong> Comprehensive platform for managing and advertising educational workshops across multiple sites with role-based access control, participant management, PowerPoint integration, mailing lists, and content development tools.</p>
+
+            <h4>📋 Overview</h4>
+            <p>Transform basic workshop CRUD operations into a full-featured workshop advertising and management system:</p>
+            <ul>
+                <li>Multi-site workshop advertising with public/private visibility</li>
+                <li>Workshop leader role management and permissions</li>
+                <li>Online registration workflow with capacity limits and waitlists</li>
+                <li>PowerPoint presentation upload/download for participants</li>
+                <li>Online content development with rich text editor</li>
+                <li>Workshop mailing lists with email history tracking</li>
+                <li>File upload/download system for workshop materials</li>
+                <li>Comprehensive authorization (CSC admin god-level, site-scoped admins/leaders)</li>
+            </ul>
+
+            <h4>📊 WorkShops Project from Database</h4>
+            [% TRY %]
+                [% SET schema = c.model('DBEncy').schema %]
+                [% SET workshop_project = schema.resultset('Project').find(73) %]
+                
+                [% IF workshop_project %]
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <h3>[% workshop_project.name %] (Project ID: 73)</h3>
+                            <ul>
+                                <li><strong>Description:</strong> [% workshop_project.description || 'Workshop module for managing and advertising educational workshops across multiple sites' %]</li>
+                                <li><strong>Start Date:</strong> [% workshop_project.start_date || '2024-01-01' %]</li>
+                                <li><strong>End Date:</strong> [% workshop_project.end_date || 'TBD' %]</li>
+                                <li><strong>Status:</strong> [% workshop_project.status || 'In-Process' %]</li>
+                                <li><strong>Project Code:</strong> [% workshop_project.project_code || 'WORKSHOP' %]</li>
+                                <li><strong>Project Size:</strong> [% workshop_project.project_size || 'Large' %]</li>
+                                <li><strong>Estimated Man Hours:</strong> [% workshop_project.estimated_man_hours || '120' %]</li>
+                                <li><strong>Developer Name:</strong> [% workshop_project.developer_name || 'Development Team' %]</li>
+                                <li><strong>Client Name:</strong> [% workshop_project.client_name || 'Internal' %]</li>
+                                <li><strong>Comments:</strong> [% workshop_project.comments || 'Multi-site workshop advertising system with participant management and PowerPoint integration' %]</li>
+                            </ul>
+
+                            <p>
+                                <a href="/project/details?project_id=8" target="_blank" style="color: #007bff;">View Details</a> |
+                                <a href="/project/editproject?project_id=8" target="_blank" style="color: #007bff;">Edit Project</a>
+                            </p>
+
+                            [% SET workshop_todos = workshop_project.todos.search({}, { order_by => 'sort_order' }) %]
+                            [% IF workshop_todos.count > 0 %]
+                                <h4>📋 Todos for [% workshop_project.name %] ([% workshop_todos.count %])</h4>
+                                <ul style="list-style-type: none; padding-left: 0;">
+                                    [% FOREACH todo IN workshop_todos.all %]
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                            [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                            [% todo.subject %]
+                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                            <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                        </li>
+                                    [% END %]
+                                </ul>
+                            [% ELSE %]
+                                <p>No todos found for this project. <a href="/todo/addtodo?project_id=8">Add a todo</a></p>
+                            [% END %]
+                    </div>
+                [% ELSE %]
+                    <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                        <strong>Note:</strong> Project ID 8 not found in database. Please ensure the project record exists.
+                        <a href="/project/addproject" style="color: #007bff;">Create Project</a>
+                    </div>
+                [% END %]
+            [% CATCH %]
+                <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                    <strong>Error loading project:</strong> [% error.info %]
+                </div>
+            [% END %]
+
+            [% INCLUDE admin/documentation/_workshops_phases.tt %]
+
+            <h4>📁 Documentation & Resources</h4>
+            <ul>
+                <li>Zenflow Task: <code>workshops-7d21</code></li>
+                <li>Requirements: <code>.zenflow/tasks/workshops-7d21/requirements.md</code></li>
+                <li>Technical Spec: <code>.zenflow/tasks/workshops-7d21/spec.md</code></li>
+                <li>Implementation Plan: <code>.zenflow/tasks/workshops-7d21/plan.md</code></li>
+                <li>API Access: <a href="http://api.workstation.local:4004/workshop" target="_blank">api.workstation.local:4004</a></li>
+            </ul>
+
+            <h4>🔌 API Endpoints</h4>
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Workshop Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop</strong> - List all workshops with filtering
+                            <br><small style="color: #666;">Query params: site_filter (all|public|mysite), status_filter (all|draft|published|registration_closed|in_progress|completed|cancelled), date_from, date_to</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/add</strong> - Display workshop creation form
+                            <br><small style="color: #666;">Auth: Authenticated users only</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/addworkshop</strong> - Create new workshop
+                            <br><small style="color: #666;">Auth: Authenticated users | Fields: title, description, start_date, max_participants, status, share (public/private), registration_deadline</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/details</strong> - View workshop details
+                            <br><small style="color: #666;">Query params: workshop_id | Auth: Public for published workshops, registered participants for materials</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/edit</strong> - Display workshop edit form
+                            <br><small style="color: #666;">Query params: workshop_id | Auth: Workshop leader or admin</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/edit</strong> - Update workshop
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Updates all workshop fields including status and share settings</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/dashboard</strong> - Workshop leader dashboard
+                            <br><small style="color: #666;">Auth: Authenticated users | Shows workshops created by user with stats</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Lifecycle Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/publish</strong> - Publish workshop (draft → published)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/close_registration</strong> - Close registration (published → registration_closed)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/start</strong> - Start workshop (any → in_progress)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/complete</strong> - Complete workshop (any → completed)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/cancel</strong> - Cancel workshop (any → cancelled)
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Registration & Participant Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/register</strong> - Register for workshop
+                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id | Auto-handles capacity limits and waitlist</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/unregister</strong> - Cancel registration
+                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/participants</strong> - View participant list
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows registered and waitlist separately</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/add_participant</strong> - Manually add participant
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, email, name, site_affiliation</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/remove_participant</strong> - Remove participant
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, participant_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>File Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/files</strong> - List workshop files
+                            <br><small style="color: #666;">Auth: View access (registered participants, leader, admin) | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/upload</strong> - Upload workshop file
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, file | Max size: 50MB | Allowed types: ppt, pptx, pdf, doc, docx, txt</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/download</strong> - Download workshop file
+                            <br><small style="color: #666;">Auth: Registered participants, leader, or admin | Params: file_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/delete_file</strong> - Delete workshop file
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: file_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Content Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/content</strong> - List content sections
+                            <br><small style="color: #666;">Auth: View access | Params: workshop_id | Ordered by sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/add_content</strong> - Display content creation form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/add_content</strong> - Create content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, title, content, content_type, sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/edit_content</strong> - Display content edit form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/edit_content</strong> - Update content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id, title, content, content_type, sort_order</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/delete_content</strong> - Delete content section
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <details open>
+                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Email Communication Endpoints</strong></summary>
+                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <ul style="list-style: none; padding-left: 0;">
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/compose_email</strong> - Display email composition form
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>POST /workshop/send_email</strong> - Send email to participants
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, subject, body | Sends to all registered participants</small>
+                        </li>
+                        <li style="margin-bottom: 8px;">
+                            <strong>GET /workshop/email_history</strong> - View email history
+                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows all sent emails with status</small>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>✅ Success Criteria</h4>
+            <ul>
+                <li>Workshop leaders can create and manage workshops</li>
+                <li>Multi-site filtering works correctly (public vs. private workshops)</li>
+                <li>Registration workflow enforces capacity limits and waitlist</li>
+                <li>PowerPoint files upload/download restricted to registered participants</li>
+                <li>Email system sends to all registered participants</li>
+                <li>Authorization checks enforce CSC admin god-level and site-scoped access</li>
+                <li>All CRUD operations follow existing Catalyst/DBIx::Class patterns</li>
+                <li>Mobile-responsive design maintained</li>
+                <li>All tests passing (unit, integration)</li>
+                <li>Production deployment successful with < 2 second page loads</li>
+            </ul>
+
+            <h4>🔑 Key Features</h4>
+            <ul>
+                <li><strong>Role-Based Access:</strong> CSC admin (god-level), Site admin (site-scoped), Workshop leader (own workshops), User (register/view), Guest (public view only)</li>
+                <li><strong>Workshop Lifecycle:</strong> Draft → Published → Registration Closed → In Progress → Completed/Cancelled</li>
+                <li><strong>Multi-Site Support:</strong> Public workshops visible across all sites, private workshops site-filtered</li>
+                <li><strong>Participant Management:</strong> Registration, capacity limits, waitlist, manual add/remove</li>
+                <li><strong>Content Development:</strong> PowerPoint upload/download, online rich text editor, content sections with sort order</li>
+                <li><strong>Communication:</strong> Workshop mailing lists, email templates, email history tracking</li>
+                <li><strong>File Management:</strong> Reuse existing files table, whitelist file types (PPT, PPTX, PDF), restrict downloads to registered participants</li>
+            </ul>
+
+            <h4>🔗 Related Projects</h4>
+            <ul>
+                <li><a href="/project/details?project_id=8">WorkShops Module (ID 8)</a></li>
+                <li><a href="/Documentation/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
+            </ul>
             </div>
         </details>
 

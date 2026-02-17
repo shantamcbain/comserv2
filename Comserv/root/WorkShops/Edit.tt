@@ -1,0 +1,140 @@
+[% META 
+   title = "Edit Workshop"
+   description = "Edit workshop details"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Edit.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Edit Workshop</h1>
+        <h2 class="page-subtitle">[% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+            
+            <div class="form-container">
+                <form method="POST" action="/workshop/edit/[% workshop.id %]" class="app-form">
+                    
+                    <div class="form-section">
+                        <h3>Workshop Information</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="title">Title: *</label>
+                                <input type="text" id="title" name="title" value="[% workshop.title | html %]" class="form-input" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="description">Description: *</label>
+                                <textarea id="description" name="description" class="form-input" rows="5" required>[% workshop.description | html %]</textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="instructor">Instructor: *</label>
+                                <input type="text" id="instructor" name="instructor" value="[% workshop.instructor | html %]" class="form-input" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Schedule</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="date">Date of Workshop: *</label>
+                                <input type="date" id="date" name="date" value="[% formatted_date | html %]" class="form-input" required>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="time">Start Time: *</label>
+                                <input type="time" id="time" name="time" value="[% workshop.time | html %]" class="form-input" required>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="end_time">End Time:</label>
+                                <input type="time" id="end_time" name="end_time" value="[% workshop.end_time | html %]" class="form-input">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="location">Location:</label>
+                                <input type="text" id="location" name="location" value="[% workshop.location | html %]" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Settings</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="max_participants">Max Participants:</label>
+                                <input type="number" id="max_participants" name="max_participants" value="[% workshop.max_participants | html %]" class="form-input" min="1">
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="share">Visibility:</label>
+                                <select id="share" name="share" class="form-input">
+                                    <option value="private" [% IF workshop.share == 'private' %]selected[% END %]>Private (My Site Only)</option>
+                                    <option value="public" [% IF workshop.share == 'public' %]selected[% END %]>Public (All Sites)</option>
+                                </select>
+                                <small>Private workshops will only be visible to your site.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="status">Status:</label>
+                                <select id="status" name="status" class="form-input">
+                                    <option value="draft" [% IF workshop.status == 'draft' %]selected[% END %]>Draft</option>
+                                    <option value="published" [% IF workshop.status == 'published' %]selected[% END %]>Published</option>
+                                    <option value="registration_closed" [% IF workshop.status == 'registration_closed' %]selected[% END %]>Registration Closed</option>
+                                    <option value="in_progress" [% IF workshop.status == 'in_progress' %]selected[% END %]>In Progress</option>
+                                    <option value="completed" [% IF workshop.status == 'completed' %]selected[% END %]>Completed</option>
+                                    <option value="cancelled" [% IF workshop.status == 'cancelled' %]selected[% END %]>Cancelled</option>
+                                </select>
+                                <small>Draft workshops are not visible to users.</small>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="registration_deadline">Registration Deadline:</label>
+                                <input type="date" id="registration_deadline" name="registration_deadline" value="[% workshop.registration_deadline | html %]" class="form-input">
+                                <small>Optional: Last date for participant registration.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Update Workshop</button>
+                        <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
