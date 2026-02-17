@@ -1,0 +1,108 @@
+[% META 
+   title = "Add/Edit Content"
+   description = "Add or edit workshop content section"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/AddContent.tt,v 0.01 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>[% IF content %]Edit[% ELSE %]Add[% END %] Content Section</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+            
+            <div class="form-container">
+                <form method="POST" action="[% IF content %]/workshop/edit_content[% ELSE %]/workshop/add_content[% END %]" class="app-form">
+                    <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                    [% IF content %]
+                    <input type="hidden" name="content_id" value="[% content.id %]">
+                    [% END %]
+                    
+                    <div class="form-section">
+                        <h3>Content Information</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="title">Title: *</label>
+                                <input type="text" id="title" name="title" value="[% content.title || form_data.title || '' | html %]" class="form-input" required>
+                                <small>A descriptive title for this content section.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="content_type">Content Type:</label>
+                                <select id="content_type" name="content_type" class="form-input">
+                                    <option value="">-- Select Type --</option>
+                                    <option value="lesson" [% IF (content.content_type || form_data.content_type) == 'lesson' %]selected[% END %]>Lesson</option>
+                                    <option value="exercise" [% IF (content.content_type || form_data.content_type) == 'exercise' %]selected[% END %]>Exercise</option>
+                                    <option value="reading" [% IF (content.content_type || form_data.content_type) == 'reading' %]selected[% END %]>Reading</option>
+                                    <option value="reference" [% IF (content.content_type || form_data.content_type) == 'reference' %]selected[% END %]>Reference</option>
+                                    <option value="other" [% IF (content.content_type || form_data.content_type) == 'other' %]selected[% END %]>Other</option>
+                                </select>
+                                <small>Optional: Categorize this content section.</small>
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="sort_order">Sort Order:</label>
+                                <input type="number" id="sort_order" name="sort_order" value="[% content.sort_order || form_data.sort_order || max_sort_order + 1 || 1 %]" class="form-input" min="1">
+                                <small>Controls the display order (lower numbers appear first).</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Content</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="content">Content: *</label>
+                                <textarea id="content" name="content" class="form-input" rows="20" required>[% content.content || form_data.content || '' | html %]</textarea>
+                                <small>Enter the main content for this section. Basic formatting will be preserved.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">[% IF content %]Update[% ELSE %]Add[% END %] Content</button>
+                        <a href="/workshop/content?workshop_id=[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+            <div class="content-section">
+                <h3>Formatting Tips</h3>
+                <ul>
+                    <li>Line breaks and paragraphs will be preserved</li>
+                    <li>For rich formatting, consider uploading a document file instead</li>
+                    <li>Keep content concise and focused on a single topic or concept</li>
+                </ul>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

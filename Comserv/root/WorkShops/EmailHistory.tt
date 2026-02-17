@@ -1,0 +1,110 @@
+[% META 
+   title = "Email History"
+   description = "View workshop email history"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/EmailHistory.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    <div class="debug-info">PageVersion: [% PageVersion %]</div>
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Email History</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title %]</h2>
+    </div>
+    
+    <div class="content-container">
+        <div class="content-primary">
+            
+            [% IF flash.success_msg %]
+            <div class="success">
+                [% flash.success_msg %]
+            </div>
+            [% END %]
+            
+            [% IF flash.warning_msg %]
+            <div class="warning">
+                [% flash.warning_msg %]
+            </div>
+            [% END %]
+            
+            [% IF flash.error_msg %]
+            <div class="error">
+                [% flash.error_msg %]
+            </div>
+            [% END %]
+            
+            <div class="content-section">
+                <p><a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-primary">Compose New Email</a></p>
+            </div>
+            
+            <div class="data-container">
+                [% IF emails.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date Sent</th>
+                                <th>Subject</th>
+                                <th>Recipients</th>
+                                <th>Status</th>
+                                <th>Sent By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH email IN emails %]
+                            <tr>
+                                <td>[% email.sent_at.strftime('%Y-%m-%d %H:%M') %]</td>
+                                <td>
+                                    <strong>[% email.subject | html %]</strong><br>
+                                    <small class="text-muted">[% email.body.substr(0, 100) | html %][% IF email.body.length > 100 %]...[% END %]</small>
+                                </td>
+                                <td>[% email.recipient_count %]</td>
+                                <td>
+                                    [% IF email.status == 'sent' %]
+                                        <span class="success">✓ Sent</span>
+                                    [% ELSIF email.status == 'failed' %]
+                                        <span class="error">✗ Failed</span>
+                                    [% ELSIF email.status == 'partial' %]
+                                        <span class="warning">⚠ Partial</span>
+                                    [% ELSE %]
+                                        [% email.status %]
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% IF email.sender %]
+                                        [% email.sender.username | html %]
+                                    [% ELSE %]
+                                        Unknown
+                                    [% END %]
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No emails have been sent for this workshop yet.</p>
+                </div>
+                [% END %]
+            </div>
+            
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                    <a href="/workshop/dashboard" class="btn btn-secondary">Dashboard</a>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+    
+</div>
