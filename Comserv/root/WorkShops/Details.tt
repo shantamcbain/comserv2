@@ -1,0 +1,245 @@
+[% META 
+   title = "Workshop Details"
+   description = "View workshop details and information"
+   roles = "admin,user"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.03"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Details.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshop Details</h1>
+        <h2 class="page-subtitle">[% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            [% IF error %]
+                <div class="error">[% error %]</div>
+            [% END %]
+            
+            <div class="data-container">
+                <div class="table-container">
+                    <table class="data-table">
+                        <tr>
+                            <th>Field</th>
+                            <th>Value</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Title</strong></td>
+                            <td>[% workshop.title | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Description</strong></td>
+                            <td>[% workshop.description | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Instructor</strong></td>
+                            <td>[% workshop.instructor | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Date</strong></td>
+                            <td>[% formatted_date | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Start Time</strong></td>
+                            <td>[% workshop.time | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>End Time</strong></td>
+                            <td>[% workshop.end_time | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Location</strong></td>
+                            <td>[% workshop.location | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Max Participants</strong></td>
+                            <td>[% workshop.max_participants || 'Unlimited' | html %]</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Current Participants</strong></td>
+                            <td>
+                                [% 
+                                    current = workshop.current_participants || 0;
+                                    max = workshop.max_participants || 0;
+                                    is_full = max > 0 && current >= max;
+                                %]
+                                [% IF max > 0 %]
+                                    [% IF is_full %]
+                                        <span class="badge badge-danger">🔴 Full ([% current %]/[% max %])</span>
+                                    [% ELSIF current >= (max * 0.8) %]
+                                        <span class="badge badge-warning">⚠️ Almost Full ([% current %]/[% max %])</span>
+                                    [% ELSE %]
+                                        <span class="badge badge-success">✓ [% current %]/[% max %] spots available</span>
+                                    [% END %]
+                                [% ELSE %]
+                                    [% current %] registered (Unlimited capacity)
+                                [% END %]
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Visibility</strong></td>
+                            <td>
+                                [% IF workshop.share == 'public' %]
+                                    <span class="badge badge-primary">🌐 Public</span>
+                                [% ELSE %]
+                                    <span class="badge badge-secondary">🔒 Private</span>
+                                [% END %]
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status</strong></td>
+                            <td>
+                                [% IF workshop.status == 'draft' %]
+                                    <span class="badge badge-secondary">Draft</span>
+                                [% ELSIF workshop.status == 'published' %]
+                                    <span class="badge badge-success">Published</span>
+                                [% ELSIF workshop.status == 'registration_closed' %]
+                                    <span class="badge badge-warning">Registration Closed</span>
+                                [% ELSIF workshop.status == 'in_progress' %]
+                                    <span class="badge badge-info">In Progress</span>
+                                [% ELSIF workshop.status == 'completed' %]
+                                    <span class="badge badge-secondary">Completed</span>
+                                [% ELSIF workshop.status == 'cancelled' %]
+                                    <span class="badge badge-danger">Cancelled</span>
+                                [% ELSE %]
+                                    <span class="badge badge-secondary">[% workshop.status || 'Unknown' %]</span>
+                                [% END %]
+                            </td>
+                        </tr>
+                        [% IF workshop.registration_deadline %]
+                        <tr>
+                            <td><strong>Registration Deadline</strong></td>
+                            <td>[% workshop.registration_deadline | html %]</td>
+                        </tr>
+                        [% END %]
+                        <tr>
+                            <td><strong>Site</strong></td>
+                            <td>[% workshop.sitename | html %]</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]
+            <div class="data-container">
+                <div class="form-actions">
+                    [% IF is_full %]
+                    <form action="/workshop/register" method="POST" style="display:inline;">
+                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                        <button type="submit" class="btn btn-warning">Join Waitlist</button>
+                        <p class="help-text">This workshop is currently full. You will be added to the waitlist and notified if a spot becomes available.</p>
+                    </form>
+                    [% ELSE %]
+                    <form action="/workshop/register" method="POST" style="display:inline;">
+                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                        <button type="submit" class="btn btn-primary">Register for Workshop</button>
+                        <p class="help-text">Click to register for this workshop.</p>
+                    </form>
+                    [% END %]
+                </div>
+            </div>
+            [% ELSIF c.user_exists && is_user_registered %]
+            <div class="data-container">
+                <div class="success">
+                    <p>✓ You are registered for this workshop.</p>
+                </div>
+                <div class="form-actions">
+                    <form action="/workshop/unregister" method="POST" style="display:inline;">
+                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                        <button type="submit" class="btn btn-secondary">Cancel Registration</button>
+                    </form>
+                </div>
+            </div>
+            [% END %]
+            
+            [% IF c.user_exists && (is_user_registered || c.session.roles.match('admin')) %]
+            <div class="data-container">
+                <h2>Workshop Materials</h2>
+                
+                [% IF workshop_files && workshop_files.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>File Type</th>
+                                <th>File Size</th>
+                                <th>Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH file IN workshop_files %]
+                            <tr>
+                                <td>[% file.file_name | html %]</td>
+                                <td>[% file.file_type | html %]</td>
+                                <td>[% file.file_size_formatted || file.file_size | html %]</td>
+                                <td>[% file.created_at || 'N/A' | html %]</td>
+                                <td class="action-cell">
+                                    <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">Download</a>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No workshop materials have been uploaded yet.</p>
+                </div>
+                [% END %]
+                
+                [% IF workshop_content && workshop_content.size > 0 %]
+                <h3>Online Content</h3>
+                <div class="content-sections">
+                    [% FOREACH content IN workshop_content %]
+                    <div class="content-section">
+                        <h4>[% content.title | html %]</h4>
+                        <div class="content-body">
+                            [% content.content | html %]
+                        </div>
+                        [% IF content.content_type %]
+                            <p class="content-meta">Type: [% content.content_type | html %]</p>
+                        [% END %]
+                    </div>
+                    [% END %]
+                </div>
+                [% END %]
+            </div>
+            [% END %]
+            
+            <div class="form-actions">
+                [% IF c.user_exists && c.session.roles.match('admin') %]
+                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
+                    <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
+                    <a href="/workshop/files?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
+                    <a href="/workshop/compose_email?workshop_id=[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                [% END %]
+                <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

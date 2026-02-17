@@ -1,0 +1,133 @@
+[% META 
+   title = "Workshop Files"
+   description = "Manage workshop files and materials"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-02-16"
+%]
+
+[% PageVersion = 'WorkShops/Files.tt,v 0.01 2026/02/16 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Workshop Files</h1>
+        <h2 class="page-subtitle">[% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            [% IF error %]
+                <div class="error">[% error %]</div>
+            [% END %]
+            
+            <div class="form-container">
+                <h3>Upload New File</h3>
+                <form method="POST" action="/workshop/upload" enctype="multipart/form-data" class="app-form">
+                    <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                    
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="file">Select File:</label>
+                                <input type="file" id="file" name="file" class="form-input" required>
+                                <small>Allowed types: PPT, PPTX, PDF, DOC, DOCX. Maximum size: 50MB</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="description">Description (optional):</label>
+                                <input type="text" id="description" name="description" class="form-input" placeholder="Brief description of the file">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Upload File</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="data-container">
+                <h2>Workshop Materials</h2>
+                
+                [% IF files.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>File Type</th>
+                                <th>File Size</th>
+                                <th>Description</th>
+                                <th>Uploaded At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH file IN files %]
+                            <tr>
+                                <td>[% file.file_name | html %]</td>
+                                <td>
+                                    [% file_type = file.file_type || '' %]
+                                    [% IF file_type.match('pdf') %]
+                                        <span class="badge badge-danger">PDF</span>
+                                    [% ELSIF file_type.match('ppt|pptx') %]
+                                        <span class="badge badge-warning">PowerPoint</span>
+                                    [% ELSIF file_type.match('doc|docx') %]
+                                        <span class="badge badge-info">Word</span>
+                                    [% ELSE %]
+                                        [% file_type | html %]
+                                    [% END %]
+                                </td>
+                                <td>[% file.file_size_formatted || file.file_size | html %]</td>
+                                <td>[% file.description || 'N/A' | html %]</td>
+                                <td>[% file.created_at || 'N/A' | html %]</td>
+                                <td class="action-cell">
+                                    <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">Download</a>
+                                    <form action="/workshop/delete_file" method="POST" style="display:inline;">
+                                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
+                                        <input type="hidden" name="file_id" value="[% file.id %]">
+                                        <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to delete this file?');">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No files have been uploaded yet.</p>
+                </div>
+                [% END %]
+            </div>
+            
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/workshop/details?id=[% workshop.id %]" class="btn btn-secondary">Back to Workshop</a>
+                    <a href="/workshop/content?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Online Content</a>
+                </div>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>

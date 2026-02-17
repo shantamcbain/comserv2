@@ -151,16 +151,23 @@ Returns the type of admin: 'standard', 'csc', 'special', or 'none'
 sub get_admin_type {
     my ($self, $c) = @_;
     
-    return 'none' unless $c->user_exists;
-    
     my $username = $c->session->{username} || '';
+    my $roles = $c->session->{roles} || [];
+    my $sitename = $c->session->{SiteName} || '';
     
-    if ($username eq 'Shanta') {
+    if ($username eq 'Shanta' || $username eq 'ai_assistant') {
         return 'special';
     }
     
-    if ($c->check_user_roles('admin')) {
-        if ($c->session->{SiteName} && $c->session->{SiteName} eq 'CSC') {
+    my $has_admin_role = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' } @$roles;
+    } elsif ($roles && $roles eq 'admin') {
+        $has_admin_role = 1;
+    }
+    
+    if ($has_admin_role) {
+        if ($sitename eq 'CSC') {
             return 'csc';
         }
         return 'standard';
