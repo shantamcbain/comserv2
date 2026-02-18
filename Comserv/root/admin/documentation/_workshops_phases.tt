@@ -162,6 +162,91 @@
         [% END %]
     [% END %]
     
+    <!-- Phase 9: Enhanced Features & Documentation -->
+    [% SET phase9 = schema.resultset('Project').find(183) %]
+    [% IF phase9 %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #9C27B0; padding: 10px; background: #f3e5f5;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            [% IF phase9.status == 'Completed' %]✅[% ELSIF phase9.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            Phase 9: Enhanced Features & Documentation ([% phase9.status %])
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Implement enhanced file access for past workshops, mailing list management, email opt-out functionality, and comprehensive workshop leader tutorials.</p>
+            <p><strong>Why:</strong> Workshop leaders need flexible tools to manage communications with attendees who registered offline, create custom mailing lists, and respect participant email preferences. Comprehensive tutorials ensure workshop leaders can effectively use all system features.</p>
+            <p><strong>Key Tasks:</strong> Update file download authorization for past participants, add registration_method field to participants, create mailing list management system, implement opt-out/unsubscribe functionality with tokens, create comprehensive WorkShopLeaderGuide.tt tutorial.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase9.id %]</li>
+                    <li><strong>Status:</strong> [% phase9.status %]</li>
+                    <li><strong>Timeline:</strong> [% phase9.start_date %] → [% phase9.end_date %]</li>
+                    <li><strong>Estimated Hours:</strong> [% phase9.estimated_man_hours %]</li>
+                    <li><strong>Project Code:</strong> [% phase9.project_code %]</li>
+                    <li><strong>Description:</strong> [% phase9.description %]</li>
+                    <li><strong>Comments:</strong> [% phase9.comments %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase9.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase9.id %]" target="_blank">Edit</a> |
+                    <a href="/todo/addtodo?project_id=[% phase9.id %]" target="_blank">Add Todo</a>
+                </p>
+                
+                [% SET phase9_todos = phase9.todos.search({}, { order_by => 'sort_order' }) %]
+                [% IF phase9_todos.count > 0 %]
+                    <h6>📋 Todos ([% phase9_todos.count %]):</h6>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        [% FOREACH task IN phase9_todos.all %]
+                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #9C27B0; background: #fafafa;">
+                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                [% task.subject %]
+                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                            </li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase9.id %]">Add a todo</a></em></p>
+                [% END %]
+            </div>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #9C27B0; background: #fce4ec;">
+                <h5>🎯 Key Enhancements</h5>
+                <ul>
+                    <li><strong>File Access:</strong> Allow past workshop attendees to download files from workshops they completed</li>
+                    <li><strong>Mailing Lists:</strong> Create custom recipient groups, send to individuals or groups, track registration method (online/manual/imported)</li>
+                    <li><strong>Opt-Out:</strong> Unsubscribe links in all emails, token-based unsubscribe mechanism, email preference management</li>
+                    <li><strong>Tutorial:</strong> Comprehensive guide covering all features (creation, lifecycle, participants, files, content, emails, multi-site)</li>
+                </ul>
+            </div>
+        </div>
+    </details>
+    [% ELSE %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #9C27B0; padding: 10px; background: #f3e5f5;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            📌 Phase 9: Enhanced Features & Documentation (Not Yet in Database)
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 183)</span></p>
+            <p><strong>What:</strong> Implement enhanced file access for past workshops, mailing list management, email opt-out functionality, and comprehensive workshop leader tutorials.</p>
+            <p><strong>Why:</strong> Workshop leaders need flexible tools to manage communications with attendees who registered offline, create custom mailing lists, and respect participant email preferences. Comprehensive tutorials ensure workshop leaders can effectively use all system features.</p>
+            <p><strong>Key Tasks:</strong> Update file download authorization for past participants, add registration_method field to participants, create mailing list management system, implement opt-out/unsubscribe functionality with tokens, create comprehensive WorkShopLeaderGuide.tt tutorial.</p>
+            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #9C27B0; background: #fce4ec;">
+                <h5>🎯 Key Enhancements</h5>
+                <ul>
+                    <li><strong>File Access:</strong> Allow past workshop attendees to download files from workshops they completed</li>
+                    <li><strong>Mailing Lists:</strong> Create custom recipient groups, send to individuals or groups, track registration method (online/manual/imported)</li>
+                    <li><strong>Opt-Out:</strong> Unsubscribe links in all emails, token-based unsubscribe mechanism, email preference management</li>
+                    <li><strong>Tutorial:</strong> Comprehensive guide covering all features (creation, lifecycle, participants, files, content, emails, multi-site)</li>
+                </ul>
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
 [% CATCH %]
     <p style="color: #d9534f;"><strong>Error loading phase details:</strong> [% error.info %]</p>
 [% END %]

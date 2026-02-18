@@ -229,7 +229,7 @@ last_updated = '2026/02/08'
                 <li><strong>AIChatSystem:</strong> <a href="[% base_url %]4001/Documentation/DailyPlan" target="_blank">aichatsystem-ef4e</a> <em>(port 4001)</em> - AI Chat System with Agent Architecture</li>
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
-                <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/admin/documentation/Planning" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
+                <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/workshop" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
             </ul>
             
