@@ -162,6 +162,160 @@
         [% END %]
     [% END %]
     
+    <!-- Phase 8C: User Testing & Bug Fixes -->
+    [% SET phase8c = schema.resultset('Project').find(184) %]
+    [% IF phase8c %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #E91E63; padding: 10px; background: #fce4ec;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            [% IF phase8c.status == 'Completed' %]✅[% ELSIF phase8c.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            Phase 8C: User Testing & Bug Fixes ([% phase8c.status %])
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Conduct comprehensive user testing, identify bugs, and fix issues before production deployment.</p>
+            <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates that the workflow is intuitive for workshop leaders and participants.</p>
+            <p><strong>Key Tasks:</strong> Prepare testing environment (port 4004), conduct user testing with workshop leaders/participants/admins, fix critical and high priority bugs, test 5 end-to-end scenarios, document feedback for Phase 9.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase8c.id %]</li>
+                    <li><strong>Status:</strong> [% phase8c.status %]</li>
+                    <li><strong>Timeline:</strong> [% phase8c.start_date %] → [% phase8c.end_date %]</li>
+                    <li><strong>Estimated Hours:</strong> [% phase8c.estimated_man_hours %]</li>
+                    <li><strong>Project Code:</strong> [% phase8c.project_code %]</li>
+                    <li><strong>Description:</strong> [% phase8c.description %]</li>
+                    <li><strong>Comments:</strong> [% phase8c.comments %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase8c.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase8c.id %]" target="_blank">Edit</a> |
+                    <a href="/todo/addtodo?project_id=[% phase8c.id %]" target="_blank">Add Todo</a>
+                </p>
+                
+                [% SET phase8c_todos = phase8c.todos.search({}, { order_by => 'sort_order' }) %]
+                [% IF phase8c_todos.count > 0 %]
+                    <h6>📋 Todos ([% phase8c_todos.count %]):</h6>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        [% FOREACH task IN phase8c_todos.all %]
+                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #E91E63; background: #fafafa;">
+                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                [% task.subject %]
+                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                            </li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase8c.id %]">Add a todo</a></em></p>
+                [% END %]
+            </div>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #E91E63; background: #fff0f5;">
+                <h5>🧪 Testing Scenarios</h5>
+                <ul>
+                    <li><strong>Scenario 1:</strong> Create and Publish Workshop (7 steps)</li>
+                    <li><strong>Scenario 2:</strong> Register and Participate (7 steps)</li>
+                    <li><strong>Scenario 3:</strong> Workshop Leader Communications (6 steps)</li>
+                    <li><strong>Scenario 4:</strong> Multi-Site Public Workshop (4 steps)</li>
+                    <li><strong>Scenario 5:</strong> Full Workshop Lifecycle (9 steps)</li>
+                </ul>
+                <p><strong>Success Criteria:</strong> At least 3 workshop leaders and 10 participants test successfully, all critical bugs fixed, performance < 2 seconds.</p>
+            </div>
+        </div>
+    </details>
+    [% ELSE %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #E91E63; padding: 10px; background: #fce4ec;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            📌 Phase 8C: User Testing & Bug Fixes (Not Yet in Database)
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 184)</span></p>
+            <p><strong>What:</strong> Conduct comprehensive user testing, identify bugs, and fix issues before production deployment.</p>
+            <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates that the workflow is intuitive for workshop leaders and participants.</p>
+            <p><strong>Key Tasks:</strong> Prepare testing environment (port 4004), conduct user testing with workshop leaders/participants/admins, fix critical and high priority bugs, test 5 end-to-end scenarios, document feedback for Phase 9.</p>
+            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #E91E63; background: #fff0f5;">
+                <h5>🧪 Testing Scenarios</h5>
+                <ul>
+                    <li><strong>Scenario 1:</strong> Create and Publish Workshop (7 steps)</li>
+                    <li><strong>Scenario 2:</strong> Register and Participate (7 steps)</li>
+                    <li><strong>Scenario 3:</strong> Workshop Leader Communications (6 steps)</li>
+                    <li><strong>Scenario 4:</strong> Multi-Site Public Workshop (4 steps)</li>
+                    <li><strong>Scenario 5:</strong> Full Workshop Lifecycle (9 steps)</li>
+                </ul>
+                <p><strong>Success Criteria:</strong> At least 3 workshop leaders and 10 participants test successfully, all critical bugs fixed, performance < 2 seconds.</p>
+            </div>
+        </div>
+    </details>
+    [% END %]
+    
+    <!-- Phase 8D: Production Readiness -->
+    [% SET phase8d = schema.resultset('Project').find(185) %]
+    [% IF phase8d %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #00BCD4; padding: 10px; background: #e0f7fa;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            [% IF phase8d.status == 'Completed' %]✅[% ELSIF phase8d.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            Phase 8D: Production Readiness ([% phase8d.status %])
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>What:</strong> Prepare system for production deployment after user testing is complete.</p>
+            <p><strong>Why:</strong> Production deployment requires careful planning, database backups, migration execution, and smoke testing to ensure smooth transition without data loss or downtime.</p>
+            <p><strong>Key Tasks:</strong> Final code review, verify bug fixes, backup database, execute migrations, deploy code, smoke test production, monitor logs, create rollback plan.</p>
+            
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <h5>📊 Database Project Details</h5>
+                <ul>
+                    <li><strong>Project ID:</strong> [% phase8d.id %]</li>
+                    <li><strong>Status:</strong> [% phase8d.status %]</li>
+                    <li><strong>Timeline:</strong> [% phase8d.start_date %] → [% phase8d.end_date %]</li>
+                    <li><strong>Estimated Hours:</strong> [% phase8d.estimated_man_hours %]</li>
+                    <li><strong>Project Code:</strong> [% phase8d.project_code %]</li>
+                    <li><strong>Description:</strong> [% phase8d.description %]</li>
+                    <li><strong>Comments:</strong> [% phase8d.comments %]</li>
+                </ul>
+                <p>
+                    <a href="/project/details?project_id=[% phase8d.id %]" target="_blank">View Details</a> |
+                    <a href="/project/editproject?project_id=[% phase8d.id %]" target="_blank">Edit</a> |
+                    <a href="/todo/addtodo?project_id=[% phase8d.id %]" target="_blank">Add Todo</a>
+                </p>
+                
+                [% SET phase8d_todos = phase8d.todos.search({}, { order_by => 'sort_order' }) %]
+                [% IF phase8d_todos.count > 0 %]
+                    <h6>📋 Todos ([% phase8d_todos.count %]):</h6>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        [% FOREACH task IN phase8d_todos.all %]
+                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #00BCD4; background: #fafafa;">
+                                [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                [% task.subject %]
+                                <br><small>Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                            </li>
+                        [% END %]
+                    </ul>
+                [% ELSE %]
+                    <p><em>No todos. <a href="/todo/addtodo?project_id=[% phase8d.id %]">Add a todo</a></em></p>
+                [% END %]
+            </div>
+        </div>
+    </details>
+    [% ELSE %]
+    <details class="phase-container" style="margin: 15px 0; border: 2px solid #00BCD4; padding: 10px; background: #e0f7fa;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            📌 Phase 8D: Production Readiness (Not Yet in Database)
+        </summary>
+        <div style="margin-top: 10px;">
+            <p><strong>Status:</strong> <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">Project not yet created in database (Project ID 185)</span></p>
+            <p><strong>What:</strong> Prepare system for production deployment after user testing is complete.</p>
+            <p><strong>Why:</strong> Production deployment requires careful planning, database backups, migration execution, and smoke testing to ensure smooth transition without data loss or downtime.</p>
+            <p><strong>Key Tasks:</strong> Final code review, verify bug fixes, backup database, execute migrations, deploy code, smoke test production, monitor logs, create rollback plan.</p>
+            <p><a href="/project/addproject" target="_blank">Create Project in Database</a></p>
+        </div>
+    </details>
+    [% END %]
+    
     <!-- Phase 9: Enhanced Features & Documentation -->
     [% SET phase9 = schema.resultset('Project').find(183) %]
     [% IF phase9 %]
