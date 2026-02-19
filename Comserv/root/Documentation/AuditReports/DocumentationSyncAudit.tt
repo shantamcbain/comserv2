@@ -1,0 +1,153 @@
+[% META
+   title = "Documentation Sync Audit Report - 2026-01-15"
+   description = "Automated audit of documentation files requiring updates based on code changes detected via git diff. Identifies primary documentation files that need version bumps or creation for recently modified code."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "audit,documentation,system"
+   page_version = "0.01"
+   last_updated = "Thu Jan 15 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'audit_reports/DocumentationSyncAudit.tt,v 0.01 2026/01/15 zencoder Exp - Documentation sync audit report (git range: HEAD~1..HEAD)' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Documentation Sync Audit Report</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Generated:</strong> 2026-01-15 | 
+        <strong>Version:</strong> 0.01 |
+        <strong>Git Range:</strong> HEAD~1..HEAD |
+        <strong>Status:</strong> Ready for DocumentationSyncAgent processing
+    </div>
+
+    <!-- QUICK SUMMARY SECTION -->
+    <div id="summary" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Audit Summary</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0;">
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Total Code Files Changed:</strong> 9</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Documentation Files Needing Update:</strong> 3</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">New Documentation Files Needed:</strong> 3</li>
+                <li style="margin: var(--spacing-small) 0;"><strong style="color: var(--primary-color);">Ready to Sync:</strong> Yes</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- FULL AUDIT REPORT SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="audit-data" style="color: var(--text-color); font-family: var(--header-font);">Detailed Audit Report (JSON)</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-style: italic;">This JSON data is the authoritative source for which documentation files need updates. Use DocumentationSyncAgent workflow to process each item.</p>
+            <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>{
+   "audit_timestamp" : "2026-01-15T15:42:30Z",
+   "summary" : {
+      "ready_to_sync" : 1,
+      "docs_missing" : 3,
+      "total_code_changes" : 9,
+      "naming_mismatches_found" : "0",
+      "docs_needing_update" : 6
+   },
+   "files_changed" : 9,
+   "naming_mismatches" : null,
+   "git_range" : "HEAD~1..HEAD",
+   "documentation_files_needing_update" : [
+      {
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/models/ApiToken.tt",
+         "exists" : null,
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/ApiToken.tt",
+         "version" : "0.01"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "code_file" : "lib/Comserv/Controller/Api.pm",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Api.tt",
+         "version" : "0.01",
+         "last_updated" : "Unknown",
+         "exists" : null,
+         "documentation_file" : "/Documentation/controllers/Api.tt"
+      },
+      {
+         "version" : "0.01",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/utils/ApiTokenValidator.tt",
+         "last_updated" : "Unknown",
+         "exists" : null,
+         "documentation_file" : "/Documentation/utils/ApiTokenValidator.tt",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "code_file" : "lib/Comserv/Util/ApiTokenValidator.pm"
+      },
+      {
+         "documentation_file" : "/Documentation/controllers/Root.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Root.tt",
+         "version" : "0.03",
+         "last_updated" : "Sat Jan 11 2026",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "code_file" : "lib/Comserv/Controller/Root.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "code_file" : "lib/Comserv/Controller/Admin/SchemaComparison.pm",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/controllers/SchemaComparison.tt",
+         "last_updated" : "Sat Jan 11 2026",
+         "version" : "0.03",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SchemaComparison.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "code_file" : "lib/Comserv/Controller/Todo.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/controllers/Todo.tt",
+         "exists" : 1,
+         "version" : "0.01",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Todo.tt",
+         "last_updated" : "Unknown"
+      }
+   ]
+}
+</code></pre>
+        </div>
+    </div>
+
+    <!-- HOW TO USE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="how-to-use" style="color: var(--text-color); font-family: var(--header-font);">How to Use This Report</h2>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Review Audit Data:</strong> Examine the JSON above to see which documentation files need updating</li>
+                <li><strong>For Each Item:</strong>
+                    <ul>
+                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": true</code> → Update existing .tt file (bump version as shown in "action" field)</li>
+                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": null</code> → Create new documentation file using DocumentationTtTemplate.tt</li>
+                    </ul>
+                </li>
+                <li><strong>Version Numbering:</strong> Follow format from "action" field (e.g., bump 1.12 → 1.13)</li>
+                <li><strong>Add Recent Changes Section:</strong> Include code change summary in updated .tt files</li>
+                <li><strong>Update Metadata:</strong> Ensure last_updated field reflects current date (YYYY-MM-DD format)</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#summary" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Summary</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row" style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">
+                <strong>Generated by:</strong> documentation_sync_audit.pl (DocumentationSyncAgent workflow)<br/>
+                <strong>Source:</strong> RepositoryCodeAudit.json v2.0 (1:N code-to-documentation mapping)<br/>
+                <strong>Timestamp:</strong> 2026-01-15T15:42:30Z
+            </p>
+        </div>
+    </div>
+</div>
