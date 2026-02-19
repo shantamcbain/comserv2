@@ -142,6 +142,30 @@ else
   echo "⚠ Warning: NFS mount /data/apis not available - workshop file uploads will use fallback directory"
 fi
 
+# Configure log rotation to prevent disk space issues
+echo "Configuring log rotation..."
+cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
+/opt/comserv/root/log/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    maxsize 100M
+}
+
+/opt/comserv/root/Documentation/session_history/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+}
+LOGROTATE_EOF
+echo "✓ Log rotation configured"
+
 # Log the port configuration
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"
