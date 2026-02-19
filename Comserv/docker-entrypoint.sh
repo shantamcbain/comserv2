@@ -131,6 +131,17 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
+# Create workshop files directory if NFS mount exists
+WORKSHOP_DIR="/data/apis/workshop_files"
+if [ -d "/data/apis" ]; then
+  echo "Creating workshop files directory: $WORKSHOP_DIR"
+  mkdir -p "$WORKSHOP_DIR"
+  chmod 755 "$WORKSHOP_DIR"
+  echo "✓ Workshop files directory ready at $WORKSHOP_DIR"
+else
+  echo "⚠ Warning: NFS mount /data/apis not available - workshop file uploads will use fallback directory"
+fi
+
 # Log the port configuration
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"
