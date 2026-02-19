@@ -347,6 +347,12 @@ sub details :Path('/workshop/details') :Args(0) {
 
     # Retrieve the ID from query parameters
     my $id = $c->request->params->{id};
+    
+    unless ($id) {
+        $c->flash->{error_msg} = 'Workshop ID is required';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
 
     # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
@@ -361,8 +367,9 @@ sub details :Path('/workshop/details') :Args(0) {
     };
 
     if ($@ || !$workshop) {
-        $c->stash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
-        $c->stash->{template} = 'WorkShops/Error.tt'; # Ensure you have an error template
+        $c->log->error("Failed to find workshop with ID $id: " . ($@ || 'Workshop not found'));
+        $c->flash->{error_msg} = 'Failed to find workshop: ' . ($@ || 'Workshop not found');
+        $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
 

@@ -222,10 +222,8 @@
             </div>
             
             <div class="data-container">
-                <details>
-                    <summary style="cursor: pointer; list-style: none;">
-                        <h2 style="display: inline;">Past Workshops ([% past_workshops.size || 0 %])</h2>
-                    </summary>
+                <details class="priority-container">
+                    <summary class="priority-summary">Past Workshops ([% past_workshops.size || 0 %])</summary>
                     
                     [% IF past_workshops.size > 0 %]
                     <div class="table-container">
