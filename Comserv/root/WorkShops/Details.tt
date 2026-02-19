@@ -4,11 +4,11 @@
    roles = "admin,user"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.04"
+   page_version = "0.05"
    last_updated = "2026-02-19"
 %]
 
-[% PageVersion = 'WorkShops/Details.tt,v 0.04 2026/02/19 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/Details.tt,v 0.05 2026/02/19 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -193,8 +193,8 @@
                             <tr>
                                 <td>[% file.file_name | html %]</td>
                                 <td>[% file.file_type | html %]</td>
-                                <td>[% file.file_size_formatted || file.file_size | html %]</td>
-                                <td>[% file.created_at || 'N/A' | html %]</td>
+                                <td>[% file.file_size | html %] bytes</td>
+                                <td>[% file.upload_date || 'N/A' | html %]</td>
                                 <td class="action-cell">
                                     <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">Download</a>
                                 </td>
