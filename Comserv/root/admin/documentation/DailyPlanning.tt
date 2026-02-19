@@ -1,0 +1,283 @@
+[% META 
+   title = "Priority Todos & Blocking Dependencies - 13 Active Items"
+   description = "Critical priority tasks ordered by blocking dependencies. Includes Architecture Migration Phase 2, Master Plan Refactor, API Logging Fix, and DailyPlan Synchronization."
+   roles = "admin,developer,devops"
+   TemplateType = "Planning"
+   category = "planning,priorities,coordination"
+   page_version = "0.26"
+   last_updated = "2026-01-26"
+   editable = "true"
+%]
+
+[% PageVersion = 'admin/documentation/PriorityTodos.tt,v 0.26 2026/01/26 07:55:00 Reconstructed from v0.23 fragments and updated with current active priorities.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .priority-table {
+        width: 100%;
+        margin: 20px 0;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    .priority-table th, .priority-table td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    .priority-table thead {
+        background: #f5f5f5;
+    }
+    .priority-high {
+        background: #fff3cd;
+    }
+    .priority-medium {
+        background: #e3f2fd;
+    }
+    .priority-low {
+        background: #f9f9f9;
+    }
+    .status-pending {
+        color: #d32f2f;
+        font-weight: bold;
+    }
+    .status-in-progress {
+        color: #f57c00;
+        font-weight: bold;
+    }
+</style>
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Priority Todos & Blocking Dependencies</h1>
+        <p>Active work items ordered by blocking priority. Resolve items at the top to unblock downstream work.</p>
+    </div>
+
+    <div class="alert alert-info">
+        <p><strong>💡 Note:</strong> A modern, interactive version of this list is available in the <strong>PRIORITY TODOS (NEW)</strong> tab of the <a href="/Documentation/DailyPlan">Daily Plan Dashboard</a>.</p>
+    </div>
+
+    <h2>Current Active Priorities</h2>
+    <table class="priority-table">
+        <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 30%;">Priority Item</th>
+                <th style="width: 15%;">Status</th>
+                <th style="width: 25%;">Blocks / Dependencies</th>
+                <th style="width: 15%;">Owner</th>
+                <th style="width: 10%;">Priority</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="priority-high">
+                <td><strong>11</strong></td>
+                <td>
+                    <strong>Architecture Migration Phase 2</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Move core components to new architecture. Refactor controllers and models for scalability.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>↳ UNBLOCKS: #7 (Agent Example)</td>
+                <td>Dev Team</td>
+                <td>HIGH</td>
+            </tr>
+            <tr class="priority-high">
+                <td><strong>4</strong></td>
+                <td>
+                    <strong>Refactor Master Plan Coordination</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Implement Coordinator Only principle. Extract detailed content to individual plan files.
+                    </div>
+                </td>
+                <td><span class="status-in-progress">IN PROGRESS</span></td>
+                <td>None</td>
+                <td>Planning Agent</td>
+                <td>HIGH</td>
+            </tr>
+            <tr class="priority-high">
+                <td><strong>19</strong></td>
+                <td>
+                    <strong>Fix updateprompt.pl API Logging</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Resolve AiMessage/AiConversation create() failure. Fix database recording blockers.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>Blocks: AI Persistence</td>
+                <td>Backend Team</td>
+                <td>HIGH</td>
+            </tr>
+            <tr class="priority-medium">
+                <td><strong>3</strong></td>
+                <td>
+                    <strong>Update Format & Multi-Plan Support</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Support Markdown vs Template Toolkit formats. Enable plan cross-referencing.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>↳ UNBLOCKS: #9 (Auto-Sync), #8 (API Docs)</td>
+                <td>Docs Team</td>
+                <td>MEDIUM</td>
+            </tr>
+            <tr class="priority-medium">
+                <td><strong>12</strong></td>
+                <td>
+                    <strong>DailyPlan Sync</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Sync daily priorities with database todos. Implement automated reporting.
+                    </div>
+                </td>
+                <td><span class="status-in-progress">IN PROGRESS</span></td>
+                <td>↳ BLOCKED BY: #16</td>
+                <td>Automation Agent</td>
+                <td>MEDIUM</td>
+            </tr>
+            <tr class="priority-medium">
+                <td><strong>5</strong></td>
+                <td>
+                    <strong>DailyPlan Flag System</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Implement 'DailyPlanActive' flag in system configuration. Integrate checks.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>None</td>
+                <td>DevOps Team</td>
+                <td>MEDIUM</td>
+            </tr>
+            <tr class="priority-medium">
+                <td><strong>6</strong></td>
+                <td>
+                    <strong>Integrate Priority into Daily Plan</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Add priority list dropdown to DailyPlan.tt. Ensure real-time updates.
+                    </div>
+                </td>
+                <td><span class="status-in-progress">IN PROGRESS</span></td>
+                <td>↳ BLOCKED BY: #12</td>
+                <td>UI Team</td>
+                <td>MEDIUM</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>16</strong></td>
+                <td>
+                    <strong>Project IDs Sync</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Map internal project names to standardized database project IDs.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>↳ UNBLOCKS: #12 (Sync)</td>
+                <td>DB Admin</td>
+                <td>LOW</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>17</strong></td>
+                <td>
+                    <strong>Theme Sync</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Synchronize documentation CSS variables with application theme engine.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>None</td>
+                <td>UI Team</td>
+                <td>LOW</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>18</strong></td>
+                <td>
+                    <strong>Doc Cleanup</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Standardize filenames. Remove redundant files. Fix broken links.
+                    </div>
+                </td>
+                <td><span class="status-in-progress">IN PROGRESS</span></td>
+                <td>None</td>
+                <td>Audit Team</td>
+                <td>LOW</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>9</strong></td>
+                <td>
+                    <strong>Auto-Sync Test</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Automated testing suite for todo/documentation synchronization.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>↳ BLOCKED BY: #3</td>
+                <td>QA Team</td>
+                <td>LOW</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>10</strong></td>
+                <td>
+                    <strong>Archive Docs</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Properly archive completed initiatives and obsolete files.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>None</td>
+                <td>Cleanup Agent</td>
+                <td>LOW</td>
+            </tr>
+            <tr class="priority-low">
+                <td><strong>8</strong></td>
+                <td>
+                    <strong>API Docs Update</strong>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Update API reference to reflect v2 changes and token-based auth.
+                    </div>
+                </td>
+                <td><span class="status-pending">PENDING</span></td>
+                <td>↳ BLOCKED BY: #3</td>
+                <td>Backend Team</td>
+                <td>LOW</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Recently Completed</h2>
+    <table class="priority-table" style="background: #f9f9f9;">
+        <thead>
+            <tr>
+                <th style="width: 5%;">✅</th>
+                <th style="width: 45%;">Task</th>
+                <th style="width: 20%;">Date</th>
+                <th style="width: 30%;">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>✅</td>
+                <td><strong>#1 CRITICAL: Fix Todo Display Bug</strong></td>
+                <td>2026-01-25</td>
+                <td>Fixed bug in Todo.pm rendering logic.</td>
+            </tr>
+            <tr>
+                <td>✅</td>
+                <td><strong>#2: API Auth Migration</strong></td>
+                <td>2026-01-25</td>
+                <td>Migrated to token-based Bearer auth.</td>
+            </tr>
+            <tr>
+                <td>✅</td>
+                <td><strong>Plan A.2: K8s Readiness</strong></td>
+                <td>2026-01-13</td>
+                <td>Infrastructure finalized.</td>
+            </tr>
+            <tr>
+                <td>✅</td>
+                <td><strong>Plan A.3: Credentials Audit</strong></td>
+                <td>2026-01-13</td>
+                <td>Security-critical audit completed.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
