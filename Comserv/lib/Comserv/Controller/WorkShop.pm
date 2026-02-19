@@ -411,7 +411,7 @@ sub details :Path('/workshop/details') :Args(0) {
     # Get workshop files
     my @workshop_files = $schema->resultset('File')->search(
         { workshop_id => $id },
-        { order_by => 'created_at DESC' }
+        { order_by => { -desc => 'upload_date' } }
     )->all;
 
     # Get workshop content
