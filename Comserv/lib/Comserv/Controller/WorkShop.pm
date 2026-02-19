@@ -381,6 +381,7 @@ sub details :Path('/workshop/details') :Args(0) {
 
     # Check if user is registered for this workshop (including past attendees)
     my $is_user_registered = 0;
+    my $is_workshop_leader = 0;
     if ($c->user_exists) {
         my $user_id = $c->session->{user_id};
         my $participant = $schema->resultset('Participant')->search({
@@ -389,6 +390,9 @@ sub details :Path('/workshop/details') :Args(0) {
             status => { -in => ['registered', 'waitlist', 'attended'] }
         })->first;
         $is_user_registered = 1 if $participant;
+        
+        # Check if user is the workshop leader
+        $is_workshop_leader = $self->_is_workshop_leader($c, $workshop);
     }
 
     # Get workshop files
@@ -408,6 +412,7 @@ sub details :Path('/workshop/details') :Args(0) {
         workshop => $workshop,
         formatted_date => $formatted_date,
         is_user_registered => $is_user_registered,
+        is_workshop_leader => $is_workshop_leader,
         workshop_files => \@workshop_files,
         workshop_content => \@workshop_content,
         template => 'WorkShops/Details.tt',

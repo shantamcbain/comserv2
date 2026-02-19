@@ -4,11 +4,11 @@
    roles = "admin,user"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.03"
-   last_updated = "2026-02-16"
+   page_version = "0.04"
+   last_updated = "2026-02-19"
 %]
 
-[% PageVersion = 'WorkShops/Details.tt,v 0.03 2026/02/16 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/Details.tt,v 0.04 2026/02/19 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -229,7 +229,7 @@
             [% END %]
             
             <div class="form-actions">
-                [% IF c.user_exists && c.session.roles.match('admin') %]
+                [% IF c.user_exists && (c.session.roles.match('admin') || is_workshop_leader) %]
                     <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
                     <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
                     <a href="/workshop/files?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
