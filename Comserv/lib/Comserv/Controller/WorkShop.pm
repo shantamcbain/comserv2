@@ -1273,25 +1273,8 @@ sub download :Local :Args(1) {
         return;
     }
     
-    my $user_id = $c->session->{user_id};
-    
-    my $is_registered = $c->model('DBEncy::Participant')->search({
-        workshop_id => $workshop->id,
-        user_id => $user_id,
-        status => { -in => ['registered', 'attended'] }
-    })->count > 0;
-    
-    my $is_leader = $self->_is_workshop_leader($c, $workshop);
-    
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
-    my $is_admin = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
-    
-    unless ($is_registered || $is_leader || $is_admin) {
-        $c->flash->{error_msg} = 'Access denied. You must be registered for this workshop to download files.';
-        $c->response->redirect($c->uri_for($self->action_for('details'), { id => $workshop->id }));
-        return;
-    }
+    # Allow ALL users to download workshop files (especially for past workshops)
+    # No access restrictions needed for educational materials
     
     my $file_data;
     if ($file->file_data) {
