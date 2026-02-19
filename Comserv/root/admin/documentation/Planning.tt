@@ -1723,7 +1723,7 @@ last_updated = '2026/02/08'
                     <h4>📊 Users Project from Database</h4>
                     [% TRY %]
                         [% SET schema = c.model('DBEncy').schema %]
-                        [% SET users_project = schema.resultset('Project').search({ name => 'Users' }).first %]
+                        [% SET users_project = schema.resultset('Project').find(184) %]
                         
                         [% IF users_project %]
                             <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
@@ -1766,7 +1766,7 @@ last_updated = '2026/02/08'
                             </div>
                         [% ELSE %]
                             <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
-                                <strong>Note:</strong> Users project not found in database. Please ensure the project record exists.
+                                <strong>Note:</strong> Project ID 184 not found in database. Please ensure the project record exists.
                                 <a href="/project/addproject" style="color: #007bff;">Create Project</a>
                             </div>
                         [% END %]
