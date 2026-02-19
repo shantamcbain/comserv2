@@ -207,6 +207,11 @@ sub index :Path :Args(0) {
         "Completed Admin index action");
 }
 
+sub docker_containers :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->redirect($c->uri_for('/admin/infrastructure'));
+}
+
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
