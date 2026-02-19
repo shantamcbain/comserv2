@@ -6,7 +6,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Data::Dumper;
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Try::Tiny;
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
