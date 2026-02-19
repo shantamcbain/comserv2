@@ -511,6 +511,14 @@ sub _check_workshop_access {
     
     $required_level ||= 'view';
     
+    if ($required_level eq 'view') {
+        # Public workshops are visible to everyone (even non-logged-in users)
+        if ($workshop->share eq 'public') {
+            return 1;
+        }
+    }
+    
+    # For non-view access or private workshops, user must be logged in
     return 0 unless $c->user_exists;
     
     my $user_id = $c->session->{user_id};
@@ -526,11 +534,6 @@ sub _check_workshop_access {
     }
     
     if ($required_level eq 'view') {
-        # Public workshops are visible to everyone
-        if ($workshop->share eq 'public') {
-            return 1;
-        }
-        
         # Check if user's site has access via site_workshop table
         if ($sitename) {
             my $schema = $c->model('DBEncy');
