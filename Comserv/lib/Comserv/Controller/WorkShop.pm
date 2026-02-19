@@ -376,10 +376,37 @@ sub details :Path('/workshop/details') :Args(0) {
     # Assuming $workshop->date is a DateTime object
     my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
 
+    # Check if user is registered for this workshop (including past attendees)
+    my $is_user_registered = 0;
+    if ($c->user_exists) {
+        my $user_id = $c->session->{user_id};
+        my $participant = $schema->resultset('Participant')->search({
+            workshop_id => $id,
+            user_id => $user_id,
+            status => { -in => ['registered', 'waitlist', 'attended'] }
+        })->first;
+        $is_user_registered = 1 if $participant;
+    }
+
+    # Get workshop files
+    my @workshop_files = $schema->resultset('File')->search(
+        { workshop_id => $id },
+        { order_by => 'created_at DESC' }
+    )->all;
+
+    # Get workshop content
+    my @workshop_content = $schema->resultset('WorkshopContent')->search(
+        { workshop_id => $id },
+        { order_by => 'sort_order ASC' }
+    )->all;
+
     # Pass the workshop to the view
     $c->stash(
         workshop => $workshop,
         formatted_date => $formatted_date,
+        is_user_registered => $is_user_registered,
+        workshop_files => \@workshop_files,
+        workshop_content => \@workshop_content,
         template => 'WorkShops/Details.tt',
     );
 }
