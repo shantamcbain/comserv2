@@ -44,6 +44,8 @@ services:
       - comserv-prod-logs:/opt/comserv/root/log
       - comserv-prod-sessions:/opt/comserv/root/session
       - comserv-prod-backups:/opt/comserv/backups
+      # NFS mount for workshop files (shared storage)
+      - workshop-files-nfs:/data/apis:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -94,6 +96,12 @@ volumes:
     driver: local
   comserv-prod-backups:
     driver: local
+  workshop-files-nfs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.1.175,rw,nfsvers=4
+      device: ":/data/apis"
 
 networks:
   comserv-prod-network:
