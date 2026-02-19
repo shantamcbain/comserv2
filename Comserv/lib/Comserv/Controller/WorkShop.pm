@@ -417,7 +417,7 @@ sub details :Path('/workshop/details') :Args(0) {
     # Get workshop content
     my @workshop_content = $schema->resultset('WorkshopContent')->search(
         { workshop_id => $id },
-        { order_by => 'sort_order ASC' }
+        { order_by => { -asc => 'sort_order' } }
     )->all;
 
     # Pass the workshop to the view
