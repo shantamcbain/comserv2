@@ -52,7 +52,7 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
     apt-get install -y --no-install-recommends \
       bash default-mysql-client libmariadb3 libssl3 libxml2 curl locales \
-      ca-certificates supervisor && \
+      ca-certificates supervisor logrotate cron && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
@@ -97,6 +97,11 @@ COPY create-supervisor-config.sh /opt/comserv/create-supervisor-config.sh
 COPY startup-wrapper.sh /opt/comserv/startup-wrapper.sh
 RUN chmod +x /opt/comserv/create-supervisor-config.sh /opt/comserv/startup-wrapper.sh && \
     chown comserv:comserv /opt/comserv/create-supervisor-config.sh /opt/comserv/startup-wrapper.sh
+
+# Copy logrotate configuration to prevent disk space exhaustion from logs
+COPY logrotate-catalyst.conf /etc/logrotate.d/catalyst
+RUN chmod 644 /etc/logrotate.d/catalyst && \
+    echo "0 0 * * * /usr/sbin/logrotate /etc/logrotate.conf" | crontab -
 
 # Health check - will check dynamic port using /health endpoint
 # /health endpoint bypasses database queries and returns immediately
