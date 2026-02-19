@@ -6,7 +6,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Data::Dumper;
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Try::Tiny;
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
@@ -4420,6 +4420,211 @@ sub generate_result_file_content {
     $content .= "1;\n";
     
     return $content;
+}
+
+=head2 Docker Container Management Routes
+
+=cut
+
+sub docker_containers :Path('/admin/docker-containers') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
+        "Docker containers management page accessed");
+    
+    # Check if we're inside a Docker container
+    my $docker_available = ! -f '/.dockerenv';
+    
+    $c->stash(
+        template => 'admin/docker_containers.tt',
+        docker_available => $docker_available
+    );
+}
+
+sub docker_list :Path('/admin/docker-list') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
+        "Docker list API called");
+    
+    # Check if we're inside a Docker container
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Run docker compose ps to get container status
+    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse JSON output (one JSON object per line)
+    my @containers;
+    foreach my $line (split /\n/, $output) {
+        next unless $line =~ /^\{/;
+        eval {
+            my $container = decode_json($line);
+            push @containers, {
+                name => $container->{Name} || '',
+                service => $container->{Service} || '',
+                state => $container->{State} || 'unknown',
+                status => $container->{Status} || '',
+                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
+                image => $container->{Image} || ''
+            };
+        };
+    }
+    
+    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_restart :Path('/admin/docker-restart') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
+        "Docker restart requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all' 
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_start :Path('/admin/docker-start') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
+        "Docker start requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_stop :Path('/admin/docker-stop') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
+        "Docker stop requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_up :Path('/admin/docker-up') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
+        "Docker up requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_logs :Path('/admin/docker-logs') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
+        "Docker logs requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=100 $service 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        logs => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
 }
 
 # Helper method to convert table name to class name
