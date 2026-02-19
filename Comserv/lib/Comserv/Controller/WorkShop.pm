@@ -376,8 +376,21 @@ sub details :Path('/workshop/details') :Args(0) {
     # Workshop details are viewable by all users
     # Edit access is restricted to admins/leaders via separate authorization checks
 
-    # Assuming $workshop->date is a DateTime object
-    my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+    # Format workshop date safely
+    my $formatted_date = '';
+    if ($workshop->date) {
+        eval {
+            if (ref($workshop->date) && $workshop->date->can('strftime')) {
+                $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+            } else {
+                $formatted_date = $workshop->date;
+            }
+        };
+        if ($@) {
+            $c->log->error("Error formatting workshop date: $@");
+            $formatted_date = $workshop->date || '';
+        }
+    }
 
     # Check if user is registered for this workshop (including past attendees)
     my $is_user_registered = 0;
