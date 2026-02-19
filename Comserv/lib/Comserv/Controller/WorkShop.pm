@@ -373,12 +373,8 @@ sub details :Path('/workshop/details') :Args(0) {
         return;
     }
 
-    # Check if user has view access to this workshop
-    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
-        $c->flash->{error_msg} = 'Access denied. You do not have permission to view this workshop.';
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
+    # Workshop details are viewable by all users
+    # Edit access is restricted to admins/leaders via separate authorization checks
 
     # Assuming $workshop->date is a DateTime object
     my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
