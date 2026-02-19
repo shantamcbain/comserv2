@@ -122,6 +122,15 @@ fi
 # Generate supervisor config with dynamic port
 bash ${CATALYST_HOME}/create-supervisor-config.sh
 
+# Start cron for logrotate (prevents disk space exhaustion)
+if command -v cron &> /dev/null; then
+  echo "Starting cron for log rotation..."
+  service cron start || /usr/sbin/cron
+  echo "✓ Cron started for logrotate"
+else
+  echo "⚠ Warning: cron not available - log rotation disabled"
+fi
+
 # Log the port configuration
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"
