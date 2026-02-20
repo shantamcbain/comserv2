@@ -10,24 +10,29 @@ my $production_host = '';
 my $service = 'web-prod';
 my $ssh_user = 'shanta';
 my $ssh_port = 22;
+my $production_directory = '~/PycharmProjects/comserv2';
 my $rollback_on_failure = 1;
 
 GetOptions(
-    'host=s'     => \$production_host,
-    'service=s'  => \$service,
-    'user=s'     => \$ssh_user,
-    'port=i'     => \$ssh_port,
+    'host=s'      => \$production_host,
+    'service=s'   => \$service,
+    'user=s'      => \$ssh_user,
+    'port=i'      => \$ssh_port,
+    'directory=s' => \$production_directory,
     'no-rollback' => sub { $rollback_on_failure = 0 },
-) or die "Usage: $0 --host=PRODUCTION_HOST [--service=SERVICE] [--user=USER] [--port=PORT] [--no-rollback]\n";
+) or die "Usage: $0 --host=PRODUCTION_HOST [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--no-rollback]\n";
 
 die "ERROR: Production host required (--host=HOSTNAME)\n" unless $production_host;
+die "ERROR: Production directory required (--directory=PATH)\n" unless $production_directory;
 
 print "=" x 80 . "\n";
 print "Docker Production Deployment Script\n";
 print "=" x 80 . "\n";
 print "Production Host: $production_host\n";
+print "Production Directory: $production_directory\n";
 print "Service: $service\n";
 print "SSH User: $ssh_user\n";
+print "SSH Port: $ssh_port\n";
 print "Rollback on failure: " . ($rollback_on_failure ? "Yes" : "No") . "\n";
 print "=" x 80 . "\n\n";
 
@@ -53,7 +58,16 @@ sub run_local {
 sub run_remote {
     my ($cmd, $description) = @_;
     print "\n[REMOTE] $description\n";
-    my $ssh_cmd = qq(ssh -p $ssh_port $ssh_user\@$production_host "$cmd");
+    
+    my $ssh_password = $ENV{SSHPASS} || '';
+    my $ssh_cmd;
+    
+    if ($ssh_password) {
+        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+    } else {
+        $ssh_cmd = qq(ssh -p $ssh_port $ssh_user\@$production_host "$cmd");
+    }
+    
     print "CMD: $cmd\n";
     my $output = `$ssh_cmd 2>&1`;
     my $exit_code = $? >> 8;
@@ -64,7 +78,15 @@ sub run_remote {
 
 sub ssh_exec {
     my ($cmd) = @_;
-    my $ssh_cmd = qq(ssh -p $ssh_port $ssh_user\@$production_host "$cmd");
+    my $ssh_password = $ENV{SSHPASS} || '';
+    my $ssh_cmd;
+    
+    if ($ssh_password) {
+        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+    } else {
+        $ssh_cmd = qq(ssh -p $ssh_port $ssh_user\@$production_host "$cmd");
+    }
+    
     return `$ssh_cmd 2>&1`;
 }
 
@@ -80,7 +102,16 @@ eval {
     print "\n[TRANSFER] Exporting and transferring Docker image via SSH pipe...\n";
     print "This combines docker save and docker load in one operation (no temp files)\n";
     
-    my $pipe_cmd = "docker save $image_name | ssh -p $ssh_port $ssh_user\@$production_host 'docker load'";
+    # Use sshpass for password-based SSH (if password provided via SSHPASS env var)
+    my $ssh_password = $ENV{SSHPASS} || '';
+    my $pipe_cmd;
+    
+    if ($ssh_password) {
+        $pipe_cmd = "docker save $image_name | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host 'docker load'";
+    } else {
+        $pipe_cmd = "docker save $image_name | ssh -p $ssh_port $ssh_user\@$production_host 'docker load'";
+    }
+    
     print "CMD: $pipe_cmd\n";
     
     my $pipe_output = `$pipe_cmd 2>&1`;
@@ -125,13 +156,13 @@ eval {
     
     # Step 4: Stop existing container
     print "\n[STOP] Stopping existing container on production...\n";
-    my $stop_output = ssh_exec("cd ~/PycharmProjects/comserv2 && docker compose stop $service");
+    my $stop_output = ssh_exec("cd $production_directory && docker compose stop $service");
     print $stop_output;
     print "✓ Container stopped\n";
     
     # Step 5: Start new container with force recreate
     print "\n[START] Starting new container on production...\n";
-    my $start_output = ssh_exec("cd ~/PycharmProjects/comserv2 && docker compose up -d --force-recreate $service");
+    my $start_output = ssh_exec("cd $production_directory && docker compose up -d --force-recreate $service");
     print $start_output;
     
     # Step 6: Health check

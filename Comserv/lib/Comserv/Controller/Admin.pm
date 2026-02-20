@@ -4772,6 +4772,8 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     
     my $ssh_target = $c->req->params->{ssh_target} || '';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $save_credentials = $c->req->params->{save_credentials} || '';
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -4779,7 +4781,22 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         return;
     }
     
-    my $cmd = qq(ssh -p $ssh_port -o ConnectTimeout=5 -o BatchMode=yes $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Check if sshpass is installed
+    my $sshpass_check = `which sshpass 2>/dev/null`;
+    unless ($sshpass_check) {
+        $c->response->body('{"success": false, "error": "sshpass not installed. Install with: sudo apt-get install sshpass"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Use sshpass for password-based SSH
+    my $cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
@@ -4788,6 +4805,34 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         output => $output,
         exit_code => $exit_code
     };
+    
+    # Save credentials if requested
+    if ($save_credentials eq 'yes' && $exit_code == 0) {
+        my $secrets_dir = "$ENV{HOME}/.comserv/secrets";
+        my $credentials_file = "$secrets_dir/ssh_credentials.json";
+        
+        unless (-d $secrets_dir) {
+            system("mkdir -p $secrets_dir");
+            system("chmod 700 $secrets_dir");
+        }
+        
+        my $credentials = {
+            ssh_target => $ssh_target,
+            ssh_port => $ssh_port,
+            ssh_password => $ssh_password,
+            last_updated => time(),
+            last_test_success => time()
+        };
+        
+        if (open my $fh, '>', $credentials_file) {
+            print $fh encode_json($credentials);
+            close $fh;
+            chmod 0600, $credentials_file;
+            
+            $result->{credentials_saved} = \1;
+            $result->{credentials_path} = $credentials_file;
+        }
+    }
     
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
@@ -4807,10 +4852,18 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     
     my $ssh_target = $c->req->params->{ssh_target} || '';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
     my $service = $c->req->params->{service} || 'web-prod';
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
         $c->response->content_type('application/json');
         return;
     }
@@ -4824,7 +4877,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
     
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service 2>&1";
+    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
     
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
@@ -4837,6 +4890,160 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
+}
+
+sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_ssh_terminal',
+        "SSH Terminal WebSocket requested");
+    
+    # Get parameters from query string
+    my $ssh_target = $c->req->params->{ssh_target} || 'ubuntu@192.168.1.126';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    
+    # Check if this is a WebSocket upgrade request
+    my $upgrade = $c->req->header('Upgrade') || '';
+    my $connection = $c->req->header('Connection') || '';
+    
+    unless ($upgrade eq 'websocket' && $connection =~ /Upgrade/i) {
+        $c->response->status(400);
+        $c->response->body('WebSocket upgrade required');
+        return;
+    }
+    
+    # Load saved credentials if no password provided
+    if (!$ssh_password) {
+        my $credentials_file = "$ENV{HOME}/.comserv/secrets/ssh_credentials.json";
+        if (-f $credentials_file) {
+            if (open my $fh, '<', $credentials_file) {
+                local $/;
+                my $json = <$fh>;
+                close $fh;
+                my $creds = eval { decode_json($json) };
+                $ssh_password = $creds->{ssh_password} if $creds;
+            }
+        }
+    }
+    
+    unless ($ssh_password) {
+        $c->response->status(400);
+        $c->response->body('SSH password required');
+        return;
+    }
+    
+    # Import WebSocket modules
+    require Protocol::WebSocket::Handshake::Server;
+    require AnyEvent;
+    require AnyEvent::Handle;
+    
+    # Get the raw IO handle
+    my $io = $c->req->io_fh;
+    
+    # Perform WebSocket handshake
+    my $hs = Protocol::WebSocket::Handshake::Server->new;
+    $hs->parse($c->req->env->{HTTP_SEC_WEBSOCKET_KEY});
+    
+    # Send handshake response
+    my $handshake_response = $hs->to_string;
+    print $io $handshake_response;
+    
+    # Create AnyEvent handle for WebSocket
+    my $handle = AnyEvent::Handle->new(
+        fh => $io,
+        on_error => sub {
+            my ($hdl, $fatal, $msg) = @_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'websocket_error',
+                "WebSocket error: $msg");
+            $hdl->destroy;
+        }
+    );
+    
+    # Spawn SSH process
+    require IPC::Run3;
+    
+    my $ssh_cmd;
+    if ($ssh_password) {
+        $ssh_cmd = ['sshpass', '-p', $ssh_password, 'ssh', '-p', $ssh_port, 
+                    '-o', 'StrictHostKeyChecking=no', 
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    $ssh_target];
+    } else {
+        $ssh_cmd = ['ssh', '-p', $ssh_port, $ssh_target];
+    }
+    
+    # Use pseudo-terminal for interactive SSH
+    require IO::Pty;
+    my $pty = IO::Pty->new;
+    
+    my $pid = fork();
+    
+    if (!defined $pid) {
+        $c->response->status(500);
+        $c->response->body('Failed to fork SSH process');
+        return;
+    }
+    
+    if ($pid == 0) {
+        # Child process
+        $pty->make_slave_controlling_terminal();
+        my $slave = $pty->slave();
+        
+        close STDIN;
+        close STDOUT;
+        close STDERR;
+        
+        open STDIN, '<&', $slave->fileno() or die "Can't redirect STDIN: $!";
+        open STDOUT, '>&', $slave->fileno() or die "Can't redirect STDOUT: $!";
+        open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
+        
+        exec(@$ssh_cmd) or die "Can't exec SSH: $!";
+    }
+    
+    # Parent process - proxy between WebSocket and PTY
+    $pty->close_slave();
+    $pty->set_raw();
+    
+    # Create frame parser
+    require Protocol::WebSocket::Frame;
+    my $frame = Protocol::WebSocket::Frame->new;
+    
+    # Read from PTY and send to WebSocket
+    my $pty_watcher = AnyEvent->io(
+        fh => $pty,
+        poll => 'r',
+        cb => sub {
+            my $buf;
+            my $n = sysread($pty, $buf, 4096);
+            if ($n) {
+                my $ws_frame = Protocol::WebSocket::Frame->new(buffer => $buf, type => 'binary');
+                $handle->push_write($ws_frame->to_bytes);
+            } elsif (defined $n) {
+                # EOF - SSH process exited
+                $handle->destroy;
+                undef $pty_watcher;
+                waitpid($pid, 0);
+            }
+        }
+    );
+    
+    # Read from WebSocket and send to PTY
+    $handle->on_read(sub {
+        my ($hdl) = @_;
+        
+        $frame->append(delete $hdl->{rbuf});
+        
+        while (my $message = $frame->next_bytes) {
+            # Write to PTY
+            syswrite($pty, $message);
+        }
+    });
+    
+    # Don't let Catalyst finish the response
+    $c->res->from_psgi_response(sub {
+        return sub { };
+    });
 }
 
 # Helper method to convert table name to class name
