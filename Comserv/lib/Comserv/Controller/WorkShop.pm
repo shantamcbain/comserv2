@@ -251,18 +251,20 @@ sub addworkshop :Local {
     my $workshop;
     eval {
         $workshop = $rs->create({
-            sitename         => $creator_sitename,
-            title            => $params->{title},
-            description      => $params->{description},
-            date             => $params->{dateOfWorkshop},
-            location         => $params->{location},
-            instructor       => $params->{instructor},
-            max_participants => $params->{maxMinAttendees},
-            share            => $params->{share} || 'private',
-            end_time         => $params->{end_time},
-            time             => $time,
-            created_by       => $c->session->{user_id},
-            site_id          => $creator_site_id,
+            sitename            => $creator_sitename,
+            title               => $params->{title},
+            description         => $params->{description},
+            date                => $params->{dateOfWorkshop},
+            location            => $params->{location},
+            instructor          => $params->{instructor},
+            max_participants    => $params->{maxMinAttendees},
+            share               => $params->{share} || 'private',
+            status              => $params->{status} || 'draft',
+            registration_deadline => $params->{registration_deadline},
+            end_time            => $params->{end_time},
+            time                => $time,
+            created_by          => $c->session->{user_id},
+            site_id             => $creator_site_id,
         });
         
         # Create site_workshop records based on share setting
@@ -504,15 +506,17 @@ sub edit :Path('/workshop/edit') :Args(1) {
         
         eval {
             $workshop->update({
-                title            => $params->{title},
-                description      => $params->{description},
-                date             => $params->{date},
-                time             => $params->{time},
-                end_time         => $params->{end_time},
-                location         => $params->{location},
-                instructor       => $params->{instructor},
-                max_participants => $params->{max_participants},
-                share            => $new_share,
+                title                => $params->{title},
+                description          => $params->{description},
+                date                 => $params->{date},
+                time                 => $params->{time},
+                end_time             => $params->{end_time},
+                location             => $params->{location},
+                instructor           => $params->{instructor},
+                max_participants     => $params->{max_participants},
+                share                => $new_share,
+                status               => $params->{status},
+                registration_deadline => $params->{registration_deadline},
             });
             
             # Update site_workshop records if share setting changed

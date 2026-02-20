@@ -146,6 +146,20 @@
                 </div>
             </div>
             
+            <!-- Debug: Registration button visibility -->
+            [% IF c.request.params.debug == 1 %]
+            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+                <p><strong>Registration Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>is_user_registered: [% is_user_registered ? 'YES' : 'NO' %]</li>
+                    <li>workshop.status: [% workshop.status %]</li>
+                    <li>is_full: [% is_full ? 'YES' : 'NO' %]</li>
+                    <li>Condition for Register button: [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]TRUE[% ELSE %]FALSE[% END %]</li>
+                </ul>
+            </div>
+            [% END %]
+            
             [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]
             <div class="data-container">
                 <div class="form-actions">
