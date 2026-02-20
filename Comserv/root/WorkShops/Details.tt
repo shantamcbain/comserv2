@@ -228,13 +228,30 @@
             </div>
             [% END %]
             
+            <!-- Debug: Show button visibility check -->
+            [% IF c.session.debug_mode == 1 %]
+            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+                <p><strong>Button Visibility Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>username: [% c.session.username || 'NOT SET' %]</li>
+                    <li>user_id: [% c.session.user_id || 'NOT SET' %]</li>
+                    <li>roles (grep admin): [% c.session.roles.grep('admin').size %]</li>
+                    <li>is_workshop_leader: [% is_workshop_leader ? 'YES' : 'NO' %]</li>
+                    <li>workshop.created_by: [% workshop.created_by || 'NOT SET' %]</li>
+                </ul>
+            </div>
+            [% END %]
+            
             <div class="form-actions" style="margin-bottom: 50px;">
-                [% IF c.user_exists && (c.session.roles.grep('admin').size || is_workshop_leader) %]
-                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
-                    <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
-                    <a href="/workshop/files/[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
-                    <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Content</a>
-                    <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                [% IF c.user_exists %]
+                    [% IF c.session.roles.grep('admin').size || is_workshop_leader %]
+                        <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
+                        <a href="/workshop/participants/[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
+                        <a href="/workshop/files/[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
+                        <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Content</a>
+                        <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                    [% END %]
                 [% END %]
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
             </div>
