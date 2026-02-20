@@ -94,12 +94,12 @@
                             </div>
                             
                             <div class="form-field">
-                                <label for="share">Visibility:</label>
+                                <label for="share">Site Sharing:</label>
                                 <select id="share" name="share" class="form-input">
-                                    <option value="private" [% IF workshop.share == 'private' %]selected[% END %]>Private (My Site Only)</option>
-                                    <option value="public" [% IF workshop.share == 'public' %]selected[% END %]>Public (All Sites)</option>
+                                    <option value="private" [% IF workshop.share == 'private' %]selected[% END %]>My Site Only</option>
+                                    <option value="public" [% IF workshop.share == 'public' %]selected[% END %]>Shared Across All Sites</option>
                                 </select>
-                                <small>Private workshops will only be visible to your site.</small>
+                                <small>Choose whether to share this workshop with other sites. Note: Workshop must be "Published" to be visible to participants.</small>
                             </div>
                         </div>
                         
