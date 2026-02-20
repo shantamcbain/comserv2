@@ -145,24 +145,34 @@ eval {
     
     # Step 3: Backup existing container on production
     print "\n[BACKUP] Backing up existing container on production...\n";
-    my $container_exists = ssh_exec("docker ps -a --filter name=comserv-$service -q");
+    my $container_name = "comserv2-$service";
+    my $container_exists = ssh_exec("docker ps -a --filter name=$container_name -q");
     if ($container_exists && $container_exists =~ /\w/) {
-        run_remote("docker commit comserv-$service $backup_tag", 
+        run_remote("docker commit $container_name $backup_tag", 
                    "Creating backup of current container");
         print "✓ Backup created: $backup_tag\n";
     } else {
         print "⚠ No existing container found - skipping backup\n";
     }
     
-    # Step 4: Stop existing container
-    print "\n[STOP] Stopping existing container on production...\n";
-    my $stop_output = ssh_exec("cd $production_directory && docker compose stop $service");
-    print $stop_output;
-    print "✓ Container stopped\n";
+    # Step 4: Rename existing container (for rollback)
+    print "\n[RENAME] Renaming existing container for rollback...\n";
+    my $old_container_name = "${container_name}-old";
+    my $rename_output = ssh_exec("docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
+    print $rename_output;
     
-    # Step 5: Start new container with force recreate
+    # Step 5: Stop old container
+    print "\n[STOP] Stopping old container on production...\n";
+    my $stop_output = ssh_exec("docker stop $old_container_name 2>&1 || echo 'No container to stop'");
+    print $stop_output;
+    print "✓ Old container stopped (kept for rollback)\n";
+    
+    # Step 6: Start new container
     print "\n[START] Starting new container on production...\n";
-    my $start_output = ssh_exec("cd $production_directory && docker compose up -d --force-recreate $service");
+    my $port_map = $service eq 'web-prod' ? '5000:3000' : '3000:3000';
+    my $secrets_volume = '-v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro';
+    my $start_cmd = "docker run -d --name $container_name --restart unless-stopped -p $port_map $secrets_volume ${image_name}:latest";
+    my $start_output = ssh_exec($start_cmd);
     print $start_output;
     
     # Step 6: Health check
@@ -174,7 +184,7 @@ eval {
     while ($attempt < $max_attempts) {
         sleep 2;
         $attempt++;
-        my $status = ssh_exec("docker inspect --format='{{.State.Health.Status}}' comserv-$service 2>/dev/null || echo 'unknown'");
+        my $status = ssh_exec("docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
         chomp $status;
         print "  Attempt $attempt/$max_attempts: Status = $status\n";
         
@@ -187,19 +197,37 @@ eval {
     }
     
     unless ($healthy) {
-        die "Container did not become healthy within timeout\n";
+        print "\n❌ Container did not become healthy within timeout\n";
+        print "\n[ROLLBACK] Starting rollback procedure...\n";
+        
+        # Stop and remove failed container
+        ssh_exec("docker stop $container_name");
+        ssh_exec("docker rm $container_name");
+        
+        # Restore old container
+        ssh_exec("docker rename $old_container_name $container_name");
+        ssh_exec("docker start $container_name");
+        
+        print "✓ Rolled back to previous container\n";
+        die "Deployment failed - rolled back to previous version\n";
     }
     
     print "\n✓ Container is healthy!\n";
     
-    # Step 7: Cleanup
+    # Step 7: Remove old container (new one is confirmed working)
+    print "\n[CLEANUP] Removing old container...\n";
+    my $rm_old = ssh_exec("docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
+    print $rm_old;
+    
+    # Step 8: Cleanup temporary files
     print "\n[CLEANUP] Removing temporary files...\n";
     run_remote("rm -rf $remote_dir", "Cleaning up remote deployment directory");
     
     print "\n" . "=" x 80 . "\n";
-    print "DEPLOYMENT SUCCESSFUL!\n";
+    print "✅ DEPLOYMENT SUCCESSFUL!\n";
     print "=" x 80 . "\n";
-    print "Production container updated: comserv-$service\n";
+    print "Production container updated: $container_name\n";
+    print "Old container removed: $old_container_name\n";
     print "Backup available: $backup_tag\n";
     print "=" x 80 . "\n";
 };
