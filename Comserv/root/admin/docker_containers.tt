@@ -321,7 +321,7 @@
                         <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
                             SSH Target:
                         </label>
-                        <input type="text" id="ssh-terminal-target" placeholder="user@hostname or use above" 
+                        <input type="text" id="ssh-terminal-target" value="ubuntu@192.168.1.126" 
                                style="width: 100%; padding: 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
                     </div>
                     <div>
