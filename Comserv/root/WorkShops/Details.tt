@@ -81,7 +81,13 @@
                                 [% 
                                     current = workshop.current_participants || 0;
                                     max = workshop.max_participants || 0;
-                                    is_full = max > 0 && current >= max;
+                                    
+                                    # Set is_full variable for use in Register button below
+                                    IF max > 0 && current >= max;
+                                        is_full = 1;
+                                    ELSE;
+                                        is_full = 0;
+                                    END;
                                 %]
                                 [% IF max > 0 %]
                                     [% IF is_full %]

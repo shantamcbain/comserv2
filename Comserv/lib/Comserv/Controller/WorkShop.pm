@@ -461,8 +461,23 @@ sub edit :Path('/workshop/edit') :Args(1) {
         return;
     }
 
+    # Debug logging for authorization issues
+    my $user_id = $c->session->{user_id};
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_leader = $self->_is_workshop_leader($c, $workshop);
+    my $can_edit = $self->_can_edit_workshop($c, $workshop);
+    
+    $c->log->debug("Edit Workshop Authorization Debug:");
+    $c->log->debug("  Workshop ID: " . $workshop->id);
+    $c->log->debug("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
+    $c->log->debug("  Session user_id: " . ($user_id || 'NULL'));
+    $c->log->debug("  Admin type: " . ($admin_type || 'NONE'));
+    $c->log->debug("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
+    $c->log->debug("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
+
     # Authorization check using helper method
-    unless ($self->_can_edit_workshop($c, $workshop)) {
+    unless ($can_edit) {
         $c->flash->{error_msg} = 'Access denied. You do not have permission to edit this workshop.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
