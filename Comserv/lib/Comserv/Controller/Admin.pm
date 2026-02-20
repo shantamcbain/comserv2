@@ -5009,8 +5009,11 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     require Protocol::WebSocket::Frame;
     my $frame = Protocol::WebSocket::Frame->new;
     
+    # Declare pty_watcher variable for use in closure
+    my $pty_watcher;
+    
     # Read from PTY and send to WebSocket
-    my $pty_watcher = AnyEvent->io(
+    $pty_watcher = AnyEvent->io(
         fh => $pty,
         poll => 'r',
         cb => sub {
