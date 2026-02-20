@@ -103,7 +103,7 @@
                                 [% END %]
                                 <th>Participants</th>
                                 <th>Status</th>
-                                <th>Visibility</th>
+                                <th>Site Sharing</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -164,9 +164,9 @@
                                 </td>
                                 <td>
                                     [% IF workshop.share == 'public' %]
-                                        <span class="badge badge-primary">🌐 Public</span>
+                                        <span class="badge badge-primary">🌐 All Sites</span>
                                     [% ELSE %]
-                                        <span class="badge badge-secondary">🔒 Private</span>
+                                        <span class="badge badge-secondary">🔒 My Site</span>
                                     [% END %]
                                 </td>
                                 <td class="action-cell">
@@ -233,7 +233,7 @@
                                     [% END %]
                                     <th>Participants</th>
                                     <th>Status</th>
-                                    <th>Visibility</th>
+                                    <th>Site Sharing</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
