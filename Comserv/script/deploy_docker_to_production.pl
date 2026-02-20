@@ -98,6 +98,40 @@ eval {
     print "✓ SSH connection OK\n";
     print $test_output;
     
+    # Step 1b: Check disk space
+    print "\n[DISK CHECK] Checking available disk space on production...\n";
+    my $disk_output = ssh_exec("df -h / | tail -1");
+    print $disk_output;
+    
+    # Extract percentage used
+    if ($disk_output =~ /(\d+)%/) {
+        my $used_percent = $1;
+        print "Disk usage: $used_percent%\n";
+        if ($used_percent > 85) {
+            print "⚠ WARNING: Disk usage is high ($used_percent%). Proceeding with cleanup...\n";
+        }
+    }
+    
+    # Step 1c: Cleanup before deployment
+    print "\n[CLEANUP] Removing old containers and images before deployment...\n";
+    
+    # Remove any old -old containers from previous deployments
+    print "  Removing old backup containers...\n";
+    my $old_containers = ssh_exec("docker ps -a -q -f name=comserv2-web-prod-old");
+    if ($old_containers && $old_containers =~ /\w/) {
+        ssh_exec("docker rm -f $old_containers");
+        print "  ✓ Removed old backup containers\n";
+    }
+    
+    # Remove dangling images
+    print "  Removing dangling images...\n";
+    ssh_exec("docker image prune -f");
+    
+    # Show disk usage after cleanup
+    my $docker_df = ssh_exec("docker system df");
+    print $docker_df;
+    print "✓ Cleanup complete\n";
+    
     # Step 2: Export and transfer image via SSH pipe (recommended method)
     print "\n[TRANSFER] Exporting and transferring Docker image via SSH pipe...\n";
     print "This combines docker save and docker load in one operation (no temp files)\n";
