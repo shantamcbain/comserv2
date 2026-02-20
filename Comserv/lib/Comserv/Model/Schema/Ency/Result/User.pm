@@ -27,6 +27,7 @@ __PACKAGE__->add_columns(
     email => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 0,
     },
     roles => {
         data_type => 'text',
