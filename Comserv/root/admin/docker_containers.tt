@@ -199,24 +199,29 @@
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="openSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-terminal"></i> Open SSH Terminal
+                    </button>
+
                     <button onclick="testSSHConnection()" 
                         style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-network-wired"></i> Test SSH Connection
+                        <i class="fas fa-network-wired"></i> Test Connection
                     </button>
 
                     <button onclick="saveDockerImage()" 
                         style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-save"></i> Save Image Locally
+                        <i class="fas fa-save"></i> Save Image
                     </button>
                     
                     <button onclick="deployToProduction()" 
                         style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-rocket"></i> Deploy to Production
+                        <i class="fas fa-rocket"></i> Auto Deploy
                     </button>
 
                     <button onclick="showDeploymentCommands()" 
                         style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-terminal"></i> Show Manual Commands
+                        <i class="fas fa-code"></i> Show Commands
                     </button>
                 </div>
 
@@ -234,6 +239,55 @@
                         <li>Health check (30 attempts, 2s interval)</li>
                         <li>Rollback if health check fails</li>
                     </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('ssh-terminal-section')" 
+                 style="background-color: #1e1e1e; padding: 15px; border-bottom: 1px solid #444; color: #00ff00;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="fas fa-terminal" style="margin-right: 10px;"></i>
+                        SSH Terminal (Port 3001)
+                    </span>
+                    <span style="font-size: 14px; background-color: #00ff00; color: #1e1e1e; padding: 4px 10px; border-radius: 3px;">
+                        INTERACTIVE
+                    </span>
+                </h3>
+            </div>
+            <div id="ssh-terminal-section" class="card-body collapsible-content" style="padding: 20px; background-color: #1e1e1e;">
+                <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 12px; margin-bottom: 15px;">
+                    <p style="margin: 0; color: #856404; font-size: 14px;">
+                        <strong>ℹ️ SSH Terminal Access:</strong> Click "Open SSH Terminal" to connect to <strong>ubuntu@192.168.1.126</strong> 
+                        via the interactive terminal on port 3001. You'll see password prompts and can execute commands directly.
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="openSSHTerminalWindow()" 
+                        style="padding: 10px 20px; background-color: #00ff00; color: #1e1e1e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-external-link-alt"></i> Open SSH Terminal (New Window)
+                    </button>
+                    <button onclick="embedSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-window-restore"></i> Embed Terminal Here
+                    </button>
+                </div>
+
+                <div id="ssh-terminal-embed" style="display: none; background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px;">
+                    <iframe id="ssh-terminal-iframe" style="width: 100%; height: 100%; border: none;"></iframe>
+                </div>
+
+                <div style="margin-top: 15px; padding: 12px; background-color: #2d2d2d; border-radius: 4px; color: #ccc; font-family: monospace; font-size: 13px;">
+                    <div style="margin-bottom: 10px; color: #00ff00;"><strong>Quick Start:</strong></div>
+                    <div>1. Click "Open SSH Terminal" (opens port 3001 in new window)</div>
+                    <div>2. Enter password when prompted: <code style="color: #ff0;">ubuntu</code></div>
+                    <div>3. Run deployment commands manually or copy from "Show Commands"</div>
+                    <div style="margin-top: 10px; color: #ff0;">Alternative: Click "Auto Deploy" for automated deployment (no terminal needed)</div>
                 </div>
             </div>
         </div>
@@ -1035,6 +1089,70 @@
                 appendOutput(`Error: ${error.message}\n`);
                 appendOutput(`${'='.repeat(80)}\n`);
             });
+    }
+
+    function openSSHTerminal() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        // Open SSH terminal in new window on port 3001
+        const terminalUrl = `http://workstation.local:3001/?ssh=${encodeURIComponent(sshTarget)}`;
+        const terminalWindow = window.open(
+            terminalUrl,
+            'SSH Terminal - ' + sshTarget,
+            'width=1000,height=600,menubar=no,toolbar=no,location=no,status=no'
+        );
+
+        if (terminalWindow) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window: ${sshTarget}\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`If window was blocked, allow popups and try again.\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, manually open: ' + terminalUrl);
+        }
+    }
+
+    function openSSHTerminalWindow() {
+        const sshTarget = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
+        const terminalUrl = `http://workstation.local:3001/?hostname=${encodeURIComponent(sshTarget.split('@')[1] || '192.168.1.126')}&username=${encodeURIComponent(sshTarget.split('@')[0] || 'ubuntu')}`;
+        
+        window.open(
+            terminalUrl,
+            'SSH Terminal',
+            'width=1200,height=700,menubar=no,toolbar=no,location=no'
+        );
+
+        appendOutput(`\n🖥️ SSH Terminal opened on port 3001\n`);
+        appendOutput(`Target: ${sshTarget}\n`);
+        appendOutput(`URL: ${terminalUrl}\n\n`);
+    }
+
+    function embedSSHTerminal() {
+        const embedDiv = document.getElementById('ssh-terminal-embed');
+        const iframe = document.getElementById('ssh-terminal-iframe');
+        const sshTarget = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
+        
+        const parts = sshTarget.split('@');
+        const username = parts[0] || 'ubuntu';
+        const hostname = parts[1] || '192.168.1.126';
+        
+        iframe.src = `http://workstation.local:3001/?hostname=${encodeURIComponent(hostname)}&username=${encodeURIComponent(username)}`;
+        embedDiv.style.display = 'block';
+
+        // Expand SSH terminal section
+        const sshSection = document.getElementById('ssh-terminal-section');
+        const sshChevron = document.getElementById('chevron-ssh-terminal-section');
+        if (sshSection && !sshSection.classList.contains('expanded')) {
+            sshSection.classList.add('expanded');
+            if (sshChevron) sshChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n🖥️ SSH Terminal embedded below\n`);
+        appendOutput(`Target: ${sshTarget}\n\n`);
     }
 
     // Initialize - load containers on page load
