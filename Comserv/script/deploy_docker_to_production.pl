@@ -155,19 +155,19 @@ eval {
         print "⚠ No existing container found - skipping backup\n";
     }
     
-    # Step 4: Stop existing container
-    print "\n[STOP] Stopping existing container on production...\n";
-    my $stop_output = ssh_exec("docker stop $container_name");
+    # Step 4: Rename existing container (for rollback)
+    print "\n[RENAME] Renaming existing container for rollback...\n";
+    my $old_container_name = "${container_name}-old";
+    my $rename_output = ssh_exec("docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
+    print $rename_output;
+    
+    # Step 5: Stop old container
+    print "\n[STOP] Stopping old container on production...\n";
+    my $stop_output = ssh_exec("docker stop $old_container_name 2>&1 || echo 'No container to stop'");
     print $stop_output;
-    print "✓ Container stopped\n";
+    print "✓ Old container stopped (kept for rollback)\n";
     
-    # Step 4b: Remove old container
-    print "\n[REMOVE] Removing old container on production...\n";
-    my $rm_output = ssh_exec("docker rm $container_name");
-    print $rm_output;
-    print "✓ Container removed\n";
-    
-    # Step 5: Start new container
+    # Step 6: Start new container
     print "\n[START] Starting new container on production...\n";
     my $port_map = $service eq 'web-prod' ? '5000:3000' : '3000:3000';
     my $secrets_volume = '-v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro';
@@ -197,19 +197,37 @@ eval {
     }
     
     unless ($healthy) {
-        die "Container did not become healthy within timeout\n";
+        print "\n❌ Container did not become healthy within timeout\n";
+        print "\n[ROLLBACK] Starting rollback procedure...\n";
+        
+        # Stop and remove failed container
+        ssh_exec("docker stop $container_name");
+        ssh_exec("docker rm $container_name");
+        
+        # Restore old container
+        ssh_exec("docker rename $old_container_name $container_name");
+        ssh_exec("docker start $container_name");
+        
+        print "✓ Rolled back to previous container\n";
+        die "Deployment failed - rolled back to previous version\n";
     }
     
     print "\n✓ Container is healthy!\n";
     
-    # Step 7: Cleanup
+    # Step 7: Remove old container (new one is confirmed working)
+    print "\n[CLEANUP] Removing old container...\n";
+    my $rm_old = ssh_exec("docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
+    print $rm_old;
+    
+    # Step 8: Cleanup temporary files
     print "\n[CLEANUP] Removing temporary files...\n";
     run_remote("rm -rf $remote_dir", "Cleaning up remote deployment directory");
     
     print "\n" . "=" x 80 . "\n";
-    print "DEPLOYMENT SUCCESSFUL!\n";
+    print "✅ DEPLOYMENT SUCCESSFUL!\n";
     print "=" x 80 . "\n";
-    print "Production container updated: comserv-$service\n";
+    print "Production container updated: $container_name\n";
+    print "Old container removed: $old_container_name\n";
     print "Backup available: $backup_tag\n";
     print "=" x 80 . "\n";
 };
