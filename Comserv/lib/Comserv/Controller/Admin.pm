@@ -4942,7 +4942,19 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     
     # Perform WebSocket handshake
     my $hs = Protocol::WebSocket::Handshake::Server->new;
-    $hs->parse($c->req->env->{HTTP_SEC_WEBSOCKET_KEY});
+    
+    # Parse the handshake from request headers
+    my $env = $c->req->env;
+    my $handshake_request = 
+        "GET " . $env->{REQUEST_URI} . " HTTP/1.1\r\n" .
+        "Host: " . $env->{HTTP_HOST} . "\r\n" .
+        "Upgrade: " . ($env->{HTTP_UPGRADE} || 'websocket') . "\r\n" .
+        "Connection: " . ($env->{HTTP_CONNECTION} || 'Upgrade') . "\r\n" .
+        "Sec-WebSocket-Key: " . ($env->{HTTP_SEC_WEBSOCKET_KEY} || '') . "\r\n" .
+        "Sec-WebSocket-Version: " . ($env->{HTTP_SEC_WEBSOCKET_VERSION} || '13') . "\r\n" .
+        "\r\n";
+    
+    $hs->parse($handshake_request);
     
     # Send handshake response
     my $handshake_response = $hs->to_string;
