@@ -842,7 +842,17 @@
             return;
         }
 
-        appendOutput(`\n🔌 Testing SSH connection to ${sshTarget}:${sshPort}...\n`);
+        // Expand output console if collapsed
+        const outputSection = document.getElementById('output-console-section');
+        const outputChevron = document.getElementById('chevron-output-console-section');
+        if (outputSection && !outputSection.classList.contains('expanded')) {
+            outputSection.classList.add('expanded');
+            if (outputChevron) outputChevron.classList.add('expanded');
+        }
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`🔌 Testing SSH connection to ${sshTarget}:${sshPort}...\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
         
         const formData = new FormData();
         formData.append('ssh_target', sshTarget);
@@ -852,18 +862,30 @@
             method: 'POST',
             body: new URLSearchParams(formData)
         })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    appendOutput(`✅ SSH connection successful!\n`);
-                    appendOutput(data.output || '');
-                } else {
-                    appendOutput(`❌ SSH connection failed\n`);
-                    appendOutput(data.output || data.error || 'Unknown error');
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
+                return response.json();
+            })
+            .then(data => {
+                appendOutput(`\n`);
+                if (data.success) {
+                    appendOutput(`✅ SSH CONNECTION SUCCESSFUL\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput(data.output || 'Connection OK\n');
+                } else {
+                    appendOutput(`❌ SSH CONNECTION FAILED\n`);
+                    appendOutput(`${'='.repeat(80)}\n`);
+                    appendOutput((data.output || data.error || 'Unknown error') + '\n');
+                }
+                appendOutput(`${'='.repeat(80)}\n\n`);
             })
             .catch(error => {
-                appendOutput(`❌ Connection test error: ${error.message}\n`);
+                appendOutput(`\n❌ CONNECTION TEST ERROR\n`);
+                appendOutput(`${'='.repeat(80)}\n`);
+                appendOutput(`Error: ${error.message}\n`);
+                appendOutput(`${'='.repeat(80)}\n\n`);
             });
     }
 
@@ -871,53 +893,80 @@
         const service = document.getElementById('deploy-service-select').value;
         const sshTarget = document.getElementById('production-host').value.trim();
         const imageName = `comserv2-${service}`;
-        const timestamp = Math.floor(Date.now() / 1000);
 
         appendOutput(`\n${'='.repeat(80)}\n`);
         appendOutput(`📋 MANUAL DEPLOYMENT COMMANDS\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Service: ${service}\n`);
         appendOutput(`Target: ${sshTarget}\n`);
+        appendOutput(`Image: ${imageName}\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
 
-        appendOutput(`# Step 1: Export Docker image\n`);
-        appendOutput(`docker save -o ~/docker-exports/${imageName}_${timestamp}.tar ${imageName}\n\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 1: Direct Copy via SSH Pipe (Recommended - No temp files)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Step 2: Copy to production server\n`);
-        appendOutput(`scp ~/docker-exports/${imageName}_${timestamp}.tar ${sshTarget}:/tmp/\n\n`);
+        appendOutput(`# Step 1: Verify image exists locally\n`);
+        appendOutput(`docker images | grep ${imageName}\n\n`);
 
-        appendOutput(`# Step 3: SSH to production and execute deployment\n`);
+        appendOutput(`# Step 2: Transfer image directly via SSH pipe\n`);
+        appendOutput(`docker save ${imageName} | ssh ${sshTarget} "docker load"\n\n`);
+
+        appendOutput(`# Step 3: SSH to production and run container\n`);
         appendOutput(`ssh ${sshTarget}\n\n`);
 
-        appendOutput(`# On production server, run these commands:\n`);
+        appendOutput(`# On production server:\n`);
         appendOutput(`cd ~/PycharmProjects/comserv2\n\n`);
 
-        appendOutput(`# Backup existing container\n`);
-        appendOutput(`docker commit comserv-${service} ${imageName}:backup-${timestamp}\n\n`);
-
-        appendOutput(`# Stop running container\n`);
+        appendOutput(`# Stop old container\n`);
         appendOutput(`docker compose stop ${service}\n\n`);
 
-        appendOutput(`# Load new image\n`);
-        appendOutput(`docker load -i /tmp/${imageName}_${timestamp}.tar\n\n`);
+        appendOutput(`# Start new container (force recreate)\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n\n`);
 
-        appendOutput(`# Start new container\n`);
-        appendOutput(`docker compose up -d ${service}\n\n`);
-
-        appendOutput(`# Check container status\n`);
+        appendOutput(`# Verify it's running\n`);
         appendOutput(`docker compose ps\n`);
-        appendOutput(`docker logs comserv-${service} --tail=50\n\n`);
+        appendOutput(`docker logs comserv-${service} --tail=50 --follow\n\n`);
 
-        appendOutput(`# If deployment fails, rollback:\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`OPTION 2: File Transfer Method (If SSH pipe fails)\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Step 1: Save image to tar file\n`);
+        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}\n\n`);
+
+        appendOutput(`# Step 2: Copy to production server\n`);
+        appendOutput(`scp /tmp/${imageName}.tar ${sshTarget}:/tmp/\n\n`);
+
+        appendOutput(`# Step 3: SSH to production\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+
+        appendOutput(`# On production server:\n`);
+        appendOutput(`docker load -i /tmp/${imageName}.tar\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
         appendOutput(`docker compose stop ${service}\n`);
-        appendOutput(`docker tag ${imageName}:backup-${timestamp} ${imageName}\n`);
-        appendOutput(`docker compose up -d ${service}\n\n`);
+        appendOutput(`docker compose up -d --force-recreate ${service}\n`);
+        appendOutput(`docker compose ps\n\n`);
 
         appendOutput(`# Cleanup\n`);
-        appendOutput(`rm /tmp/${imageName}_${timestamp}.tar\n\n`);
+        appendOutput(`rm /tmp/${imageName}.tar\n\n`);
+
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n`);
+        appendOutput(`BACKUP & ROLLBACK\n`);
+        appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
+
+        appendOutput(`# Before deployment, create backup:\n`);
+        appendOutput(`ssh ${sshTarget} "docker commit comserv-${service} ${imageName}:backup-$(date +%s)"\n\n`);
+
+        appendOutput(`# If deployment fails, rollback:\n`);
+        appendOutput(`ssh ${sshTarget}\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker tag ${imageName}:backup-TIMESTAMP ${imageName}:latest\n`);
+        appendOutput(`docker compose up -d ${service}\n\n`);
 
         appendOutput(`${'='.repeat(80)}\n`);
-        appendOutput(`Copy these commands to execute manually via SSH terminal\n`);
+        appendOutput(`NOTE: Use 'docker compose' (space), not 'docker-compose' (hyphen)\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
     }
 
