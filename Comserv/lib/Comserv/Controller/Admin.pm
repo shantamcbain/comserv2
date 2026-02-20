@@ -5054,7 +5054,39 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
         }
     });
     
-    # Prevent Catalyst from rendering template or finishing response
+    # Clean up on disconnect
+    $handle->on_eof(sub {
+        undef $pty_watcher;
+        undef $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+    });
+    
+    # Enter event loop - this blocks until connection closes
+    my $cv = AnyEvent->condvar;
+    
+    # Set up cleanup when connection ends
+    my $cleanup = sub {
+        undef $pty_watcher;
+        $handle->destroy if $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+        $cv->send;
+    };
+    
+    # Monitor SSH process
+    my $child_watcher = AnyEvent->child(
+        pid => $pid,
+        cb => sub {
+            my ($pid, $status) = @_;
+            $cleanup->();
+        }
+    );
+    
+    # Wait for connection to close
+    $cv->recv;
+    
+    # Prevent template rendering
     $c->detach();
 }
 
