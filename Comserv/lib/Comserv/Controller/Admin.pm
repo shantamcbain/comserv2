@@ -4430,9 +4430,13 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
     
+    # Check authentication status (allow page view, but operations will require login)
+    my $authenticated = $c->user_exists ? 1 : 0;
+    
     $c->stash(
         template => 'admin/docker_containers.tt',
-        docker_available => $docker_available
+        docker_available => $docker_available,
+        authenticated => $authenticated
     );
 }
 
