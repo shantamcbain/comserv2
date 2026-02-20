@@ -30,6 +30,7 @@ __PACKAGE__->add_columns(
     },
     roles => {
         data_type => 'text',
+        is_nullable => 0,
     },
 );
 __PACKAGE__->set_primary_key('id');
