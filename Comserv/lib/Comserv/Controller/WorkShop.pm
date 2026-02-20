@@ -121,9 +121,18 @@ sub index :Path :Args(0) {
 sub dashboard :Local {
     my ( $self, $c ) = @_;
 
+    # Check if user has admin access OR workshop_leader role
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'workshop_dashboard')) {
-        $c->flash->{error_msg} = "Access denied. Admin access required.";
+    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_dashboard');
+    
+    my $roles = $c->session->{roles} || [];
+    my $has_workshop_leader_role = 0;
+    if (ref $roles eq 'ARRAY') {
+        $has_workshop_leader_role = grep { $_ eq 'workshop_leader' } @$roles;
+    }
+    
+    unless ($has_admin || $has_workshop_leader_role) {
+        $c->flash->{error_msg} = "Access denied. Admin or workshop leader access required.";
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
