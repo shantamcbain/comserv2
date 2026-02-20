@@ -170,16 +170,40 @@
                     </div>
 
                     <div>
+                        <label for="ssh-target-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Target:
+                        </label>
+                        <select id="ssh-target-select" onchange="updateSSHTarget()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="custom">Custom...</option>
+                            <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
+                            <option value="shanta@workstation.local">shanta@workstation.local</option>
+                        </select>
+                    </div>
+
+                    <div>
                         <label for="production-host" style="display: block; margin-bottom: 8px; font-weight: bold;">
                             Production Server:
                         </label>
-                        <input type="text" id="production-host" placeholder="e.g., production.example.com or IP" 
+                        <input type="text" id="production-host" value="ubuntu@192.168.1.126" 
                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <small style="color: #666;">Hostname or IP address of production server</small>
+                        <small style="color: #666;">Format: user@hostname or user@IP</small>
+                    </div>
+
+                    <div>
+                        <label for="ssh-port" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Port:
+                        </label>
+                        <input type="number" id="ssh-port" value="22" min="1" max="65535"
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="testSSHConnection()" 
+                        style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-network-wired"></i> Test SSH Connection
+                    </button>
+
                     <button onclick="saveDockerImage()" 
                         style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-save"></i> Save Image Locally
@@ -188,6 +212,11 @@
                     <button onclick="deployToProduction()" 
                         style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-rocket"></i> Deploy to Production
+                    </button>
+
+                    <button onclick="showDeploymentCommands()" 
+                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-terminal"></i> Show Manual Commands
                     </button>
                 </div>
 
@@ -795,18 +824,116 @@
             });
     }
 
+    function updateSSHTarget() {
+        const select = document.getElementById('ssh-target-select');
+        const input = document.getElementById('production-host');
+        
+        if (select.value !== 'custom') {
+            input.value = select.value;
+        }
+    }
+
+    function testSSHConnection() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        appendOutput(`\n🔌 Testing SSH connection to ${sshTarget}:${sshPort}...\n`);
+        
+        const formData = new FormData();
+        formData.append('ssh_target', sshTarget);
+        formData.append('ssh_port', sshPort);
+
+        fetch('/admin/docker-test-ssh', {
+            method: 'POST',
+            body: new URLSearchParams(formData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✅ SSH connection successful!\n`);
+                    appendOutput(data.output || '');
+                } else {
+                    appendOutput(`❌ SSH connection failed\n`);
+                    appendOutput(data.output || data.error || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                appendOutput(`❌ Connection test error: ${error.message}\n`);
+            });
+    }
+
+    function showDeploymentCommands() {
+        const service = document.getElementById('deploy-service-select').value;
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const imageName = `comserv2-${service}`;
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        appendOutput(`\n${'='.repeat(80)}\n`);
+        appendOutput(`📋 MANUAL DEPLOYMENT COMMANDS\n`);
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`Service: ${service}\n`);
+        appendOutput(`Target: ${sshTarget}\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+
+        appendOutput(`# Step 1: Export Docker image\n`);
+        appendOutput(`docker save -o ~/docker-exports/${imageName}_${timestamp}.tar ${imageName}\n\n`);
+
+        appendOutput(`# Step 2: Copy to production server\n`);
+        appendOutput(`scp ~/docker-exports/${imageName}_${timestamp}.tar ${sshTarget}:/tmp/\n\n`);
+
+        appendOutput(`# Step 3: SSH to production and execute deployment\n`);
+        appendOutput(`ssh ${sshTarget}\n\n`);
+
+        appendOutput(`# On production server, run these commands:\n`);
+        appendOutput(`cd ~/PycharmProjects/comserv2\n\n`);
+
+        appendOutput(`# Backup existing container\n`);
+        appendOutput(`docker commit comserv-${service} ${imageName}:backup-${timestamp}\n\n`);
+
+        appendOutput(`# Stop running container\n`);
+        appendOutput(`docker compose stop ${service}\n\n`);
+
+        appendOutput(`# Load new image\n`);
+        appendOutput(`docker load -i /tmp/${imageName}_${timestamp}.tar\n\n`);
+
+        appendOutput(`# Start new container\n`);
+        appendOutput(`docker compose up -d ${service}\n\n`);
+
+        appendOutput(`# Check container status\n`);
+        appendOutput(`docker compose ps\n`);
+        appendOutput(`docker logs comserv-${service} --tail=50\n\n`);
+
+        appendOutput(`# If deployment fails, rollback:\n`);
+        appendOutput(`docker compose stop ${service}\n`);
+        appendOutput(`docker tag ${imageName}:backup-${timestamp} ${imageName}\n`);
+        appendOutput(`docker compose up -d ${service}\n\n`);
+
+        appendOutput(`# Cleanup\n`);
+        appendOutput(`rm /tmp/${imageName}_${timestamp}.tar\n\n`);
+
+        appendOutput(`${'='.repeat(80)}\n`);
+        appendOutput(`Copy these commands to execute manually via SSH terminal\n`);
+        appendOutput(`${'='.repeat(80)}\n\n`);
+    }
+
     function deployToProduction() {
         const service = document.getElementById('deploy-service-select').value;
-        const productionHost = document.getElementById('production-host').value.trim();
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
 
-        if (!productionHost) {
-            alert('Please enter production server hostname or IP address');
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
             return;
         }
 
         const confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
                           `Service: ${service}\n` +
-                          `Target: ${productionHost}\n\n` +
+                          `Target: ${sshTarget}:${sshPort}\n\n` +
                           `This will:\n` +
                           `1. Export Docker image\n` +
                           `2. Copy to production server via SSH\n` +
@@ -824,12 +951,13 @@
         appendOutput(`🚀 PRODUCTION DEPLOYMENT STARTED\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Service: ${service}\n`);
-        appendOutput(`Target: ${productionHost}\n`);
+        appendOutput(`Target: ${sshTarget}:${sshPort}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
 
         const formData = new FormData();
-        formData.append('production_host', productionHost);
+        formData.append('ssh_target', sshTarget);
+        formData.append('ssh_port', sshPort);
         formData.append('service', service);
 
         fetch('/admin/docker-deploy-to-production', {

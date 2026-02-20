@@ -4753,6 +4753,41 @@ sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
     $c->response->content_type('application/json');
 }
 
+sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_test_ssh',
+        "Docker SSH connection test requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = qq(ssh -p $ssh_port -o ConnectTimeout=5 -o BatchMode=yes $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
 sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
     my ($self, $c) = @_;
     
@@ -4765,17 +4800,26 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
     
-    my $production_host = $c->req->params->{production_host} || '';
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $service = $c->req->params->{service} || 'web-prod';
     
-    if (!$production_host) {
-        $c->response->body('{"success": false, "error": "Production host not specified"}');
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse user@host format
+    my ($user, $host) = $ssh_target =~ /^([^@]+)@(.+)$/;
+    unless ($user && $host) {
+        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname"}');
         $c->response->content_type('application/json');
         return;
     }
     
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "perl $script_path --host=$production_host --service=$service 2>&1";
+    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service 2>&1";
     
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
