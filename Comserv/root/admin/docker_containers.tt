@@ -77,9 +77,9 @@
                                     style="padding: 8px 16px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     <i class="icon-refresh"></i> Restart
                                 </button>
-                                <button id="status-btn" onclick="checkStatus()" 
-                                    style="padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                    <i class="icon-status"></i> Check Status
+                                <button id="rebuild-btn" onclick="rebuildContainer()" 
+                                    style="padding: 8px 16px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer;">
+                                    🔨 Rebuild
                                 </button>
                                 <button id="logs-btn" onclick="viewLogs()" 
                                     style="padding: 8px 16px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
@@ -262,6 +262,10 @@
                                     style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ↻ Restart
                                 </button>
+                                <button onclick="rebuildContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔨 Rebuild
+                                </button>
                                 <button onclick="viewLogsDirect('${container.service}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
@@ -271,9 +275,9 @@
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ▶ Start
                                 </button>
-                                <button onclick="restartContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    ↻ Restart
+                                <button onclick="rebuildContainerDirect('${container.service}')"
+                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    🔨 Rebuild
                                 </button>
                                 <button onclick="viewLogsDirect('${container.service}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
@@ -399,6 +403,67 @@
                     appendOutput(`Error getting logs:\n` + data.error);
                 } else {
                     appendOutput('Unable to retrieve logs');
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}`);
+            });
+    }
+
+    function rebuildContainerDirect(service) {
+        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes and stop the container.`)) {
+            return;
+        }
+
+        appendOutput(`Rebuilding ${service}... This may take several minutes.`);
+
+        fetch(`/admin/docker-rebuild/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ ${service} rebuilt successfully!\n` + (data.stdout || ''));
+                    appendOutput(`Starting ${service}...`);
+                    // Auto-start after rebuild
+                    return fetch(`/admin/docker-up/${service}`);
+                } else {
+                    appendOutput(`✗ Failed to rebuild ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    throw new Error('Rebuild failed');
+                }
+            })
+            .then(response => response ? response.json() : null)
+            .then(data => {
+                if (data && data.success) {
+                    appendOutput(`✓ ${service} started successfully!`);
+                    setTimeout(refreshContainers, 2000);
+                } else if (data) {
+                    appendOutput(`✗ Failed to start ${service} after rebuild`);
+                }
+            })
+            .catch(error => {
+                if (error.message !== 'Rebuild failed') {
+                    appendOutput(`Error: ${error.message}`);
+                }
+            });
+    }
+
+    function rebuildContainer() {
+        const service = getSelectedService();
+        if (!service) return;
+
+        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes.`)) {
+            return;
+        }
+
+        appendOutput(`Rebuilding ${service}... This may take several minutes.`);
+
+        fetch(`/admin/docker-rebuild/${service}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    appendOutput(`✓ Rebuild successful!\n` + (data.stdout || ''));
+                    setTimeout(refreshContainers, 2000);
+                } else {
+                    appendOutput(`✗ Rebuild failed:\n` + (data.stderr || data.error || 'Unknown error'));
                 }
             })
             .catch(error => {
