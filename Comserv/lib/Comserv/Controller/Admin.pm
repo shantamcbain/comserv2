@@ -4608,13 +4608,46 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
         return;
     }
     
-    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=100 $service 2>&1";
+    # Get lines parameter from query string, default to 100
+    my $lines = $c->req->params->{lines} || 100;
+    
+    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
-        logs => $output,
+        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_rebuild',
+        "Docker rebuild requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Rebuild with --no-cache to ensure fresh build
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
         exit_code => $exit_code
     };
     
