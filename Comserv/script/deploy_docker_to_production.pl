@@ -69,32 +69,50 @@ sub ssh_exec {
 }
 
 eval {
-    # Step 1: Export local Docker image
-    my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
-    run_local("docker save -o $tar_file $image_name", 
-              "Saving Docker image: $image_name");
-    
-    print "\n✓ Exported to: $tar_file\n";
-    my $size = -s $tar_file;
-    printf "  Size: %.2f MB\n", $size / 1024 / 1024;
-    
-    # Step 2: Test SSH connection
+    # Step 1: Test SSH connection first
     print "\n[TEST] Testing SSH connection to $production_host...\n";
-    my $test_output = ssh_exec("echo 'SSH connection successful'");
+    my $test_output = ssh_exec("echo 'SSH connection successful'; docker --version");
     die "SSH connection failed\n" unless $test_output =~ /SSH connection successful/;
     print "✓ SSH connection OK\n";
+    print $test_output;
     
-    # Step 3: Create remote directory
-    run_remote("mkdir -p $remote_dir", 
-               "Creating remote deployment directory");
+    # Step 2: Export and transfer image via SSH pipe (recommended method)
+    print "\n[TRANSFER] Exporting and transferring Docker image via SSH pipe...\n";
+    print "This combines docker save and docker load in one operation (no temp files)\n";
     
-    # Step 4: Copy image to production server
-    my $scp_cmd = "scp -P $ssh_port $tar_file $ssh_user\@$production_host:$remote_dir/";
-    run_local($scp_cmd, "Copying image to production server");
+    my $pipe_cmd = "docker save $image_name | ssh -p $ssh_port $ssh_user\@$production_host 'docker load'";
+    print "CMD: $pipe_cmd\n";
     
-    print "\n✓ Image copied to production server\n";
+    my $pipe_output = `$pipe_cmd 2>&1`;
+    my $pipe_exit = $? >> 8;
     
-    # Step 5: Backup existing container on production
+    if ($pipe_exit == 0) {
+        print "\n✓ Image transferred successfully via SSH pipe\n";
+        print $pipe_output if $pipe_output;
+    } else {
+        # Fallback to file transfer method if pipe fails
+        print "\n⚠ SSH pipe failed, falling back to file transfer method...\n";
+        print $pipe_output if $pipe_output;
+        
+        my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
+        run_local("docker save -o $tar_file $image_name", 
+                  "Saving Docker image to tar file");
+        
+        my $size = -s $tar_file;
+        printf "  Size: %.2f MB\n", $size / 1024 / 1024;
+        
+        run_remote("mkdir -p $remote_dir", "Creating remote directory");
+        
+        my $scp_cmd = "scp -P $ssh_port $tar_file $ssh_user\@$production_host:$remote_dir/";
+        run_local($scp_cmd, "Copying tar file to production server");
+        
+        run_remote("docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
+                   "Loading image from tar file");
+        
+        print "\n✓ Image loaded via file transfer\n";
+    }
+    
+    # Step 3: Backup existing container on production
     print "\n[BACKUP] Backing up existing container on production...\n";
     my $container_exists = ssh_exec("docker ps -a --filter name=comserv-$service -q");
     if ($container_exists && $container_exists =~ /\w/) {
@@ -105,22 +123,18 @@ eval {
         print "⚠ No existing container found - skipping backup\n";
     }
     
-    # Step 6: Stop existing container
+    # Step 4: Stop existing container
     print "\n[STOP] Stopping existing container on production...\n";
     my $stop_output = ssh_exec("cd ~/PycharmProjects/comserv2 && docker compose stop $service");
     print $stop_output;
     print "✓ Container stopped\n";
     
-    # Step 7: Load new image on production
-    run_remote("docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
-               "Loading new Docker image on production");
-    
-    # Step 8: Start new container
+    # Step 5: Start new container with force recreate
     print "\n[START] Starting new container on production...\n";
-    my $start_output = ssh_exec("cd ~/PycharmProjects/comserv2 && docker compose up -d $service");
+    my $start_output = ssh_exec("cd ~/PycharmProjects/comserv2 && docker compose up -d --force-recreate $service");
     print $start_output;
     
-    # Step 9: Health check
+    # Step 6: Health check
     print "\n[HEALTH CHECK] Waiting for container to be healthy...\n";
     my $max_attempts = 30;
     my $attempt = 0;
@@ -147,7 +161,7 @@ eval {
     
     print "\n✓ Container is healthy!\n";
     
-    # Step 10: Cleanup
+    # Step 7: Cleanup
     print "\n[CLEANUP] Removing temporary files...\n";
     run_remote("rm -rf $remote_dir", "Cleaning up remote deployment directory");
     
