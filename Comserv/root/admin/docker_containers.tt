@@ -312,8 +312,32 @@
                         ℹ️ Interactive SSH Terminal
                     </p>
                     <p style="margin: 10px 0 0 0; font-size: 13px;">
-                        Terminal connects to production server using stored SSH credentials. Click "Connect" to start.
+                        Enter SSH credentials below or use saved credentials from "Test Connection" above.
                     </p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Target:
+                        </label>
+                        <input type="text" id="ssh-terminal-target" placeholder="user@hostname or use above" 
+                               style="width: 100%; padding: 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-terminal-password" placeholder="Enter password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
+                            <button onclick="toggleSSHTerminalPassword()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #00ff00;">
+                                <i id="ssh-terminal-password-eye" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="color: #ccc;">Leave blank to use saved credentials</small>
+                    </div>
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
@@ -1112,18 +1136,41 @@
         }
     }
 
+    function toggleSSHTerminalPassword() {
+        const passwordField = document.getElementById('ssh-terminal-password');
+        const eyeIcon = document.getElementById('ssh-terminal-password-eye');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
     function connectSSHTerminal() {
-        const sshTarget = document.getElementById('production-host').value.trim();
-        const sshPort = document.getElementById('ssh-port').value;
-        const sshPassword = document.getElementById('ssh-password').value;
+        // Try terminal section fields first, fallback to production deployment fields
+        let sshTarget = document.getElementById('ssh-terminal-target').value.trim();
+        let sshPassword = document.getElementById('ssh-terminal-password').value;
+        
+        // If terminal fields are empty, use production deployment fields
+        if (!sshTarget) {
+            sshTarget = document.getElementById('production-host').value.trim();
+        }
+        if (!sshPassword) {
+            sshPassword = document.getElementById('ssh-password').value;
+        }
+        
+        const sshPort = document.getElementById('ssh-port').value || 22;
 
         if (!sshTarget) {
-            alert('Please enter SSH target (user@host)');
+            alert('Please enter SSH target (user@host) in either SSH Terminal section or Production Deployment section above');
             return;
         }
 
         if (!sshPassword) {
-            alert('Please enter SSH password or test connection first to save credentials');
+            alert('Please enter SSH password in the field above, or use "Test Connection" in Production Deployment section to save credentials');
             return;
         }
 
