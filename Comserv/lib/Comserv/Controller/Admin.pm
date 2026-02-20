@@ -4642,10 +4642,10 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
         return;
     }
     
-    # Rebuild with --no-cache to ensure fresh build
+    # Rebuild with --no-cache and --progress=plain for detailed output
     my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache $service 2>&1";
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
     
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
@@ -4653,6 +4653,70 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
         stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_prune :Path('/admin/docker-prune') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
+        "Docker prune requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Prune stopped containers, dangling images, and unused networks
+    my $output = '';
+    
+    # Remove stopped containers
+    $output .= "=== Removing stopped containers ===\n";
+    $output .= `docker container prune -f 2>&1`;
+    
+    # Remove dangling images
+    $output .= "\n=== Removing dangling images ===\n";
+    $output .= `docker image prune -f 2>&1`;
+    
+    # Remove unused networks
+    $output .= "\n=== Removing unused networks ===\n";
+    $output .= `docker network prune -f 2>&1`;
+    
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_system_df',
+        "Docker system df requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $output = `docker system df 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
         exit_code => $exit_code
     };
     
