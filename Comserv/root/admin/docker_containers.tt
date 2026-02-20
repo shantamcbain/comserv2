@@ -89,6 +89,22 @@
                         </div>
 
                         <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Cleanup:
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="prune-btn" onclick="pruneDockerSystem()" 
+                                    style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    🗑️ Prune Unused
+                                </button>
+                                <button id="disk-usage-btn" onclick="showDiskUsage()" 
+                                    style="padding: 8px 16px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    💾 Disk Usage
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
                             <label for="force-restart" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                 <input type="checkbox" id="force-restart" style="width: 18px; height: 18px;">
                                 <span>Force restart (down/up cycle)</span>
@@ -415,35 +431,66 @@
             return;
         }
 
-        appendOutput(`Rebuilding ${service}... This may take several minutes.`);
+        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        // Disable rebuild buttons during rebuild
+        disableRebuildButtons();
 
         fetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ ${service} rebuilt successfully!\n` + (data.stdout || ''));
-                    appendOutput(`Starting ${service}...`);
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✓ ${service} rebuilt successfully!\n`);
+                    appendOutput(`\nBuild output (last 50 lines):\n`);
+                    const lines = (data.stdout || '').split('\n');
+                    appendOutput(lines.slice(-50).join('\n'));
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`⏳ Starting ${service}...\n`);
                     // Auto-start after rebuild
                     return fetch(`/admin/docker-up/${service}`);
                 } else {
-                    appendOutput(`✗ Failed to rebuild ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✗ Failed to rebuild ${service}:\n`);
+                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
+                    enableRebuildButtons();
                     throw new Error('Rebuild failed');
                 }
             })
             .then(response => response ? response.json() : null)
             .then(data => {
                 if (data && data.success) {
-                    appendOutput(`✓ ${service} started successfully!`);
-                    setTimeout(refreshContainers, 2000);
+                    appendOutput(`✓ ${service} started successfully!\n`);
+                    setTimeout(() => {
+                        refreshContainers();
+                        enableRebuildButtons();
+                    }, 2000);
                 } else if (data) {
-                    appendOutput(`✗ Failed to start ${service} after rebuild`);
+                    appendOutput(`✗ Failed to start ${service} after rebuild\n`);
+                    enableRebuildButtons();
                 }
             })
             .catch(error => {
                 if (error.message !== 'Rebuild failed') {
-                    appendOutput(`Error: ${error.message}`);
+                    appendOutput(`Error: ${error.message}\n`);
                 }
+                enableRebuildButtons();
             });
+    }
+
+    function disableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        });
+    }
+
+    function enableRebuildButtons() {
+        document.querySelectorAll('button[onclick*="rebuild"]').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
     }
 
     function rebuildContainer() {
@@ -454,20 +501,77 @@
             return;
         }
 
-        appendOutput(`Rebuilding ${service}... This may take several minutes.`);
+        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        disableRebuildButtons();
 
         fetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ Rebuild successful!\n` + (data.stdout || ''));
-                    setTimeout(refreshContainers, 2000);
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✓ Rebuild successful!\n`);
+                    appendOutput(`\nBuild output (last 50 lines):\n`);
+                    const lines = (data.stdout || '').split('\n');
+                    appendOutput(lines.slice(-50).join('\n'));
+                    setTimeout(() => {
+                        refreshContainers();
+                        enableRebuildButtons();
+                    }, 2000);
                 } else {
-                    appendOutput(`✗ Rebuild failed:\n` + (data.stderr || data.error || 'Unknown error'));
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`✗ Rebuild failed:\n`);
+                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
+                    enableRebuildButtons();
                 }
             })
             .catch(error => {
-                appendOutput(`Error: ${error.message}`);
+                appendOutput(`Error: ${error.message}\n`);
+                enableRebuildButtons();
+            });
+    }
+
+    function pruneDockerSystem() {
+        if (!confirm('Remove all stopped containers, dangling images, and unused networks? This will free up disk space.')) {
+            return;
+        }
+
+        appendOutput(`⏳ Cleaning up Docker system...\n`);
+
+        fetch('/admin/docker-prune')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    appendOutput(`✓ Cleanup complete!\n\n`);
+                    appendOutput(data.output || 'No output\n');
+                    setTimeout(refreshContainers, 1000);
+                } else {
+                    appendOutput(`✗ Cleanup failed:\n${data.error || 'Unknown error'}\n`);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
+            });
+    }
+
+    function showDiskUsage() {
+        appendOutput(`⏳ Fetching Docker disk usage...\n`);
+
+        fetch('/admin/docker-system-df')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.output) {
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`💾 Docker Disk Usage:\n\n`);
+                    appendOutput(data.output || 'No data available\n');
+                    appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                } else {
+                    appendOutput(`✗ Failed to get disk usage:\n${data.error || 'Unknown error'}\n`);
+                }
+            })
+            .catch(error => {
+                appendOutput(`Error: ${error.message}\n`);
             });
     }
 
