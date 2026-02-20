@@ -227,18 +227,32 @@
 
                 <div style="margin-top: 15px; padding: 10px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
                     <h5 style="margin: 0 0 8px 0;">
-                        <i class="fas fa-info-circle"></i> Deployment Steps:
+                        <i class="fas fa-info-circle"></i> Manual Deployment Commands (Copy to SSH Terminal):
                     </h5>
-                    <ol style="margin: 0; padding-left: 20px; font-size: 14px;">
-                        <li>Export Docker image to .tar file</li>
-                        <li>Copy .tar file to production server via SSH/SCP</li>
-                        <li>Backup current production container</li>
-                        <li>Stop running production container</li>
-                        <li>Load new image from .tar file</li>
-                        <li>Start new container with docker-compose</li>
-                        <li>Health check (30 attempts, 2s interval)</li>
-                        <li>Rollback if health check fails</li>
-                    </ol>
+                    <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
+                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ SSH Pipe Method (Recommended):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
+                            docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"
+                        </div>
+                        
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Then on Production Server:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd ~/PycharmProjects/comserv2')" title="Click to copy">
+                            cd ~/PycharmProjects/comserv2
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker compose stop web-prod')" title="Click to copy">
+                            docker compose stop web-prod
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker compose up -d --force-recreate web-prod')" title="Click to copy">
+                            docker compose up -d --force-recreate web-prod
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker compose ps')" title="Click to copy">
+                            docker compose ps
+                        </div>
+                        
+                        <div style="margin-top: 10px; color: #ffc107; font-size: 12px;">
+                            💡 Click any command to copy it to clipboard, then paste in SSH terminal
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -260,21 +274,31 @@
                 </h3>
             </div>
             <div id="ssh-terminal-section" class="card-body collapsible-content" style="padding: 20px; background-color: #1e1e1e;">
-                <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 12px; margin-bottom: 15px;">
-                    <p style="margin: 0; color: #856404; font-size: 14px;">
-                        <strong>ℹ️ SSH Terminal Access:</strong> Click "Open SSH Terminal" to connect to <strong>ubuntu@192.168.1.126</strong> 
-                        via the interactive terminal on port 3001. You'll see password prompts and can execute commands directly.
+                <div id="ssh-status-message" style="background-color: #dc3545; border: 1px solid #c82333; border-radius: 4px; padding: 15px; margin-bottom: 15px; color: white;">
+                    <p style="margin: 0; font-size: 14px; font-weight: bold;">
+                        ⚠️ SSH Terminal Service Not Running on Port 3001
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 13px;">
+                        To enable interactive SSH terminal in browser, run this command on workstation.local:
+                    </p>
+                    <div style="background-color: #2d2d2d; padding: 10px; margin-top: 10px; border-radius: 4px; font-family: monospace; cursor: pointer;" 
+                         onclick="copyToClipboard('/home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh')"
+                         title="Click to copy">
+                        /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh
+                    </div>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #ffc107;">
+                        After running setup, refresh this page and the terminal will work.
                     </p>
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button onclick="openSSHTerminalWindow()" 
-                        style="padding: 10px 20px; background-color: #00ff00; color: #1e1e1e; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-external-link-alt"></i> Open SSH Terminal (New Window)
+                    <button onclick="checkSSHTerminalService()" 
+                        style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-sync"></i> Check SSH Terminal Status
                     </button>
-                    <button onclick="embedSSHTerminal()" 
-                        style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-window-restore"></i> Embed Terminal Here
+                    <button id="open-ssh-terminal-btn" onclick="openSSHTerminalWindow()" disabled
+                        style="padding: 10px 20px; background-color: #00ff00; color: #1e1e1e; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
+                        <i class="fas fa-external-link-alt"></i> Open SSH Terminal (Setup Required)
                     </button>
                 </div>
 
@@ -283,11 +307,12 @@
                 </div>
 
                 <div style="margin-top: 15px; padding: 12px; background-color: #2d2d2d; border-radius: 4px; color: #ccc; font-family: monospace; font-size: 13px;">
-                    <div style="margin-bottom: 10px; color: #00ff00;"><strong>Quick Start:</strong></div>
-                    <div>1. Click "Open SSH Terminal" (opens port 3001 in new window)</div>
-                    <div>2. Enter password when prompted: <code style="color: #ff0;">ubuntu</code></div>
-                    <div>3. Run deployment commands manually or copy from "Show Commands"</div>
-                    <div style="margin-top: 10px; color: #ff0;">Alternative: Click "Auto Deploy" for automated deployment (no terminal needed)</div>
+                    <div style="margin-bottom: 10px; color: #00ff00;"><strong>Alternative - Use PyCharm Terminal:</strong></div>
+                    <div>1. PyCharm → Tools → Start SSH Session</div>
+                    <div>2. Enter: <code style="color: #ff0;">ubuntu@192.168.1.126</code></div>
+                    <div>3. Enter password when prompted</div>
+                    <div>4. Copy commands from "Manual Deployment Commands" section above</div>
+                    <div style="margin-top: 10px; color: #ff0;">Or click "Auto Deploy" for fully automated deployment</div>
                 </div>
             </div>
         </div>
@@ -887,13 +912,19 @@
         }
     }
 
-    function testSSHConnection() {
+    function testSSHConnection(event) {
+        // Prevent any default form submission behavior
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
         const sshTarget = document.getElementById('production-host').value.trim();
         const sshPort = document.getElementById('ssh-port').value;
 
         if (!sshTarget) {
             alert('Please enter SSH target (user@host)');
-            return;
+            return false;
         }
 
         // Expand output console if collapsed
@@ -940,6 +971,56 @@
                 appendOutput(`${'='.repeat(80)}\n`);
                 appendOutput(`Error: ${error.message}\n`);
                 appendOutput(`${'='.repeat(80)}\n\n`);
+            });
+
+        return false; // Prevent any form submission
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Show temporary success message
+            const msg = document.createElement('div');
+            msg.textContent = '✓ Copied to clipboard!';
+            msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 2000);
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    function checkSSHTerminalService() {
+        appendOutput('\n🔍 Checking SSH terminal service on port 3001...\n');
+        
+        fetch('http://workstation.local:3001/')
+            .then(response => {
+                if (response.ok) {
+                    appendOutput('✅ SSH terminal service is running on port 3001\n');
+                    appendOutput('You can now use "Open SSH Terminal" button\n\n');
+                    
+                    // Enable the SSH terminal button
+                    const btn = document.getElementById('open-ssh-terminal-btn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.cursor = 'pointer';
+                        btn.style.opacity = '1';
+                        btn.innerHTML = '<i class="fas fa-external-link-alt"></i> Open SSH Terminal';
+                    }
+                    
+                    // Update status message
+                    const statusMsg = document.getElementById('ssh-status-message');
+                    if (statusMsg) {
+                        statusMsg.style.backgroundColor = '#28a745';
+                        statusMsg.style.borderColor = '#1e7e34';
+                        statusMsg.innerHTML = '<p style="margin: 0; font-size: 14px; font-weight: bold;">✅ SSH Terminal Service Running</p><p style="margin: 5px 0 0 0; font-size: 13px;">Interactive SSH terminal available on port 3001. Click "Open SSH Terminal" to connect.</p>';
+                    }
+                } else {
+                    throw new Error('Service not responding');
+                }
+            })
+            .catch(error => {
+                appendOutput('❌ SSH terminal service is NOT running on port 3001\n');
+                appendOutput('Run setup script to enable: /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh\n\n');
             });
     }
 
@@ -1117,18 +1198,21 @@
     }
 
     function openSSHTerminalWindow() {
-        const sshTarget = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
-        const terminalUrl = `http://workstation.local:3001/?hostname=${encodeURIComponent(sshTarget.split('@')[1] || '192.168.1.126')}&username=${encodeURIComponent(sshTarget.split('@')[0] || 'ubuntu')}`;
+        const terminalUrl = 'http://workstation.local:3001/';
         
-        window.open(
+        const termWin = window.open(
             terminalUrl,
-            'SSH Terminal',
-            'width=1200,height=700,menubar=no,toolbar=no,location=no'
+            'SSH Terminal - ubuntu@192.168.1.126',
+            'width=1200,height=700,menubar=no,toolbar=no,location=no,scrollbars=yes'
         );
 
-        appendOutput(`\n🖥️ SSH Terminal opened on port 3001\n`);
-        appendOutput(`Target: ${sshTarget}\n`);
-        appendOutput(`URL: ${terminalUrl}\n\n`);
+        if (termWin) {
+            appendOutput(`\n🖥️ SSH Terminal opened in new window\n`);
+            appendOutput(`URL: ${terminalUrl}\n`);
+            appendOutput(`Target: ubuntu@192.168.1.126\n\n`);
+        } else {
+            alert('Popup blocked! Please allow popups for this site.\n\nAlternatively, open manually: ' + terminalUrl);
+        }
     }
 
     function embedSSHTerminal() {
@@ -1158,6 +1242,9 @@
     // Initialize - load containers on page load
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
+        
+        // Auto-check SSH terminal service status
+        checkSSHTerminalService();
     });
 </script>
 
