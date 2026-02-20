@@ -1844,7 +1844,7 @@ sub get_result_file_schema {
 sub parse_result_file_columns {
     my ($self, $text) = @_;
     my $columns = {};
-    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
+    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,\s*$|\s*\))/g) {
         my ($name, $def) = ($1, $2);
         my $info = {};
         while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
