@@ -228,12 +228,13 @@
             </div>
             [% END %]
             
-            <div class="form-actions">
-                [% IF c.user_exists && (c.session.roles.match('admin') || is_workshop_leader) %]
+            <div class="form-actions" style="margin-bottom: 50px;">
+                [% IF c.user_exists && (c.session.roles.grep('admin').size || is_workshop_leader) %]
                     <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
                     <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
-                    <a href="/workshop/files?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
-                    <a href="/workshop/compose_email?workshop_id=[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                    <a href="/workshop/files/[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
+                    <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Content</a>
+                    <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
                 [% END %]
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
             </div>
