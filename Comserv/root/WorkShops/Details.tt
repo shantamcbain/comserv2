@@ -172,7 +172,7 @@
             </div>
             [% END %]
             
-            [% IF c.user_exists && (is_user_registered || c.session.roles.match('admin')) %]
+            [% IF workshop_files.size > 0 || workshop_content.size > 0 %]
             <div class="data-container">
                 <h2>Workshop Materials</h2>
                 
