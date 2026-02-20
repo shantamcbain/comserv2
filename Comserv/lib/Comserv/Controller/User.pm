@@ -493,7 +493,6 @@ sub settings :Local {
             first_name => $user->first_name,
             last_name => $user->last_name,
             email => $user->email,
-            email_notifications => $user->email_notifications || 0,
             # Add other fields as needed
         },
         template => 'user/settings.tt'
@@ -554,7 +553,6 @@ sub update_settings :Local {
             first_name => $first_name,
             last_name => $last_name,
             email => $email,
-            email_notifications => $email_notifications,
             # Add other fields as needed
         });
     };
