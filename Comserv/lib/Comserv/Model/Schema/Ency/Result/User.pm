@@ -10,7 +10,7 @@ __PACKAGE__->add_columns(
     username => {
         data_type => 'varchar',
         size => 255,
-        is_nullable => 0,
+        is_nullable => 1,
     },
     password => {
         data_type => 'varchar',
@@ -31,6 +31,40 @@ __PACKAGE__->add_columns(
     roles => {
         data_type => 'text',
     },
+    email_notifications => {
+        data_type => 'tinyint',
+        default_value => 1,
+        is_nullable => 0,
+    },
+    status => {
+        data_type => 'varchar',
+        size => 50,
+        default_value => 'pending_verification',
+        is_nullable => 0,
+    },
+    email_verified_at => {
+        data_type => 'timestamp',
+        is_nullable => 1,
+    },
+    created_by => {
+        data_type => 'integer',
+        is_nullable => 1,
+    },
+    creation_context => {
+        data_type => 'varchar',
+        size => 100,
+        is_nullable => 1,
+    },
+    created_at => {
+        data_type => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
+        is_nullable => 0,
+    },
+    updated_at => {
+        data_type => 'timestamp',
+        default_value => \'CURRENT_TIMESTAMP',
+        is_nullable => 0,
+    },
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
@@ -38,6 +72,35 @@ __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
 # Relationships
 __PACKAGE__->has_many(
     'ai_conversations' => 'Comserv::Model::Schema::Ency::Result::AiConversation',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->belongs_to(
+    'creator' => 'Comserv::Model::Schema::Ency::Result::User',
+    'created_by',
+    { join_type => 'left', on_delete => 'set null' }
+);
+
+__PACKAGE__->has_many(
+    'created_users' => 'Comserv::Model::Schema::Ency::Result::User',
+    { 'foreign.created_by' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
+    'verification_codes' => 'Comserv::Model::Schema::Ency::Result::EmailVerificationCode',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'password_reset_tokens' => 'Comserv::Model::Schema::Ency::Result::PasswordResetToken',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'user_site_roles' => 'Comserv::Model::Schema::Ency::Result::UserSiteRole',
     { 'foreign.user_id' => 'self.id' },
     { cascade_delete => 1 }
 );
