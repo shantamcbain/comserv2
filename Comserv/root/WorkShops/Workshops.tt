@@ -38,56 +38,48 @@
                 [% END %]
             </div>
             
-            <div class="form-container">
+            <div class="form-container" style="margin-bottom: 15px;">
                 <form method="GET" action="/workshop" class="app-form">
-                    <div class="form-section">
-                        <h3>Filter Workshops</h3>
+                    <div class="form-section" style="padding: 10px;">
+                        <h3 style="margin-top: 0;">Filters</h3>
                         
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label for="site_filter">Filter by Site:</label>
+                        <div class="form-row" style="gap: 10px; align-items: flex-end;">
+                            <div class="form-field" style="flex: 0 1 200px;">
+                                <label for="site_filter" style="font-size: 0.9em;">Site:</label>
                                 <select name="site_filter" id="site_filter" onchange="this.form.submit()" class="form-input">
-                                    <option value="">All Sites</option>
-                                    <option value="public" [% IF c.request.params.site_filter == 'public' %]selected[% END %]>Public Workshops Only</option>
-                                    <option value="my_site" [% IF c.request.params.site_filter == 'my_site' %]selected[% END %]>My Site ([% sitename || 'N/A' %])</option>
+                                    <option value="">All</option>
+                                    <option value="public" [% IF c.request.params.site_filter == 'public' %]selected[% END %]>Public</option>
+                                    <option value="my_site" [% IF c.request.params.site_filter == 'my_site' %]selected[% END %]>My Site</option>
                                 </select>
                             </div>
                             
-                            <div class="form-field">
-                                <label for="status_filter">Filter by Status:</label>
+                            <div class="form-field" style="flex: 0 1 200px;">
+                                <label for="status_filter" style="font-size: 0.9em;">Status:</label>
                                 <select name="status_filter" id="status_filter" onchange="this.form.submit()" class="form-input">
-                                    <option value="">All Statuses</option>
+                                    <option value="">All</option>
                                     <option value="draft" [% IF c.request.params.status_filter == 'draft' %]selected[% END %]>Draft</option>
                                     <option value="published" [% IF c.request.params.status_filter == 'published' %]selected[% END %]>Published</option>
-                                    <option value="registration_closed" [% IF c.request.params.status_filter == 'registration_closed' %]selected[% END %]>Registration Closed</option>
+                                    <option value="registration_closed" [% IF c.request.params.status_filter == 'registration_closed' %]selected[% END %]>Reg. Closed</option>
                                     <option value="in_progress" [% IF c.request.params.status_filter == 'in_progress' %]selected[% END %]>In Progress</option>
                                     <option value="completed" [% IF c.request.params.status_filter == 'completed' %]selected[% END %]>Completed</option>
                                     <option value="cancelled" [% IF c.request.params.status_filter == 'cancelled' %]selected[% END %]>Cancelled</option>
                                 </select>
                             </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label for="date_from">Date From:</label>
+                            
+                            <div class="form-field" style="flex: 0 1 150px;">
+                                <label for="date_from" style="font-size: 0.9em;">From:</label>
                                 <input type="date" name="date_from" id="date_from" value="[% c.request.params.date_from || '' %]" class="form-input">
                             </div>
                             
-                            <div class="form-field">
-                                <label for="date_to">Date To:</label>
+                            <div class="form-field" style="flex: 0 1 150px;">
+                                <label for="date_to" style="font-size: 0.9em;">To:</label>
                                 <input type="date" name="date_to" id="date_to" value="[% c.request.params.date_to || '' %]" class="form-input">
                             </div>
                             
-                            <div class="form-field" style="align-self: flex-end;">
-                                <button type="submit" class="btn btn-primary">Apply Date Filter</button>
+                            <div class="form-field" style="flex: 0 0 auto;">
+                                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
                             </div>
                         </div>
-                        
-                        <noscript>
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary">Apply Filters</button>
-                            </div>
-                        </noscript>
                     </div>
                 </form>
             </div>

@@ -289,8 +289,22 @@ sub addworkshop :Local {
     };
 
     if ($@) {
-        # If creation fails, return to the form with an error message
-        $c->stash->{error_msg} = 'Failed to create workshop: ' . $@;
+        # Log error with details and send email to site admin
+        my $error_msg = "Failed to create workshop: $@";
+        $c->log->error($error_msg);
+        
+        # Send error notification to site admin
+        $self->_send_error_notification($c, {
+            error_type => 'Workshop Creation Error',
+            error_message => $error_msg,
+            user_id => $c->session->{user_id},
+            username => $c->session->{username},
+            site => $c->session->{SiteName},
+            form_data => $params,
+        });
+        
+        # Show user-friendly error message
+        $c->stash->{error_msg} = 'An error occurred while creating the workshop. The site administrator has been notified.';
         $c->stash->{form_data} = $params; # Add the form data to the stash
         $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
         return;
@@ -766,6 +780,44 @@ sub cancel :Local :Args(1) {
     }
     
     $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
+}
+
+sub delete :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    unless ($self->_can_edit_workshop($c, $workshop)) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to delete this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('dashboard')));
+        return;
+    }
+    
+    eval {
+        # Delete related records first (cascade)
+        $c->model('DBEncy::Participant')->search({ workshop_id => $id })->delete;
+        $c->model('DBEncy::WorkshopEmail')->search({ workshop_id => $id })->delete;
+        $c->model('DBEncy::WorkshopContent')->search({ workshop_id => $id })->delete;
+        $c->model('DBEncy::WorkshopRole')->search({ workshop_id => $id })->delete;
+        $c->model('DBEncy::SiteWorkshop')->search({ workshop_id => $id })->delete;
+        # Delete workshop itself
+        $workshop->delete;
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to delete workshop: $@");
+        $c->flash->{error_msg} = 'Failed to delete workshop: ' . $@;
+        $c->response->redirect($c->uri_for($self->action_for('dashboard')));
+    } else {
+        $c->flash->{success_msg} = 'Workshop deleted successfully.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+    }
 }
 
 sub register :Local :Args(1) {
@@ -1765,6 +1817,59 @@ sub email_history :Local :Args(1) {
         emails => \@emails,
         template => 'WorkShops/EmailHistory.tt',
     );
+}
+
+sub _send_error_notification {
+    my ($self, $c, $error_details) = @_;
+    
+    # Get site admin email from config or database
+    my $admin_email = $c->config->{admin_email} || 'admin@' . lc($error_details->{site}) . '.ca';
+    
+    # Get site from database to get proper admin email
+    my $site = $c->model('DBEncy::Site')->search({ name => $error_details->{site} })->first;
+    if ($site && $site->admin_email) {
+        $admin_email = $site->admin_email;
+    }
+    
+    # Format error details for email
+    my $error_report = sprintf(
+        "Error Type: %s\n\nError Message:\n%s\n\nUser Details:\n- User ID: %s\n- Username: %s\n- Site: %s\n\nTimestamp: %s\n\nRequest URI: %s\n\n",
+        $error_details->{error_type} || 'Unknown Error',
+        $error_details->{error_message} || 'No error message provided',
+        $error_details->{user_id} || 'N/A',
+        $error_details->{username} || 'N/A',
+        $error_details->{site} || 'N/A',
+        DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+        $c->req->uri || 'N/A'
+    );
+    
+    # Add form data if provided
+    if ($error_details->{form_data}) {
+        $error_report .= "Form Data:\n";
+        for my $key (sort keys %{$error_details->{form_data}}) {
+            my $value = $error_details->{form_data}->{$key} || '';
+            # Truncate long values
+            $value = substr($value, 0, 200) . '...' if length($value) > 200;
+            $error_report .= "  $key: $value\n";
+        }
+    }
+    
+    # Send email notification
+    eval {
+        $c->stash->{email} = {
+            to       => $admin_email,
+            from     => $c->config->{system_email} || 'noreply@comserv.ca',
+            subject  => '[Workshop System Error] ' . $error_details->{error_type},
+            body     => $error_report,
+        };
+        
+        $c->forward($c->view('Email'));
+        $c->log->info("Error notification sent to admin: $admin_email");
+    };
+    
+    if ($@) {
+        $c->log->error("Failed to send error notification email: $@");
+    }
 }
 
 
