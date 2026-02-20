@@ -632,7 +632,12 @@ sub _is_workshop_leader {
     
     my $user_id = $c->session->{user_id};
     
-    if ($workshop->created_by && $workshop->created_by == $user_id) {
+    $c->log->debug("_is_workshop_leader check:");
+    $c->log->debug("  user_id: " . ($user_id || 'NULL'));
+    $c->log->debug("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
+    
+    if ($workshop->created_by && $user_id && $workshop->created_by == $user_id) {
+        $c->log->debug("  Result: TRUE (created_by matches)");
         return 1;
     }
     
@@ -641,6 +646,9 @@ sub _is_workshop_leader {
         user_id => $user_id,
         role => 'workshop_leader'
     })->count > 0;
+    
+    $c->log->debug("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
+    $c->log->debug("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
     
     return $has_leader_role;
 }
