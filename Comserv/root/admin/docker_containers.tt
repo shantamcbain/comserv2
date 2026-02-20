@@ -9,6 +9,11 @@
 %]
 [% PageVersion = 'docker_containers.tt,v 1.0 2025/12/14 ai_assistant Exp ai_assistant ' %]
 
+<!-- xterm.js for SSH Terminal -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
 <style>
 .collapsible-header {
     cursor: pointer;
@@ -294,7 +299,7 @@
                     <span>
                         <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 10px; font-size: 0.8em;"></i>
                         <i class="fas fa-terminal" style="margin-right: 10px;"></i>
-                        SSH Terminal (Port 3001)
+                        SSH Terminal (Embedded)
                     </span>
                     <span style="font-size: 14px; background-color: #00ff00; color: #1e1e1e; padding: 4px 10px; border-radius: 3px;">
                         INTERACTIVE
@@ -302,46 +307,31 @@
                 </h3>
             </div>
             <div id="ssh-terminal-section" class="card-body collapsible-content" style="padding: 20px; background-color: #1e1e1e;">
-                <div id="ssh-status-message" style="background-color: #dc3545; border: 1px solid #c82333; border-radius: 4px; padding: 15px; margin-bottom: 15px; color: white;">
+                <div id="ssh-terminal-info" style="background-color: #17a2b8; border: 1px solid #138496; border-radius: 4px; padding: 15px; margin-bottom: 15px; color: white;">
                     <p style="margin: 0; font-size: 14px; font-weight: bold;">
-                        ⚠️ SSH Terminal Service Not Running on Port 3001
+                        ℹ️ Interactive SSH Terminal
                     </p>
                     <p style="margin: 10px 0 0 0; font-size: 13px;">
-                        To enable interactive SSH terminal in browser, run this command on workstation.local:
-                    </p>
-                    <div style="background-color: #2d2d2d; padding: 10px; margin-top: 10px; border-radius: 4px; font-family: monospace; cursor: pointer;" 
-                         onclick="copyToClipboard('/home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh')"
-                         title="Click to copy">
-                        /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh
-                    </div>
-                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #ffc107;">
-                        After running setup, refresh this page and the terminal will work.
+                        Terminal connects to production server using stored SSH credentials. Click "Connect" to start.
                     </p>
                 </div>
                 
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button onclick="checkSSHTerminalService()" 
-                        style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-sync"></i> Check SSH Terminal Status
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                    <button id="ssh-connect-btn" onclick="connectSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-play"></i> Connect
                     </button>
-                    <button id="open-ssh-terminal-btn" onclick="openSSHTerminalWindow()" disabled
-                        style="padding: 10px 20px; background-color: #00ff00; color: #1e1e1e; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
-                        <i class="fas fa-external-link-alt"></i> Open SSH Terminal (Setup Required)
+                    <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled
+                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
+                        <i class="fas fa-stop"></i> Disconnect
                     </button>
+                    <div id="ssh-connection-status" style="margin-left: 10px; color: #ccc; font-size: 14px;">
+                        <i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected
+                    </div>
                 </div>
 
-                <div id="ssh-terminal-error" style="display: none; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 15px;">
-                    <p style="margin: 0; font-weight: bold; color: #856404;">
-                        ⚠️ SSH Terminal Service Not Available
-                    </p>
-                    <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
-                        The wetty SSH terminal service on port 3001 is not responding. 
-                        Please use PyCharm terminal or command line instead.
-                    </p>
-                </div>
-
-                <div id="ssh-terminal-embed" style="display: none; background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px;">
-                    <iframe id="ssh-terminal-iframe" style="width: 100%; height: 100%; border: none;"></iframe>
+                <div id="ssh-terminal-container" style="background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px; padding: 10px;">
+                    <div id="ssh-xterm-terminal"></div>
                 </div>
 
                 <div style="margin-top: 15px; padding: 12px; background-color: #2d2d2d; border-radius: 4px; color: #ccc; font-family: monospace; font-size: 13px;">
@@ -1080,67 +1070,142 @@
         });
     }
 
-    function openSSHTerminalWindow() {
-        // First check if wetty is available
-        fetch('http://workstation.local:3001/')
-            .then(response => {
-                if (response.ok) {
-                    // Open in new window
-                    window.open('http://workstation.local:3001/', 'ssh-terminal', 'width=1000,height=700,menubar=no,toolbar=no,location=no');
-                } else {
-                    throw new Error('Service not available');
-                }
-            })
-            .catch(error => {
-                // Show error in the terminal section
-                const errorDiv = document.getElementById('ssh-terminal-error');
-                if (errorDiv) {
-                    errorDiv.style.display = 'block';
-                }
-                appendOutput('\n❌ SSH terminal service is not running on port 3001\n');
-                appendOutput('Please use PyCharm SSH terminal or command line instead\n\n');
-            });
+    // SSH Terminal WebSocket connection
+    let sshTerminal = null;
+    let sshWebSocket = null;
+    let sshFitAddon = null;
+
+    function updateSSHConnectionStatus(status, message) {
+        const statusDiv = document.getElementById('ssh-connection-status');
+        const connectBtn = document.getElementById('ssh-connect-btn');
+        const disconnectBtn = document.getElementById('ssh-disconnect-btn');
+        
+        if (status === 'connected') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+            disconnectBtn.disabled = false;
+            disconnectBtn.style.opacity = '1';
+            disconnectBtn.style.cursor = 'pointer';
+        } else if (status === 'connecting') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #ffc107;"></i> ' + message;
+            connectBtn.disabled = true;
+            connectBtn.style.opacity = '0.5';
+            connectBtn.style.cursor = 'not-allowed';
+        } else if (status === 'error') {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #dc3545;"></i> ' + message;
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        } else {
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected';
+            connectBtn.disabled = false;
+            connectBtn.style.opacity = '1';
+            connectBtn.style.cursor = 'pointer';
+            disconnectBtn.disabled = true;
+            disconnectBtn.style.opacity = '0.5';
+            disconnectBtn.style.cursor = 'not-allowed';
+        }
     }
 
-    function checkSSHTerminalService() {
-        appendOutput('\n🔍 Checking SSH terminal service on port 3001...\n');
-        
-        fetch('http://workstation.local:3001/')
-            .then(response => {
-                if (response.ok) {
-                    appendOutput('✅ SSH terminal service is running on port 3001\n');
-                    appendOutput('You can now use "Open SSH Terminal" button\n\n');
-                    
-                    // Enable the SSH terminal button
-                    const btn = document.getElementById('open-ssh-terminal-btn');
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.style.cursor = 'pointer';
-                        btn.style.opacity = '1';
-                        btn.innerHTML = '<i class="fas fa-external-link-alt"></i> Open SSH Terminal';
-                    }
-                    
-                    // Update status message
-                    const statusMsg = document.getElementById('ssh-status-message');
-                    if (statusMsg) {
-                        statusMsg.style.backgroundColor = '#28a745';
-                        statusMsg.style.borderColor = '#1e7e34';
-                        statusMsg.innerHTML = '<p style="margin: 0; font-size: 14px; font-weight: bold;">✅ SSH Terminal Service Running</p><p style="margin: 5px 0 0 0; font-size: 13px;">Interactive SSH terminal available on port 3001. Click "Open SSH Terminal" to connect.</p>';
-                    }
-                } else {
-                    throw new Error('Service not responding');
-                }
-            })
-            .catch(error => {
-                appendOutput('❌ SSH terminal service is NOT running on port 3001\n');
-                appendOutput('Use PyCharm SSH terminal or run setup: /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh\n\n');
-                
-                // Show error message
-                const errorDiv = document.getElementById('ssh-terminal-error');
-                if (errorDiv) {
-                    errorDiv.style.display = 'block';
+    function connectSSHTerminal() {
+        const sshTarget = document.getElementById('production-host').value.trim();
+        const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
+
+        if (!sshTarget) {
+            alert('Please enter SSH target (user@host)');
+            return;
+        }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password or test connection first to save credentials');
+            return;
+        }
+
+        updateSSHConnectionStatus('connecting', 'Connecting...');
+
+        // Initialize xterm.js terminal
+        if (!sshTerminal) {
+            sshTerminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                theme: {
+                    background: '#000000',
+                    foreground: '#00ff00'
+                },
+                rows: 30,
+                cols: 100
+            });
+
+            sshFitAddon = new FitAddon.FitAddon();
+            sshTerminal.loadAddon(sshFitAddon);
+
+            const terminalContainer = document.getElementById('ssh-xterm-terminal');
+            sshTerminal.open(terminalContainer);
+            sshFitAddon.fit();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (sshFitAddon) {
+                    sshFitAddon.fit();
                 }
             });
+        }
+
+        // Build WebSocket URL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/admin/docker-ssh-terminal?ssh_target=${encodeURIComponent(sshTarget)}&ssh_port=${sshPort}&ssh_password=${encodeURIComponent(sshPassword)}`;
+
+        // Create WebSocket connection
+        sshWebSocket = new WebSocket(wsUrl);
+
+        sshWebSocket.onopen = function() {
+            updateSSHConnectionStatus('connected', 'Connected');
+            sshTerminal.writeln('\r\n\x1b[32m✓ Connected to ' + sshTarget + '\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onmessage = function(event) {
+            if (event.data instanceof Blob) {
+                event.data.arrayBuffer().then(buffer => {
+                    const text = new TextDecoder().decode(buffer);
+                    sshTerminal.write(text);
+                });
+            } else {
+                sshTerminal.write(event.data);
+            }
+        };
+
+        sshWebSocket.onerror = function(error) {
+            updateSSHConnectionStatus('error', 'Connection Error');
+            sshTerminal.writeln('\r\n\x1b[31m✗ Connection error\x1b[0m\r\n');
+        };
+
+        sshWebSocket.onclose = function() {
+            updateSSHConnectionStatus('disconnected', 'Disconnected');
+            sshTerminal.writeln('\r\n\x1b[33m✓ Connection closed\x1b[0m\r\n');
+            sshWebSocket = null;
+        };
+
+        // Send keyboard input to WebSocket
+        sshTerminal.onData(data => {
+            if (sshWebSocket && sshWebSocket.readyState === WebSocket.OPEN) {
+                sshWebSocket.send(data);
+            }
+        });
+    }
+
+    function disconnectSSHTerminal() {
+        if (sshWebSocket) {
+            sshWebSocket.close();
+            sshWebSocket = null;
+        }
+        updateSSHConnectionStatus('disconnected', 'Disconnected');
     }
 
     function showDeploymentCommands() {
