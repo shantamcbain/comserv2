@@ -196,18 +196,46 @@
                         <input type="number" id="ssh-port" value="22" min="1" max="65535"
                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                     </div>
+
+                    <div>
+                        <label for="ssh-password" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-password" placeholder="Enter SSH password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <button onclick="togglePasswordVisibility()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666;">
+                                <i id="password-eye-icon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="color: #666;">Stored securely in ~/.comserv/secrets/ssh_credentials.json</small>
+                    </div>
+
+                    <div>
+                        <label for="production-directory" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Production Directory:
+                        </label>
+                        <input type="text" id="production-directory" value="~/PycharmProjects/comserv2" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">Path where docker-compose.yml is located on production server</small>
+                    </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                     <button onclick="openSSHTerminal()" 
                         style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-terminal"></i> Open SSH Terminal
                     </button>
 
-                    <button onclick="testSSHConnection()" 
-                        style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        <i class="fas fa-network-wired"></i> Test Connection
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button onclick="testSSHConnection()" 
+                            style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            <i class="fas fa-network-wired"></i> Test Connection
+                        </button>
+                        <div id="ssh-status-indicator" style="width: 16px; height: 16px; border-radius: 50%; background-color: #ccc; border: 2px solid #999;" 
+                             title="Not tested"></div>
+                    </div>
 
                     <button onclick="saveDockerImage()" 
                         style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
@@ -300,6 +328,16 @@
                         style="padding: 10px 20px; background-color: #00ff00; color: #1e1e1e; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
                         <i class="fas fa-external-link-alt"></i> Open SSH Terminal (Setup Required)
                     </button>
+                </div>
+
+                <div id="ssh-terminal-error" style="display: none; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 15px;">
+                    <p style="margin: 0; font-weight: bold; color: #856404;">
+                        ⚠️ SSH Terminal Service Not Available
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
+                        The wetty SSH terminal service on port 3001 is not responding. 
+                        Please use PyCharm terminal or command line instead.
+                    </p>
                 </div>
 
                 <div id="ssh-terminal-embed" style="display: none; background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px;">
@@ -912,6 +950,42 @@
         }
     }
 
+    function togglePasswordVisibility() {
+        const passwordField = document.getElementById('ssh-password');
+        const eyeIcon = document.getElementById('password-eye-icon');
+        
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            eyeIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            eyeIcon.className = 'fas fa-eye';
+        }
+    }
+
+    function updateSSHStatusIndicator(status) {
+        const indicator = document.getElementById('ssh-status-indicator');
+        if (!indicator) return;
+        
+        if (status === 'success') {
+            indicator.style.backgroundColor = '#28a745';
+            indicator.style.borderColor = '#1e7e34';
+            indicator.title = 'SSH connection successful';
+        } else if (status === 'failed') {
+            indicator.style.backgroundColor = '#dc3545';
+            indicator.style.borderColor = '#c82333';
+            indicator.title = 'SSH connection failed';
+        } else if (status === 'testing') {
+            indicator.style.backgroundColor = '#ffc107';
+            indicator.style.borderColor = '#e0a800';
+            indicator.title = 'Testing connection...';
+        } else {
+            indicator.style.backgroundColor = '#ccc';
+            indicator.style.borderColor = '#999';
+            indicator.title = 'Not tested';
+        }
+    }
+
     function testSSHConnection(event) {
         // Prevent any default form submission behavior
         if (event) {
@@ -921,11 +995,20 @@
 
         const sshTarget = document.getElementById('production-host').value.trim();
         const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
 
         if (!sshTarget) {
             alert('Please enter SSH target (user@host)');
             return false;
         }
+
+        if (!sshPassword) {
+            alert('Please enter SSH password to test connection');
+            return false;
+        }
+
+        // Update indicator to testing state
+        updateSSHStatusIndicator('testing');
 
         // Expand output console if collapsed
         const outputSection = document.getElementById('output-console-section');
@@ -942,6 +1025,8 @@
         const formData = new FormData();
         formData.append('ssh_target', sshTarget);
         formData.append('ssh_port', sshPort);
+        formData.append('ssh_password', sshPassword);
+        formData.append('save_credentials', 'yes');
 
         fetch('/admin/docker-test-ssh', {
             method: 'POST',
@@ -959,10 +1044,15 @@
                     appendOutput(`✅ SSH CONNECTION SUCCESSFUL\n`);
                     appendOutput(`${'='.repeat(80)}\n`);
                     appendOutput(data.output || 'Connection OK\n');
+                    if (data.credentials_saved) {
+                        appendOutput(`\n✓ Credentials saved to ${data.credentials_path}\n`);
+                    }
+                    updateSSHStatusIndicator('success');
                 } else {
                     appendOutput(`❌ SSH CONNECTION FAILED\n`);
                     appendOutput(`${'='.repeat(80)}\n`);
                     appendOutput((data.output || data.error || 'Unknown error') + '\n');
+                    updateSSHStatusIndicator('failed');
                 }
                 appendOutput(`${'='.repeat(80)}\n\n`);
             })
@@ -971,6 +1061,7 @@
                 appendOutput(`${'='.repeat(80)}\n`);
                 appendOutput(`Error: ${error.message}\n`);
                 appendOutput(`${'='.repeat(80)}\n\n`);
+                updateSSHStatusIndicator('failed');
             });
 
         return false; // Prevent any form submission
@@ -987,6 +1078,28 @@
         }).catch(err => {
             alert('Failed to copy: ' + err);
         });
+    }
+
+    function openSSHTerminalWindow() {
+        // First check if wetty is available
+        fetch('http://workstation.local:3001/')
+            .then(response => {
+                if (response.ok) {
+                    // Open in new window
+                    window.open('http://workstation.local:3001/', 'ssh-terminal', 'width=1000,height=700,menubar=no,toolbar=no,location=no');
+                } else {
+                    throw new Error('Service not available');
+                }
+            })
+            .catch(error => {
+                // Show error in the terminal section
+                const errorDiv = document.getElementById('ssh-terminal-error');
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                }
+                appendOutput('\n❌ SSH terminal service is not running on port 3001\n');
+                appendOutput('Please use PyCharm SSH terminal or command line instead\n\n');
+            });
     }
 
     function checkSSHTerminalService() {
@@ -1020,7 +1133,13 @@
             })
             .catch(error => {
                 appendOutput('❌ SSH terminal service is NOT running on port 3001\n');
-                appendOutput('Run setup script to enable: /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh\n\n');
+                appendOutput('Use PyCharm SSH terminal or run setup: /home/shanta/.zenflow/worktrees/dockerbug-ee56/setup-ssh-terminal.sh\n\n');
+                
+                // Show error message
+                const errorDiv = document.getElementById('ssh-terminal-error');
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                }
             });
     }
 
@@ -1106,18 +1225,31 @@
     }
 
     function deployToProduction() {
-        const service = document.getElementById('deploy-service-select').value;
         const sshTarget = document.getElementById('production-host').value.trim();
         const sshPort = document.getElementById('ssh-port').value;
+        const sshPassword = document.getElementById('ssh-password').value;
+        const productionDir = document.getElementById('production-directory').value.trim();
+        const service = document.getElementById('deploy-service-select').value;
 
         if (!sshTarget) {
             alert('Please enter SSH target (user@host)');
             return;
         }
 
+        if (!sshPassword) {
+            alert('Please enter SSH password for deployment');
+            return;
+        }
+
+        if (!productionDir) {
+            alert('Please enter production directory path');
+            return;
+        }
+
         const confirmMsg = `⚠️ PRODUCTION DEPLOYMENT\n\n` +
                           `Service: ${service}\n` +
-                          `Target: ${sshTarget}:${sshPort}\n\n` +
+                          `Target: ${sshTarget}:${sshPort}\n` +
+                          `Directory: ${productionDir}\n\n` +
                           `This will:\n` +
                           `1. Export Docker image\n` +
                           `2. Copy to production server via SSH\n` +
@@ -1142,6 +1274,8 @@
         const formData = new FormData();
         formData.append('ssh_target', sshTarget);
         formData.append('ssh_port', sshPort);
+        formData.append('ssh_password', sshPassword);
+        formData.append('production_directory', productionDir);
         formData.append('service', service);
 
         fetch('/admin/docker-deploy-to-production', {

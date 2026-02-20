@@ -4767,6 +4767,8 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     
     my $ssh_target = $c->req->params->{ssh_target} || '';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $save_credentials = $c->req->params->{save_credentials} || '';
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -4774,7 +4776,22 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         return;
     }
     
-    my $cmd = qq(ssh -p $ssh_port -o ConnectTimeout=5 -o BatchMode=yes $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Check if sshpass is installed
+    my $sshpass_check = `which sshpass 2>/dev/null`;
+    unless ($sshpass_check) {
+        $c->response->body('{"success": false, "error": "sshpass not installed. Install with: sudo apt-get install sshpass"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Use sshpass for password-based SSH
+    my $cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
@@ -4783,6 +4800,34 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         output => $output,
         exit_code => $exit_code
     };
+    
+    # Save credentials if requested
+    if ($save_credentials eq 'yes' && $exit_code == 0) {
+        my $secrets_dir = "$ENV{HOME}/.comserv/secrets";
+        my $credentials_file = "$secrets_dir/ssh_credentials.json";
+        
+        unless (-d $secrets_dir) {
+            system("mkdir -p $secrets_dir");
+            system("chmod 700 $secrets_dir");
+        }
+        
+        my $credentials = {
+            ssh_target => $ssh_target,
+            ssh_port => $ssh_port,
+            ssh_password => $ssh_password,
+            last_updated => time(),
+            last_test_success => time()
+        };
+        
+        if (open my $fh, '>', $credentials_file) {
+            print $fh encode_json($credentials);
+            close $fh;
+            chmod 0600, $credentials_file;
+            
+            $result->{credentials_saved} = \1;
+            $result->{credentials_path} = $credentials_file;
+        }
+    }
     
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
@@ -4802,10 +4847,18 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     
     my $ssh_target = $c->req->params->{ssh_target} || '';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
     my $service = $c->req->params->{service} || 'web-prod';
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
         $c->response->content_type('application/json');
         return;
     }
@@ -4819,7 +4872,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
     
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service 2>&1";
+    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
     
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
