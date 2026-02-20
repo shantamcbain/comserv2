@@ -4719,6 +4719,77 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_save_image',
+        "Docker save image requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $timestamp = time();
+    my $export_dir = "$ENV{HOME}/docker-exports";
+    system("mkdir -p $export_dir") unless -d $export_dir;
+    
+    my $image_name = "comserv2-$service";
+    my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
+    
+    my $cmd = "docker save -o $tar_file $image_name 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        tar_file => $tar_file,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Docker deploy to production requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $production_host = $c->req->params->{production_host} || '';
+    my $service = $c->req->params->{service} || 'web-prod';
+    
+    if (!$production_host) {
+        $c->response->body('{"success": false, "error": "Production host not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
+    my $cmd = "perl $script_path --host=$production_host --service=$service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
 # Helper method to convert table name to class name
 sub table_name_to_class_name {
     my ($self, $table_name) = @_;
