@@ -613,15 +613,26 @@ sub _check_workshop_access {
     }
     
     if ($required_level eq 'leader' || $required_level eq 'edit') {
+        # Site admin can edit workshops from their site
         if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
+            $c->log->debug("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
             return 1;
         }
         
+        # Workshop leader (creator or workshop_roles)
         if ($self->_is_workshop_leader($c, $workshop)) {
+            $c->log->debug("_check_workshop_access: GRANTED (workshop leader)");
+            return 1;
+        }
+        
+        # Fallback: If created_by is NULL and user is admin, allow edit
+        if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
+            $c->log->debug("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
             return 1;
         }
     }
     
+    $c->log->debug("_check_workshop_access: DENIED");
     return 0;
 }
 
