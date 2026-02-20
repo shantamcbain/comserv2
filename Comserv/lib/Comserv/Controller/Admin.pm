@@ -5054,10 +5054,20 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
         }
     });
     
-    # Don't let Catalyst finish the response
-    $c->res->from_psgi_response(sub {
-        return sub { };
-    });
+    # Prevent Catalyst from rendering template or finishing response
+    $c->detach();
+}
+
+sub end : Private {
+    my ($self, $c) = @_;
+    
+    # Skip template rendering for WebSocket endpoints
+    if ($c->req->path =~ m{/admin/docker-ssh-terminal}) {
+        return;
+    }
+    
+    # Normal template rendering for other requests
+    $c->forward($c->view('TT')) unless $c->response->body;
 }
 
 # Helper method to convert table name to class name
