@@ -117,18 +117,18 @@ eval {
     
     # Remove any old -old containers from previous deployments
     print "  Removing old backup containers...\n";
-    my $old_containers = ssh_exec("docker ps -a -q -f name=comserv2-web-prod-old");
+    my $old_containers = ssh_exec("sudo docker ps -a -q -f name=comserv2-web-prod-old");
     if ($old_containers && $old_containers =~ /\w/) {
-        ssh_exec("docker rm -f $old_containers");
+        ssh_exec("sudo docker rm -f $old_containers");
         print "  ✓ Removed old backup containers\n";
     }
     
     # Remove dangling images
     print "  Removing dangling images...\n";
-    ssh_exec("docker image prune -f");
+    ssh_exec("sudo docker image prune -f");
     
     # Show disk usage after cleanup
-    my $docker_df = ssh_exec("docker system df");
+    my $docker_df = ssh_exec("sudo docker system df");
     print $docker_df;
     print "✓ Cleanup complete\n";
     
@@ -141,9 +141,9 @@ eval {
     my $pipe_cmd;
     
     if ($ssh_password) {
-        $pipe_cmd = "docker save $image_name | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host 'docker load'";
+        $pipe_cmd = "docker save ${image_name}:latest | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host 'sudo docker load'";
     } else {
-        $pipe_cmd = "docker save $image_name | ssh -p $ssh_port $ssh_user\@$production_host 'docker load'";
+        $pipe_cmd = "docker save ${image_name}:latest | ssh -p $ssh_port $ssh_user\@$production_host 'sudo docker load'";
     }
     
     print "CMD: $pipe_cmd\n";
@@ -160,7 +160,7 @@ eval {
         print $pipe_output if $pipe_output;
         
         my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
-        run_local("docker save -o $tar_file $image_name", 
+        run_local("docker save -o $tar_file ${image_name}:latest", 
                   "Saving Docker image to tar file");
         
         my $size = -s $tar_file;
@@ -171,7 +171,7 @@ eval {
         my $scp_cmd = "scp -P $ssh_port $tar_file $ssh_user\@$production_host:$remote_dir/";
         run_local($scp_cmd, "Copying tar file to production server");
         
-        run_remote("docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
+        run_remote("sudo docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
                    "Loading image from tar file");
         
         print "\n✓ Image loaded via file transfer\n";
@@ -180,9 +180,9 @@ eval {
     # Step 3: Backup existing container on production
     print "\n[BACKUP] Backing up existing container on production...\n";
     my $container_name = "comserv2-$service";
-    my $container_exists = ssh_exec("docker ps -a --filter name=$container_name -q");
+    my $container_exists = ssh_exec("sudo docker ps -a --filter name=$container_name -q");
     if ($container_exists && $container_exists =~ /\w/) {
-        run_remote("docker commit $container_name $backup_tag", 
+        run_remote("sudo docker commit $container_name $backup_tag", 
                    "Creating backup of current container");
         print "✓ Backup created: $backup_tag\n";
     } else {
@@ -192,12 +192,12 @@ eval {
     # Step 4: Rename existing container (for rollback)
     print "\n[RENAME] Renaming existing container for rollback...\n";
     my $old_container_name = "${container_name}-old";
-    my $rename_output = ssh_exec("docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
+    my $rename_output = ssh_exec("sudo docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
     print $rename_output;
     
     # Step 5: Stop old container
     print "\n[STOP] Stopping old container on production...\n";
-    my $stop_output = ssh_exec("docker stop $old_container_name 2>&1 || echo 'No container to stop'");
+    my $stop_output = ssh_exec("sudo docker stop $old_container_name 2>&1 || echo 'No container to stop'");
     print $stop_output;
     print "✓ Old container stopped (kept for rollback)\n";
     
@@ -205,7 +205,7 @@ eval {
     print "\n[START] Starting new container on production...\n";
     my $port_map = $service eq 'web-prod' ? '5000:3000' : '3000:3000';
     my $secrets_volume = '-v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro';
-    my $start_cmd = "docker run -d --name $container_name --restart unless-stopped -p $port_map $secrets_volume ${image_name}:latest";
+    my $start_cmd = "sudo docker run -d --name $container_name --restart unless-stopped -p $port_map $secrets_volume ${image_name}:latest";
     my $start_output = ssh_exec($start_cmd);
     print $start_output;
     
@@ -218,7 +218,7 @@ eval {
     while ($attempt < $max_attempts) {
         sleep 2;
         $attempt++;
-        my $status = ssh_exec("docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
+        my $status = ssh_exec("sudo docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
         chomp $status;
         print "  Attempt $attempt/$max_attempts: Status = $status\n";
         
@@ -235,12 +235,12 @@ eval {
         print "\n[ROLLBACK] Starting rollback procedure...\n";
         
         # Stop and remove failed container
-        ssh_exec("docker stop $container_name");
-        ssh_exec("docker rm $container_name");
+        ssh_exec("sudo docker stop $container_name");
+        ssh_exec("sudo docker rm $container_name");
         
         # Restore old container
-        ssh_exec("docker rename $old_container_name $container_name");
-        ssh_exec("docker start $container_name");
+        ssh_exec("sudo docker rename $old_container_name $container_name");
+        ssh_exec("sudo docker start $container_name");
         
         print "✓ Rolled back to previous container\n";
         die "Deployment failed - rolled back to previous version\n";
@@ -250,7 +250,7 @@ eval {
     
     # Step 7: Remove old container (new one is confirmed working)
     print "\n[CLEANUP] Removing old container...\n";
-    my $rm_old = ssh_exec("docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
+    my $rm_old = ssh_exec("sudo docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
     print $rm_old;
     
     # Step 8: Cleanup temporary files
