@@ -479,13 +479,13 @@ sub edit :Path('/workshop/edit') :Args(1) {
     my $is_leader = $self->_is_workshop_leader($c, $workshop);
     my $can_edit = $self->_can_edit_workshop($c, $workshop);
     
-    $c->log->debug("Edit Workshop Authorization Debug:");
-    $c->log->debug("  Workshop ID: " . $workshop->id);
-    $c->log->debug("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
-    $c->log->debug("  Session user_id: " . ($user_id || 'NULL'));
-    $c->log->debug("  Admin type: " . ($admin_type || 'NONE'));
-    $c->log->debug("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
-    $c->log->debug("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
+    $c->log->info("Edit Workshop Authorization Debug:");
+    $c->log->info("  Workshop ID: " . $workshop->id);
+    $c->log->info("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
+    $c->log->info("  Session user_id: " . ($user_id || 'NULL'));
+    $c->log->info("  Admin type: " . ($admin_type || 'NONE'));
+    $c->log->info("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
+    $c->log->info("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
 
     # Authorization check using helper method
     unless ($can_edit) {
@@ -624,24 +624,24 @@ sub _check_workshop_access {
     if ($required_level eq 'leader' || $required_level eq 'edit') {
         # Site admin can edit workshops from their site
         if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
-            $c->log->debug("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
+            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
             return 1;
         }
         
         # Workshop leader (creator or workshop_roles)
         if ($self->_is_workshop_leader($c, $workshop)) {
-            $c->log->debug("_check_workshop_access: GRANTED (workshop leader)");
+            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
             return 1;
         }
         
         # Fallback: If created_by is NULL and user is admin, allow edit
         if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
-            $c->log->debug("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
+            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
             return 1;
         }
     }
     
-    $c->log->debug("_check_workshop_access: DENIED");
+    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -652,12 +652,12 @@ sub _is_workshop_leader {
     
     my $user_id = $c->session->{user_id};
     
-    $c->log->debug("_is_workshop_leader check:");
-    $c->log->debug("  user_id: " . ($user_id || 'NULL'));
-    $c->log->debug("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
+    $c->log->info("_is_workshop_leader check:");
+    $c->log->info("  user_id: " . ($user_id || 'NULL'));
+    $c->log->info("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
     
     if ($workshop->created_by && $user_id && $workshop->created_by == $user_id) {
-        $c->log->debug("  Result: TRUE (created_by matches)");
+        $c->log->info("  Result: TRUE (created_by matches)");
         return 1;
     }
     
@@ -667,8 +667,8 @@ sub _is_workshop_leader {
         role => 'workshop_leader'
     })->count > 0;
     
-    $c->log->debug("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
-    $c->log->debug("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
+    $c->log->info("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
+    $c->log->info("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
     
     return $has_leader_role;
 }
