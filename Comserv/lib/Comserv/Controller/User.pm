@@ -493,7 +493,7 @@ sub settings :Local {
             first_name => $user->first_name,
             last_name => $user->last_name,
             email => $user->email,
-            email_notifications => $user->email_notifications || 0,
+            email_notifications => eval { $user->email_notifications } || 0,
         },
         template => 'user/settings.tt'
     );
@@ -549,12 +549,13 @@ sub update_settings :Local {
 
     # Update user in database
     eval {
-        $user->update({
+        my $updates = {
             first_name => $first_name,
             last_name => $last_name,
             email => $email,
-            email_notifications => $email_notifications,
-        });
+        };
+        $updates->{email_notifications} = $email_notifications if eval { $user->can('email_notifications') };
+        $user->update($updates);
     };
 
     if ($@) {
