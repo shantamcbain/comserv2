@@ -35,7 +35,6 @@ __PACKAGE__->add_columns(
     roles => {
         data_type => 'text',
         is_nullable => 0,
-        default_value => 'user',
     },
     email_notifications => {
         data_type => 'tinyint',
