@@ -1101,6 +1101,10 @@ sub update_table_field_from_result {
     my $default = "";
     if (defined $result_field_info->{default_value}) {
         my $def_val = $result_field_info->{default_value};
+        # If it's a scalar reference (like \'CURRENT_TIMESTAMP'), dereference it
+        if (ref($def_val) eq 'SCALAR') {
+            $def_val = $$def_val;
+        }
         # Check if this is a SQL literal (CURRENT_TIMESTAMP, NOW(), etc) - these don't need quotes
         if ($def_val =~ /^(CURRENT_TIMESTAMP|NOW\(\)|CURRENT_DATE|CURRENT_TIME|NULL)$/i) {
             $default = "DEFAULT $def_val";
@@ -1856,7 +1860,14 @@ sub parse_result_file_columns {
         while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
             my $attr = $1;
             my $val = $2 // $3 // $4 // $5;
-            $info->{$attr} = $val;
+            # If the value was captured from \'...' syntax, mark it as a scalar ref
+            if (defined $4) {
+                # This was \'SOMETHING', which is a scalar reference in Perl
+                # Store the actual string value
+                $info->{$attr} = $val;
+            } else {
+                $info->{$attr} = $val;
+            }
         }
         $columns->{$name} = $info;
     }
