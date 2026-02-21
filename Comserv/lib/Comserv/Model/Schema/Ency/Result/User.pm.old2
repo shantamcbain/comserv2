@@ -15,17 +15,14 @@ __PACKAGE__->add_columns(
     password => {
         data_type => 'varchar',
         size => 255,
-        is_nullable => 1,
     },
     first_name => {
         data_type => 'varchar',
         size => 255,
-        is_nullable => 1,
     },
     last_name => {
         data_type => 'varchar',
         size => 255,
-        is_nullable => 1,
     },
     email => {
         data_type => 'varchar',
@@ -34,18 +31,16 @@ __PACKAGE__->add_columns(
     },
     roles => {
         data_type => 'text',
-        is_nullable => 0,
     },
     email_notifications => {
         data_type => 'tinyint',
-        size => 4,
-        is_nullable => 0,
         default_value => 1,
+        is_nullable => 0,
     },
     status => {
         data_type => 'varchar',
         size => 50,
-        default_value => 'active',
+        default_value => 'pending_verification',
         is_nullable => 0,
     },
     email_verified_at => {
@@ -76,7 +71,11 @@ __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
 
 # Relationships
-__PACKAGE__->has_many(site_users => 'Comserv::Model::Schema::Ency::Result::System::SiteUser', 'user_id');
+__PACKAGE__->has_many(
+    'ai_conversations' => 'Comserv::Model::Schema::Ency::Result::AiConversation',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
 
 __PACKAGE__->belongs_to(
     'creator' => 'Comserv::Model::Schema::Ency::Result::User',
