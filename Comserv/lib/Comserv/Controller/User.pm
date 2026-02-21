@@ -594,8 +594,8 @@ sub update_settings :Local {
 sub create_account :Local {
     my ($self, $c) = @_;
 
-    # Display the account creation form
-    $c->stash(template => '/user/create_account.tt');
+    # Redirect to new 3-step registration
+    $c->response->redirect($c->uri_for('/user/register_step1'));
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
@@ -1072,8 +1072,8 @@ sub do_edit_user :Local :Args(1) {
 sub register :Local {
     my ($self, $c) = @_;
 
-    # Display the registration form
-    $c->stash(template => 'user/register.tt');
+    # Redirect to new 3-step registration
+    $c->response->redirect($c->uri_for('/user/register_step1'));
 }
 sub welcome :Local {
     my ($self, $c) = @_;
