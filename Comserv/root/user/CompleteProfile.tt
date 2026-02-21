@@ -1,0 +1,74 @@
+[% PageVersion = 'complete_profile.tt,v 0.01 2026/02/21 AI Assistant Exp AI Assistant ' %]
+[% IF c.session.debug_mode == 1 %]
+  [% PageVersion %]
+
+[% END %]
+
+<h2>Create Account - Step 3 of 3</h2>
+<p>Complete your profile to finish registration.</p>
+
+[% IF c.stash.error_msg %]
+    <p class="error">[% c.stash.error_msg %]</p>
+[% END %]
+
+<form method="post" action="/user/complete_profile">
+    <label for="first_name">First Name</label>
+    <input type="text" id="first_name" name="first_name" value="[% first_name | html %]" required><br>
+
+    <label for="last_name">Last Name</label>
+    <input type="text" id="last_name" name="last_name" value="[% last_name | html %]" required><br>
+
+    <label for="password">Password (minimum 8 characters)</label>
+    <input type="password" id="password" name="password" minlength="8" required><br>
+
+    <label for="password_confirm">Confirm Password</label>
+    <input type="password" id="password_confirm" name="password_confirm" minlength="8" required><br>
+
+    <input type="submit" value="Complete Registration">
+</form>
+
+<style>
+    .error {
+        color: red;
+        font-weight: bold;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    form {
+        max-width: 400px;
+        margin: 20px 0;
+    }
+    
+    label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+    
+    input[type="text"],
+    input[type="password"] {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    
+    input[type="submit"] {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    input[type="submit"]:hover {
+        background: #218838;
+    }
+</style>

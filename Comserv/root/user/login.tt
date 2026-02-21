@@ -10,13 +10,16 @@
     <p class="success">[% c.flash.success_msg %]</p>
 [% END %]
 <!-- Display error message if it exists -->
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
 [% IF c.stash.error_msg %]
     <p class="error">[% c.stash.error_msg %]</p>
 [% END %]
 
 <!-- root/src/login.tt2 -->
 <form method="post" action="/user/do_login">
-    <label for="username">Username</label>
+    <label for="username">Username or Email</label>
     <input type="text" id="username" name="username" required>
 
     <label for="password">Password</label>
