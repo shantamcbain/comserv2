@@ -36,8 +36,9 @@ __PACKAGE__->add_columns(
     ## COMMENTED OUT - Add via schema_compare first, then uncomment
     # email_notifications => {
     #     data_type => 'tinyint',
-    #     default_value => 1,
+    #     size => 4,
     #     is_nullable => 0,
+    #     default_value => '1',
     # },
     # status => {
     #     data_type => 'varchar',
