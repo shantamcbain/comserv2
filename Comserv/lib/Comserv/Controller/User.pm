@@ -38,8 +38,10 @@ sub login :Local {
         $referer = $return_to;
     }
 
-    # Don't store the login page as the referer
-    if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login}) {
+    # Don't store the login or registration pages as the referer
+    if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login} &&
+        $referer !~ m{/user/register} && $referer !~ m{/user/do_create_account} &&
+        $referer !~ m{/user/verify_email} && $referer !~ m{/user/complete_profile}) {
         $c->session->{referer} = $referer;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Stored referer in session: $referer");
     } else {
