@@ -21,8 +21,16 @@ sub get_active_workshops {
         my $admin_auth = Comserv::Util::AdminAuth->new();
         my $admin_type = $admin_auth->get_admin_type($c);
         my $sitename = $c->session->{SiteName};
+        my $user_id = $c->session->{user_id};
+        my $roles = $c->session->{roles} || [];
         
-        # CSC admin (god-level) sees all workshops
+        # Check if user is workshop leader
+        my $is_workshop_leader = 0;
+        if (ref $roles eq 'ARRAY') {
+            $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
+        }
+        
+        # CSC admin (god-level) sees all workshops including drafts
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
@@ -33,19 +41,57 @@ sub get_active_workshops {
                     prefetch => 'creator'
                 }
             );
-        } else {
-            # Get site_id from session or sites table
+        } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
+            # Site admin and workshop leaders see:
+            # 1. All published workshops (public + their site)
+            # 2. Their own draft workshops
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
                 $site_id = $site->id if $site;
             }
             
-            # Site admin and regular users see:
-            # 1. Public workshops (share='public')
-            # 2. Workshops associated with their site via site_workshop table
             my $search_filter = {
                 date => { '>=' => DateTime->today->ymd },
+                -or => [
+                    { status => 'published' },
+                    { created_by => $user_id }
+                ]
+            };
+            
+            if ($site_id) {
+                $search_filter->{-or} = [
+                    { share => 'public', status => 'published' },
+                    { 'site_associations.site_id' => $site_id, status => 'published' },
+                    { created_by => $user_id }
+                ];
+            } else {
+                $search_filter->{-or} = [
+                    { share => 'public', status => 'published' },
+                    { created_by => $user_id }
+                ];
+            }
+            
+            @workshops = $rs->search(
+                $search_filter,
+                { 
+                    order_by => { -asc => 'date' },
+                    prefetch => 'creator',
+                    join => 'site_associations',
+                    distinct => 1
+                }
+            );
+        } else {
+            # Regular users see only published workshops
+            my $site_id;
+            if ($sitename) {
+                my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+                $site_id = $site->id if $site;
+            }
+            
+            my $search_filter = {
+                date => { '>=' => DateTime->today->ymd },
+                status => 'published',
             };
             
             if ($site_id) {
@@ -54,7 +100,6 @@ sub get_active_workshops {
                     { 'site_associations.site_id' => $site_id }
                 ];
             } else {
-                # If no site_id, only show public workshops
                 $search_filter->{share} = 'public';
             }
             
@@ -108,8 +153,16 @@ sub get_past_workshops {
         my $admin_auth = Comserv::Util::AdminAuth->new();
         my $admin_type = $admin_auth->get_admin_type($c);
         my $sitename = $c->session->{SiteName};
+        my $user_id = $c->session->{user_id};
+        my $roles = $c->session->{roles} || [];
         
-        # CSC admin (god-level) sees all workshops
+        # Check if user is workshop leader
+        my $is_workshop_leader = 0;
+        if (ref $roles eq 'ARRAY') {
+            $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
+        }
+        
+        # CSC admin (god-level) sees all workshops including drafts
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
@@ -120,19 +173,53 @@ sub get_past_workshops {
                     prefetch => 'creator'
                 }
             );
-        } else {
-            # Get site_id from session or sites table
+        } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
+            # Site admin and workshop leaders see:
+            # 1. All published workshops (public + their site)
+            # 2. Their own draft workshops
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
                 $site_id = $site->id if $site;
             }
             
-            # Site admin and regular users see:
-            # 1. Public workshops (share='public')
-            # 2. Workshops associated with their site via site_workshop table
             my $search_filter = {
                 date => { '<' => DateTime->today->ymd },
+            };
+            
+            if ($site_id) {
+                $search_filter->{-or} = [
+                    { share => 'public', status => 'published' },
+                    { 'site_associations.site_id' => $site_id, status => 'published' },
+                    { created_by => $user_id }
+                ];
+            } else {
+                $search_filter->{-or} = [
+                    { share => 'public', status => 'published' },
+                    { created_by => $user_id }
+                ];
+            }
+            
+            @workshops = $rs->search(
+                $search_filter,
+                { 
+                    order_by => { -desc => 'date' },
+                    prefetch => 'creator',
+                    join => 'site_associations',
+                    distinct => 1
+                }
+            );
+        } else {
+            # Regular users see only published workshops
+            my $site_id;
+            if ($sitename) {
+                my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
+                $site_id = $site->id if $site;
+            }
+            
+            my $search_filter = {
+                date => { '<' => DateTime->today->ymd },
+                status => 'published',
             };
             
             if ($site_id) {
@@ -141,7 +228,6 @@ sub get_past_workshops {
                     { 'site_associations.site_id' => $site_id }
                 ];
             } else {
-                # If no site_id, only show public workshops
                 $search_filter->{share} = 'public';
             }
             

@@ -63,8 +63,45 @@
                                     <small>[% workshop.sitename | html %]</small>
                                 </td>
                                 <td>
-                                    [% workshop.date.split(' ').0 %]<br>
-                                    <small>[% workshop.time %] - [% workshop.end_time %]</small>
+                                    [% IF workshop.date %]
+                                        [% USE date_obj = DateTime(year=workshop.date.split('-').0, month=workshop.date.split('-').1, day=workshop.date.split('-').2) %]
+                                        [% date_obj.strftime('%b %d, %Y') %]<br>
+                                    [% ELSE %]
+                                        <em>No date set</em><br>
+                                    [% END %]
+                                    <small>
+                                        [% IF workshop.time %]
+                                            [% 
+                                                hour = workshop.time.split(':').0;
+                                                min = workshop.time.split(':').1;
+                                                IF hour >= 12;
+                                                    ampm = 'PM';
+                                                    display_hour = hour == 12 ? 12 : hour - 12;
+                                                ELSE;
+                                                    ampm = 'AM';
+                                                    display_hour = hour == 0 ? 12 : hour;
+                                                END;
+                                            %]
+                                            [% display_hour %]:[% min %] [% ampm %]
+                                        [% ELSE %]
+                                            N/A
+                                        [% END %]
+                                        [% IF workshop.end_time %]
+                                            - 
+                                            [% 
+                                                hour_end = workshop.end_time.split(':').0;
+                                                min_end = workshop.end_time.split(':').1;
+                                                IF hour_end >= 12;
+                                                    ampm_end = 'PM';
+                                                    display_hour_end = hour_end == 12 ? 12 : hour_end - 12;
+                                                ELSE;
+                                                    ampm_end = 'AM';
+                                                    display_hour_end = hour_end == 0 ? 12 : hour_end;
+                                                END;
+                                            %]
+                                            [% display_hour_end %]:[% min_end %] [% ampm_end %]
+                                        [% END %]
+                                    </small>
                                 </td>
                                 <td>
                                     [% IF workshop.creator && workshop.created_by %]

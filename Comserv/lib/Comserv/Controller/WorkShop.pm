@@ -121,9 +121,18 @@ sub index :Path :Args(0) {
 sub dashboard :Local {
     my ( $self, $c ) = @_;
 
+    # Check if user has admin access OR workshop_leader role
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'workshop_dashboard')) {
-        $c->flash->{error_msg} = "Access denied. Admin access required.";
+    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_dashboard');
+    
+    my $roles = $c->session->{roles} || [];
+    my $has_workshop_leader_role = 0;
+    if (ref $roles eq 'ARRAY') {
+        $has_workshop_leader_role = grep { $_ eq 'workshop_leader' } @$roles;
+    }
+    
+    unless ($has_admin || $has_workshop_leader_role) {
+        $c->flash->{error_msg} = "Access denied. Admin or workshop leader access required.";
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
@@ -251,18 +260,20 @@ sub addworkshop :Local {
     my $workshop;
     eval {
         $workshop = $rs->create({
-            sitename         => $creator_sitename,
-            title            => $params->{title},
-            description      => $params->{description},
-            date             => $params->{dateOfWorkshop},
-            location         => $params->{location},
-            instructor       => $params->{instructor},
-            max_participants => $params->{maxMinAttendees},
-            share            => $params->{share} || 'private',
-            end_time         => $params->{end_time},
-            time             => $time,
-            created_by       => $c->session->{user_id},
-            site_id          => $creator_site_id,
+            sitename            => $creator_sitename,
+            title               => $params->{title},
+            description         => $params->{description},
+            date                => $params->{dateOfWorkshop},
+            location            => $params->{location},
+            instructor          => $params->{instructor},
+            max_participants    => $params->{maxMinAttendees},
+            share               => $params->{share} || 'private',
+            status              => $params->{status} || 'draft',
+            registration_deadline => $params->{registration_deadline},
+            end_time            => $params->{end_time},
+            time                => $time,
+            created_by          => $c->session->{user_id},
+            site_id             => $creator_site_id,
         });
         
         # Create site_workshop records based on share setting
@@ -461,8 +472,23 @@ sub edit :Path('/workshop/edit') :Args(1) {
         return;
     }
 
+    # Debug logging for authorization issues
+    my $user_id = $c->session->{user_id};
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_leader = $self->_is_workshop_leader($c, $workshop);
+    my $can_edit = $self->_can_edit_workshop($c, $workshop);
+    
+    $c->log->info("Edit Workshop Authorization Debug:");
+    $c->log->info("  Workshop ID: " . $workshop->id);
+    $c->log->info("  Workshop created_by: " . ($workshop->created_by || 'NULL'));
+    $c->log->info("  Session user_id: " . ($user_id || 'NULL'));
+    $c->log->info("  Admin type: " . ($admin_type || 'NONE'));
+    $c->log->info("  Is workshop leader: " . ($is_leader ? 'YES' : 'NO'));
+    $c->log->info("  Can edit workshop: " . ($can_edit ? 'YES' : 'NO'));
+
     # Authorization check using helper method
-    unless ($self->_can_edit_workshop($c, $workshop)) {
+    unless ($can_edit) {
         $c->flash->{error_msg} = 'Access denied. You do not have permission to edit this workshop.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
@@ -489,15 +515,17 @@ sub edit :Path('/workshop/edit') :Args(1) {
         
         eval {
             $workshop->update({
-                title            => $params->{title},
-                description      => $params->{description},
-                date             => $params->{date},
-                time             => $params->{time},
-                end_time         => $params->{end_time},
-                location         => $params->{location},
-                instructor       => $params->{instructor},
-                max_participants => $params->{max_participants},
-                share            => $new_share,
+                title                => $params->{title},
+                description          => $params->{description},
+                date                 => $params->{date},
+                time                 => $params->{time},
+                end_time             => $params->{end_time},
+                location             => $params->{location},
+                instructor           => $params->{instructor},
+                max_participants     => $params->{max_participants},
+                share                => $new_share,
+                status               => $params->{status},
+                registration_deadline => $params->{registration_deadline},
             });
             
             # Update site_workshop records if share setting changed
@@ -594,15 +622,26 @@ sub _check_workshop_access {
     }
     
     if ($required_level eq 'leader' || $required_level eq 'edit') {
+        # Site admin can edit workshops from their site
         if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
+            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
             return 1;
         }
         
+        # Workshop leader (creator or workshop_roles)
         if ($self->_is_workshop_leader($c, $workshop)) {
+            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
+            return 1;
+        }
+        
+        # Fallback: If created_by is NULL and user is admin, allow edit
+        if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
+            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
             return 1;
         }
     }
     
+    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -613,7 +652,12 @@ sub _is_workshop_leader {
     
     my $user_id = $c->session->{user_id};
     
-    if ($workshop->created_by && $workshop->created_by == $user_id) {
+    $c->log->info("_is_workshop_leader check:");
+    $c->log->info("  user_id: " . ($user_id || 'NULL'));
+    $c->log->info("  workshop.created_by: " . ($workshop->created_by || 'NULL'));
+    
+    if ($workshop->created_by && $user_id && $workshop->created_by == $user_id) {
+        $c->log->info("  Result: TRUE (created_by matches)");
         return 1;
     }
     
@@ -622,6 +666,9 @@ sub _is_workshop_leader {
         user_id => $user_id,
         role => 'workshop_leader'
     })->count > 0;
+    
+    $c->log->info("  has_leader_role from workshop_roles: " . ($has_leader_role ? 'YES' : 'NO'));
+    $c->log->info("  Result: " . ($has_leader_role ? 'TRUE' : 'FALSE'));
     
     return $has_leader_role;
 }
