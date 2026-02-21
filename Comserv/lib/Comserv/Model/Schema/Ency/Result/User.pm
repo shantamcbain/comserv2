@@ -1,4 +1,4 @@
-package Comserv::Model::Schema::Ency::Result::User::User;
+package Comserv::Model::Schema::Ency::Result::User;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('users');
@@ -77,13 +77,13 @@ __PACKAGE__->has_many(site_users => 'Comserv::Model::Schema::Ency::Result::Syste
 
 ## COMMENTED OUT - Uncomment after schema update
 # __PACKAGE__->belongs_to(
-#     'creator' => 'Comserv::Model::Schema::Ency::Result::User::User',
+#     'creator' => 'Comserv::Model::Schema::Ency::Result::User',
 #     'created_by',
 #     { join_type => 'left', on_delete => 'set null' }
 # );
 # 
 # __PACKAGE__->has_many(
-#     'created_users' => 'Comserv::Model::Schema::Ency::Result::User::User',
+#     'created_users' => 'Comserv::Model::Schema::Ency::Result::User',
 #     { 'foreign.created_by' => 'self.id' }
 # );
 # 
