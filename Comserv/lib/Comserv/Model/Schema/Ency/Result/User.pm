@@ -86,18 +86,17 @@ __PACKAGE__->has_many(
     { 'foreign.created_by' => 'self.id' }
 );
 
-# Commented out - tables don't exist yet
-# __PACKAGE__->has_many(
-#     'verification_codes' => 'Comserv::Model::Schema::Ency::Result::EmailVerificationCode',
-#     { 'foreign.user_id' => 'self.id' },
-#     { cascade_delete => 1 }
-# );
-# 
-# __PACKAGE__->has_many(
-#     'password_reset_tokens' => 'Comserv::Model::Schema::Ency::Result::PasswordResetToken',
-#     { 'foreign.user_id' => 'self.id' },
-#     { cascade_delete => 1 }
-# );
+__PACKAGE__->has_many(
+    'verification_codes' => 'Comserv::Model::Schema::Ency::Result::EmailVerificationCode',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'password_reset_tokens' => 'Comserv::Model::Schema::Ency::Result::PasswordResetToken',
+    { 'foreign.user_id' => 'self.id' },
+    { cascade_delete => 1 }
+);
 
 __PACKAGE__->has_many(
     'user_site_roles' => 'Comserv::Model::Schema::Ency::Result::UserSiteRole',
