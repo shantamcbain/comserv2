@@ -81,7 +81,13 @@
                                 [% 
                                     current = workshop.current_participants || 0;
                                     max = workshop.max_participants || 0;
-                                    is_full = max > 0 && current >= max;
+                                    
+                                    # Set is_full variable for use in Register button below
+                                    IF max > 0 && current >= max;
+                                        is_full = 1;
+                                    ELSE;
+                                        is_full = 0;
+                                    END;
                                 %]
                                 [% IF max > 0 %]
                                     [% IF is_full %]
@@ -139,6 +145,20 @@
                     </table>
                 </div>
             </div>
+            
+            <!-- Debug: Registration button visibility -->
+            [% IF c.request.params.debug == 1 %]
+            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+                <p><strong>Registration Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>is_user_registered: [% is_user_registered ? 'YES' : 'NO' %]</li>
+                    <li>workshop.status: [% workshop.status %]</li>
+                    <li>is_full: [% is_full ? 'YES' : 'NO' %]</li>
+                    <li>Condition for Register button: [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]TRUE[% ELSE %]FALSE[% END %]</li>
+                </ul>
+            </div>
+            [% END %]
             
             [% IF c.user_exists && !is_user_registered && workshop.status == 'published' %]
             <div class="data-container">
@@ -228,12 +248,30 @@
             </div>
             [% END %]
             
-            <div class="form-actions">
-                [% IF c.user_exists && (c.session.roles.match('admin') || is_workshop_leader) %]
-                    <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
-                    <a href="/workshop/participants?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
-                    <a href="/workshop/files?workshop_id=[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
-                    <a href="/workshop/compose_email?workshop_id=[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+            <!-- Debug: Show button visibility check -->
+            [% IF c.session.debug_mode == 1 %]
+            <div class="debug-info" style="background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107;">
+                <p><strong>Button Visibility Debug:</strong></p>
+                <ul>
+                    <li>c.user_exists: [% c.user_exists ? 'YES' : 'NO' %]</li>
+                    <li>username: [% c.session.username || 'NOT SET' %]</li>
+                    <li>user_id: [% c.session.user_id || 'NOT SET' %]</li>
+                    <li>roles (grep admin): [% c.session.roles.grep('admin').size %]</li>
+                    <li>is_workshop_leader: [% is_workshop_leader ? 'YES' : 'NO' %]</li>
+                    <li>workshop.created_by: [% workshop.created_by || 'NOT SET' %]</li>
+                </ul>
+            </div>
+            [% END %]
+            
+            <div class="form-actions" style="margin-bottom: 50px;">
+                [% IF c.user_exists %]
+                    [% IF c.session.roles.grep('admin').size || is_workshop_leader %]
+                        <a href="/workshop/edit/[% workshop.id %]" class="btn btn-edit">Edit Workshop</a>
+                        <a href="/workshop/participants/[% workshop.id %]" class="btn btn-secondary">Manage Participants</a>
+                        <a href="/workshop/files/[% workshop.id %]" class="btn btn-secondary">Manage Files</a>
+                        <a href="/workshop/content/[% workshop.id %]" class="btn btn-secondary">Manage Content</a>
+                        <a href="/workshop/compose_email/[% workshop.id %]" class="btn btn-secondary">Email Participants</a>
+                    [% END %]
                 [% END %]
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
             </div>
