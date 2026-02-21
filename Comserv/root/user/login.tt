@@ -19,7 +19,7 @@
 
 <!-- root/src/login.tt2 -->
 <form method="post" action="/user/do_login">
-    <label for="username">Username</label>
+    <label for="username">Username or Email</label>
     <input type="text" id="username" name="username" required>
 
     <label for="password">Password</label>
