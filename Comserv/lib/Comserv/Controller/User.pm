@@ -172,9 +172,18 @@ sub do_login :Local {
     # Manual authentication to bypass Catalyst auth system issues
     my $user;
     eval {
-        $user = $c->model('DBEncy::User')->find({ username => $username });
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
-            "Manual user lookup for '$username': " . (defined $user ? "found" : "not found"));
+        # Check if input contains '@' to determine if it's email or username
+        if ($username =~ /@/) {
+            # Lookup by email
+            $user = $c->model('DBEncy::User')->find({ email => $username });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
+                "Manual user lookup by email for '$username': " . (defined $user ? "found" : "not found"));
+        } else {
+            # Lookup by username
+            $user = $c->model('DBEncy::User')->find({ username => $username });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
+                "Manual user lookup by username for '$username': " . (defined $user ? "found" : "not found"));
+        }
     };
     
     if ($@) {
@@ -185,7 +194,16 @@ sub do_login :Local {
         return;
     }
     
+    # Check if user exists and password is correct
     if ($user && $user->check_password($password)) {
+        # Check if account is suspended
+        if ($user->status && $user->status eq 'suspended') {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Login attempt for suspended account: '$username'");
+            $c->flash->{error_msg} = 'Your account has been suspended. Please contact an administrator.';
+            $c->res->redirect($c->uri_for('/user/login'));
+            return;
+        }
         # Manual authentication successful
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "User '$username' successfully authenticated via manual check.");
