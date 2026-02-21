@@ -10,6 +10,9 @@
     <p class="success">[% c.flash.success_msg %]</p>
 [% END %]
 <!-- Display error message if it exists -->
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
 [% IF c.stash.error_msg %]
     <p class="error">[% c.stash.error_msg %]</p>
 [% END %]
