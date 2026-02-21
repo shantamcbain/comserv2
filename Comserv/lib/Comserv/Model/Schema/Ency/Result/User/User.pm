@@ -75,33 +75,34 @@ __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
 # Relationships
 __PACKAGE__->has_many(site_users => 'Comserv::Model::Schema::Ency::Result::System::SiteUser', 'user_id');
 
-__PACKAGE__->belongs_to(
-    'creator' => 'Comserv::Model::Schema::Ency::Result::User::User',
-    'created_by',
-    { join_type => 'left', on_delete => 'set null' }
-);
-
-__PACKAGE__->has_many(
-    'created_users' => 'Comserv::Model::Schema::Ency::Result::User::User',
-    { 'foreign.created_by' => 'self.id' }
-);
-
-__PACKAGE__->has_many(
-    'verification_codes' => 'Comserv::Model::Schema::Ency::Result::EmailVerificationCode',
-    { 'foreign.user_id' => 'self.id' },
-    { cascade_delete => 1 }
-);
-
-__PACKAGE__->has_many(
-    'password_reset_tokens' => 'Comserv::Model::Schema::Ency::Result::PasswordResetToken',
-    { 'foreign.user_id' => 'self.id' },
-    { cascade_delete => 1 }
-);
-
-__PACKAGE__->has_many(
-    'user_site_roles' => 'Comserv::Model::Schema::Ency::Result::UserSiteRole',
-    { 'foreign.user_id' => 'self.id' },
-    { cascade_delete => 1 }
-);
+## COMMENTED OUT - Uncomment after schema update
+# __PACKAGE__->belongs_to(
+#     'creator' => 'Comserv::Model::Schema::Ency::Result::User::User',
+#     'created_by',
+#     { join_type => 'left', on_delete => 'set null' }
+# );
+# 
+# __PACKAGE__->has_many(
+#     'created_users' => 'Comserv::Model::Schema::Ency::Result::User::User',
+#     { 'foreign.created_by' => 'self.id' }
+# );
+# 
+# __PACKAGE__->has_many(
+#     'verification_codes' => 'Comserv::Model::Schema::Ency::Result::EmailVerificationCode',
+#     { 'foreign.user_id' => 'self.id' },
+#     { cascade_delete => 1 }
+# );
+# 
+# __PACKAGE__->has_many(
+#     'password_reset_tokens' => 'Comserv::Model::Schema::Ency::Result::PasswordResetToken',
+#     { 'foreign.user_id' => 'self.id' },
+#     { cascade_delete => 1 }
+# );
+# 
+# __PACKAGE__->has_many(
+#     'user_site_roles' => 'Comserv::Model::Schema::Ency::Result::UserSiteRole',
+#     { 'foreign.user_id' => 'self.id' },
+#     { cascade_delete => 1 }
+# );
 
 1;
