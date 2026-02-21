@@ -10,7 +10,7 @@ __PACKAGE__->add_columns(
     username => {
         data_type => 'varchar',
         size => 255,
-        is_nullable => 1,
+        is_nullable => 0,  ## Keep as NOT NULL until schema updated
     },
     password => {
         data_type => 'varchar',
@@ -33,40 +33,41 @@ __PACKAGE__->add_columns(
         data_type => 'text',
         is_nullable => 0,
     },
-    email_notifications => {
-        data_type => 'tinyint',
-        default_value => 1,
-        is_nullable => 0,
-    },
-    status => {
-        data_type => 'varchar',
-        size => 50,
-        default_value => 'pending_verification',
-        is_nullable => 0,
-    },
-    email_verified_at => {
-        data_type => 'timestamp',
-        is_nullable => 1,
-    },
-    created_by => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    creation_context => {
-        data_type => 'varchar',
-        size => 100,
-        is_nullable => 1,
-    },
-    created_at => {
-        data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP',
-        is_nullable => 0,
-    },
-    updated_at => {
-        data_type => 'timestamp',
-        default_value => \'CURRENT_TIMESTAMP',
-        is_nullable => 0,
-    },
+    ## COMMENTED OUT - Add via schema_compare first, then uncomment
+    # email_notifications => {
+    #     data_type => 'tinyint',
+    #     default_value => 1,
+    #     is_nullable => 0,
+    # },
+    # status => {
+    #     data_type => 'varchar',
+    #     size => 50,
+    #     default_value => 'pending_verification',
+    #     is_nullable => 0,
+    # },
+    # email_verified_at => {
+    #     data_type => 'timestamp',
+    #     is_nullable => 1,
+    # },
+    # created_by => {
+    #     data_type => 'integer',
+    #     is_nullable => 1,
+    # },
+    # creation_context => {
+    #     data_type => 'varchar',
+    #     size => 100,
+    #     is_nullable => 1,
+    # },
+    # created_at => {
+    #     data_type => 'timestamp',
+    #     default_value => \'CURRENT_TIMESTAMP',
+    #     is_nullable => 0,
+    # },
+    # updated_at => {
+    #     data_type => 'timestamp',
+    #     default_value => \'CURRENT_TIMESTAMP',
+    #     is_nullable => 0,
+    # },
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint('username_unique' => ['username']);
