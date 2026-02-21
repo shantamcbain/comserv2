@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.73' %]
+[% version = '0.74' %]
 [% date_iso = '2026/02/21' %]
 [% formatted_date = 'February 21, 2026' %]
-[% time = '15:37:00' %]
-[% change_log = 'Users: UserVerification utility module COMPLETE - Moose-based utility with SHA256 hashing, 6-digit codes, 32-char tokens, 24h expiry. Methods: generate/create/verify for codes and tokens. Phase 1 complete, Phase 2 in progress. Next: 3-step self-registration.' %]
+[% time = '16:30:00' %]
+[% change_log = 'Users: 3-Step Self-Registration COMPLETE - Refactored existing register.tt and do_create_account, created VerifyEmail.tt and CompleteProfile.tt (PascalCase). Clean URLs (/register, /verify_email, /complete_profile). Reused existing code, deleted duplicates. Phase 2 in progress. Next: Enhanced login (email/username support).' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -1787,7 +1787,8 @@ last_updated = '2026/02/08'
                         <li>✅ Fixed schema_compare bugs (CURRENT_TIMESTAMP, JSON serialization)</li>
                         <li>✅ Database schema changes verified (all 3 tables created/modified, DBIx::Class relationships active)</li>
                         <li>✅ UserVerification utility module created (SHA256 hashing, code/token generation, 24h expiry)</li>
-                        <li>⏳ **NEXT**: Implement 3-step self-registration workflow</li>
+                        <li>✅ 3-step self-registration workflow implemented (refactored existing code, PascalCase templates)</li>
+                        <li>⏳ **NEXT**: Enhance login with email/username support</li>
                     </ul>
 
                     <h4>🔧 Issues Resolved</h4>
@@ -1800,48 +1801,81 @@ last_updated = '2026/02/08'
                         <li>✅ Fixed regex in <code>parse_result_file_columns()</code> to capture last column</li>
                     </ul>
 
-                    <h4>🔨 Latest Implementation: UserVerification Utility Module</h4>
+                    <h4>🔨 Latest Implementation: 3-Step Self-Registration Workflow</h4>
                     <div style="padding: 10px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; margin: 10px 0;">
-                        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Util/UserVerification.pm</code></p>
-                        <p><strong>Purpose:</strong> Centralized utility for secure verification code and password reset token management. Refactors existing placeholder logic in User.pm into a reusable, tested module.</p>
+                        <p><strong>Status:</strong> ✅ COMPLETE - Ready for testing</p>
+                        <p><strong>Access:</strong> <a href="http://workstation.local:4005/user/register" target="_blank">http://workstation.local:4005/user/register</a></p>
                         
-                        <p><strong>Why Created:</strong></p>
+                        <p><strong>Implementation Approach:</strong></p>
                         <ul style="margin-top: 5px;">
-                            <li><strong>Security:</strong> Uses SHA256 hashing for all codes/tokens (never stored in plain text)</li>
-                            <li><strong>Consistency:</strong> Single source of truth for code generation, validation, and expiry logic</li>
-                            <li><strong>Reusability:</strong> Used across email verification, password reset, and admin invitation workflows</li>
-                            <li><strong>Best Practice:</strong> Follows codebase patterns (Moose-based, integrates with DBIx::Class relationships)</li>
+                            <li><strong>Reused Existing Code:</strong> Refactored <code>register</code> action and <code>register.tt</code> template instead of creating duplicates</li>
+                            <li><strong>Followed PascalCase:</strong> New templates named <code>VerifyEmail.tt</code> and <code>CompleteProfile.tt</code></li>
+                            <li><strong>Clean URLs:</strong> <code>/user/register</code> (not /register_step1), <code>/user/verify_email</code>, <code>/user/complete_profile</code></li>
+                            <li><strong>Deleted Orphans:</strong> Removed duplicate templates (<code>create_account.tt</code>, <code>register_step1.tt</code>) and orphaned actions</li>
+                            <li><strong>Backward Compatible:</strong> <code>/user/create_account</code> redirects to <code>/user/register</code></li>
                         </ul>
 
-                        <p><strong>Implementation Details:</strong></p>
-                        <ul style="margin-top: 5px;">
-                            <li><strong>Verification Codes:</strong> 6-digit numeric codes for email verification</li>
-                            <li><strong>Reset Tokens:</strong> 32-character hex tokens for password reset links</li>
-                            <li><strong>Expiry:</strong> All codes/tokens expire after 24 hours (configurable DateTime calculation)</li>
-                            <li><strong>Database Integration:</strong> Creates and validates records in <code>email_verification_codes</code> and <code>password_reset_tokens</code> tables</li>
-                            <li><strong>Methods:</strong>
+                        <p><strong>Workflow (3 Steps):</strong></p>
+                        <ol style="margin-top: 5px;">
+                            <li><strong>Step 1 - Register (<code>/user/register</code>):</strong>
                                 <ul style="font-size: 0.9em; margin-top: 3px;">
-                                    <li><code>generate_verification_code()</code> - Random 6-digit code</li>
-                                    <li><code>create_verification_code($user, $code)</code> - Hash & store code with 24h expiry</li>
-                                    <li><code>verify_code($user, $code)</code> - Validate code, check expiry, mark verified</li>
-                                    <li><code>generate_reset_token()</code> - Random 32-char hex token</li>
-                                    <li><code>create_reset_token($user, $token)</code> - Hash & store token with 24h expiry</li>
-                                    <li><code>verify_reset_token($schema, $token)</code> - Validate token, check expiry (requires schema parameter)</li>
-                                    <li><code>is_expired($record)</code> - Check if code/token has expired (handles DateTime and MySQL timestamp formats)</li>
+                                    <li>User enters username + email</li>
+                                    <li>Validates uniqueness (username & email)</li>
+                                    <li>Creates user with <code>status='pending_verification'</code></li>
+                                    <li>Generates 6-digit code (SHA256 hashed)</li>
+                                    <li>Stores in <code>email_verification_codes</code> table</li>
+                                    <li>Displays code in session for testing (placeholder for email)</li>
+                                    <li>Redirects to Step 2</li>
                                 </ul>
                             </li>
-                        </ul>
+                            <li><strong>Step 2 - Verify Email (<code>/user/verify_email</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters 6-digit code</li>
+                                    <li>Validates against hashed value</li>
+                                    <li>Checks 24-hour expiry via <code>UserVerification::is_expired()</code></li>
+                                    <li>Marks <code>verified_at</code> timestamp</li>
+                                    <li>Redirects to Step 3</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 3 - Complete Profile (<code>/user/complete_profile</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters first name, last name, password (2x)</li>
+                                    <li>Validates password length (≥8 chars) and match</li>
+                                    <li>Hashes password with SHA256</li>
+                                    <li>Updates user: <code>status='active'</code>, <code>email_verified_at</code>, name, password</li>
+                                    <li>Clears session verification data</li>
+                                    <li>Redirects to login with success message</li>
+                                </ul>
+                            </li>
+                        </ol>
 
-                        <p><strong>Testing:</strong></p>
+                        <p><strong>Files Modified/Created:</strong></p>
                         <ul style="margin-top: 5px;">
-                            <li>✅ Perl syntax validation (<code>perl -c</code>)</li>
-                            <li>✅ Code generation tested (6-digit format, 32-char hex format)</li>
-                            <li>✅ SHA256 hashing verified (consistent, deterministic)</li>
-                            <li>✅ Expiry calculation tested (24 hours = 86400 seconds)</li>
-                            <li>✅ Expiry logic tested (expired vs valid records)</li>
+                            <li>✅ <code>User.pm</code> - Refactored <code>do_create_account</code> for Step 1, added <code>verify_email</code> and <code>complete_profile</code> actions</li>
+                            <li>✅ <code>register.tt</code> - Refactored to show only username + email (removed password, name fields)</li>
+                            <li>✅ <code>VerifyEmail.tt</code> - Created (PascalCase) with code entry form and testing helper</li>
+                            <li>✅ <code>CompleteProfile.tt</code> - Created (PascalCase) with name + password form</li>
+                            <li>❌ Deleted: <code>create_account.tt</code>, <code>register_step1.tt</code> (duplicates)</li>
                         </ul>
 
-                        <p><strong>Next Steps:</strong> This module will be integrated into controller actions for self-registration, password reset, and admin invitation workflows in the next implementation steps.</p>
+                        <p><strong>Security Features:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ SHA256 hashing for verification codes (never stored plain text)</li>
+                            <li>✅ SHA256 hashing for passwords</li>
+                            <li>✅ 24-hour expiry on verification codes</li>
+                            <li>✅ Server-side validation (username uniqueness, email format, password strength)</li>
+                            <li>✅ Session-based workflow (prevents skipping steps)</li>
+                        </ul>
+
+                        <p><strong>Testing Notes:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>⚠️ <strong>Database schema must be applied</strong> via schema_compare before testing</li>
+                            <li>📧 Email sending is placeholder (code displayed on screen for testing)</li>
+                            <li>🔧 Syntax verified with <code>perl -Ilib -c</code></li>
+                            <li>🔄 Server restart required after schema changes</li>
+                        </ul>
+
+                        <p><strong>Next Step:</strong> Enhance login to accept email OR username (currently username only)</p>
                     </div>
 
                     <h4>🚀 Implementation Phases (6 weeks)</h4>
@@ -1872,8 +1906,17 @@ last_updated = '2026/02/08'
                                 <li>Full integration with DBIx::Class relationships (EmailVerificationCode, PasswordResetToken)</li>
                             </ul>
                         </li>
-                        <li>⏳ **NEXT**: 3-step registration (email → verify code → complete profile)</li>
-                        <li>Enhanced login (email/username, password/code)</li>
+                        <li>✅ 3-step registration (email → verify code → complete profile)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Refactored existing register.tt and do_create_account (reuse over new)</li>
+                                <li>Created VerifyEmail.tt and CompleteProfile.tt (PascalCase naming)</li>
+                                <li>Clean URLs: /user/register, /user/verify_email, /user/complete_profile</li>
+                                <li>Session-based workflow prevents step skipping</li>
+                                <li>Full validation: username/email uniqueness, password strength, code expiry</li>
+                                <li>Deleted orphaned duplicates: create_account.tt, register_step1.tt</li>
+                            </ul>
+                        </li>
+                        <li>⏳ **NEXT**: Enhanced login (email/username, password/code)</li>
                         <li>Password management (change, reset)</li>
                         <li>Profile view/edit</li>
                         <li>Email templates (verification, reset, welcome)</li>
