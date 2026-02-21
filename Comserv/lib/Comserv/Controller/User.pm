@@ -594,225 +594,22 @@ sub update_settings :Local {
 sub create_account :Local {
     my ($self, $c) = @_;
 
-    # Redirect to new 3-step registration
-    $c->response->redirect($c->uri_for('/user/register_step1'));
+    # Redirect to register for backward compatibility
+    $c->response->redirect($c->uri_for('/user/register'));
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
-
-    # Retrieve the form data
-    my $username = $c->request->params->{username};
-    my $password = $c->request->params->{password};
-    my $password_confirm = $c->request->params->{password_confirm};  # Retrieve the confirmation password
-    my $first_name = $c->request->params->{first_name};
-    my $last_name = $c->request->params->{last_name};
-    my $email = $c->request->params->{email};
-    my $roles = $c->request->params->{roles} || 'user';  # Default role is 'user'
-
-    # Log the account creation attempt
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-        "Account creation attempt for username: $username");
-
-    # Ensure all required fields are filled
-    unless ($username && $password && $password_confirm && $first_name && $last_name) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-            "Missing required fields for account creation");
-
-        $c->stash(
-            error_msg => 'All fields are required to create an account',
-            template  => 'user/create_account.tt',
-        );
-        return;
-    }
-
-    # Check if the passwords match
-    if ($password ne $password_confirm) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-            "Passwords do not match for account creation");
-
-        $c->stash(
-            error_msg => 'Passwords do not match',
-            template  => 'user/create_account.tt',
-        );
-        return;
-    }
-
-    # Hash the password
-    my $hashed_password = $self->hash_password($password);
-
-    # Check if the username already exists in the database
-    my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
-    if ($existing_user) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-            "Username already exists: $username");
-
-        $c->stash(
-            error_msg => 'Username already exists. Please choose another.',
-            template  => 'user/create_account.tt',
-        );
-        return;
-    }
-
-    # Create the new user in the database
-    my $new_user;
-    eval {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-            "Creating new user: $username with roles: $roles");
-
-        $new_user = $c->model('DBEncy::User')->create({
-            username    => $username,
-            password    => $hashed_password,
-            first_name  => $first_name,
-            last_name   => $last_name,
-            email       => $email,
-            roles       => $roles,
-        });
-    };
-
-    if ($@) {
-        # Handle any database errors
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error creating user: $@");
-            
-        $c->stash(
-            error_msg => "An error occurred while creating the account: $@",
-            template  => 'user/create_account.tt',
-        );
-        return;
-    }
-
-    # Get email configuration from the stash (set by site_setup in Root.pm)
-    # These variables are set in Root.pm's site_setup method for each site
-    my $mail_from = $c->stash->{mail_from}; 
-    my $mail_replyto = $c->stash->{mail_replyto};
-    
-    # Log the email configuration for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-        "Email configuration - From: " . ($mail_from || 'undefined') . 
-        ", Reply-To: " . ($mail_replyto || 'undefined'));
-    
-    # Send email notification to the user if we have a valid email address
-    if ($email && $email =~ /\@/) {
-        eval {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Sending welcome email to new user: $email");
-                
-            # Use default values if site configuration is missing
-            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
-            my $reply_to = $mail_replyto || 'helpdesk@computersystemconsulting.ca';
-            
-            $c->stash->{email} = {
-                to       => $email,
-                from     => $from_address,
-                reply_to => $reply_to,
-                subject  => 'Welcome to Comserv - Account Created',
-                template => 'email/account_created.tt',
-                template_vars => {
-                    username   => $username,
-                    first_name => $first_name,
-                    last_name  => $last_name,
-                    email      => $email,
-                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
-                },
-            };
-            
-            # Send the email
-            $c->forward($c->view('Email::Template'));
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Welcome email sent successfully to: $email");
-        };
-    } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-            "Cannot send welcome email: Invalid or missing user email address");
-    }
-    
-    if ($@) {
-        # Log email error but continue (don't block account creation if email fails)
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error sending welcome email: $@");
-    }
-    
-    # Get the admin email from the stash (set by site_setup in Root.pm)
-    # This variable is set in Root.pm's site_setup method for each site
-    my $mail_to_admin = $c->stash->{mail_to_admin};
-    
-    # Log the admin email for debugging
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-        "Admin email: " . ($mail_to_admin || 'undefined'));
-    
-    # Send notification to admin if we have a valid admin email
-    if ($mail_to_admin && $mail_to_admin =~ /\@/) {
-        eval {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Sending admin notification about new user to: $mail_to_admin");
-                
-            # Format the current timestamp
-            my $timestamp = scalar localtime;
-            
-            # Use default values if site configuration is missing
-            my $from_address = $mail_from || 'noreply@computersystemconsulting.ca';
-                
-            $c->stash->{email} = {
-                to       => $mail_to_admin,
-                from     => $from_address,
-                subject  => 'Comserv - New User Account Created',
-                template => 'email/admin_account_notification.tt',
-                template_vars => {
-                    username   => $username,
-                    first_name => $first_name,
-                    last_name  => $last_name,
-                    email      => $email,
-                    roles      => $roles,
-                    created_at => $timestamp,
-                    site_name  => $c->stash->{ScriptDisplayName} || 'Comserv',
-                },
-            };
-            
-            # Send the email
-            $c->forward($c->view('Email::Template'));
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Admin notification email sent successfully to: $mail_to_admin");
-        };
-    } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-            "Cannot send admin notification: Invalid or missing admin email address");
-    }
-    
-    if ($@) {
-        # Log email error but continue
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error sending admin notification email: $@");
-    }
-
-    # Set success message and redirect to the login page
-    $c->flash->{success_msg} = "Your account has been created successfully. You can now log in.";
-    $c->response->redirect($c->uri_for('/user/login'));
-}
-
-sub register_step1 :Local {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_step1',
-        'Displaying Step 1 registration form');
-    
-    $c->stash(template => 'user/register_step1.tt');
-}
-
-sub do_register_step1 :Local {
-    my ($self, $c) = @_;
     
     my $username = $c->request->params->{username};
     my $email = $c->request->params->{email};
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_register_step1',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
         "Step 1 registration attempt for username: $username, email: $email");
     
     unless ($username && $email) {
         $c->stash(
             error_msg => 'Username and email are required',
-            template => 'user/register_step1.tt'
+            template => 'user/register.tt'
         );
         return;
     }
@@ -820,7 +617,7 @@ sub do_register_step1 :Local {
     unless ($email =~ /\@/) {
         $c->stash(
             error_msg => 'Please enter a valid email address',
-            template => 'user/register_step1.tt'
+            template => 'user/register.tt'
         );
         return;
     }
@@ -829,7 +626,7 @@ sub do_register_step1 :Local {
     if ($existing_user) {
         $c->stash(
             error_msg => 'Username already exists. Please choose another.',
-            template => 'user/register_step1.tt'
+            template => 'user/register.tt'
         );
         return;
     }
@@ -838,7 +635,7 @@ sub do_register_step1 :Local {
     if ($existing_email) {
         $c->stash(
             error_msg => 'An account with this email already exists.',
-            template => 'user/register_step1.tt'
+            template => 'user/register.tt'
         );
         return;
     }
@@ -858,16 +655,16 @@ sub do_register_step1 :Local {
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $code;
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_register_step1',
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
             "User created with ID: " . $new_user->id . ", verification code generated");
     };
     
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_register_step1',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Error creating user: $@");
         $c->stash(
             error_msg => "An error occurred during registration: $@",
-            template => 'user/register_step1.tt'
+            template => 'user/register.tt'
         );
         return;
     }
@@ -879,7 +676,7 @@ sub verify_email :Local {
     my ($self, $c) = @_;
     
     unless ($c->session->{verification_user_id}) {
-        $c->response->redirect($c->uri_for('/user/register_step1'));
+        $c->response->redirect($c->uri_for('/user/register'));
         return;
     }
     
@@ -891,7 +688,7 @@ sub verify_email :Local {
         unless ($user) {
             $c->stash(
                 error_msg => 'User not found. Please start registration again.',
-                template => 'user/verify_email.tt'
+                template => 'user/VerifyEmail.tt'
             );
             return;
         }
@@ -910,11 +707,11 @@ sub verify_email :Local {
             
             $c->stash(
                 error_msg => 'Invalid or expired verification code. Please try again.',
-                template => 'user/verify_email.tt'
+                template => 'user/VerifyEmail.tt'
             );
         }
     } else {
-        $c->stash(template => 'user/verify_email.tt');
+        $c->stash(template => 'user/VerifyEmail.tt');
     }
 }
 
@@ -922,7 +719,7 @@ sub complete_profile :Local {
     my ($self, $c) = @_;
     
     unless ($c->session->{verification_user_id}) {
-        $c->response->redirect($c->uri_for('/user/register_step1'));
+        $c->response->redirect($c->uri_for('/user/register'));
         return;
     }
     
@@ -930,7 +727,7 @@ sub complete_profile :Local {
     my $user = $c->model('DBEncy::User')->find($user_id);
     
     unless ($user) {
-        $c->response->redirect($c->uri_for('/user/register_step1'));
+        $c->response->redirect($c->uri_for('/user/register'));
         return;
     }
     
@@ -943,7 +740,7 @@ sub complete_profile :Local {
         unless ($first_name && $last_name && $password && $password_confirm) {
             $c->stash(
                 error_msg => 'All fields are required',
-                template => 'user/complete_profile.tt'
+                template => 'user/CompleteProfile.tt'
             );
             return;
         }
@@ -951,7 +748,7 @@ sub complete_profile :Local {
         unless ($password eq $password_confirm) {
             $c->stash(
                 error_msg => 'Passwords do not match',
-                template => 'user/complete_profile.tt'
+                template => 'user/CompleteProfile.tt'
             );
             return;
         }
@@ -959,7 +756,7 @@ sub complete_profile :Local {
         unless (length($password) >= 8) {
             $c->stash(
                 error_msg => 'Password must be at least 8 characters long',
-                template => 'user/complete_profile.tt'
+                template => 'user/CompleteProfile.tt'
             );
             return;
         }
@@ -984,7 +781,7 @@ sub complete_profile :Local {
                 "Error completing profile: $@");
             $c->stash(
                 error_msg => "An error occurred: $@",
-                template => 'user/complete_profile.tt'
+                template => 'user/CompleteProfile.tt'
             );
             return;
         }
@@ -994,7 +791,7 @@ sub complete_profile :Local {
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
         $c->response->redirect($c->uri_for('/user/login'));
     } else {
-        $c->stash(template => 'user/complete_profile.tt');
+        $c->stash(template => 'user/CompleteProfile.tt');
     }
 }
 
@@ -1072,8 +869,10 @@ sub do_edit_user :Local :Args(1) {
 sub register :Local {
     my ($self, $c) = @_;
 
-    # Redirect to new 3-step registration
-    $c->response->redirect($c->uri_for('/user/register_step1'));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+        'Displaying registration form (Step 1)');
+    
+    $c->stash(template => 'user/register.tt');
 }
 sub welcome :Local {
     my ($self, $c) = @_;
