@@ -7,12 +7,19 @@ use Email::Sender::Simple qw(sendmail);
 use Email::Simple;
 use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP;
+use Comserv::Util::UserVerification;
+use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
 # Apply restrictions to the entire controller
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
+);
+
+has 'user_verification' => (
+    is => 'ro',
+    default => sub { Comserv::Util::UserVerification->new }
 );
 
 sub login :Local {
@@ -783,6 +790,214 @@ sub do_create_account :Local {
     $c->flash->{success_msg} = "Your account has been created successfully. You can now log in.";
     $c->response->redirect($c->uri_for('/user/login'));
 }
+
+sub register_step1 :Local {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_step1',
+        'Displaying Step 1 registration form');
+    
+    $c->stash(template => 'user/register_step1.tt');
+}
+
+sub do_register_step1 :Local {
+    my ($self, $c) = @_;
+    
+    my $username = $c->request->params->{username};
+    my $email = $c->request->params->{email};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_register_step1',
+        "Step 1 registration attempt for username: $username, email: $email");
+    
+    unless ($username && $email) {
+        $c->stash(
+            error_msg => 'Username and email are required',
+            template => 'user/register_step1.tt'
+        );
+        return;
+    }
+    
+    unless ($email =~ /\@/) {
+        $c->stash(
+            error_msg => 'Please enter a valid email address',
+            template => 'user/register_step1.tt'
+        );
+        return;
+    }
+    
+    my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
+    if ($existing_user) {
+        $c->stash(
+            error_msg => 'Username already exists. Please choose another.',
+            template => 'user/register_step1.tt'
+        );
+        return;
+    }
+    
+    my $existing_email = $c->model('DBEncy::User')->find({ email => $email });
+    if ($existing_email) {
+        $c->stash(
+            error_msg => 'An account with this email already exists.',
+            template => 'user/register_step1.tt'
+        );
+        return;
+    }
+    
+    my $new_user;
+    eval {
+        $new_user = $c->model('DBEncy::User')->create({
+            username => $username,
+            email => $email,
+            status => 'pending_verification',
+            creation_context => 'self_registration',
+        });
+        
+        my $code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($new_user, $code);
+        
+        $c->session->{verification_user_id} = $new_user->id;
+        $c->session->{verification_code_display} = $code;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_register_step1',
+            "User created with ID: " . $new_user->id . ", verification code generated");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_register_step1',
+            "Error creating user: $@");
+        $c->stash(
+            error_msg => "An error occurred during registration: $@",
+            template => 'user/register_step1.tt'
+        );
+        return;
+    }
+    
+    $c->response->redirect($c->uri_for('/user/verify_email'));
+}
+
+sub verify_email :Local {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{verification_user_id}) {
+        $c->response->redirect($c->uri_for('/user/register_step1'));
+        return;
+    }
+    
+    if ($c->request->method eq 'POST') {
+        my $code = $c->request->params->{code};
+        my $user_id = $c->session->{verification_user_id};
+        
+        my $user = $c->model('DBEncy::User')->find($user_id);
+        unless ($user) {
+            $c->stash(
+                error_msg => 'User not found. Please start registration again.',
+                template => 'user/verify_email.tt'
+            );
+            return;
+        }
+        
+        my $verified = $self->user_verification->verify_code($user, $code);
+        
+        if ($verified) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
+                "Email verified successfully for user ID: $user_id");
+            
+            delete $c->session->{verification_code_display};
+            $c->response->redirect($c->uri_for('/user/complete_profile'));
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'verify_email',
+                "Invalid or expired verification code for user ID: $user_id");
+            
+            $c->stash(
+                error_msg => 'Invalid or expired verification code. Please try again.',
+                template => 'user/verify_email.tt'
+            );
+        }
+    } else {
+        $c->stash(template => 'user/verify_email.tt');
+    }
+}
+
+sub complete_profile :Local {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{verification_user_id}) {
+        $c->response->redirect($c->uri_for('/user/register_step1'));
+        return;
+    }
+    
+    my $user_id = $c->session->{verification_user_id};
+    my $user = $c->model('DBEncy::User')->find($user_id);
+    
+    unless ($user) {
+        $c->response->redirect($c->uri_for('/user/register_step1'));
+        return;
+    }
+    
+    if ($c->request->method eq 'POST') {
+        my $first_name = $c->request->params->{first_name};
+        my $last_name = $c->request->params->{last_name};
+        my $password = $c->request->params->{password};
+        my $password_confirm = $c->request->params->{password_confirm};
+        
+        unless ($first_name && $last_name && $password && $password_confirm) {
+            $c->stash(
+                error_msg => 'All fields are required',
+                template => 'user/complete_profile.tt'
+            );
+            return;
+        }
+        
+        unless ($password eq $password_confirm) {
+            $c->stash(
+                error_msg => 'Passwords do not match',
+                template => 'user/complete_profile.tt'
+            );
+            return;
+        }
+        
+        unless (length($password) >= 8) {
+            $c->stash(
+                error_msg => 'Password must be at least 8 characters long',
+                template => 'user/complete_profile.tt'
+            );
+            return;
+        }
+        
+        my $hashed_password = sha256_hex($password);
+        
+        eval {
+            $user->update({
+                first_name => $first_name,
+                last_name => $last_name,
+                password => $hashed_password,
+                status => 'active',
+                email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+            });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                "Profile completed for user ID: $user_id, status set to active");
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'complete_profile',
+                "Error completing profile: $@");
+            $c->stash(
+                error_msg => "An error occurred: $@",
+                template => 'user/complete_profile.tt'
+            );
+            return;
+        }
+        
+        delete $c->session->{verification_user_id};
+        
+        $c->flash->{success_msg} = "Registration complete! You can now log in.";
+        $c->response->redirect($c->uri_for('/user/login'));
+    } else {
+        $c->stash(template => 'user/complete_profile.tt');
+    }
+}
+
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
