@@ -15,14 +15,17 @@ __PACKAGE__->add_columns(
     password => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 1,
     },
     first_name => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 1,
     },
     last_name => {
         data_type => 'varchar',
         size => 255,
+        is_nullable => 1,
     },
     email => {
         data_type => 'varchar',
