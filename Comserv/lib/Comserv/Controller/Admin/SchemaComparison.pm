@@ -987,12 +987,18 @@ sub get_result_field_info {
         die "Field '$field_name' not found in Result source '$source_name'";
     }
     
+    # Dereference scalar references for JSON serialization
+    my $default_value = $info->{default_value};
+    if (defined $default_value && ref($default_value) eq 'SCALAR') {
+        $default_value = $$default_value;
+    }
+    
     return {
         data_type => $info->{data_type},
         size => $info->{size},
         is_nullable => $info->{is_nullable} ? 1 : 0,
         is_auto_increment => $info->{is_auto_increment} ? 1 : 0,
-        default_value => $info->{default_value},
+        default_value => $default_value,
         enum_list => ($info->{extra} && $info->{extra}->{list}) ? $info->{extra}->{list} : undef
     };
 }
@@ -1621,9 +1627,12 @@ sub get_table_result_comparison_v2 {
             }
         }
         
+        # Clean scalar references from result field for JSON serialization
+        my $cleaned_result_field = $result_field ? $self->clean_scalar_refs($result_field) : undef;
+        
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
-            result => $result_field,
+            result => $cleaned_result_field,
             differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
         };
     }
@@ -1872,6 +1881,40 @@ sub parse_result_file_columns {
         $columns->{$name} = $info;
     }
     return $columns;
+}
+
+=head2 clean_scalar_refs
+
+Recursively clean scalar references from data structures for JSON serialization
+
+=cut
+
+sub clean_scalar_refs {
+    my ($self, $data) = @_;
+    
+    return undef unless defined $data;
+    
+    # If it's a scalar reference, dereference it
+    if (ref($data) eq 'SCALAR') {
+        return $$data;
+    }
+    
+    # If it's a hash, recursively clean all values
+    if (ref($data) eq 'HASH') {
+        my $cleaned = {};
+        foreach my $key (keys %$data) {
+            $cleaned->{$key} = $self->clean_scalar_refs($data->{$key});
+        }
+        return $cleaned;
+    }
+    
+    # If it's an array, recursively clean all elements
+    if (ref($data) eq 'ARRAY') {
+        return [ map { $self->clean_scalar_refs($_) } @$data ];
+    }
+    
+    # Otherwise return as-is
+    return $data;
 }
 
 sub get_result_file_path {
