@@ -158,14 +158,16 @@ sub add_mail_config :Local {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
             "SMTP config saved for site_id $site_id");
-        $c->stash->{status_msg} = "SMTP configuration saved successfully";
+        $c->flash->{success_msg} = "SMTP configuration saved successfully for site ID $site_id";
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
             "Failed to save SMTP config: $_");
-        $c->stash->{debug_msg} = "Failed to save configuration: $_";
+        $c->flash->{error_msg} = "Failed to save configuration: $_";
+        $c->res->redirect($c->uri_for('/mail/add_mail_config_form'));
+        return;
     };
-    
-    $c->res->redirect($c->uri_for($self->action_for('add_mail_config_form')));
 }
 
 # New method to create a mail account using Virtualmin API
