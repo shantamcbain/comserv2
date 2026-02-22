@@ -3521,10 +3521,29 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has admin role (using session-based check like create_table_from_result)
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
         return;
     }
@@ -3559,11 +3578,20 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Getting field info for table: $table_name, field: $field_name, database: $database");
+        
         # Get table field info
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Field info retrieved: " . Data::Dumper::Dumper($table_field_info));
+        
         # Update result file with table values
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Result file updated successfully for field: $field_name");
         
         $c->stash(json => {
             success => 1,
@@ -3657,21 +3685,42 @@ sub get_table_field_info {
     my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
     my $schema = $c->model($model_name)->schema;
     
-    # Get table information from database
+    # Get table information from database using DESCRIBE (same as get_ency_table_schema)
     my $dbh = $schema->storage->dbh;
-    my $sth = $dbh->column_info(undef, undef, $table_name, $field_name);
-    my $column_info = $sth->fetchrow_hashref;
+    my $sth = $dbh->prepare("DESCRIBE $table_name");
+    $sth->execute();
     
-    if (!$column_info) {
+    my $field_info;
+    while (my $row = $sth->fetchrow_hashref()) {
+        if ($row->{Field} eq $field_name) {
+            $field_info = {
+                data_type => $row->{Type},
+                size => undef,  # Will be parsed from Type
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                default_value => $row->{Default},
+                extra => $row->{Extra},
+            };
+            
+            # Parse size from Type (e.g., "varchar(255)" -> 255)
+            if ($row->{Type} =~ /\((\d+)\)/) {
+                $field_info->{size} = $1;
+            }
+            last;
+        }
+    }
+    
+    unless ($field_info) {
         die "Field '$field_name' not found in table '$table_name'";
     }
     
     return {
-        data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
-        size => $column_info->{COLUMN_SIZE},
-        is_nullable => $column_info->{NULLABLE} ? 1 : 0,
-        is_auto_increment => $column_info->{IS_AUTOINCREMENT} ? 1 : 0,
-        default_value => $column_info->{COLUMN_DEF}
+        data_type => $field_info->{data_type},
+        size => $field_info->{size},
+        is_nullable => $field_info->{is_nullable},
+        is_auto_increment => $field_info->{is_auto_increment},
+        default_value => $field_info->{default_value},
+        extra => $field_info->{extra}
     };
 }
 
