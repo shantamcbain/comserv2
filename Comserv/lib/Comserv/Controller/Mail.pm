@@ -230,7 +230,7 @@ sub mail_admin_dashboard :Local {
     
     $c->stash(
         mail_stats => $mail_stats,
-        template => 'mail/admin_dashboard.tt'
+        template => 'mail/AdminDashboard.tt'
     );
     
     $c->forward($c->view('TT'));
