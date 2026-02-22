@@ -128,9 +128,24 @@ sub add_mail_config :Local {
     my $site_id = $params->{site_id};
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
-        "Processing mail configuration for site_id $site_id");
+        "Processing mail configuration for site_id '$site_id'");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+        "Params: smtp_host=" . ($params->{smtp_host} || 'undef') . 
+        ", smtp_port=" . ($params->{smtp_port} || 'undef') .
+        ", smtp_username=" . ($params->{smtp_username} || 'undef'));
     
     # Validate required fields
+    unless ($site_id) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
+            "Missing site_id parameter");
+        $c->stash(
+            error_msg => "Please provide a Site ID",
+            template => 'mail/add_mail_config_form.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
     unless ($params->{smtp_host} && $params->{smtp_port}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
             "Incomplete SMTP config for site_id $site_id");
@@ -138,33 +153,46 @@ sub add_mail_config :Local {
             error_msg => "Please provide SMTP host and port",
             template => 'mail/add_mail_config_form.tt'
         );
+        $c->forward($c->view('TT'));
         return;
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+            "Connecting to database to save SMTP config");
+        
         my $schema = $c->model('DBEncy');
         my $site_config_rs = $schema->resultset('SiteConfig');
         
         # Create or update SMTP configuration
+        my $saved_count = 0;
         for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
             next unless defined $params->{$config_key};
             
-            $site_config_rs->update_or_create({
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+                "Saving $config_key for site_id $site_id");
+            
+            my $result = $site_config_rs->update_or_create({
                 site_id => $site_id,
                 config_key => $config_key,
                 config_value => $params->{$config_key},
             });
+            $saved_count++;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+                "Saved $config_key: " . ($result->in_storage ? "exists" : "created"));
         }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
-            "SMTP config saved for site_id $site_id");
-        $c->flash->{success_msg} = "SMTP configuration saved successfully for site ID $site_id";
+            "SMTP config saved for site_id $site_id ($saved_count fields saved)");
+        $c->flash->{success_msg} = "SMTP configuration saved successfully for site ID $site_id ($saved_count settings)";
         $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
         return;
     } catch {
+        my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
-            "Failed to save SMTP config: $_");
-        $c->flash->{error_msg} = "Failed to save configuration: $_";
+            "Failed to save SMTP config: $error");
+        $c->flash->{error_msg} = "Failed to save configuration: $error";
         $c->res->redirect($c->uri_for('/mail/add_mail_config_form'));
         return;
     };
@@ -199,36 +227,55 @@ sub edit_smtp_config :Local {
     if ($c->req->method eq 'POST') {
         my $params = $c->req->params;
         
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
+            "Processing SMTP config update for site_id $site_id");
+        
         try {
             my $schema = $c->model('DBEncy');
             my $site_config_rs = $schema->resultset('SiteConfig');
             
             # Update SMTP configuration
+            my $updated_count = 0;
             for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
                 next unless defined $params->{$config_key};
+                
+                # Skip password if it's empty (user wants to keep existing password)
+                if ($config_key eq 'smtp_password' && $params->{$config_key} eq '') {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
+                        "Skipping empty password field (keeping existing)");
+                    next;
+                }
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
+                    "Updating $config_key for site_id $site_id");
                 
                 $site_config_rs->update_or_create({
                     site_id => $site_id,
                     config_key => $config_key,
                     config_value => $params->{$config_key},
                 });
+                $updated_count++;
             }
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
-                "SMTP config updated for site_id $site_id");
-            $c->flash->{success_msg} = "SMTP configuration updated successfully";
+                "SMTP config updated for site_id $site_id ($updated_count fields updated)");
+            $c->flash->{success_msg} = "SMTP configuration updated successfully ($updated_count settings)";
             $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
             return;
         } catch {
+            my $error = $_;
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config', 
-                "Failed to update SMTP config: $_");
-            $c->flash->{error_msg} = "Failed to update configuration: $_";
+                "Failed to update SMTP config: $error");
+            $c->flash->{error_msg} = "Failed to update configuration: $error";
         };
     }
     
     # Load existing configuration
     my %config;
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
+            "Loading existing SMTP config for site_id $site_id");
+        
         my $schema = $c->model('DBEncy');
         my $dbh = $schema->schema->storage->dbh;
         my $sth = $dbh->prepare("
@@ -238,12 +285,20 @@ sub edit_smtp_config :Local {
         ");
         $sth->execute($site_id);
         
+        my $row_count = 0;
         while (my $row = $sth->fetchrow_hashref()) {
+            $row_count++;
             $config{$row->{config_key}} = $row->{config_value};
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config',
+                "Loaded config: " . $row->{config_key});
         }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
+            "Loaded $row_count SMTP config items for site_id $site_id");
     } catch {
+        my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config',
-            "Failed to load SMTP config: $_");
+            "Failed to load SMTP config: $error");
     };
     
     $c->stash(
@@ -283,6 +338,9 @@ sub test_smtp_config :Local {
     # Load SMTP configuration
     my %config;
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Loading SMTP config for testing site_id $site_id");
+        
         my $schema = $c->model('DBEncy');
         my $dbh = $schema->schema->storage->dbh;
         my $sth = $dbh->prepare("
@@ -292,11 +350,19 @@ sub test_smtp_config :Local {
         ");
         $sth->execute($site_id);
         
+        my $row_count = 0;
         while (my $row = $sth->fetchrow_hashref()) {
+            $row_count++;
             $config{$row->{config_key}} = $row->{config_value};
         }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Loaded $row_count SMTP config items for testing");
     } catch {
-        $c->flash->{error_msg} = "Failed to load SMTP configuration: $_";
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_smtp_config',
+            "Failed to load SMTP config: $error");
+        $c->flash->{error_msg} = "Failed to load SMTP configuration: $error";
         $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
         return;
     };
@@ -450,6 +516,9 @@ sub mail_admin_dashboard :Local {
         
         # Load SMTP server configurations from SiteConfig
         eval {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Attempting to load SMTP configurations from site_config table");
+            
             my $dbh = $schema->schema->storage->dbh;
             my $sth = $dbh->prepare("
                 SELECT site_id, config_key, config_value 
@@ -460,10 +529,15 @@ sub mail_admin_dashboard :Local {
             $sth->execute();
             
             my %servers_by_site;
+            my $row_count = 0;
             while (my $row = $sth->fetchrow_hashref()) {
+                $row_count++;
                 my $site_id = $row->{site_id};
                 my $key = $row->{config_key};
                 my $value = $row->{config_value};
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'mail_admin_dashboard',
+                    "Loaded SMTP config: site_id=$site_id, key=$key");
                 
                 $servers_by_site{$site_id} ||= { site_id => $site_id };
                 $servers_by_site{$site_id}{$key} = $value;
@@ -471,11 +545,14 @@ sub mail_admin_dashboard :Local {
             
             @smtp_servers = sort { $a->{site_id} <=> $b->{site_id} } values %servers_by_site;
             $mail_stats->{active_servers} = scalar @smtp_servers;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Loaded $row_count SMTP config rows, " . scalar(@smtp_servers) . " servers total");
         };
         
         if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mail_admin_dashboard',
-                "Could not load SMTP configs (table may not exist): $@");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Could not load SMTP configs: $@");
         }
         
     } catch {
