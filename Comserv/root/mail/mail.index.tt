@@ -1,24 +1,45 @@
 [%# INCLUDE 'layout.tt' %]
-[% PageVersion	= 'user/mail.tt,v 0.01 2024/01/09 shanta Exp shanta '	%]
+[% PageVersion = 'mail/mail.index.tt,v 0.02 2026/02/22 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
- [%	PageVersion %]
+ [% PageVersion %]
     [% "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
 [% SiteName = c.session.SiteName %]
-  [% IF c.session.username %]
-   <h3> Hello  [% firstname%]&nbsp;  [% lastname%]! Welcome to [% MailServer %]'s Mail page!</h3>
-<p>When you click the mail link, you will be prompted for your username@[% MailServer %] and your mail password. Once you are logged into the mail, you will have access to forwarding and spam control functions. </p>
 
-<p><a href="https://[% MailServerName %]" Target="_blank">Mail</a></p>
-
-
-  [% ELSE %]
-
-  <h3>  Hello!  Welcome to [% MailServer %]'s Mail Page!</h3>
-<h2> We offer to our members one free</a> email address. </h2>
-<p>When you join any of the hosted sites at [% MailServerName %] you will be given an email address based on your
-    username, if available. You may access your mail by either your local mail reader for reading off-line, or you
-    can use the Mail link on our sites. Once you log in, the application will know who you are and take you to your mail.</p>
-<p>To join <a href="https://www.computersystemconsulting.ca/whmcs/cart.php?gid=5" Target="_blank">[% SiteName%]</a> </p>
-  [% END %]
+[% IF is_logged_in %]
+    <h3>Hello [% c.session.first_name %] [% c.session.last_name %]! Welcome to [% MailServer %]'s Mail page!</h3>
+    
+    [% IF has_mail_account %]
+        <p>When you click the mail link, you will be prompted for your username@[% MailServer %] and your mail password. 
+        Once you are logged into the mail, you will have access to forwarding and spam control functions.</p>
+        
+        <p><a href="https://[% MailServerName %]" target="_blank" class="btn btn-primary">Access Your Mail</a></p>
+        
+        [% IF is_admin %]
+            <hr>
+            <h4>Administrative Functions</h4>
+            <p><a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-warning">Mail Admin Dashboard</a></p>
+            <p>Manage mail servers, domains, and accounts.</p>
+        [% END %]
+    [% ELSE %]
+        <h4>Email Account Not Active</h4>
+        <p>You do not currently have an active email account. Email accounts are available to members.</p>
+        <p>Contact an administrator to upgrade your account or purchase an email address.</p>
+    [% END %]
+    
+[% ELSE %]
+    <h3>Hello! Welcome to [% MailServer %]'s Mail Page!</h3>
+    <h4>Email Service for Members</h4>
+    <p>We offer email services to our members. When you join any of the hosted sites at [% MailServerName %], 
+    you may receive an email address based on your username, if available.</p>
+    
+    <p>You may access your mail by either your local mail reader for reading off-line, or you can use the 
+    Mail link on our sites. Once you log in, the application will know who you are and take you to your mail.</p>
+    
+    <p><a href="[% c.uri_for('/user/login') %]" class="btn btn-primary">Login</a> 
+    or <a href="[% c.uri_for('/user/register') %]" class="btn btn-secondary">Register</a></p>
+    
+    <p>For more information about membership and services, visit 
+    <a href="https://www.computersystemconsulting.ca/whmcs/cart.php?gid=5" target="_blank">[% SiteName %]</a></p>
+[% END %]
