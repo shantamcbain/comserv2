@@ -45,10 +45,20 @@ sub login :Local {
         $c->session->{referer} = $referer;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Stored referer in session: $referer");
     } else {
-        # If we don't have a valid referer and none is stored, use the home page
-        $c->session->{referer} = $c->session->{referer} || $c->uri_for('/');
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
-            "Using existing session referer: " . $c->session->{referer});
+        # Clear session referer if it's a login/registration page, and default to home page
+        if (!$c->session->{referer} || 
+            $c->session->{referer} =~ m{/user/login} || 
+            $c->session->{referer} =~ m{/user/register} ||
+            $c->session->{referer} =~ m{/user/do_create_account} ||
+            $c->session->{referer} =~ m{/user/verify_email} ||
+            $c->session->{referer} =~ m{/user/complete_profile}) {
+            $c->session->{referer} = $c->uri_for('/');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
+                "Cleared registration/login referer, using home page");
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
+                "Using existing valid session referer: " . $c->session->{referer});
+        }
     }
 
     # Clear any error messages
@@ -667,6 +677,7 @@ sub do_create_account :Local {
             email => $email,
             status => 'pending_verification',
             creation_context => 'self_registration',
+            roles => 'user',
         });
         
         my $code = $self->user_verification->generate_verification_code();

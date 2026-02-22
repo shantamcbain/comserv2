@@ -2576,6 +2576,9 @@ sub get_ency_database_tables {
         die $_;
     };
     
+    # Sort tables alphabetically
+    @tables = sort @tables;
+    
     return \@tables;
 }
 
@@ -2599,6 +2602,9 @@ sub get_forager_database_tables {
             "Error getting forager database tables: $_");
         die $_;
     };
+    
+    # Sort tables alphabetically
+    @tables = sort @tables;
     
     return \@tables;
 }
