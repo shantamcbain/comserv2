@@ -1564,7 +1564,7 @@ function syncTableToResult(tableName, database, fieldName, event) {
         button.disabled = true;
     }
     
-    fetch('[% c.uri_for("/schema-comparison/sync_table_to_result") %]', {
+    fetch('[% c.uri_for("/admin/sync_table_to_result") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1584,8 +1584,8 @@ function syncTableToResult(tableName, database, fieldName, event) {
         
         if (data.success) {
             alert('Field synchronized successfully from table to result!');
-            // Refresh the field comparison
-            refreshFieldComparison(tableName, database);
+            // Reload the entire page to show updated schema
+            location.reload();
         } else {
             alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
         }
@@ -1614,7 +1614,7 @@ function syncResultToTable(tableName, database, fieldName, event) {
         button.disabled = true;
     }
     
-    fetch('[% c.uri_for("/schema-comparison/sync_result_to_table") %]', {
+    fetch('[% c.uri_for("/admin/sync_result_to_table") %]', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1634,8 +1634,8 @@ function syncResultToTable(tableName, database, fieldName, event) {
         
         if (data.success) {
             alert('Field synchronized successfully from result to table!');
-            // Refresh the field comparison
-            refreshFieldComparison(tableName, database);
+            // Reload the entire page to show updated schema
+            location.reload();
         } else {
             alert('Error synchronizing field: ' + (data.error || 'Unknown error'));
         }
