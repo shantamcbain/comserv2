@@ -11,10 +11,10 @@
     <h3>Hello [% c.session.first_name %] [% c.session.last_name %]! Welcome to [% MailServer %]'s Mail page!</h3>
     
     [% IF has_mail_account %]
-        <p>When you click the mail link, you will be prompted for your username@[% MailServer %] and your mail password. 
+        <p>When you click the mail link, you will be prompted for your username and your mail password. 
         Once you are logged into the mail, you will have access to forwarding and spam control functions.</p>
         
-        <p><a href="https://[% MailServerName %]" target="_blank" class="btn btn-primary">Access Your Mail</a></p>
+        <p><a href="[% c.session.MailServer || 'http://webmail.computersystemconsulting.ca' %]" target="_blank" class="btn btn-primary">Access Your Mail</a></p>
         
         [% IF is_admin %]
             <hr>
@@ -29,9 +29,9 @@
     [% END %]
     
 [% ELSE %]
-    <h3>Hello! Welcome to [% MailServer %]'s Mail Page!</h3>
+    <h3>Hello! Welcome to [% c.session.SiteName || 'CSC' %]'s Mail Page!</h3>
     <h4>Email Service for Members</h4>
-    <p>We offer email services to our members. When you join any of the hosted sites at [% MailServerName %], 
+    <p>We offer email services to our members. When you join any of the hosted sites, 
     you may receive an email address based on your username, if available.</p>
     
     <p>You may access your mail by either your local mail reader for reading off-line, or you can use the 
