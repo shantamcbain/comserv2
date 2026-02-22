@@ -84,11 +84,45 @@ sub add_mail_config_form :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
         "Displaying mail configuration form");
     
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Non-admin user attempted to access mail config form");
+        $c->stash(
+            error_msg => 'Access denied. Admin privileges required.',
+            template => 'mail/mail.index.tt'
+        );
+        return;
+    }
+    
     $c->stash(template => 'mail/add_mail_config_form.tt');
 }
 
 sub add_mail_config :Local {
     my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config', 
+            "Non-admin user attempted to save mail config");
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
     
     my $params = $c->req->params;
     my $site_id = $params->{site_id};
@@ -100,8 +134,10 @@ sub add_mail_config :Local {
     unless ($params->{smtp_host} && $params->{smtp_port}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
             "Incomplete SMTP config for site_id $site_id");
-        $c->stash->{debug_msg} = "Please provide SMTP host and port";
-        $c->stash(template => 'mail/add_mail_config_form.tt');
+        $c->stash(
+            error_msg => "Please provide SMTP host and port",
+            template => 'mail/add_mail_config_form.tt'
+        );
         return;
     }
     

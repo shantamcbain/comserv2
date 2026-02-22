@@ -1,21 +1,104 @@
-
-[% PageVersion = '/mail/add_mail_config_form.tt,v 0.01 2024/11/24 shanta Exp shanta ' %]
-[% META title = 'Edit User' %]
-[% IF debug_mode == 1 %]
-[% END %]
+[% PageVersion = '/mail/add_mail_config_form.tt,v 0.02 2026/02/22 shanta Exp shanta ' %]
+[% META title = 'Mail Configuration' %]
+[% IF c.session.debug_mode == 1 %]
   [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
-[% END %]    <h1>Add Mail Configuration</h1>
+  [% INCLUDE 'debug.tt' %]
+[% END %]
+
+<h1>Add Mail Configuration</h1>
+
+[% IF error_msg %]
+    <p class="error">[% error_msg %]</p>
+[% END %]
+
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
+
+[% IF status_msg %]
+    <p class="success">[% status_msg %]</p>
+[% END %]
+
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+
 <form method="POST" action="/mail/add_mail_config">
     <label for="site_id">Site ID:</label>
     <input type="text" id="site_id" name="site_id" required><br>
+    
     <label for="smtp_host">SMTP Host:</label>
     <input type="text" id="smtp_host" name="smtp_host" required><br>
+    
     <label for="smtp_port">SMTP Port:</label>
-    <input type="text" id="smtp_port" name="smtp_port" required><br>
+    <input type="text" id="smtp_port" name="smtp_port" value="587" required><br>
+    
     <label for="smtp_username">SMTP Username:</label>
-    <input type="text" id="smtp_username" name="smtp_username" required><br>
+    <input type="text" id="smtp_username" name="smtp_username"><br>
+    
     <label for="smtp_password">SMTP Password:</label>
-    <input type="password" id="smtp_password" name="smtp_password" required><br>
+    <input type="password" id="smtp_password" name="smtp_password"><br>
+    
+    <label for="smtp_from">From Email:</label>
+    <input type="email" id="smtp_from" name="smtp_from"><br>
+    
+    <label for="smtp_ssl">Use SSL:</label>
+    <input type="checkbox" id="smtp_ssl" name="smtp_ssl" value="1"><br>
+    
     <input type="submit" value="Add Configuration">
 </form>
+
+<p><a href="[% c.uri_for('/mail/mail_admin_dashboard') %]">Back to Mail Admin Dashboard</a></p>
+
+<style>
+    .error {
+        color: red;
+        font-weight: bold;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    .success {
+        color: green;
+        font-weight: bold;
+        padding: 10px;
+        background: #e6ffe6;
+        border: 1px solid green;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    form {
+        max-width: 500px;
+    }
+    
+    label {
+        display: inline-block;
+        width: 150px;
+        margin-top: 10px;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        width: 300px;
+        padding: 5px;
+    }
+    
+    input[type="submit"] {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    input[type="submit"]:hover {
+        background: #0056b3;
+    }
+</style>
