@@ -170,6 +170,191 @@ sub add_mail_config :Local {
     };
 }
 
+sub edit_smtp_config :Local {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    my $site_id = $c->req->param('site_id');
+    
+    unless ($site_id) {
+        $c->flash->{error_msg} = 'Site ID is required';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # If this is a POST request, update the configuration
+    if ($c->req->method eq 'POST') {
+        my $params = $c->req->params;
+        
+        try {
+            my $schema = $c->model('DBEncy');
+            my $site_config_rs = $schema->resultset('SiteConfig');
+            
+            # Update SMTP configuration
+            for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
+                next unless defined $params->{$config_key};
+                
+                $site_config_rs->update_or_create({
+                    site_id => $site_id,
+                    config_key => $config_key,
+                    config_value => $params->{$config_key},
+                });
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
+                "SMTP config updated for site_id $site_id");
+            $c->flash->{success_msg} = "SMTP configuration updated successfully";
+            $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+            return;
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config', 
+                "Failed to update SMTP config: $_");
+            $c->flash->{error_msg} = "Failed to update configuration: $_";
+        };
+    }
+    
+    # Load existing configuration
+    my %config;
+    try {
+        my $schema = $c->model('DBEncy');
+        my $dbh = $schema->schema->storage->dbh;
+        my $sth = $dbh->prepare("
+            SELECT config_key, config_value 
+            FROM site_config 
+            WHERE site_id = ? AND config_key LIKE 'smtp_%'
+        ");
+        $sth->execute($site_id);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            $config{$row->{config_key}} = $row->{config_value};
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config',
+            "Failed to load SMTP config: $_");
+    };
+    
+    $c->stash(
+        site_id => $site_id,
+        smtp_config => \%config,
+        template => 'mail/EditSmtpConfig.tt'
+    );
+    
+    $c->forward($c->view('TT'));
+}
+
+sub test_smtp_config :Local {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    my $site_id = $c->req->param('site_id');
+    
+    unless ($site_id) {
+        $c->flash->{error_msg} = 'Site ID is required';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # Load SMTP configuration
+    my %config;
+    try {
+        my $schema = $c->model('DBEncy');
+        my $dbh = $schema->schema->storage->dbh;
+        my $sth = $dbh->prepare("
+            SELECT config_key, config_value 
+            FROM site_config 
+            WHERE site_id = ? AND config_key LIKE 'smtp_%'
+        ");
+        $sth->execute($site_id);
+        
+        while (my $row = $sth->fetchrow_hashref()) {
+            $config{$row->{config_key}} = $row->{config_value};
+        }
+    } catch {
+        $c->flash->{error_msg} = "Failed to load SMTP configuration: $_";
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    };
+    
+    # Validate that we have the required config
+    unless ($config{smtp_host} && $config{smtp_port}) {
+        $c->flash->{error_msg} = 'SMTP host and port must be configured before testing';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # Test SMTP connection
+    my $test_result = {
+        success => 0,
+        message => '',
+    };
+    
+    try {
+        require Net::SMTP;
+        
+        my $smtp = Net::SMTP->new(
+            $config{smtp_host},
+            Port => $config{smtp_port},
+            Timeout => 10,
+            Debug => 0,
+            SSL => $config{smtp_ssl} ? 1 : 0,
+        );
+        
+        if ($smtp) {
+            # Try to authenticate if credentials are provided
+            if ($config{smtp_username} && $config{smtp_password}) {
+                if ($smtp->auth($config{smtp_username}, $config{smtp_password})) {
+                    $test_result->{success} = 1;
+                    $test_result->{message} = "Successfully connected and authenticated to SMTP server";
+                } else {
+                    $test_result->{message} = "Connected but authentication failed: " . $smtp->message();
+                }
+            } else {
+                $test_result->{success} = 1;
+                $test_result->{message} = "Successfully connected to SMTP server (authentication not configured)";
+            }
+            $smtp->quit();
+        } else {
+            $test_result->{message} = "Failed to connect to SMTP server: $@";
+        }
+    } catch {
+        $test_result->{message} = "SMTP test error: $_";
+    };
+    
+    if ($test_result->{success}) {
+        $c->flash->{success_msg} = $test_result->{message};
+    } else {
+        $c->flash->{error_msg} = $test_result->{message};
+    }
+    
+    $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+}
+
 # New method to create a mail account using Virtualmin API
 sub create_mail_account :Local {
     my ($self, $c) = @_;
@@ -253,13 +438,45 @@ sub mail_admin_dashboard :Local {
         active_servers => 0,
     };
     
+    my @smtp_servers = ();
+    
     try {
         my $schema = $c->model('DBEncy');
         
         # Count mail domains
-        $mail_stats->{total_domains} = $schema->resultset('MailDomain')->count;
+        eval {
+            $mail_stats->{total_domains} = $schema->resultset('MailDomain')->count;
+        };
         
-        # TODO: Add more statistics when mail account table is available
+        # Load SMTP server configurations from SiteConfig
+        eval {
+            my $dbh = $schema->schema->storage->dbh;
+            my $sth = $dbh->prepare("
+                SELECT site_id, config_key, config_value 
+                FROM site_config 
+                WHERE config_key LIKE 'smtp_%' 
+                ORDER BY site_id, config_key
+            ");
+            $sth->execute();
+            
+            my %servers_by_site;
+            while (my $row = $sth->fetchrow_hashref()) {
+                my $site_id = $row->{site_id};
+                my $key = $row->{config_key};
+                my $value = $row->{config_value};
+                
+                $servers_by_site{$site_id} ||= { site_id => $site_id };
+                $servers_by_site{$site_id}{$key} = $value;
+            }
+            
+            @smtp_servers = sort { $a->{site_id} <=> $b->{site_id} } values %servers_by_site;
+            $mail_stats->{active_servers} = scalar @smtp_servers;
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Could not load SMTP configs (table may not exist): $@");
+        }
         
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard', 
@@ -268,6 +485,7 @@ sub mail_admin_dashboard :Local {
     
     $c->stash(
         mail_stats => $mail_stats,
+        smtp_servers => \@smtp_servers,
         template => 'mail/AdminDashboard.tt'
     );
     
