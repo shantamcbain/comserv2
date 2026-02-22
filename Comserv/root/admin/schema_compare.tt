@@ -755,7 +755,9 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         // Add detailed field debugging
         if (comparison.fields) {
             html += '<strong>Field Details:</strong><br>';
-            for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+            // Sort fields alphabetically for consistent display
+            const sortedDebugFields = Object.entries(comparison.fields).sort((a, b) => a[0].localeCompare(b[0]));
+            for (const [fieldName, fieldData] of sortedDebugFields) {
                 html += '&nbsp;&nbsp;Field: ' + fieldName + '<br>';
                 html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Table Data: ' + (fieldData.table ? 'YES' : 'NO') + '<br>';
                 html += '&nbsp;&nbsp;&nbsp;&nbsp;Has Result Data: ' + (fieldData.result ? 'YES' : 'NO') + '<br>';
@@ -801,7 +803,10 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         html += '</thead>';
         html += '<tbody>';
         
-        for (const [fieldName, fieldData] of Object.entries(comparison.fields)) {
+        // Sort fields alphabetically for consistent display
+        const sortedFields = Object.entries(comparison.fields).sort((a, b) => a[0].localeCompare(b[0]));
+        
+        for (const [fieldName, fieldData] of sortedFields) {
             const tableField = fieldData.table;
             const resultField = fieldData.result;
             const tableMissing = !tableField;
