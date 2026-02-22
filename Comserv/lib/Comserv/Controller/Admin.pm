@@ -3916,52 +3916,78 @@ sub update_result_field_from_table {
     my $content = read_file($result_file_path);
     
     # Build new field definition
-    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
+    my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}'";
     
     if ($table_field_info->{size}) {
-        $new_field_def .= ", size => $table_field_info->{size}";
+        $new_field_def .= ",\n        size => $table_field_info->{size}";
     }
     
-    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
+    if ($table_field_info->{is_nullable}) {
+        $new_field_def .= ",\n        is_nullable => 1";
+    }
     
     if ($table_field_info->{is_auto_increment}) {
-        $new_field_def .= ", is_auto_increment => 1";
+        $new_field_def .= ",\n        is_auto_increment => 1";
     }
     
     if (defined $table_field_info->{default_value}) {
-        $new_field_def .= ", default_value => '$table_field_info->{default_value}'";
+        my $default = $table_field_info->{default_value};
+        
+        # Handle special timestamp defaults (scalar refs)
+        if ($default =~ /CURRENT_TIMESTAMP/i) {
+            if ($default =~ /ON UPDATE/i) {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'";
+            } else {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP'";
+            }
+        }
+        # Handle NULL default
+        elsif (!defined $default || $default eq '') {
+            # Skip - NULL is default when is_nullable => 1
+        }
+        # Handle numeric defaults
+        elsif ($default =~ /^\d+$/) {
+            $new_field_def .= ",\n        default_value => $default";
+        }
+        # Handle string defaults
+        else {
+            $default =~ s/'/\\'/g;  # Escape single quotes
+            $new_field_def .= ",\n        default_value => '$default'";
+        }
     }
     
-    $new_field_def .= " }";
+    $new_field_def .= ",\n    }";
     
     # Update the field definition in the content
     if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
         my $columns_section = $1;
         my $updated = 0;
         
-        # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
-            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
+        # Try hash format: field_name => { ... } (handles multiline)
+        # Match field_name => { ... } where { ... } can span multiple lines
+        if ($columns_section =~ /(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/s) {
+            $columns_section =~ s/(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/$field_name => $new_field_def/s;
             $updated = 1;
         }
-        # Try array format: "field_name", { ... }
-        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
-            $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+        # Try array format: "field_name", { ... } (handles multiline)
+        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{.*?\}/s) {
+            $columns_section =~ s/["']$field_name["']\s*,\s*\{.*?\}/"$field_name", $new_field_def/s;
             $updated = 1;
         }
         # If not found, append it to the columns section
         else {
-            if ($columns_section =~ /,\s*$/) {
-                $columns_section .= "\n    $field_name => $new_field_def,";
+            # Find the last field definition to insert after
+            if ($columns_section =~ /,\s*$/s) {
+                $columns_section .= "\n    $field_name => $new_field_def";
             } else {
-                $columns_section .= ",\n    $field_name => $new_field_def,";
+                $columns_section .= ",\n    $field_name => $new_field_def";
             }
             $updated = 1;
         }
         
         if ($updated) {
             # Replace in the full content
-            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
+            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns($columns_section\n);/s;
             
             # Write back to file
             write_file($result_file_path, $content);
