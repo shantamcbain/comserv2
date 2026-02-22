@@ -1,0 +1,134 @@
+[% PageVersion = 'mail/admin_dashboard.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<h2>Mail Administration Dashboard</h2>
+
+[% IF c.flash.error_msg %]
+    <p class="error">[% c.flash.error_msg %]</p>
+[% END %]
+
+[% IF c.flash.success_msg %]
+    <p class="success">[% c.flash.success_msg %]</p>
+[% END %]
+
+<div class="admin-stats">
+    <h3>Mail System Statistics</h3>
+    <ul>
+        <li><strong>Total Mail Domains:</strong> [% mail_stats.total_domains %]</li>
+        <li><strong>Total Mail Accounts:</strong> [% mail_stats.total_accounts %]</li>
+        <li><strong>Active Mail Servers:</strong> [% mail_stats.active_servers %]</li>
+    </ul>
+</div>
+
+<hr>
+
+<div class="admin-functions">
+    <h3>Mail System Management</h3>
+    
+    <div class="function-section">
+        <h4>Server Configuration</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure SMTP Settings</a> - Set up outbound mail server</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>Domain Management</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/admin/mail_domains') %]">Manage Mail Domains</a> - Add/edit mail domains</li>
+            <li><a href="[% c.uri_for('/admin/dns_records') %]">DNS Records</a> - Manage SPF, DKIM, DMARC records</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>Account Management</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/mail/create_mail_account') %]">Create Mail Account</a> - Add new email accounts</li>
+            <li><a href="[% c.uri_for('/admin/mail_accounts') %]">Manage Mail Accounts</a> - View and edit existing accounts</li>
+        </ul>
+    </div>
+    
+    <div class="function-section">
+        <h4>System Tools</h4>
+        <ul>
+            <li><a href="[% c.uri_for('/admin/mail_logs') %]">Mail Logs</a> - View mail server logs</li>
+            <li><a href="[% c.uri_for('/admin/mail_queue') %]">Mail Queue</a> - Monitor outbound mail queue</li>
+        </ul>
+    </div>
+</div>
+
+<hr>
+
+<p><a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">Back to Mail</a></p>
+
+<style>
+    .admin-stats {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 20px 0;
+    }
+    
+    .function-section {
+        margin: 20px 0;
+        padding: 15px;
+        border-left: 3px solid #007bff;
+        background: #f9f9f9;
+    }
+    
+    .function-section h4 {
+        margin-top: 0;
+        color: #007bff;
+    }
+    
+    .function-section ul {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .function-section li {
+        margin: 10px 0;
+    }
+    
+    .error {
+        color: red;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+    }
+    
+    .success {
+        color: green;
+        padding: 10px;
+        background: #e6ffe6;
+        border: 1px solid green;
+        border-radius: 4px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-warning {
+        background: #ffc107;
+        color: black;
+    }
+</style>

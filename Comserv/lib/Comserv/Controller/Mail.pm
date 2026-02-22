@@ -16,8 +16,37 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Accessing mail index page");
     
-    # Set the template to users/index .tt
-    $c->stash(template => 'user/mail.tt');
+    my $username = $c->session->{username};
+    my $roles = $c->session->{roles} || [];
+    
+    # Convert roles to array if it's a string
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    # Determine user type and permissions
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_developer = grep { $_ eq 'developer' } @$roles;
+    my $is_member = grep { $_ eq 'member' } @$roles;
+    my $is_logged_in = $username ? 1 : 0;
+    
+    # Check if user has a mail account (assume username-based for now)
+    my $has_mail_account = 0;
+    if ($is_logged_in) {
+        # TODO: Query actual mail account database when available
+        # For now, members, developers, and admins get mail access
+        $has_mail_account = $is_member || $is_developer || $is_admin;
+    }
+    
+    # Set stash variables for template
+    $c->stash(
+        is_admin => $is_admin,
+        is_developer => $is_developer,
+        is_member => $is_member,
+        is_logged_in => $is_logged_in,
+        has_mail_account => $has_mail_account,
+        template => 'mail/mail.index.tt'
+    );
 
     # Forward to the TT view to render the template
     $c->forward($c->view('TT'));
@@ -155,6 +184,56 @@ sub create_mail_account :Local {
     } else {
         $c->res->redirect($c->uri_for('/mail'));
     }
+}
+
+sub mail_admin_dashboard :Local {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard', 
+        "Accessing mail admin dashboard");
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mail_admin_dashboard', 
+            "Non-admin user attempted to access mail admin dashboard");
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    # Get mail server statistics and configuration
+    my $mail_stats = {
+        total_domains => 0,
+        total_accounts => 0,
+        active_servers => 0,
+    };
+    
+    try {
+        my $schema = $c->model('DBEncy');
+        
+        # Count mail domains
+        $mail_stats->{total_domains} = $schema->resultset('MailDomain')->count;
+        
+        # TODO: Add more statistics when mail account table is available
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard', 
+            "Error loading mail statistics: $_");
+    };
+    
+    $c->stash(
+        mail_stats => $mail_stats,
+        template => 'mail/admin_dashboard.tt'
+    );
+    
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;
