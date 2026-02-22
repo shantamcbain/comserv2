@@ -37,8 +37,8 @@
     <div class="function-section">
         <h4>Domain Management</h4>
         <ul>
-            <li><a href="[% c.uri_for('/admin/mail_domains') %]">Manage Mail Domains</a> - Add/edit mail domains</li>
-            <li><a href="[% c.uri_for('/admin/dns_records') %]">DNS Records</a> - Manage SPF, DKIM, DMARC records</li>
+            <li><strong>Manage Mail Domains</strong> - (Coming soon - Add/edit mail domains)</li>
+            <li><strong>DNS Records</strong> - (Coming soon - Manage SPF, DKIM, DMARC records)</li>
         </ul>
     </div>
     
@@ -46,15 +46,15 @@
         <h4>Account Management</h4>
         <ul>
             <li><a href="[% c.uri_for('/mail/create_mail_account') %]">Create Mail Account</a> - Add new email accounts</li>
-            <li><a href="[% c.uri_for('/admin/mail_accounts') %]">Manage Mail Accounts</a> - View and edit existing accounts</li>
+            <li><strong>Manage Mail Accounts</strong> - (Coming soon - View and edit existing accounts)</li>
         </ul>
     </div>
     
     <div class="function-section">
         <h4>System Tools</h4>
         <ul>
-            <li><a href="[% c.uri_for('/admin/mail_logs') %]">Mail Logs</a> - View mail server logs</li>
-            <li><a href="[% c.uri_for('/admin/mail_queue') %]">Mail Queue</a> - Monitor outbound mail queue</li>
+            <li><strong>Mail Logs</strong> - (Coming soon - View mail server logs)</li>
+            <li><strong>Mail Queue</strong> - (Coming soon - Monitor outbound mail queue)</li>
         </ul>
     </div>
 </div>
