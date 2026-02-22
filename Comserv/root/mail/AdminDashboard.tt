@@ -1,4 +1,4 @@
-[% PageVersion = 'mail/admin_dashboard.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
+[% PageVersion = 'mail/AdminDashboard.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
