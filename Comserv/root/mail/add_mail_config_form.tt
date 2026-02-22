@@ -31,7 +31,12 @@
     <input type="text" id="smtp_host" name="smtp_host" required><br>
     
     <label for="smtp_port">SMTP Port:</label>
-    <input type="text" id="smtp_port" name="smtp_port" value="587" required><br>
+    <select id="smtp_port" name="smtp_port" required>
+        <option value="587" selected>587 (TLS/STARTTLS - Recommended)</option>
+        <option value="465">465 (SSL/TLS)</option>
+        <option value="25">25 (Standard/No Encryption)</option>
+        <option value="2525">2525 (Alternative)</option>
+    </select><br>
     
     <label for="smtp_username">SMTP Username:</label>
     <input type="text" id="smtp_username" name="smtp_username"><br>
@@ -83,7 +88,8 @@
     
     input[type="text"],
     input[type="email"],
-    input[type="password"] {
+    input[type="password"],
+    select {
         width: 300px;
         padding: 5px;
     }
