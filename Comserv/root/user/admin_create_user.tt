@@ -86,8 +86,8 @@
                             <div class="form-field">
                                 [% FOREACH role IN roles %]
                                 <label>
-                                    <input type="checkbox" name="roles" value="[% role.id | html %]">
-                                    [% role.role_name | html %] ([% role.sitename | html %])[% IF role.description %] - [% role.description | html %][% END %]
+                                    <input type="checkbox" name="roles" value="[% role | html %]">
+                                    [% role | html %]
                                 </label><br>
                                 [% END %]
                             </div>
