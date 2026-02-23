@@ -427,8 +427,7 @@ sub users :Path('/admin/users') :Args(0) {
             {
                 page => $page,
                 rows => $rows_per_page,
-                order_by => { -desc => 'created_at' },
-                prefetch => ['user_site_roles', 'creator'],
+                order_by => { -desc => 'me.id' },
             }
         );
     } else {
@@ -440,26 +439,19 @@ sub users :Path('/admin/users') :Args(0) {
             $filter_site = $sitename;
         }
         
-        my $user_ids_rs = $schema->resultset('UserSiteRole')->search(
+        my @user_ids = $schema->resultset('UserSiteRole')->search(
             { sitename => $sitename },
             { columns => ['user_id'], distinct => 1 }
-        );
+        )->get_column('user_id')->all;
         
-        my @user_ids = $user_ids_rs->get_column('user_id')->all;
-        
-        if (@user_ids) {
-            $search_conditions{id} = { -in => \@user_ids };
-        } else {
-            $search_conditions{id} = { -in => [0] };
-        }
+        $search_conditions{id} = @user_ids ? { -in => \@user_ids } : { -in => [0] };
         
         $user_rs = $schema->resultset('User')->search(
             \%search_conditions,
             {
                 page => $page,
                 rows => $rows_per_page,
-                order_by => { -desc => 'created_at' },
-                prefetch => ['user_site_roles', 'creator'],
+                order_by => { -desc => 'me.id' },
             }
         );
     }
@@ -467,32 +459,21 @@ sub users :Path('/admin/users') :Args(0) {
     my @users = $user_rs->all;
     my $pager = $user_rs->pager;
 
-    my %stats = (
-        total => $user_rs->pager->total_entries,
-        active => 0,
-        suspended => 0,
-        pending => 0,
-        by_role => {},
+    my %stats = ( total => 0, active => 0, suspended => 0, pending => 0, by_role => {} );
+
+    my $stats_rs = $schema->resultset('User')->search(
+        $is_csc_admin ? {} : \%search_conditions
     );
 
-    my $all_users_rs = $schema->resultset('User')->search(
-        $is_csc_admin ? {} : { id => { -in => \@{[$user_rs->pager->total_entries > 0 ? $user_rs->get_column('id')->all : (0)]} } }
-    );
+    while (my $u = $stats_rs->next) {
+        $stats{total}++;
+        my $status = $u->status || 'active';
+        if ($status eq 'active')         { $stats{active}++ }
+        elsif ($status eq 'suspended')   { $stats{suspended}++ }
+        elsif ($status =~ /pending/)     { $stats{pending}++ }
 
-    while (my $user = $all_users_rs->next) {
-        my $status = $user->status || 'active';
-        
-        if ($status eq 'active') {
-            $stats{active}++;
-        } elsif ($status eq 'suspended') {
-            $stats{suspended}++;
-        } elsif ($status =~ /pending/) {
-            $stats{pending}++;
-        }
-
-        if ($user->roles) {
-            my @roles = split /,/, $user->roles;
-            for my $role (@roles) {
+        if ($u->roles) {
+            for my $role (split /,/, $u->roles) {
                 $role =~ s/^\s+|\s+$//g;
                 $stats{by_role}{$role} = ($stats{by_role}{$role} || 0) + 1;
             }
