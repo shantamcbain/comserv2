@@ -499,11 +499,8 @@ sub profile :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'profile',
         "User '" . $c->session->{username} . "' accessing profile");
 
-    # Get user data from database with prefetch for site roles
-    my $user = $c->model('DBEncy::User')->find(
-        { username => $c->session->{username} },
-        { prefetch => { user_site_roles => 'role' } }
-    );
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
 
     unless ($user) {
         $c->flash->{error_msg} = "User not found in database. Please log in again.";
@@ -512,22 +509,42 @@ sub profile :Local {
         return;
     }
 
-    # Load site roles with role names
+    # Load site roles with role names (with error handling)
     my @site_roles = ();
-    my $user_site_roles = $user->user_site_roles;
-    while (my $usr = $user_site_roles->next) {
-        push @site_roles, {
-            sitename => $usr->sitename,
-            role_name => $usr->role->role_name,
-        };
+    eval {
+        if ($user->can('user_site_roles')) {
+            my $user_site_roles_rs = $user->user_site_roles;
+            if ($user_site_roles_rs && ref($user_site_roles_rs)) {
+                while (my $usr = $user_site_roles_rs->next) {
+                    eval {
+                        my $role = $usr->can('role') ? $usr->role : undef;
+                        my $role_name = ($role && $role->can('role_name')) ? $role->role_name : 'Unknown';
+                        my $sitename = $usr->can('sitename') ? ($usr->sitename || 'Unknown') : 'Unknown';
+                        
+                        push @site_roles, {
+                            sitename => $sitename,
+                            role_name => $role_name,
+                        };
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'profile',
+                            "Error loading individual site role: $@");
+                    }
+                }
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'profile',
+            "Error loading site roles: $@");
     }
 
     # Prepare user data for display
     my $user_data = {
-        username => $user->username,
-        first_name => $user->first_name,
-        last_name => $user->last_name,
-        email => $user->email,
+        username => $user->username || '',
+        first_name => $user->first_name || '',
+        last_name => $user->last_name || '',
+        email => $user->email || '',
         roles => $c->session->{roles} || [],
         status => $user->status || 'active',
         site_roles => \@site_roles,
