@@ -31,6 +31,13 @@
                 </div>
                 
                 <div class="info-group">
+                    <label>Status:</label>
+                    <span class="status-badge status-[% user.status || 'active' %]">
+                        [% user.status || 'active' | ucfirst %]
+                    </span>
+                </div>
+                
+                <div class="info-group">
                     <label>Roles:</label>
                     <span>
                         [% IF user.roles.size %]
@@ -44,6 +51,30 @@
                 </div>
             </div>
         </div>
+        
+        [% IF user.site_roles.size %]
+        <div class="profile-section">
+            <h2>Site Access</h2>
+            <div class="profile-info">
+                <table class="site-roles-table">
+                    <thead>
+                        <tr>
+                            <th>Site Name</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH site_role IN user.site_roles %]
+                        <tr>
+                            <td>[% site_role.sitename %]</td>
+                            <td><span class="role-badge">[% site_role.role_name %]</span></td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        [% END %]
         
         <div class="profile-actions">
             <a href="[% c.uri_for('/user/settings') %]" class="action-button">Edit Profile</a>
@@ -130,6 +161,55 @@
         font-size: 0.8em;
         margin-right: 5px;
         text-transform: capitalize;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+        font-weight: bold;
+        text-transform: capitalize;
+    }
+    
+    .status-active {
+        background-color: #28a745;
+        color: white;
+    }
+    
+    .status-suspended {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .status-pending_verification,
+    .status-pending_setup {
+        background-color: #ffc107;
+        color: #333;
+    }
+    
+    .site-roles-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    
+    .site-roles-table th {
+        background-color: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .site-roles-table td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .site-roles-table tbody tr:hover {
+        background-color: #f8f9fa;
     }
     
     .profile-actions {

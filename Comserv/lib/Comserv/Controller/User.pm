@@ -499,14 +499,27 @@ sub profile :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'profile',
         "User '" . $c->session->{username} . "' accessing profile");
 
-    # Get user data from database
-    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+    # Get user data from database with prefetch for site roles
+    my $user = $c->model('DBEncy::User')->find(
+        { username => $c->session->{username} },
+        { prefetch => { user_site_roles => 'role' } }
+    );
 
     unless ($user) {
         $c->flash->{error_msg} = "User not found in database. Please log in again.";
         $c->session({});  # Clear session
         $c->response->redirect($c->uri_for('/user/login'));
         return;
+    }
+
+    # Load site roles with role names
+    my @site_roles = ();
+    my $user_site_roles = $user->user_site_roles;
+    while (my $usr = $user_site_roles->next) {
+        push @site_roles, {
+            sitename => $usr->sitename,
+            role_name => $usr->role->role_name,
+        };
     }
 
     # Prepare user data for display
@@ -516,7 +529,8 @@ sub profile :Local {
         last_name => $user->last_name,
         email => $user->email,
         roles => $c->session->{roles} || [],
-        # Add other fields as needed
+        status => $user->status || 'active',
+        site_roles => \@site_roles,
     };
 
     # Set template and stash data
