@@ -646,7 +646,7 @@ sub mail_admin_dashboard :Local {
             my $sth = $dbh->prepare("
                 SELECT sc.site_id, sc.config_key, sc.config_value, s.name as site_name
                 FROM site_config sc
-                LEFT JOIN site s ON sc.site_id = s.id
+                LEFT JOIN sites s ON sc.site_id = s.id
                 WHERE sc.config_key LIKE 'smtp_%' 
                 ORDER BY sc.site_id, sc.config_key
             ");
