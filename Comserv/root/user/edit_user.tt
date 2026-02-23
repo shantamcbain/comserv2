@@ -106,6 +106,28 @@
                     </div>
 
                     <div class="form-section">
+                        <h3>Site Access</h3>
+                        <p>Select sites this user should have access to. Removing a site revokes all their roles for that site.</p>
+
+                        <div class="form-field">
+                            [% IF all_sites.size > 0 %]
+                            <div class="check-pill-group">
+                                [% FOREACH site IN all_sites %]
+                                [% SET sid = site.id %]
+                                <label class="check-pill">
+                                    <input type="checkbox" name="sitenames" value="[% site.name | html %]"
+                                        [% IF user_site_ids.item(sid) %]checked[% END %]>
+                                    [% site.name | html %]
+                                </label>
+                                [% END %]
+                            </div>
+                            [% ELSE %]
+                            <p class="empty-state">No sites available.</p>
+                            [% END %]
+                        </div>
+                    </div>
+
+                    <div class="form-section">
                         <h3>Status</h3>
 
                         <div class="form-row">
