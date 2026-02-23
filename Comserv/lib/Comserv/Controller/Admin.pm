@@ -5,6 +5,7 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use Data::Dumper;
 use JSON qw(decode_json);
 use Try::Tiny;
@@ -373,93 +374,150 @@ sub get_system_notifications {
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Starting users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-    
-    # Get filter parameter
-    my $filter = $c->req->param('filter') || 'all';
-    
-    # Get search parameter
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+        "Admin accessing user management");
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
     my $search = $c->req->param('search') || '';
-    
-    # Get page parameter
+    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_role = $c->req->param('filter_role') || '';
+    my $filter_status = $c->req->param('filter_status') || '';
     my $page = $c->req->param('page') || 1;
-    my $users_per_page = 20;
+    my $rows_per_page = 50;
+
+    my %search_conditions;
     
-    # Build search conditions
-    my $search_conditions = {};
-    
-    # Apply filter
-    if ($filter eq 'active') {
-        $search_conditions->{status} = 'active';
-    }
-    elsif ($filter eq 'pending') {
-        $search_conditions->{status} = 'pending';
-    }
-    elsif ($filter eq 'disabled') {
-        $search_conditions->{status} = 'disabled';
-    }
-    
-    # Apply search
     if ($search) {
-        $search_conditions->{'-or'} = [
+        $search_conditions{'-or'} = [
             { username => { 'like', "%$search%" } },
-            { email => { 'like', "%$search%" } },
             { first_name => { 'like', "%$search%" } },
-            { last_name => { 'like', "%$search%" } }
+            { last_name => { 'like', "%$search%" } },
+            { email => { 'like', "%$search%" } },
         ];
     }
-    
-    # Get users from database
-    my $users_rs = $c->model('DBEncy::User')->search(
-        $search_conditions,
-        {
-            order_by => { -asc => 'username' },
-            page => $page,
-            rows => $users_per_page
-        }
-    );
-    
-    # Get user roles
-    my %user_roles = ();
-    eval {
-        my @user_role_records = $c->model('DBEncy::UserRole')->search({});
-        foreach my $record (@user_role_records) {
-            push @{$user_roles{$record->user_id}}, $record->role->role;
-        }
-    };
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
-        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
-        push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
+
+    if ($filter_status) {
+        $search_conditions{status} = $filter_status;
     }
+
+    if ($filter_role && $filter_role ne 'all') {
+        $search_conditions{roles} = { 'like', "%$filter_role%" };
+    }
+
+    my $user_rs;
     
-    # Pass data to the template
+    if ($is_csc_admin) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "CSC admin - showing all users");
+        $user_rs = $schema->resultset('User')->search(
+            \%search_conditions,
+            {
+                page => $page,
+                rows => $rows_per_page,
+                order_by => { -desc => 'created_at' },
+                prefetch => ['user_site_roles', 'creator'],
+            }
+        );
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Site admin ($sitename) - filtering users");
+        
+        if ($filter_site && $filter_site ne $sitename) {
+            $c->flash->{error_msg} = "You can only view users from your site: $sitename";
+            $filter_site = $sitename;
+        }
+        
+        my $user_ids_rs = $schema->resultset('UserSiteRole')->search(
+            { sitename => $sitename },
+            { columns => ['user_id'], distinct => 1 }
+        );
+        
+        my @user_ids = $user_ids_rs->get_column('user_id')->all;
+        
+        if (@user_ids) {
+            $search_conditions{id} = { -in => \@user_ids };
+        } else {
+            $search_conditions{id} = { -in => [0] };
+        }
+        
+        $user_rs = $schema->resultset('User')->search(
+            \%search_conditions,
+            {
+                page => $page,
+                rows => $rows_per_page,
+                order_by => { -desc => 'created_at' },
+                prefetch => ['user_site_roles', 'creator'],
+            }
+        );
+    }
+
+    my @users = $user_rs->all;
+    my $pager = $user_rs->pager;
+
+    my %stats = (
+        total => $user_rs->pager->total_entries,
+        active => 0,
+        suspended => 0,
+        pending => 0,
+        by_role => {},
+    );
+
+    my $all_users_rs = $schema->resultset('User')->search(
+        $is_csc_admin ? {} : { id => { -in => \@{[$user_rs->pager->total_entries > 0 ? $user_rs->get_column('id')->all : (0)]} } }
+    );
+
+    while (my $user = $all_users_rs->next) {
+        my $status = $user->status || 'active';
+        
+        if ($status eq 'active') {
+            $stats{active}++;
+        } elsif ($status eq 'suspended') {
+            $stats{suspended}++;
+        } elsif ($status =~ /pending/) {
+            $stats{pending}++;
+        }
+
+        if ($user->roles) {
+            my @roles = split /,/, $user->roles;
+            for my $role (@roles) {
+                $role =~ s/^\s+|\s+$//g;
+                $stats{by_role}{$role} = ($stats{by_role}{$role} || 0) + 1;
+            }
+        }
+    }
+
+    my @available_sites;
+    if ($is_csc_admin) {
+        @available_sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    } else {
+        @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
+    }
+
     $c->stash(
-        template => 'admin/users.tt',
-        users => [ $users_rs->all ],
-        user_roles => \%user_roles,
-        filter => $filter,
+        users => \@users,
+        pager => $pager,
+        stats => \%stats,
         search => $search,
-        pager => $users_rs->pager
+        filter_site => $filter_site,
+        filter_role => $filter_role,
+        filter_status => $filter_status,
+        is_csc_admin => $is_csc_admin,
+        admin_type => $admin_type,
+        sitename => $sitename,
+        available_sites => \@available_sites,
+        template => 'admin/users.tt',
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
