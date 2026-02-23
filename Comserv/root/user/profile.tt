@@ -1,5 +1,5 @@
 [% PageVersion = 'user/profile.tt,v 0.02 2026/02/22 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
+[% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
