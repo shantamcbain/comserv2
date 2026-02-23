@@ -1,6 +1,14 @@
-[% META title = 'User Management' %]
-[% PageVersion = 'admin/users.tt,v 0.01 2026/02/23 AI Assistant Exp AI Assistant ' %]
-[% IF c.session.debug_mode == 1 %]
+[% META 
+   title = "User Management"
+   description = "Admin interface for managing user accounts, roles, and site access"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.02"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'admin/users.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
 
@@ -19,11 +27,11 @@
         <div class="content-primary">
             
             [% IF c.flash.error_msg %]
-                <p class="error">[% c.flash.error_msg %]</p>
+                <div class="error">[% c.flash.error_msg %]</div>
             [% END %]
             
             [% IF c.flash.success_msg %]
-                <p class="success">[% c.flash.success_msg %]</p>
+                <div class="success">[% c.flash.success_msg %]</div>
             [% END %]
             
             <!-- Statistics Section -->
@@ -206,15 +214,13 @@
                 [% END %]
             </div>
             
+            <div class="form-actions">
+                <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-primary">Create New User</a>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Back to Admin Dashboard</a>
+            </div>
+            
         </div>
         
-    </div>
-    
-    <div class="page-footer">
-        <div class="footer-actions">
-            <a href="[% c.uri_for('/admin/create_user') %]" class="btn btn-primary">Create New User</a>
-            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Back to Admin Dashboard</a>
-        </div>
     </div>
     
 </div>

@@ -1,5 +1,5 @@
 [% PageVersion = 'register.tt,v 0.02 2026/02/21 AI Assistant Exp AI Assistant ' %]
-[% IF c.session.debug_mode == 1 %]
+[% IF debug_mode == 1 %]
   [% PageVersion %]
 
 [% END %]
@@ -8,7 +8,7 @@
 <p>Enter your username and email to begin registration.</p>
 
 [% IF c.stash.error_msg %]
-    <p class="error">[% c.stash.error_msg %]</p>
+    <div class="error">[% c.stash.error_msg %]</div>
 [% END %]
 
 <form method="post" action="/user/do_create_account">
