@@ -102,11 +102,23 @@ sub add_mail_config_form :Local {
         return;
     }
     
-    # Get current site name from stash
-    my $current_sitename = $c->stash->{SiteName} || '';
+    # Get current site name from stash or session
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
     
-    # Determine if user is CSC (has access to all sites)
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+        "Current SiteName: '$current_sitename', Username: " . ($c->session->{username} || 'none'));
+    
+    # Determine if user is CSC admin (has access to all sites)
+    # CSC admin can be identified by SiteName='CSC' OR by having admin role
     my $is_csc = ($current_sitename eq 'CSC') ? 1 : 0;
+    
+    # If SiteName is not set but user is admin, default to CSC
+    if (!$current_sitename && $is_admin) {
+        $current_sitename = 'CSC';
+        $is_csc = 1;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "No SiteName found for admin user, defaulting to CSC");
+    }
     
     # Load all sites if CSC user
     my @all_sites = ();
@@ -198,18 +210,49 @@ sub add_mail_config :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
             "Looking up site by name: '$site_input'");
         
-        my $site_model = $c->model('Site');
-        my $site = $site_model->get_site_details_by_name($c, $site_input);
+        my $schema = $c->model('DBEncy');
+        my $site = $schema->resultset('Site')->search(
+            { name => $site_input },
+            { rows => 1 }
+        )->single;
         
-        if ($site && $site->{id}) {
-            $site_id = $site->{id};
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+            "Site lookup result: " . (defined $site ? "found" : "not found"));
+        
+        if ($site) {
+            $site_id = $site->id;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
                 "Found site '$site_input' with ID: $site_id");
         } else {
+            # Debug: List all available sites
+            my @all_site_names = ();
+            my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
+            while (my $s = $sites_rs->next) {
+                push @all_site_names, $s->name;
+            }
+            
+            my $available_sites = join(', ', @all_site_names);
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
-                "Site not found: '$site_input'");
+                "Site not found: '$site_input'. Available sites: $available_sites");
+            
+            # Reload the form with error and site list
+            my @all_sites_for_form = ();
+            my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+            my $is_csc = 1; # Assume CSC if we're in site lookup
+            
+            $sites_rs->reset; # Reset the iterator
+            while (my $s = $sites_rs->next) {
+                push @all_sites_for_form, {
+                    id => $s->id,
+                    name => $s->name,
+                };
+            }
+            
             $c->stash(
-                error_msg => "Site '$site_input' not found. Please enter a valid site name (e.g., CSC) or numeric site ID.",
+                error_msg => "Site '$site_input' not found. Available sites: $available_sites",
+                current_sitename => $current_sitename,
+                is_csc => $is_csc,
+                all_sites => \@all_sites_for_form,
                 template => 'mail/add_mail_config_form.tt'
             );
             $c->forward($c->view('TT'));
