@@ -898,8 +898,7 @@ sub do_create_account :Local {
         }
         
         $c->session->{verification_user_id} = $new_user->id;
-        # Remove testing code display - verification code only sent via email now
-        # $c->session->{verification_code_display} = $verification_code;
+        $c->session->{verification_code_display} = $verification_code;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
             "User created with ID: " . $new_user->id . ", verification code: $verification_code");
@@ -941,13 +940,8 @@ sub do_create_account :Local {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Failed to send verification email: $@");
-        
-        # Notify admin about email failure
-        eval {
-            $self->send_error_notification($c, "Email Send Failure",
-                "Failed to send verification email to user '" . $new_user->username . "' (" . $new_user->email . "). Error: $@");
-        };
     }
+    $c->session->{email_sent} = $email_sent ? 1 : 0;
     
     # Send notification to admin about successful registration
     eval {

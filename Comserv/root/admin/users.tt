@@ -172,9 +172,10 @@
                                     [% END %]
                                 </td>
                                 <td>
-                                    [% IF user.user_site_roles.size > 0 %]
-                                        [% FOREACH site_role IN user.user_site_roles %]
-                                            <span class="badge-info">[% site_role.sitename | html %]</span>
+                                    [% SET user_sites = user_sites_map.item(user.id) %]
+                                    [% IF user_sites && user_sites.size > 0 %]
+                                        [% FOREACH sn IN user_sites %]
+                                            <span class="badge-info">[% sn | html %]</span>
                                         [% END %]
                                     [% ELSE %]
                                         <span class="empty-state">No sites</span>
