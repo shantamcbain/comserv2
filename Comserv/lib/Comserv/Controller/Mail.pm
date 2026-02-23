@@ -102,7 +102,41 @@ sub add_mail_config_form :Local {
         return;
     }
     
-    $c->stash(template => 'mail/add_mail_config_form.tt');
+    # Get current site name from stash
+    my $current_sitename = $c->stash->{SiteName} || '';
+    
+    # Determine if user is CSC (has access to all sites)
+    my $is_csc = ($current_sitename eq 'CSC') ? 1 : 0;
+    
+    # Load all sites if CSC user
+    my @all_sites = ();
+    if ($is_csc) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Loading all sites for CSC user");
+        
+        my $schema = $c->model('DBEncy');
+        my $sites_rs = $schema->resultset('Site')->search(
+            {},
+            { order_by => 'name' }
+        );
+        
+        while (my $site = $sites_rs->next) {
+            push @all_sites, {
+                id => $site->id,
+                name => $site->name,
+            };
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Loaded " . scalar(@all_sites) . " sites");
+    }
+    
+    $c->stash(
+        current_sitename => $current_sitename,
+        is_csc => $is_csc,
+        all_sites => \@all_sites,
+        template => 'mail/add_mail_config_form.tt'
+    );
 }
 
 sub add_mail_config :Local {
@@ -307,13 +341,21 @@ sub edit_smtp_config :Local {
         };
     }
     
-    # Load existing configuration
+    # Load existing configuration and site name
     my %config;
+    my $site_name = '';
     try {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
             "Loading existing SMTP config for site_id $site_id");
         
         my $schema = $c->model('DBEncy');
+        
+        # Get site name
+        my $site = $schema->resultset('Site')->find($site_id);
+        if ($site) {
+            $site_name = $site->name;
+        }
+        
         my $dbh = $schema->schema->storage->dbh;
         my $sth = $dbh->prepare("
             SELECT config_key, config_value 
@@ -331,7 +373,7 @@ sub edit_smtp_config :Local {
         }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
-            "Loaded $row_count SMTP config items for site_id $site_id");
+            "Loaded $row_count SMTP config items for site_id $site_id ($site_name)");
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config',
@@ -340,6 +382,7 @@ sub edit_smtp_config :Local {
     
     $c->stash(
         site_id => $site_id,
+        site_name => $site_name,
         smtp_config => \%config,
         template => 'mail/EditSmtpConfig.tt'
     );
