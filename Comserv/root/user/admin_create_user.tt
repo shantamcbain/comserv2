@@ -1,0 +1,146 @@
+[% PageVersion = 'admin_create_user.tt,v 0.01 2026/02/22 AI Assistant Exp AI Assistant ' %]
+[% IF c.session.debug_mode == 1 %]
+  [% PageVersion %]
+
+[% END %]
+
+<h2>Create User (Admin)</h2>
+<p>Create a new user account. The user will receive an invitation email with a verification code to complete their setup.</p>
+
+[% IF error_msg %]
+    <p class="error">[% error_msg %]</p>
+[% END %]
+
+<form method="post" action="/user/admin_create_user">
+    <fieldset>
+        <legend>User Information</legend>
+        
+        <label for="first_name">First Name *</label>
+        <input type="text" id="first_name" name="first_name" value="[% c.req.params.first_name | html %]" required><br>
+
+        <label for="last_name">Last Name *</label>
+        <input type="text" id="last_name" name="last_name" value="[% c.req.params.last_name | html %]" required><br>
+
+        <label for="email">Email *</label>
+        <input type="email" id="email" name="email" value="[% c.req.params.email | html %]" required><br>
+
+        <label for="username">Username (optional - user can set during setup)</label>
+        <input type="text" id="username" name="username" value="[% c.req.params.username | html %]"><br>
+    </fieldset>
+
+    <fieldset>
+        <legend>Site Access *</legend>
+        <p class="help-text">Select one or more sites this user will have access to.</p>
+        [% FOREACH site IN sites %]
+            <label class="checkbox-label">
+                <input type="checkbox" name="sitenames" value="[% site.name | html %]"
+                    [% IF c.req.param('sitenames').grep('^' _ site.name _ '$').size > 0 %]checked[% END %]>
+                [% site.name | html %] - [% site.description | html %]
+            </label><br>
+        [% END %]
+    </fieldset>
+
+    <fieldset>
+        <legend>Roles *</legend>
+        <p class="help-text">Select one or more roles. Each role will be assigned to each selected site.</p>
+        [% FOREACH role IN roles %]
+            <label class="checkbox-label">
+                <input type="checkbox" name="roles" value="[% role.id | html %]"
+                    [% IF c.req.param('roles').grep('^' _ role.id _ '$').size > 0 %]checked[% END %]>
+                [% role.role_name | html %] ([% role.sitename | html %])
+                [% IF role.description %] - [% role.description | html %][% END %]
+            </label><br>
+        [% END %]
+    </fieldset>
+
+    <input type="submit" value="Create User">
+    <a href="/admin/users" class="button-link">Cancel</a>
+</form>
+
+<style>
+    .error {
+        color: red;
+        font-weight: bold;
+        padding: 10px;
+        background: #ffe6e6;
+        border: 1px solid red;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    .help-text {
+        font-size: 0.9em;
+        color: #666;
+        margin: 5px 0;
+    }
+    
+    form {
+        max-width: 600px;
+        margin: 20px 0;
+    }
+    
+    fieldset {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 4px;
+    }
+    
+    legend {
+        font-weight: bold;
+        padding: 0 10px;
+    }
+    
+    label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+    
+    label.checkbox-label {
+        font-weight: normal;
+    }
+    
+    input[type="text"],
+    input[type="email"] {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    
+    input[type="checkbox"] {
+        margin-right: 5px;
+    }
+    
+    input[type="submit"] {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    input[type="submit"]:hover {
+        background: #218838;
+    }
+    
+    .button-link {
+        display: inline-block;
+        margin-top: 15px;
+        margin-left: 10px;
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    
+    .button-link:hover {
+        background: #5a6268;
+    }
+</style>
