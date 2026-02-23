@@ -1,5 +1,5 @@
-[% META title = 'User Management Dashboard' %]
-[% PageVersion = 'user/dashboard.tt,v 0.01 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% META title = 'User Management' %]
+[% PageVersion = 'admin/users.tt,v 0.01 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF c.session.debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
@@ -7,7 +7,7 @@
 <div class="app-container">
     
     <div class="page-header">
-        <h1>User Management Dashboard</h1>
+        <h1>User Management</h1>
         <h2 class="page-subtitle">[% IF is_csc_admin %]CSC Admin - All Users[% ELSE %]Site Admin - [% sitename | html %] Users[% END %]</h2>
     </div>
     
@@ -59,7 +59,7 @@
             <div class="content-section">
                 <h3>Search & Filters</h3>
                 <div class="form-container">
-                    <form method="get" action="[% c.uri_for('/user/dashboard') %]" class="app-form">
+                    <form method="get" action="[% c.uri_for('/admin/users') %]" class="app-form">
                         <div class="form-section">
                             <div class="form-row">
                                 <div class="form-field">
@@ -108,7 +108,7 @@
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">Apply Filters</button>
-                            <a href="[% c.uri_for('/user/dashboard') %]" class="btn btn-secondary">Clear Filters</a>
+                            <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Clear Filters</a>
                         </div>
                     </form>
                 </div>
@@ -185,13 +185,13 @@
                 [% IF pager.last_page > 1 %]
                 <div class="pagination">
                     [% IF pager.previous_page %]
-                        <a href="[% c.uri_for('/user/dashboard', { page => pager.previous_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">« Previous</a>
+                        <a href="[% c.uri_for('/admin/users', { page => pager.previous_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">« Previous</a>
                     [% END %]
                     
                     <span class="page-info">Page [% pager.current_page %] of [% pager.last_page %]</span>
                     
                     [% IF pager.next_page %]
-                        <a href="[% c.uri_for('/user/dashboard', { page => pager.next_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">Next »</a>
+                        <a href="[% c.uri_for('/admin/users', { page => pager.next_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">Next »</a>
                     [% END %]
                 </div>
                 [% END %]
@@ -209,8 +209,8 @@
     
     <div class="page-footer">
         <div class="footer-actions">
-            <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-primary">Create New User</a>
-            <a href="[% c.uri_for('/') %]" class="btn btn-secondary">Back to Home</a>
+            <a href="[% c.uri_for('/admin/create_user') %]" class="btn btn-primary">Create New User</a>
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Back to Admin Dashboard</a>
         </div>
     </div>
     
