@@ -1,19 +1,101 @@
-[% PageVersion = 'login.tt,v 0.01 2023/09/01 shanta Exp shanta ' %]
-[% META title = 'Edit User' %]
+[% META
+   title = "Edit User"
+   description = "Admin interface for editing user account details"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.02"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/edit_user.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
-[% END %]
   [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
-<form method="POST" action="/user/do_edit_user/[% user.id %]">
-    <label for="username">Username:</label><br>
-    <input type="text" id="username" name="username" value="[% user.username %]"><br>
-    <label for="first_name">First Name:</label><br>
-    <input type="text" id="first_name" name="first_name" value="[% user.first_name %]"><br>
-    <label for="last_name">Last Name:</label><br>
-    <input type="text" id="last_name" name="last_name" value="[% user.last_name %]"><br>
-    <label for="email">Email:</label><br>
-    <input type="text" id="email" name="email" value="[% user.email %]"><br>
-    <label for="roles">Roles:</label><br>
-    <input type="text" id="roles" name="roles" value="[% user.roles %]"><br>
-    <input type="submit" value="Submit">
-</form>
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Edit User</h1>
+        <h2 class="page-subtitle">[% user.username || user.email | html %]</h2>
+    </div>
+
+    <div class="content-container">
+
+        <div class="content-primary">
+
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+
+            <div class="form-container">
+                <form method="POST" action="[% c.uri_for('/user/do_edit_user', user.id) %]" class="app-form">
+
+                    <div class="form-section">
+                        <h3>Account Details</h3>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="username">Username</label>
+                                <input type="text" id="username" name="username"
+                                       value="[% user.username | html %]" class="form-input">
+                            </div>
+                            <div class="form-field">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email"
+                                       value="[% user.email | html %]" class="form-input" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="first_name">First Name</label>
+                                <input type="text" id="first_name" name="first_name"
+                                       value="[% user.first_name | html %]" class="form-input">
+                            </div>
+                            <div class="form-field">
+                                <label for="last_name">Last Name</label>
+                                <input type="text" id="last_name" name="last_name"
+                                       value="[% user.last_name | html %]" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Access & Status</h3>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="roles">Roles <small>(comma-separated)</small></label>
+                                <input type="text" id="roles" name="roles"
+                                       value="[% user.roles | html %]" class="form-input"
+                                       placeholder="normal, admin, editor, developer">
+                            </div>
+                            <div class="form-field">
+                                <label for="status">Status</label>
+                                <select id="status" name="status" class="form-input">
+                                    [% SET cur_status = user.status || 'active' %]
+                                    <option value="active"              [% IF cur_status == 'active'              %]selected[% END %]>Active</option>
+                                    <option value="suspended"           [% IF cur_status == 'suspended'           %]selected[% END %]>Suspended</option>
+                                    <option value="pending_verification"[% IF cur_status == 'pending_verification'%]selected[% END %]>Pending Verification</option>
+                                    <option value="pending_setup"       [% IF cur_status == 'pending_setup'       %]selected[% END %]>Pending Setup</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
