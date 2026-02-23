@@ -1,267 +1,108 @@
-[% PageVersion = 'user/profile.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
+[% PageVersion = 'user/profile.tt,v 0.02 2026/02/22 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 [% META title = 'User Profile' %]
 
-<div class="user-profile-container">
-    <div class="profile-header">
+<!-- Main Application Container -->
+<div class="app-container">
+    
+    <!-- Page Header -->
+    <div class="page-header">
         <h1>User Profile</h1>
-        <p class="profile-subtitle">View and manage your account information</p>
+        <h2 class="page-subtitle">View and manage your account information</h2>
     </div>
     
-    <div class="profile-content">
-        <div class="profile-section">
-            <h2>Account Information</h2>
-            <div class="profile-info">
-                <div class="info-group">
-                    <label>Username:</label>
-                    <span>[% user.username %]</span>
-                </div>
+    <!-- Main Content Area -->
+    <div class="content-container">
+        
+        <!-- Primary Content Section -->
+        <div class="content-primary">
+            
+            <!-- Account Information Section -->
+            <div class="content-section">
+                <h3>Account Information</h3>
                 
-                <div class="info-group">
-                    <label>Name:</label>
-                    <span>[% user.first_name %] [% user.last_name %]</span>
+                <div class="data-container">
+                    <table class="data-table">
+                        <tbody>
+                            <tr>
+                                <td><strong>Username:</strong></td>
+                                <td>[% user.username | html %]</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Name:</strong></td>
+                                <td>[% user.first_name | html %] [% user.last_name | html %]</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email:</strong></td>
+                                <td>[% user.email | html %]</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td>
+                                    [% SET user_status = user.status || 'active' %]
+                                    [% IF user_status == 'active' %]
+                                        <span class="badge-success">[% user_status | ucfirst %]</span>
+                                    [% ELSIF user_status == 'suspended' %]
+                                        <span class="badge-danger">[% user_status | ucfirst %]</span>
+                                    [% ELSE %]
+                                        <span class="badge-warning">[% user_status | ucfirst %]</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Roles:</strong></td>
+                                <td>
+                                    [% IF user.roles && user.roles.size %]
+                                        [% FOREACH role IN user.roles %]
+                                            <span class="badge-primary">[% role | html %]</span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        <span class="badge-primary">normal</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+            
+            <!-- Site Access Section -->
+            [% IF user.site_roles && user.site_roles.size > 0 %]
+            <div class="content-section">
+                <h3>Site Access</h3>
                 
-                <div class="info-group">
-                    <label>Email:</label>
-                    <span>[% user.email %]</span>
-                </div>
-                
-                <div class="info-group">
-                    <label>Status:</label>
-                    [% SET user_status = user.status || 'active' %]
-                    <span class="status-badge status-[% user_status %]">
-                        [% user_status | ucfirst %]
-                    </span>
-                </div>
-                
-                <div class="info-group">
-                    <label>Roles:</label>
-                    <span>
-                        [% IF user.roles.size %]
-                            [% FOREACH role IN user.roles %]
-                                <span class="role-badge">[% role %]</span>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Site Name</th>
+                                <th>Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH site_role IN user.site_roles %]
+                            <tr>
+                                <td>[% site_role.sitename | html %]</td>
+                                <td><span class="badge-primary">[% site_role.role_name | html %]</span></td>
+                            </tr>
                             [% END %]
-                        [% ELSE %]
-                            <span class="role-badge">normal</span>
-                        [% END %]
-                    </span>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-        
-        [% IF user.site_roles && user.site_roles.size > 0 %]
-        <div class="profile-section">
-            <h2>Site Access</h2>
-            <div class="profile-info">
-                <table class="site-roles-table">
-                    <thead>
-                        <tr>
-                            <th>Site Name</th>
-                            <th>Role</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH site_role IN user.site_roles %]
-                        <tr>
-                            <td>[% site_role.sitename %]</td>
-                            <td><span class="role-badge">[% site_role.role_name %]</span></td>
-                        </tr>
-                        [% END %]
-                    </tbody>
-                </table>
+            [% END %]
+            
+            <!-- Profile Actions -->
+            <div class="form-actions">
+                <a href="[% c.uri_for('/user/settings') %]" class="btn btn-primary">Edit Profile</a>
+                <a href="[% c.uri_for('/user/change_password') %]" class="btn btn-secondary">Change Password</a>
             </div>
-        </div>
-        [% END %]
-        
-        <div class="profile-actions">
-            <a href="[% c.uri_for('/user/settings') %]" class="action-button">Edit Profile</a>
-            <a href="[% c.uri_for('/user/change_password') %]" class="action-button">Change Password</a>
+            
         </div>
         
-        <div class="profile-section">
-            <h2>Recent Activity</h2>
-            <p class="no-activity">No recent activity to display.</p>
-        </div>
     </div>
+    
 </div>
-
-<style>
-    .user-profile-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: Arial, sans-serif;
-    }
-    
-    .profile-header {
-        margin-bottom: 30px;
-        text-align: center;
-    }
-    
-    .profile-header h1 {
-        color: #333;
-        margin-bottom: 5px;
-    }
-    
-    .profile-subtitle {
-        color: #666;
-        font-size: 1.1em;
-    }
-    
-    .profile-content {
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        padding: 25px;
-    }
-    
-    .profile-section {
-        margin-bottom: 30px;
-    }
-    
-    .profile-section h2 {
-        color: #0066cc;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
-        margin-top: 0;
-    }
-    
-    .profile-info {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 15px;
-        margin-top: 20px;
-    }
-    
-    .info-group {
-        display: flex;
-        align-items: baseline;
-    }
-    
-    .info-group label {
-        font-weight: bold;
-        width: 100px;
-        color: #555;
-    }
-    
-    .info-group span {
-        color: #333;
-        flex: 1;
-    }
-    
-    .role-badge {
-        display: inline-block;
-        background-color: #0066cc;
-        color: white;
-        padding: 3px 10px;
-        border-radius: 15px;
-        font-size: 0.8em;
-        margin-right: 5px;
-        text-transform: capitalize;
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-size: 0.85em;
-        font-weight: bold;
-        text-transform: capitalize;
-    }
-    
-    .status-active {
-        background-color: #28a745;
-        color: white;
-    }
-    
-    .status-suspended {
-        background-color: #dc3545;
-        color: white;
-    }
-    
-    .status-pending_verification,
-    .status-pending_setup {
-        background-color: #ffc107;
-        color: #333;
-    }
-    
-    .site-roles-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 15px;
-    }
-    
-    .site-roles-table th {
-        background-color: #f8f9fa;
-        padding: 10px;
-        text-align: left;
-        border-bottom: 2px solid #dee2e6;
-        font-weight: bold;
-        color: #495057;
-    }
-    
-    .site-roles-table td {
-        padding: 10px;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .site-roles-table tbody tr:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .profile-actions {
-        display: flex;
-        gap: 15px;
-        margin: 25px 0;
-    }
-    
-    .action-button {
-        display: inline-block;
-        background-color: #0066cc;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        text-decoration: none;
-        font-weight: bold;
-        transition: background-color 0.2s;
-    }
-    
-    .action-button:hover {
-        background-color: #0055aa;
-    }
-    
-    .no-activity {
-        color: #666;
-        font-style: italic;
-        padding: 10px 0;
-    }
-    
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
-        .profile-info {
-            grid-template-columns: 1fr;
-        }
-        
-        .info-group {
-            flex-direction: column;
-        }
-        
-        .info-group label {
-            width: 100%;
-            margin-bottom: 5px;
-        }
-        
-        .profile-actions {
-            flex-direction: column;
-        }
-        
-        .action-button {
-            width: 100%;
-            text-align: center;
-        }
-    }
-</style>
