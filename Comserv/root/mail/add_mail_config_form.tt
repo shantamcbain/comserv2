@@ -31,9 +31,21 @@
 </p>
 
 <form method="POST" action="[% c.uri_for('/mail/add_mail_config') %]">
-    <label for="site_id">Site Name or ID:</label>
-    <input type="text" id="site_id" name="site_id" required placeholder="e.g., CSC or 1">
-    <small style="display: block; margin-left: 150px; color: #666;">Enter site name (e.g., "CSC", "harper") or numeric site ID</small><br>
+    <label for="site_id">Site Name:</label>
+    [% IF is_csc %]
+        <select id="site_id" name="site_id" required>
+            <option value="">-- Select Site --</option>
+            [% FOREACH site IN all_sites %]
+                <option value="[% site.name %]" [% site.name == 'CSC' ? 'selected' : '' %]>
+                    [% site.name %] (ID: [% site.id %])
+                </option>
+            [% END %]
+        </select>
+        <small style="display: block; margin-left: 150px; color: #666;">CSC can configure any site</small><br>
+    [% ELSE %]
+        <input type="text" id="site_id" name="site_id" value="[% current_sitename %]" readonly style="background: #f0f0f0;">
+        <small style="display: block; margin-left: 150px; color: #666;">Your site: [% current_sitename %]</small><br>
+    [% END %]
     
     <label for="smtp_host">SMTP Host:</label>
     <input type="text" id="smtp_host" name="smtp_host" required><br>
@@ -110,6 +122,14 @@ document.querySelector('form').addEventListener('submit', function(e) {
     select {
         width: 300px;
         padding: 5px;
+    }
+    
+    input[readonly] {
+        cursor: not-allowed;
+    }
+    
+    select {
+        width: 310px;
     }
     
     input[type="submit"] {

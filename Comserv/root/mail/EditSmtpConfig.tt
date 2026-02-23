@@ -7,7 +7,7 @@
 
 <h1>Edit SMTP Configuration</h1>
 
-<h2>Site ID: [% site_id %]</h2>
+<h2>Site: [% site_name %] (ID: [% site_id %])</h2>
 
 [% IF error_msg %]
     <p class="error">[% error_msg %]</p>
