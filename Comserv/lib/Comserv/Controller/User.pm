@@ -718,29 +718,36 @@ sub do_create_account :Local {
         $verification_code = $self->user_verification->generate_verification_code();
         $self->user_verification->create_verification_code($new_user, $verification_code);
         
-        # Create UserSiteRole entry for the current site
-        my $sitename = $c->stash->{SiteName} || 'CSC';
-        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
-        
-        if ($site) {
-            # Look up the 'user' role_id for this site
-            my $user_role = $c->model('DBEncy::SiteRole')->search({
-                sitename => $sitename,
-                name => 'user',
-            })->single;
+        # Create UserSiteRole entry for the current site (if site_roles table exists)
+        eval {
+            my $sitename = $c->stash->{SiteName} || 'CSC';
+            my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
             
-            if ($user_role) {
-                $c->model('DBEncy::UserSiteRole')->create({
-                    user_id => $new_user->id,
-                    role_id => $user_role->id,
+            if ($site) {
+                # Try to look up the 'user' role_id for this site
+                my $user_role = $c->model('DBEncy::SiteRole')->search({
                     sitename => $sitename,
-                });
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                    "Created UserSiteRole for user " . $new_user->id . " on site $sitename with role 'user' (role_id: " . $user_role->id . ")");
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-                    "No 'user' role found for site $sitename - UserSiteRole not created");
+                    name => 'user',
+                })->single;
+                
+                if ($user_role) {
+                    $c->model('DBEncy::UserSiteRole')->create({
+                        user_id => $new_user->id,
+                        role_id => $user_role->id,
+                        sitename => $sitename,
+                    });
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                        "Created UserSiteRole for user " . $new_user->id . " on site $sitename with role 'user' (role_id: " . $user_role->id . ")");
+                } else {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                        "No 'user' role found for site $sitename - UserSiteRole not created");
+                }
             }
+        };
+        if ($@) {
+            # Log the error but don't fail registration
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Could not create UserSiteRole (table may not exist): $@");
         }
         
         $c->session->{verification_user_id} = $new_user->id;
