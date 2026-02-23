@@ -131,25 +131,56 @@ sub add_mail_config :Local {
     }
     
     my $params = $c->req->params;
-    my $site_id = $params->{site_id};
+    my $site_input = $params->{site_id};
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
-        "Processing mail configuration for site_id '$site_id'");
+        "Processing mail configuration for site input: '$site_input'");
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
         "Params: smtp_host=" . ($params->{smtp_host} || 'undef') . 
         ", smtp_port=" . ($params->{smtp_port} || 'undef') .
         ", smtp_username=" . ($params->{smtp_username} || 'undef'));
     
     # Validate required fields
-    unless ($site_id) {
+    unless ($site_input) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
             "Missing site_id parameter");
         $c->stash(
-            error_msg => "Please provide a Site ID",
+            error_msg => "Please provide a Site ID or Site Name",
             template => 'mail/add_mail_config_form.tt'
         );
         $c->forward($c->view('TT'));
         return;
+    }
+    
+    # Lookup site_id if user entered a site name instead of numeric ID
+    my $site_id;
+    if ($site_input =~ /^\d+$/) {
+        # It's already a numeric ID
+        $site_id = $site_input;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+            "Using numeric site_id: $site_id");
+    } else {
+        # It's a site name, look it up
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+            "Looking up site by name: '$site_input'");
+        
+        my $site_model = $c->model('Site');
+        my $site = $site_model->get_site_details_by_name($c, $site_input);
+        
+        if ($site && $site->{id}) {
+            $site_id = $site->{id};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+                "Found site '$site_input' with ID: $site_id");
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
+                "Site not found: '$site_input'");
+            $c->stash(
+                error_msg => "Site '$site_input' not found. Please enter a valid site name (e.g., CSC) or numeric site ID.",
+                template => 'mail/add_mail_config_form.tt'
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
     }
     
     unless ($params->{smtp_host} && $params->{smtp_port}) {
@@ -520,17 +551,18 @@ sub mail_admin_dashboard :Local {
             $mail_stats->{total_domains} = $schema->resultset('MailDomain')->count;
         };
         
-        # Load SMTP server configurations from SiteConfig
+        # Load SMTP server configurations from SiteConfig with site names
         eval {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
                 "Attempting to load SMTP configurations from site_config table");
             
             my $dbh = $schema->schema->storage->dbh;
             my $sth = $dbh->prepare("
-                SELECT site_id, config_key, config_value 
-                FROM site_config 
-                WHERE config_key LIKE 'smtp_%' 
-                ORDER BY site_id, config_key
+                SELECT sc.site_id, sc.config_key, sc.config_value, s.name as site_name
+                FROM site_config sc
+                LEFT JOIN site s ON sc.site_id = s.id
+                WHERE sc.config_key LIKE 'smtp_%' 
+                ORDER BY sc.site_id, sc.config_key
             ");
             $sth->execute();
             
@@ -541,11 +573,15 @@ sub mail_admin_dashboard :Local {
                 my $site_id = $row->{site_id};
                 my $key = $row->{config_key};
                 my $value = $row->{config_value};
+                my $site_name = $row->{site_name} || "Unknown";
                 
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'mail_admin_dashboard',
-                    "Loaded SMTP config: site_id=$site_id, key=$key");
+                    "Loaded SMTP config: site_id=$site_id ($site_name), key=$key");
                 
-                $servers_by_site{$site_id} ||= { site_id => $site_id };
+                $servers_by_site{$site_id} ||= { 
+                    site_id => $site_id,
+                    site_name => $site_name
+                };
                 $servers_by_site{$site_id}{$key} = $value;
             }
             
