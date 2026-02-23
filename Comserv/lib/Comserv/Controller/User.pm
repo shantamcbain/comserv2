@@ -1431,63 +1431,163 @@ sub list_users :Local :Args(0) {
 sub edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
-    # Retrieve the user ID from the URL
-    my $user_id = $c->request->arguments->[0];
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('User');
-
-    # Find the user in the database
-    my $user = $rs->find($user_id);
-
-    if ($user) {
-        # The user was found, so store the user object in the stash
-        $c->stash(user => $user);
-
-        # Set the template for the response
-        $c->stash(template => 'user/edit_user.tt');
-    } else {
-        # The user was not found, so display an error message
-        $c->response->body('User not found');
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'edit_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
     }
+
+    my $user_id = $c->request->arguments->[0];
+    my $schema  = $c->model('DBEncy');
+    my $user    = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    unless ($is_csc_admin) {
+        my $sitename = $c->session->{SiteName};
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only edit users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_user',
+        "Admin editing user_id=$user_id");
+
+    $c->stash(
+        user     => $user,
+        template => 'user/edit_user.tt',
+    );
 }
+
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
 
-    # Retrieve the user ID from the URL
-    my $user_id = $c->request->arguments->[0];
-
-    # Get a DBIx::Class::Schema object
-    my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object
-    my $rs = $schema->resultset('User');
-
-    # Find the user in the database
-    my $user = $rs->find($user_id);
-
-    if ($user) {
-        # The user was found, so retrieve the form data
-        my $form_data = $c->request->body_parameters;
-
-        # Update the user record with the new data
-        $user->update({
-            username   => $form_data->{username},
-            first_name => $form_data->{first_name},
-            last_name  => $form_data->{last_name},
-            email      => $form_data->{email},
-            roles      => $form_data->{roles},
-        });
-
-        # Redirect the user back to the list of users
-        $c->response->redirect($c->uri_for($self->action_for('list_users')));
-    } else {
-        # The user was not found, so display an error message
-        $c->response->body('User not found');
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'do_edit_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
     }
+
+    my $user_id  = $c->request->arguments->[0];
+    my $schema   = $c->model('DBEncy');
+    my $user     = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    unless ($is_csc_admin) {
+        my $sitename = $c->session->{SiteName};
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only edit users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    my $username   = $c->req->params->{username} || undef;
+    my $first_name = $c->req->params->{first_name};
+    my $last_name  = $c->req->params->{last_name};
+    my $email      = $c->req->params->{email};
+    my $roles      = $c->req->params->{roles};
+    my $status     = $c->req->params->{status};
+
+    unless ($email) {
+        $c->stash(
+            user      => $user,
+            error_msg => 'Email is required.',
+            template  => 'user/edit_user.tt',
+        );
+        return;
+    }
+
+    if ($username && $username ne ($user->username || '')) {
+        my $existing = $schema->resultset('User')->search({
+            username => $username,
+            id       => { '!=' => $user_id },
+        })->count;
+        if ($existing) {
+            $c->stash(
+                user      => $user,
+                error_msg => "Username '$username' is already taken.",
+                template  => 'user/edit_user.tt',
+            );
+            return;
+        }
+    }
+
+    if ($email ne $user->email) {
+        my $existing = $schema->resultset('User')->search({
+            email => $email,
+            id    => { '!=' => $user_id },
+        })->count;
+        if ($existing) {
+            $c->stash(
+                user      => $user,
+                error_msg => "Email '$email' is already in use.",
+                template  => 'user/edit_user.tt',
+            );
+            return;
+        }
+    }
+
+    eval {
+        $user->update({
+            username   => $username,
+            first_name => $first_name,
+            last_name  => $last_name,
+            email      => $email,
+            roles      => $roles,
+            status     => $status,
+        });
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_edit_user',
+            "Error updating user_id=$user_id: $@");
+        $c->stash(
+            user      => $user,
+            error_msg => "An error occurred while saving changes: $@",
+            template  => 'user/edit_user.tt',
+        );
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+        "User updated by admin: user_id=$user_id email=$email status=$status");
+
+    $c->flash->{success_msg} = 'User updated successfully.';
+    $c->response->redirect($c->uri_for('/admin/users'));
 }
 sub register :Local {
     my ($self, $c) = @_;

@@ -1,4 +1,4 @@
-[% PageVersion	= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '	%]
+[% PageVersion	= 'footer.tt,v 0.04 2026/02/23 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
  <br><a href="/reset_session">Reset Session</a></br>
@@ -22,3 +22,10 @@
     </details>
 </div>
 [% END %]
+
+<footer class="site-footer">
+    <div class="footer-content" style="text-align:center; padding: 1rem 0;">
+        [% USE date %]
+        <p>&copy; [% date.format(date.now, '%Y') %] [% c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
+    </div>
+</footer>
