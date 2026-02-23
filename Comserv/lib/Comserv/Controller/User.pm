@@ -1746,6 +1746,123 @@ sub do_edit_user :Local :Args(1) {
     $c->flash->{success_msg} = 'User updated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
 }
+
+sub admin_suspend_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_suspend_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $user   = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only manage users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    my $admin_uid = $c->session->{user_id};
+
+    eval {
+        $user->update({ status => 'suspended' });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_suspend_user',
+            "Error suspending user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'An error occurred while suspending the account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
+        "User suspended: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+
+    $c->flash->{success_msg} = 'User account suspended successfully.';
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
+sub admin_activate_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_activate_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $user   = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only manage users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    my $admin_uid = $c->session->{user_id};
+
+    eval {
+        $user->update({ status => 'active' });
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_activate_user',
+            "Error activating user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'An error occurred while activating the account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_activate_user',
+        "User activated: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+
+    $c->flash->{success_msg} = 'User account activated successfully.';
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
 sub register :Local {
     my ($self, $c) = @_;
 
