@@ -445,10 +445,14 @@ sub users :Path('/admin/users') :Args(0) {
                 $filter_site = $sitename;
             }
 
-            my @user_ids = $schema->resultset('UserSiteRole')->search(
-                { sitename => $sitename },
-                { columns => ['user_id'], distinct => 1 }
-            )->get_column('user_id')->all;
+            my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+            my @user_ids;
+            if ($site_obj) {
+                @user_ids = $schema->resultset('UserSiteRole')->search(
+                    { site_id => $site_obj->id },
+                    { columns => ['user_id'], distinct => 1 }
+                )->get_column('user_id')->all;
+            }
 
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
                 "Found " . scalar(@user_ids) . " user_ids for sitename=$sitename");
@@ -471,10 +475,17 @@ sub users :Path('/admin/users') :Args(0) {
             my @user_ids = map { $_->id } @users;
             my @site_role_rows = $schema->resultset('UserSiteRole')->search(
                 { user_id => { -in => \@user_ids } },
-                { columns => ['user_id', 'sitename'] }
+                { columns => ['user_id', 'site_id'], distinct => 1 }
             )->all;
+            my %site_name_cache;
             for my $sr (@site_role_rows) {
-                push @{$user_sites_map{$sr->user_id}}, $sr->sitename;
+                my $sid = $sr->site_id;
+                next unless defined $sid;
+                unless (exists $site_name_cache{$sid}) {
+                    my $s = $schema->resultset('Site')->find($sid);
+                    $site_name_cache{$sid} = $s ? $s->name : "site#$sid";
+                }
+                push @{$user_sites_map{$sr->user_id}}, $site_name_cache{$sid};
             }
         }
 
@@ -604,12 +615,15 @@ sub create_user :Path('/admin/create_user') :Args(0) {
             my $code = $user_verification->generate_verification_code();
             $user_verification->create_verification_code($user, $code);
 
-            foreach my $site (@sitenames) {
-                foreach my $role (@roles) {
+            foreach my $site_name (@sitenames) {
+                my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                next unless $site_obj;
+                foreach my $role_name (@roles) {
                     $schema->resultset('UserSiteRole')->create({
-                        user_id => $user->id,
-                        sitename => $site,
-                        role_name => $role,
+                        user_id    => $user->id,
+                        site_id    => $site_obj->id,
+                        role       => $role_name,
+                        granted_by => $c->session->{user_id},
                     });
                 }
             }
