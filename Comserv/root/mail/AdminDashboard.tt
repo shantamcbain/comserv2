@@ -31,7 +31,7 @@
         <table class="smtp-servers-table">
             <thead>
                 <tr>
-                    <th>Site ID</th>
+                    <th>Site</th>
                     <th>SMTP Host</th>
                     <th>Port</th>
                     <th>Username</th>
@@ -43,7 +43,10 @@
             <tbody>
                 [% FOREACH server IN smtp_servers %]
                 <tr>
-                    <td>[% server.site_id %]</td>
+                    <td>
+                        <strong>[% server.site_name || 'Unknown' %]</strong><br>
+                        <small style="color: #666;">ID: [% server.site_id %]</small>
+                    </td>
                     <td>[% server.smtp_host || 'Not set' %]</td>
                     <td>[% server.smtp_port || 'Not set' %]</td>
                     <td>[% server.smtp_username || 'Not set' %]</td>
