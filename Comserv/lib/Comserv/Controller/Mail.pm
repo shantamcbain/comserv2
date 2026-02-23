@@ -108,6 +108,9 @@ sub add_mail_config_form :Local {
 sub add_mail_config :Local {
     my ($self, $c) = @_;
     
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+        "add_mail_config action called - Method: " . $c->req->method);
+    
     # Check if user is admin
     my $roles = $c->session->{roles} || [];
     if (!ref $roles) {
@@ -115,6 +118,9 @@ sub add_mail_config :Local {
     }
     
     my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+        "User: " . ($c->session->{username} || 'not logged in') . ", Is Admin: " . ($is_admin ? 'yes' : 'no'));
     
     unless ($is_admin) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config', 
