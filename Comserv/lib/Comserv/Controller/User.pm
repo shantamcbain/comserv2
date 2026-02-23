@@ -9,6 +9,7 @@ use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
+use Comserv::Util::AdminAuth;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -1084,6 +1085,354 @@ sub complete_profile :Local {
         $c->response->redirect($c->uri_for('/user/login'));
     } else {
         $c->stash(template => 'user/CompleteProfile.tt');
+    }
+}
+
+sub admin_create_user :Local {
+    my ($self, $c) = @_;
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    
+    unless ($admin_auth->check_admin_access($c, 'admin_create_user')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+        'Admin accessing user creation form');
+    
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+    
+    my @sites;
+    if ($is_csc_admin) {
+        @sites = $schema->resultset('Site')->all;
+    } else {
+        my $site = $schema->resultset('Site')->find({ name => $sitename });
+        @sites = ($site) if $site;
+    }
+    
+    my @roles = $schema->resultset('SiteRole')->search(
+        $is_csc_admin ? {} : { sitename => $sitename }
+    )->all;
+    
+    if ($c->req->method eq 'POST') {
+        my $first_name = $c->req->params->{first_name};
+        my $last_name = $c->req->params->{last_name};
+        my $email = $c->req->params->{email};
+        my $username = $c->req->params->{username} || undef;
+        my @selected_sites = $c->req->param('sitenames');
+        my @selected_roles = $c->req->param('roles');
+        
+        unless ($first_name && $last_name && $email) {
+            $c->stash(
+                error_msg => 'First name, last name, and email are required',
+                sites => \@sites,
+                roles => \@roles,
+                template => 'user/admin_create_user.tt'
+            );
+            return;
+        }
+        
+        unless (@selected_sites && @selected_roles) {
+            $c->stash(
+                error_msg => 'Please select at least one site and one role',
+                sites => \@sites,
+                roles => \@roles,
+                template => 'user/admin_create_user.tt'
+            );
+            return;
+        }
+        
+        my $existing_email = $schema->resultset('User')->find({ email => $email });
+        if ($existing_email) {
+            $c->stash(
+                error_msg => 'A user with this email already exists',
+                sites => \@sites,
+                roles => \@roles,
+                template => 'user/admin_create_user.tt'
+            );
+            return;
+        }
+        
+        if ($username) {
+            my $existing_username = $schema->resultset('User')->find({ username => $username });
+            if ($existing_username) {
+                $c->stash(
+                    error_msg => 'A user with this username already exists',
+                    sites => \@sites,
+                    roles => \@roles,
+                    template => 'user/admin_create_user.tt'
+                );
+                return;
+            }
+        }
+        
+        eval {
+            my $user = $schema->resultset('User')->create({
+                username => $username,
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                status => 'pending_setup',
+                created_by => $c->session->{user_id},
+                creation_context => 'admin_created',
+                created_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+            });
+            
+            my $code = $self->user_verification->generate_verification_code();
+            $self->user_verification->create_verification_code($user, $code);
+            
+            foreach my $site_name (@selected_sites) {
+                foreach my $role_id (@selected_roles) {
+                    my $role = $schema->resultset('SiteRole')->find($role_id);
+                    next unless $role && $role->sitename eq $site_name;
+                    
+                    $schema->resultset('UserSiteRole')->create({
+                        user_id => $user->id,
+                        role_id => $role_id,
+                        sitename => $site_name,
+                        assigned_by => $c->session->{user_id},
+                    });
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+                "User created by admin: email=$email, user_id=" . $user->id . ", code=$code");
+            
+            $c->flash->{success_msg} = "User created successfully. Verification code: $code (would be emailed in production)";
+            $c->response->redirect($c->uri_for('/admin/users'));
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_create_user',
+                "Error creating user: $@");
+            $c->stash(
+                error_msg => "An error occurred: $@",
+                sites => \@sites,
+                roles => \@roles,
+                template => 'user/admin_create_user.tt'
+            );
+            return;
+        }
+    } else {
+        $c->stash(
+            sites => \@sites,
+            roles => \@roles,
+            template => 'user/admin_create_user.tt'
+        );
+    }
+}
+
+sub complete_username_setup :Local {
+    my ($self, $c) = @_;
+    
+    my $email = $c->req->param('email') || $c->session->{setup_email};
+    my $code = $c->req->param('code');
+    
+    unless ($email) {
+        $c->flash->{error_msg} = 'Invalid setup link';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user = $c->model('DBEncy::User')->find({ email => $email });
+    
+    unless ($user && $user->status eq 'pending_setup') {
+        $c->flash->{error_msg} = 'Invalid or expired setup link';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $input_code = $c->req->params->{code};
+        my $username = $c->req->params->{username};
+        my $first_name = $c->req->params->{first_name};
+        my $last_name = $c->req->params->{last_name};
+        my $password = $c->req->params->{password};
+        my $password_confirm = $c->req->params->{password_confirm};
+        
+        unless ($input_code && $username && $first_name && $last_name && $password && $password_confirm) {
+            $c->stash(
+                user => $user,
+                error_msg => 'All fields are required',
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        my $verification = $self->user_verification->verify_code($user, $input_code);
+        unless ($verification) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Invalid or expired verification code',
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        my $existing = $c->model('DBEncy::User')->find({ username => $username });
+        if ($existing) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Username already taken',
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        unless ($password eq $password_confirm) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Passwords do not match',
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        unless (length($password) >= 8) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Password must be at least 8 characters long',
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        eval {
+            $user->update({
+                username => $username,
+                first_name => $first_name,
+                last_name => $last_name,
+                password => sha256_hex($password),
+                status => 'active',
+                email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+            });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_username_setup',
+                "Setup completed for user: $username (email=$email)");
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'complete_username_setup',
+                "Error completing setup: $@");
+            $c->stash(
+                user => $user,
+                error_msg => "An error occurred: $@",
+                template => 'user/complete_username_setup.tt'
+            );
+            return;
+        }
+        
+        delete $c->session->{setup_email};
+        
+        $c->flash->{success_msg} = "Account setup complete! You can now log in.";
+        $c->response->redirect($c->uri_for('/user/login'));
+    } else {
+        $c->session->{setup_email} = $email;
+        $c->stash(
+            user => $user,
+            template => 'user/complete_username_setup.tt'
+        );
+    }
+}
+
+sub complete_password_setup :Local {
+    my ($self, $c) = @_;
+    
+    my $email = $c->req->param('email') || $c->session->{setup_email};
+    
+    unless ($email) {
+        $c->flash->{error_msg} = 'Invalid setup link';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $user = $c->model('DBEncy::User')->find({ email => $email });
+    
+    unless ($user && $user->status eq 'pending_setup' && $user->username) {
+        $c->flash->{error_msg} = 'Invalid or expired setup link';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    if ($c->req->method eq 'POST') {
+        my $input_code = $c->req->params->{code};
+        my $password = $c->req->params->{password};
+        my $password_confirm = $c->req->params->{password_confirm};
+        
+        unless ($input_code && $password && $password_confirm) {
+            $c->stash(
+                user => $user,
+                error_msg => 'All fields are required',
+                template => 'user/complete_password_setup.tt'
+            );
+            return;
+        }
+        
+        my $verification = $self->user_verification->verify_code($user, $input_code);
+        unless ($verification) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Invalid or expired verification code',
+                template => 'user/complete_password_setup.tt'
+            );
+            return;
+        }
+        
+        unless ($password eq $password_confirm) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Passwords do not match',
+                template => 'user/complete_password_setup.tt'
+            );
+            return;
+        }
+        
+        unless (length($password) >= 8) {
+            $c->stash(
+                user => $user,
+                error_msg => 'Password must be at least 8 characters long',
+                template => 'user/complete_password_setup.tt'
+            );
+            return;
+        }
+        
+        eval {
+            $user->update({
+                password => sha256_hex($password),
+                status => 'active',
+                email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+            });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_password_setup',
+                "Password setup completed for user: " . $user->username);
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'complete_password_setup',
+                "Error completing password setup: $@");
+            $c->stash(
+                user => $user,
+                error_msg => "An error occurred: $@",
+                template => 'user/complete_password_setup.tt'
+            );
+            return;
+        }
+        
+        delete $c->session->{setup_email};
+        
+        $c->flash->{success_msg} = "Account setup complete! You can now log in.";
+        $c->response->redirect($c->uri_for('/user/login'));
+    } else {
+        $c->session->{setup_email} = $email;
+        $c->stash(
+            user => $user,
+            template => 'user/complete_password_setup.tt'
+        );
     }
 }
 
