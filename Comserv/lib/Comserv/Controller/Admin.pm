@@ -404,6 +404,7 @@ sub users :Path('/admin/users') :Args(0) {
     my $pager;
     my %stats = ( total => 0, active => 0, suspended => 0, pending => 0, by_role => {} );
     my @available_sites;
+    my %user_sites_map;
     my $error_msg;
 
     eval {
@@ -466,6 +467,17 @@ sub users :Path('/admin/users') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
             "Fetched " . scalar(@users) . " users (page $page, total " . $pager->total_entries . ")");
 
+        if (@users) {
+            my @user_ids = map { $_->id } @users;
+            my @site_role_rows = $schema->resultset('UserSiteRole')->search(
+                { user_id => { -in => \@user_ids } },
+                { columns => ['user_id', 'sitename'] }
+            )->all;
+            for my $sr (@site_role_rows) {
+                push @{$user_sites_map{$sr->user_id}}, $sr->sitename;
+            }
+        }
+
         my $stats_rs = $schema->resultset('User')->search(
             $is_csc_admin ? {} : \%search_conditions
         );
@@ -510,6 +522,7 @@ sub users :Path('/admin/users') :Args(0) {
         admin_type      => $admin_type,
         sitename        => $sitename,
         available_sites => \@available_sites,
+        user_sites_map  => \%user_sites_map,
         error_msg       => $error_msg,
         template        => 'admin/users.tt',
     );
