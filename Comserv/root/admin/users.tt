@@ -26,7 +26,9 @@
         
         <div class="content-primary">
             
-            [% IF c.flash.error_msg %]
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% ELSIF c.flash.error_msg %]
                 <div class="error">[% c.flash.error_msg %]</div>
             [% END %]
             
@@ -127,7 +129,7 @@
             
             <!-- Users List Section -->
             <div class="content-section">
-                <h3>Users ([% pager.total_entries %] total)</h3>
+                <h3>Users ([% pager ? pager.total_entries : 0 %] total)</h3>
                 
                 [% IF users.size > 0 %]
                 <div class="table-container">
@@ -193,7 +195,7 @@
                 </div>
                 
                 <!-- Pagination -->
-                [% IF pager.last_page > 1 %]
+                [% IF pager && pager.last_page > 1 %]
                 <div class="pagination">
                     [% IF pager.previous_page %]
                         <a href="[% c.uri_for('/admin/users', { page => pager.previous_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">« Previous</a>
