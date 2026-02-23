@@ -51,7 +51,17 @@
                         <div class="form-row">
                             <div class="form-field">
                                 <label for="password">Password</label>
-                                <input type="password" id="password" name="password" class="form-input" required>
+                                <input type="password" id="password" name="password" class="form-input">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="verification_code">Verification Code <small>(if you received one by email)</small></label>
+                                <input type="text" id="verification_code" name="verification_code" class="form-input"
+                                       maxlength="6" pattern="\d{6}" placeholder="6-digit code"
+                                       autocomplete="one-time-code">
+                                <small style="color:#666;">Enter your 6-digit code <em>instead of</em> your password if this is your first time logging in.</small>
                             </div>
                         </div>
                     </div>
