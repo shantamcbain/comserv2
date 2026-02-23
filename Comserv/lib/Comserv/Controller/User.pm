@@ -1194,26 +1194,185 @@ sub forgot_password :Local {
         my $user = $c->model('DBEncy::User')->find({ email => $email });
 
         if ($user) {
-            # Generate a reset token (in a real implementation, you'd store this in the database)
-            # For now, we'll just show a success message
-
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                "Password reset requested for email: $email"
-            );
-
-            $c->stash(
-                success_msg => 'If an account exists with that email, password reset instructions have been sent.',
-                template => 'user/forgot_password.tt'
-            );
+            # Generate a 32-char hex reset token
+            my $token = $self->user_verification->generate_reset_token();
+            
+            # Store hashed token in database (expires in 24 hours)
+            eval {
+                my $reset_record = $self->user_verification->create_reset_token($user, $token);
+                
+                # Build reset link
+                my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
+                
+                $self->logging->log_with_details(
+                    $c, 'info', __FILE__, __LINE__, 'forgot_password',
+                    "Password reset token generated for email: $email. Reset link: $reset_link"
+                );
+                
+                # TODO: Send reset email with $reset_link
+                # For now, store the token in session for testing
+                $c->session->{reset_token} = $token;
+                $c->session->{reset_email} = $email;
+            };
+            
+            if ($@) {
+                $self->logging->log_with_details(
+                    $c, 'error', __FILE__, __LINE__, 'forgot_password',
+                    "Error generating reset token for email $email: $@"
+                );
+            }
         } else {
             # Don't reveal that the email doesn't exist (security best practice)
-            $c->stash(success_msg => 'If an account exists with that email, password reset instructions have been sent.');
+            $self->logging->log_with_details(
+                $c, 'info', __FILE__, __LINE__, 'forgot_password',
+                "Password reset requested for non-existent email: $email"
+            );
         }
+        
+        # Always show generic success message (security)
+        $c->stash(success_msg => 'If an account exists with that email, password reset instructions have been sent.');
     }
 
     # Display the forgot password form
     $c->stash(template => 'user/forgot_password.tt');
+}
+
+sub reset_password :Local {
+    my ($self, $c) = @_;
+
+    # Get token from URL parameter
+    my $token = $c->req->param('token');
+
+    # Log access to reset password page
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password', 
+        "Accessing reset password page with token: " . ($token ? 'present' : 'missing'));
+
+    if ($c->req->method eq 'POST') {
+        # Process the password reset form
+        my $new_password = $c->req->param('new_password');
+        my $password_confirm = $c->req->param('password_confirm');
+
+        # Validate inputs
+        if (!$token) {
+            $c->stash(error_msg => 'Invalid or missing reset token');
+            $c->stash(template => 'user/reset_password.tt');
+            return;
+        }
+
+        if (!$new_password || !$password_confirm) {
+            $c->stash(
+                error_msg => 'Please enter and confirm your new password',
+                template => 'user/reset_password.tt',
+                token => $token
+            );
+            return;
+        }
+
+        # Validate passwords match
+        if ($new_password ne $password_confirm) {
+            $c->stash(
+                error_msg => 'Passwords do not match',
+                template => 'user/reset_password.tt',
+                token => $token
+            );
+            return;
+        }
+
+        # Validate password length
+        if (length($new_password) < 8) {
+            $c->stash(
+                error_msg => 'Password must be at least 8 characters long',
+                template => 'user/reset_password.tt',
+                token => $token
+            );
+            return;
+        }
+
+        # Verify the reset token
+        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
+
+        if (!$reset_record) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
+                "Invalid or expired reset token");
+            $c->stash(
+                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
+                template => 'user/reset_password.tt'
+            );
+            return;
+        }
+
+        # Get the user
+        my $user = $c->model('DBEncy::User')->find({ id => $reset_record->user_id });
+
+        if (!$user) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+                "User not found for reset token");
+            $c->stash(
+                error_msg => 'User account not found',
+                template => 'user/reset_password.tt'
+            );
+            return;
+        }
+
+        # Hash the new password
+        my $password_hash = sha256_hex($new_password);
+
+        # Update user password
+        eval {
+            $user->update({ password => $password_hash });
+            
+            # Mark token as used
+            $reset_record->update({ used_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
+                "Password successfully reset for user: " . $user->username);
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+                "Error resetting password: $@");
+            $c->stash(
+                error_msg => 'An error occurred while resetting your password. Please try again.',
+                template => 'user/reset_password.tt',
+                token => $token
+            );
+            return;
+        }
+
+        # Clear session data
+        delete $c->session->{reset_token};
+        delete $c->session->{reset_email};
+
+        # Redirect to login with success message
+        $c->flash->{success_msg} = 'Your password has been successfully reset. You can now login with your new password.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Validate token for GET request
+    if ($token) {
+        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
+        
+        if (!$reset_record) {
+            $c->stash(
+                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
+                template => 'user/reset_password.tt'
+            );
+            return;
+        }
+    } else {
+        $c->stash(
+            error_msg => 'No reset token provided. Please use the link from your email.',
+            template => 'user/reset_password.tt'
+        );
+        return;
+    }
+
+    # Display the reset password form
+    $c->stash(
+        template => 'user/reset_password.tt',
+        token => $token
+    );
 }
 
 sub change_password_request :Local {
