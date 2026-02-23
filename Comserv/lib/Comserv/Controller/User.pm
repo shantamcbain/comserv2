@@ -681,6 +681,121 @@ sub update_settings :Local {
     $c->response->redirect($c->uri_for('/user/profile'));
     return;
 }
+
+sub change_password :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to change your password.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the page access
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password',
+        "User '" . $c->session->{username} . "' accessing change password page");
+
+    # Display the change password form
+    $c->stash(template => 'user/change_password.tt');
+    $c->forward($c->view('TT'));
+}
+
+sub do_change_password :Local {
+    my ($self, $c) = @_;
+
+    # Check if user is logged in
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "You must be logged in to change your password.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Log the password change attempt
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
+        "User '" . $c->session->{username} . "' attempting to change password");
+
+    # Get user data from database
+    my $user = $c->model('DBEncy::User')->find({ username => $c->session->{username} });
+
+    unless ($user) {
+        $c->flash->{error_msg} = "User not found in database. Please log in again.";
+        $c->session({});  # Clear session
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    # Get form data
+    my $current_password = $c->req->params->{current_password};
+    my $new_password = $c->req->params->{new_password};
+    my $new_password_confirm = $c->req->params->{new_password_confirm};
+
+    # Validate input
+    unless ($current_password && $new_password && $new_password_confirm) {
+        $c->stash(
+            error_msg => 'All password fields are required.',
+            template => 'user/change_password.tt'
+        );
+        return;
+    }
+
+    # Validate current password
+    unless ($user->check_password($current_password)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_change_password',
+            "User '" . $c->session->{username} . "' entered incorrect current password");
+        $c->stash(
+            error_msg => 'Current password is incorrect.',
+            template => 'user/change_password.tt'
+        );
+        return;
+    }
+
+    # Validate new passwords match
+    unless ($new_password eq $new_password_confirm) {
+        $c->stash(
+            error_msg => 'New passwords do not match.',
+            template => 'user/change_password.tt'
+        );
+        return;
+    }
+
+    # Validate new password length
+    unless (length($new_password) >= 8) {
+        $c->stash(
+            error_msg => 'New password must be at least 8 characters long.',
+            template => 'user/change_password.tt'
+        );
+        return;
+    }
+
+    # Hash new password with SHA256
+    my $hashed_password = sha256_hex($new_password);
+
+    # Update user password in database
+    eval {
+        $user->update({ password => $hashed_password });
+    };
+
+    if ($@) {
+        # Log the error
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_change_password',
+            "Error updating password: $@");
+
+        $c->flash->{error_msg} = "An error occurred while changing your password. Please try again.";
+        $c->response->redirect($c->uri_for('/user/change_password'));
+        return;
+    }
+
+    # Log the successful password change
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
+        "User '" . $c->session->{username} . "' password changed successfully");
+
+    # Set success message and redirect (user remains logged in)
+    $c->flash->{success_msg} = "Your password has been changed successfully.";
+    $c->response->redirect($c->uri_for('/user/profile'));
+    return;
+}
+
 sub create_account :Local {
     my ($self, $c) = @_;
 
