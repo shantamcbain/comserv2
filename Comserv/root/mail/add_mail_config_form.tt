@@ -7,6 +7,8 @@
 
 <h1>Add Mail Configuration</h1>
 
+<p><strong>Debug Info:</strong> Logged in as: [% c.session.username || 'Guest' %], Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+
 [% IF error_msg %]
     <p class="error">[% error_msg %]</p>
 [% END %]
@@ -23,7 +25,12 @@
     <p class="success">[% c.flash.success_msg %]</p>
 [% END %]
 
-<form method="POST" action="/mail/add_mail_config">
+<p style="background: #fffacd; padding: 10px; border: 1px solid #daa520;">
+    <strong>Form Action:</strong> [% c.uri_for('/mail/add_mail_config') %]<br>
+    <strong>Current URL:</strong> [% c.req.uri %]
+</p>
+
+<form method="POST" action="[% c.uri_for('/mail/add_mail_config') %]">
     <label for="site_id">Site ID:</label>
     <input type="text" id="site_id" name="site_id" required><br>
     
@@ -50,8 +57,18 @@
     <label for="smtp_ssl">Use SSL:</label>
     <input type="checkbox" id="smtp_ssl" name="smtp_ssl" value="1"><br>
     
-    <input type="submit" value="Add Configuration">
+    <input type="submit" value="Add Configuration" onclick="console.log('Form submitting...'); return true;">
 </form>
+
+<script>
+document.querySelector('form').addEventListener('submit', function(e) {
+    console.log('Form submit event triggered');
+    console.log('Action:', this.action);
+    console.log('Method:', this.method);
+    console.log('Form data:', new FormData(this));
+    // Let the form submit normally
+});
+</script>
 
 <p><a href="[% c.uri_for('/mail/mail_admin_dashboard') %]">Back to Mail Admin Dashboard</a></p>
 
