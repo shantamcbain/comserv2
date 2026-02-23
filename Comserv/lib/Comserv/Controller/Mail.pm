@@ -281,15 +281,23 @@ sub add_mail_config :Local {
         # Create or update SMTP configuration
         my $saved_count = 0;
         for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
-            next unless defined $params->{$config_key};
+            # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+            my $value = $params->{$config_key};
+            
+            # For smtp_ssl, default to 0 if not checked
+            if ($config_key eq 'smtp_ssl' && !defined $value) {
+                $value = 0;
+            }
+            
+            next unless defined $value;
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
-                "Saving $config_key for site_id $site_id");
+                "Saving $config_key for site_id $site_id, value: " . (defined $value ? $value : 'undef'));
             
             my $result = $site_config_rs->update_or_create({
                 site_id => $site_id,
                 config_key => $config_key,
-                config_value => $params->{$config_key},
+                config_value => $value,
             });
             $saved_count++;
             
@@ -351,22 +359,30 @@ sub edit_smtp_config :Local {
             # Update SMTP configuration
             my $updated_count = 0;
             for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
-                next unless defined $params->{$config_key};
+                # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+                my $value = $params->{$config_key};
+                
+                # For smtp_ssl, default to 0 if not checked
+                if ($config_key eq 'smtp_ssl' && !defined $value) {
+                    $value = 0;
+                }
+                
+                next unless defined $value;
                 
                 # Skip password if it's empty (user wants to keep existing password)
-                if ($config_key eq 'smtp_password' && $params->{$config_key} eq '') {
+                if ($config_key eq 'smtp_password' && $value eq '') {
                     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
                         "Skipping empty password field (keeping existing)");
                     next;
                 }
                 
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
-                    "Updating $config_key for site_id $site_id");
+                    "Updating $config_key for site_id $site_id, value: $value");
                 
                 $site_config_rs->update_or_create({
                     site_id => $site_id,
                     config_key => $config_key,
-                    config_value => $params->{$config_key},
+                    config_value => $value,
                 });
                 $updated_count++;
             }
@@ -504,14 +520,19 @@ sub test_smtp_config :Local {
     };
     
     try {
+        my $use_ssl = $config{smtp_ssl} && $config{smtp_ssl} ne '0';
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Testing SMTP: host=$config{smtp_host}, port=$config{smtp_port}, SSL=" . ($use_ssl ? 'yes' : 'no'));
+        
         require Net::SMTP;
         
         my $smtp = Net::SMTP->new(
             $config{smtp_host},
             Port => $config{smtp_port},
             Timeout => 10,
-            Debug => 0,
-            SSL => $config{smtp_ssl} ? 1 : 0,
+            Debug => 1,
+            SSL => $use_ssl,
         );
         
         if ($smtp) {
