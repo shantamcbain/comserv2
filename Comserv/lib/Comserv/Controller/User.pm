@@ -8,6 +8,7 @@ use Email::Simple;
 use Email::Simple::Creator;
 use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
+use Comserv::Util::EmailNotification;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -20,6 +21,15 @@ has 'logging' => (
 has 'user_verification' => (
     is => 'ro',
     default => sub { Comserv::Util::UserVerification->new }
+);
+
+has 'email_notification' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        my $self = shift;
+        return Comserv::Util::EmailNotification->new(logging => $self->logging);
+    },
 );
 
 sub login :Local {
@@ -671,6 +681,7 @@ sub do_create_account :Local {
     }
     
     my $new_user;
+    my $verification_code;
     eval {
         $new_user = $c->model('DBEncy::User')->create({
             username => $username,
@@ -680,24 +691,51 @@ sub do_create_account :Local {
             roles => 'user',
         });
         
-        my $code = $self->user_verification->generate_verification_code();
-        $self->user_verification->create_verification_code($new_user, $code);
+        $verification_code = $self->user_verification->generate_verification_code();
+        $self->user_verification->create_verification_code($new_user, $verification_code);
         
         $c->session->{verification_user_id} = $new_user->id;
-        $c->session->{verification_code_display} = $code;
+        $c->session->{verification_code_display} = $verification_code;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-            "User created with ID: " . $new_user->id . ", verification code generated");
+            "User created with ID: " . $new_user->id . ", verification code: $verification_code");
     };
     
     if ($@) {
+        my $error = $@;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
-            "Error creating user: $@");
+            "Error creating user: $error");
+        
+        my $error_msg = "An error occurred during registration.";
+        if ($error =~ /Duplicate entry.*email_unique/) {
+            $error_msg = "An account with this email address already exists.";
+        } elsif ($error =~ /Duplicate entry.*username_unique/) {
+            $error_msg = "This username is already taken.";
+        }
+        
         $c->stash(
-            error_msg => "An error occurred during registration: $@",
+            error_msg => $error_msg,
             template => 'user/register.tt'
         );
         return;
+    }
+    
+    # Send verification email to user
+    eval {
+        $self->email_notification->send_verification_email($c, $new_user, $verification_code);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+            "Failed to send verification email: $@");
+    }
+    
+    # Send notification to admin
+    eval {
+        $self->email_notification->send_admin_registration_notification($c, $new_user);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
+            "Failed to send admin notification: $@");
     }
     
     $c->response->redirect($c->uri_for('/user/verify_email'));
