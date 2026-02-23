@@ -57,6 +57,51 @@ $sitename Team
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_error_notification {
+    my ($self, $c, $admin_email, $subject, $error_details) = @_;
+    
+    unless ($admin_email) {
+        $admin_email = 'helpdesk@computersystemconsulting.ca';
+    }
+    
+    my $sitename = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+    
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_error_notification',
+            "No SMTP configuration found - error notification not sent");
+        return 0;
+    }
+    
+    my $timestamp = localtime();
+    my $body = qq{
+Error Notification - $sitename
+
+Subject: $subject
+Time: $timestamp
+
+Details:
+$error_details
+
+This is an automated error notification.
+};
+    
+    my $email = Email::MIME->create(
+        header_str => [
+            From => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To => $admin_email,
+            Subject => "[$sitename] $subject",
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+    
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub send_admin_registration_notification {
     my ($self, $c, $user) = @_;
     
@@ -73,7 +118,7 @@ sub send_admin_registration_notification {
     }
     
     my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
-    my $admin_email = $site ? $site->mail_to_admin : 'admin@localhost';
+    my $admin_email = ($site && $site->mail_to_admin) ? $site->mail_to_admin : 'helpdesk@computersystemconsulting.ca';
     
     my $timestamp = localtime();
     my $body = qq{
