@@ -4,10 +4,10 @@
    roles = "admin"
    TemplateType = "Application"
    category = "User"
-   page_version = "0.01"
+   page_version = "0.02"
    last_updated = "2026-02-23"
 %]
-[% PageVersion = 'user/admin_create_user.tt,v 0.01 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% PageVersion = 'user/admin_create_user.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
@@ -27,11 +27,11 @@
                 <div class="error">[% error_msg %]</div>
             [% END %]
             
-            <p>Create a new user account. The user will receive an invitation with a verification code to complete their account setup.</p>
+            <p>Create a new user account. The user will receive a verification code to complete their account setup.</p>
             
             <div class="form-container">
-                <form method="POST" action="/user/admin_create_user" class="app-form">
-                    
+                <form method="POST" action="[% c.uri_for('/user/admin_create_user') %]" class="app-form">
+
                     <div class="form-section">
                         <h3>User Information</h3>
                         
@@ -55,7 +55,7 @@
                                        value="[% c.req.params.email | html %]" class="form-input" required>
                             </div>
                             <div class="form-field">
-                                <label for="username">Username (optional - user can set during setup):</label>
+                                <label for="username">Username <small>(optional — user can set during setup)</small></label>
                                 <input type="text" id="username" name="username" 
                                        value="[% c.req.params.username | html %]" class="form-input">
                             </div>
@@ -68,12 +68,12 @@
                         
                         <div class="form-row">
                             <div class="form-field">
-                                [% FOREACH site IN sites %]
-                                <label>
-                                    <input type="checkbox" name="sitenames" value="[% site.name | html %]">
-                                    [% site.name | html %][% IF site.description %] - [% site.description | html %][% END %]
-                                </label><br>
-                                [% END %]
+                                <select name="sitenames" id="sitenames" multiple class="form-input" size="[% sites.size > 8 ? 8 : (sites.size < 3 ? 3 : sites.size) %]">
+                                    [% FOREACH site IN sites %]
+                                    <option value="[% site.name | html %]">[% site.name | html %][% IF site.description %] — [% site.description | html %][% END %]</option>
+                                    [% END %]
+                                </select>
+                                <small>Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple sites.</small>
                             </div>
                         </div>
                     </div>
@@ -84,19 +84,30 @@
                         
                         <div class="form-row">
                             <div class="form-field">
-                                [% FOREACH role IN roles %]
-                                <label>
-                                    <input type="checkbox" name="roles" value="[% role | html %]">
-                                    [% role | html %]
-                                </label><br>
-                                [% END %]
+                                <select name="roles" id="roles" multiple class="form-input" size="[% (available_roles.default_roles.size + available_roles.site_roles.size + 2) > 12 ? 12 : (available_roles.default_roles.size + available_roles.site_roles.size + 2) %]">
+                                    <optgroup label="Application Roles">
+                                        [% FOREACH role IN available_roles.default_roles %]
+                                        <option value="[% role | html %]">[% role | ucfirst | html %]</option>
+                                        [% END %]
+                                    </optgroup>
+                                    [% IF available_roles.site_roles.size > 0 %]
+                                    <optgroup label="Site-Specific Roles">
+                                        [% FOREACH sr IN available_roles.site_roles %]
+                                        <option value="[% sr.name | html %]">
+                                            [% sr.name | html %][% IF is_csc_admin %] ([% sr.sitename | html %])[% END %]
+                                        </option>
+                                        [% END %]
+                                    </optgroup>
+                                    [% END %]
+                                </select>
+                                <small>Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple roles.</small>
                             </div>
                         </div>
                     </div>
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Create User</button>
-                        <a href="/admin/users" class="btn btn-secondary">Cancel</a>
+                        <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Cancel</a>
                     </div>
                     
                 </form>

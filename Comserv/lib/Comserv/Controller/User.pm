@@ -280,12 +280,12 @@ sub do_login :Local {
             # Already an array, keep as is
             # This branch exists for future compatibility
         } else {
-            # Undefined or invalid, default to user role
+            # Undefined or invalid, default to normal role
             $self->logging->log_with_details(
                 $c, 'warn', __FILE__, __LINE__, 'do_login',
-                "User '$username' has invalid or missing roles. Defaulting to ['user']."
+                "User '$username' has invalid or missing roles. Defaulting to ['normal']."
             );
-            $roles = ['user'];
+            $roles = ['normal'];
         }
 
         # Log the roles before assigning to session
@@ -861,7 +861,7 @@ sub do_create_account :Local {
             email => $email,
             status => 'pending_verification',
             creation_context => 'self_registration',
-            roles => 'user',
+            roles => 'normal',
         });
         
         $verification_code = $self->user_verification->generate_verification_code();
@@ -876,10 +876,10 @@ sub do_create_account :Local {
                 $c->model('DBEncy::UserSiteRole')->create({
                     user_id => $new_user->id,
                     site_id => $site->id,
-                    role    => 'user',
+                    role    => 'normal',
                 });
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role 'user'");
+                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role 'normal'");
             }
         };
         if ($@) {
@@ -1043,15 +1043,16 @@ sub complete_profile :Local {
         
         eval {
             $user->update({
-                first_name => $first_name,
-                last_name => $last_name,
-                password => $hashed_password,
-                status => 'active',
+                first_name        => $first_name,
+                last_name         => $last_name,
+                password          => $hashed_password,
+                status            => 'active',
+                roles             => 'normal',
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "Profile completed for user ID: $user_id, status set to active");
+                "Profile completed for user ID: $user_id, status set to active, role set to normal");
         };
         
         if ($@) {
@@ -1094,81 +1095,82 @@ sub admin_create_user :Local {
     
     my @sites;
     if ($is_csc_admin) {
-        @sites = $schema->resultset('Site')->all;
+        @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
     } else {
-        my $site = $schema->resultset('Site')->find({ name => $sitename });
+        my $site = $schema->resultset('Site')->search({ name => $sitename })->single;
         @sites = ($site) if $site;
     }
-    
-    my @roles = qw(normal editor developer admin);
-    
+
+    my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
+
     if ($c->req->method eq 'POST') {
-        my $first_name = $c->req->params->{first_name};
-        my $last_name = $c->req->params->{last_name};
-        my $email = $c->req->params->{email};
-        my $username = $c->req->params->{username} || undef;
+        my $first_name     = $c->req->params->{first_name};
+        my $last_name      = $c->req->params->{last_name};
+        my $email          = $c->req->params->{email};
+        my $username       = $c->req->params->{username} || undef;
         my @selected_sites = $c->req->param('sitenames');
         my @selected_roles = $c->req->param('roles');
-        
+
         unless ($first_name && $last_name && $email) {
             $c->stash(
-                error_msg => 'First name, last name, and email are required',
-                sites => \@sites,
-                roles => \@roles,
-                template => 'user/admin_create_user.tt'
+                error_msg       => 'First name, last name, and email are required',
+                sites           => \@sites,
+                available_roles => $available_roles,
+                template        => 'user/admin_create_user.tt',
             );
             return;
         }
-        
+
         unless (@selected_sites && @selected_roles) {
             $c->stash(
-                error_msg => 'Please select at least one site and one role',
-                sites => \@sites,
-                roles => \@roles,
-                template => 'user/admin_create_user.tt'
+                error_msg       => 'Please select at least one site and one role',
+                sites           => \@sites,
+                available_roles => $available_roles,
+                template        => 'user/admin_create_user.tt',
             );
             return;
         }
-        
-        my $existing_email = $schema->resultset('User')->find({ email => $email });
+
+        my $existing_email = $schema->resultset('User')->search({ email => $email })->count;
         if ($existing_email) {
             $c->stash(
-                error_msg => 'A user with this email already exists',
-                sites => \@sites,
-                roles => \@roles,
-                template => 'user/admin_create_user.tt'
+                error_msg       => 'A user with this email already exists',
+                sites           => \@sites,
+                available_roles => $available_roles,
+                template        => 'user/admin_create_user.tt',
             );
             return;
         }
-        
+
         if ($username) {
-            my $existing_username = $schema->resultset('User')->find({ username => $username });
+            my $existing_username = $schema->resultset('User')->search({ username => $username })->count;
             if ($existing_username) {
                 $c->stash(
-                    error_msg => 'A user with this username already exists',
-                    sites => \@sites,
-                    roles => \@roles,
-                    template => 'user/admin_create_user.tt'
+                    error_msg       => 'A user with this username already exists',
+                    sites           => \@sites,
+                    available_roles => $available_roles,
+                    template        => 'user/admin_create_user.tt',
                 );
                 return;
             }
         }
-        
+
         eval {
             my $user = $schema->resultset('User')->create({
-                username => $username,
-                first_name => $first_name,
-                last_name => $last_name,
-                email => $email,
-                status => 'pending_setup',
-                created_by => $c->session->{user_id},
+                username         => $username,
+                first_name       => $first_name,
+                last_name        => $last_name,
+                email            => $email,
+                status           => 'pending_setup',
+                roles            => join(',', @selected_roles),
+                created_by       => $c->session->{user_id},
                 creation_context => 'admin_created',
-                created_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
+                created_at       => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
-            
+
             my $code = $self->user_verification->generate_verification_code();
             $self->user_verification->create_verification_code($user, $code);
-            
+
             foreach my $site_name (@selected_sites) {
                 my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
                 next unless $site_obj;
@@ -1181,30 +1183,31 @@ sub admin_create_user :Local {
                     });
                 }
             }
-            
+
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
-                "User created by admin: email=$email, user_id=" . $user->id . ", code=$code");
-            
+                "User created by admin: email=$email user_id=" . $user->id
+                . " roles=" . join(',', @selected_roles) . " code=$code");
+
             $c->flash->{success_msg} = "User created successfully. Verification code: $code (would be emailed in production)";
             $c->response->redirect($c->uri_for('/admin/users'));
         };
-        
+
         if ($@) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_create_user',
                 "Error creating user: $@");
             $c->stash(
-                error_msg => "An error occurred: $@",
-                sites => \@sites,
-                roles => \@roles,
-                template => 'user/admin_create_user.tt'
+                error_msg       => "An error occurred: $@",
+                sites           => \@sites,
+                available_roles => $available_roles,
+                template        => 'user/admin_create_user.tt',
             );
             return;
         }
     } else {
         $c->stash(
-            sites => \@sites,
-            roles => \@roles,
-            template => 'user/admin_create_user.tt'
+            sites           => \@sites,
+            available_roles => $available_roles,
+            template        => 'user/admin_create_user.tt',
         );
     }
 }
@@ -1450,9 +1453,9 @@ sub edit_user :Local :Args(1) {
 
     my $admin_type   = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
 
     unless ($is_csc_admin) {
-        my $sitename = $c->session->{SiteName};
         my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
         if ($site_obj) {
             my $access = $schema->resultset('UserSiteRole')->search({
@@ -1470,9 +1473,13 @@ sub edit_user :Local :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_user',
         "Admin editing user_id=$user_id");
 
+    my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
+
     $c->stash(
-        user     => $user,
-        template => 'user/edit_user.tt',
+        user            => $user,
+        available_roles => $available_roles,
+        is_csc_admin    => $is_csc_admin,
+        template        => 'user/edit_user.tt',
     );
 }
 
@@ -1498,9 +1505,9 @@ sub do_edit_user :Local :Args(1) {
 
     my $admin_type   = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
 
     unless ($is_csc_admin) {
-        my $sitename = $c->session->{SiteName};
         my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
         if ($site_obj) {
             my $access = $schema->resultset('UserSiteRole')->search({
@@ -1515,18 +1522,23 @@ sub do_edit_user :Local :Args(1) {
         }
     }
 
+    my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
+
     my $username   = $c->req->params->{username} || undef;
     my $first_name = $c->req->params->{first_name};
     my $last_name  = $c->req->params->{last_name};
     my $email      = $c->req->params->{email};
-    my $roles      = $c->req->params->{roles};
+    my @roles_arr  = $c->req->param('roles');
+    my $roles_str  = join(',', @roles_arr);
     my $status     = $c->req->params->{status};
 
     unless ($email) {
         $c->stash(
-            user      => $user,
-            error_msg => 'Email is required.',
-            template  => 'user/edit_user.tt',
+            user            => $user,
+            available_roles => $available_roles,
+            is_csc_admin    => $is_csc_admin,
+            error_msg       => 'Email is required.',
+            template        => 'user/edit_user.tt',
         );
         return;
     }
@@ -1538,24 +1550,28 @@ sub do_edit_user :Local :Args(1) {
         })->count;
         if ($existing) {
             $c->stash(
-                user      => $user,
-                error_msg => "Username '$username' is already taken.",
-                template  => 'user/edit_user.tt',
+                user            => $user,
+                available_roles => $available_roles,
+                is_csc_admin    => $is_csc_admin,
+                error_msg       => "Username '$username' is already taken.",
+                template        => 'user/edit_user.tt',
             );
             return;
         }
     }
 
-    if ($email ne $user->email) {
+    if ($email ne ($user->email // '')) {
         my $existing = $schema->resultset('User')->search({
             email => $email,
             id    => { '!=' => $user_id },
         })->count;
         if ($existing) {
             $c->stash(
-                user      => $user,
-                error_msg => "Email '$email' is already in use.",
-                template  => 'user/edit_user.tt',
+                user            => $user,
+                available_roles => $available_roles,
+                is_csc_admin    => $is_csc_admin,
+                error_msg       => "Email '$email' is already in use.",
+                template        => 'user/edit_user.tt',
             );
             return;
         }
@@ -1567,7 +1583,7 @@ sub do_edit_user :Local :Args(1) {
             first_name => $first_name,
             last_name  => $last_name,
             email      => $email,
-            roles      => $roles,
+            roles      => $roles_str,
             status     => $status,
         });
     };
@@ -1576,15 +1592,17 @@ sub do_edit_user :Local :Args(1) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_edit_user',
             "Error updating user_id=$user_id: $@");
         $c->stash(
-            user      => $user,
-            error_msg => "An error occurred while saving changes: $@",
-            template  => 'user/edit_user.tt',
+            user            => $user,
+            available_roles => $available_roles,
+            is_csc_admin    => $is_csc_admin,
+            error_msg       => "An error occurred while saving changes: $@",
+            template        => 'user/edit_user.tt',
         );
         return;
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
-        "User updated by admin: user_id=$user_id email=$email status=$status");
+        "User updated by admin: user_id=$user_id email=$email roles=$roles_str status=$status");
 
     $c->flash->{success_msg} = 'User updated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -1857,6 +1875,46 @@ sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
         template => 'user/change_password_request.tt'
     );
     $c->forward($c->view('TT'));
+}
+
+sub _load_available_roles {
+    my ($self, $c, $is_csc_admin, $sitename) = @_;
+
+    my @default_roles = qw(normal member editor developer admin);
+
+    my @site_specific;
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $rs;
+        if ($is_csc_admin) {
+            $rs = $schema->resultset('SiteRole')->search(
+                {},
+                { order_by => ['sitename', 'role_name'] }
+            );
+        } else {
+            $rs = $schema->resultset('SiteRole')->search(
+                { sitename => $sitename },
+                { order_by => 'role_name' }
+            );
+        }
+        my %default_set = map { $_ => 1 } @default_roles;
+        while (my $sr = $rs->next) {
+            next if $default_set{ $sr->role_name };
+            push @site_specific, {
+                name     => $sr->role_name,
+                sitename => $sr->sitename,
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_load_available_roles',
+            "Could not load site_roles (table may not exist): $@");
+    }
+
+    return {
+        default_roles => \@default_roles,
+        site_roles    => \@site_specific,
+    };
 }
 
 __PACKAGE__->meta->make_immutable;
