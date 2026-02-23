@@ -32,6 +32,25 @@ has 'email_notification' => (
     },
 );
 
+sub send_error_notification {
+    my ($self, $c, $subject, $error_details) = @_;
+    
+    my $sitename = $c->stash->{SiteName} || 'CSC';
+    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin) ? $site->mail_to_admin : 'helpdesk@computersystemconsulting.ca';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_error_notification',
+        "Sending error notification to admin: $admin_email");
+    
+    eval {
+        $self->email_notification->send_error_notification($c, $admin_email, $subject, $error_details);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_error_notification',
+            "Failed to send error notification: $@");
+    }
+}
+
 sub login :Local {
     my ($self, $c) = @_;
 
@@ -671,10 +690,15 @@ sub do_create_account :Local {
         return;
     }
     
-    my $existing_email = $c->model('DBEncy::User')->find({ email => $email });
-    if ($existing_email) {
+    # Check if email exists with same username (prevent exact duplicates)
+    # Allow same email with different username for multi-site access
+    my $existing_email_user = $c->model('DBEncy::User')->find({ 
+        email => $email,
+        username => $username 
+    });
+    if ($existing_email_user) {
         $c->stash(
-            error_msg => 'An account with this email already exists.',
+            error_msg => 'An account with this username and email already exists. Please login instead.',
             template => 'user/register.tt'
         );
         return;
@@ -694,6 +718,20 @@ sub do_create_account :Local {
         $verification_code = $self->user_verification->generate_verification_code();
         $self->user_verification->create_verification_code($new_user, $verification_code);
         
+        # Create UserSiteRole entry for the current site
+        my $sitename = $c->stash->{SiteName} || 'CSC';
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+        
+        if ($site) {
+            $c->model('DBEncy::UserSiteRole')->create({
+                user_id => $new_user->id,
+                sitename => $sitename,
+                role => 'user',
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Created UserSiteRole for user " . $new_user->id . " on site $sitename");
+        }
+        
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
@@ -707,16 +745,21 @@ sub do_create_account :Local {
             "Error creating user: $error");
         
         my $error_msg = "An error occurred during registration.";
-        if ($error =~ /Duplicate entry.*email_unique/) {
-            $error_msg = "An account with this email address already exists.";
-        } elsif ($error =~ /Duplicate entry.*username_unique/) {
-            $error_msg = "This username is already taken.";
+        if ($error =~ /Duplicate entry.*username_unique/) {
+            $error_msg = "This username is already taken. Please choose a different username.";
         }
         
         $c->stash(
             error_msg => $error_msg,
             template => 'user/register.tt'
         );
+        
+        # Send error notification to admin
+        eval {
+            $self->send_error_notification($c, "Registration Error", 
+                "User attempted registration with username '$username', email '$email'. Error: $error");
+        };
+        
         return;
     }
     
