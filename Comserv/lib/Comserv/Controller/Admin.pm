@@ -6,6 +6,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::UserVerification;
 use Data::Dumper;
 use JSON qw(decode_json);
 use Try::Tiny;
@@ -522,6 +523,131 @@ sub users :Path('/admin/users') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
         "Completed users action");
+}
+
+# Admin create user
+sub create_user :Path('/admin/create_user') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    
+    unless ($admin_auth->check_admin_access($c, 'admin_create_user')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
+    if ($c->req->method eq 'POST') {
+        my $first_name = $c->req->param('first_name');
+        my $last_name = $c->req->param('last_name');
+        my $email = $c->req->param('email');
+        my @sitenames = $c->req->param('sitenames');
+        my @roles = $c->req->param('roles');
+
+        unless ($first_name && $last_name && $email) {
+            $c->stash(
+                error_msg => 'First name, last name, and email are required',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        unless (@sitenames && @roles) {
+            $c->stash(
+                error_msg => 'At least one site and role must be selected',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        if (!$is_csc_admin) {
+            foreach my $site (@sitenames) {
+                if ($site ne $sitename) {
+                    $c->flash->{error_msg} = "You can only create users for your site: $sitename";
+                    $c->response->redirect($c->uri_for('/admin/create_user'));
+                    return;
+                }
+            }
+        }
+
+        my $existing_user = $schema->resultset('User')->find({ email => $email });
+        if ($existing_user) {
+            $c->stash(
+                error_msg => "A user with email '$email' already exists",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        eval {
+            my $user = $schema->resultset('User')->create({
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                username => undef,
+                password => undef,
+                status => 'pending_setup',
+                created_by => $c->session->{user_id},
+                creation_context => 'admin_created',
+                roles => 'normal',
+            });
+
+            my $user_verification = Comserv::Util::UserVerification->new();
+            my $code = $user_verification->generate_verification_code();
+            $user_verification->create_verification_code($user, $code);
+
+            foreach my $site (@sitenames) {
+                foreach my $role (@roles) {
+                    $schema->resultset('UserSiteRole')->create({
+                        user_id => $user->id,
+                        sitename => $site,
+                        role_name => $role,
+                    });
+                }
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_user',
+                "Admin created user: $email with sites: " . join(',', @sitenames) . " roles: " . join(',', @roles));
+
+            $c->session->{invitation_code} = $code;
+            $c->session->{invitation_email} = $email;
+
+            $c->flash->{success_msg} = "User invitation sent to $email. Verification code: $code (testing mode)";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_user',
+                "Error creating user: $@");
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+    }
+
+    my @available_sites;
+    if ($is_csc_admin) {
+        @available_sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    } else {
+        @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
+    }
+
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+
+    $c->stash(
+        available_sites => \@available_sites,
+        available_roles => \@available_roles,
+        is_csc_admin => $is_csc_admin,
+        template => 'admin/create_user.tt',
+    );
 }
 
 # Admin content management
