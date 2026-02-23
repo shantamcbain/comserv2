@@ -176,13 +176,36 @@ sub get_smtp_config {
 sub send_email {
     my ($self, $c, $email, $smtp_config) = @_;
     
-    my $transport = Email::Sender::Transport::SMTP->new({
-        host => $smtp_config->{smtp_host},
-        port => $smtp_config->{smtp_port} || 587,
-        ssl => ($smtp_config->{smtp_ssl} && $smtp_config->{smtp_ssl} ne '0') ? 1 : 0,
-        sasl_username => $smtp_config->{smtp_username},
-        sasl_password => $smtp_config->{smtp_password},
-    });
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Attempting to send email to: " . $email->header('To') . 
+        " via SMTP: " . $smtp_config->{smtp_host} . ":" . ($smtp_config->{smtp_port} || 587));
+    
+    my $use_ssl = ($smtp_config->{smtp_ssl} && $smtp_config->{smtp_ssl} ne '0') ? 1 : 0;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+        "SMTP Config: host=" . $smtp_config->{smtp_host} . 
+        ", port=" . ($smtp_config->{smtp_port} || 587) . 
+        ", ssl=" . ($use_ssl ? 'yes' : 'no') .
+        ", username=" . ($smtp_config->{smtp_username} || 'none'));
+    
+    my $transport;
+    eval {
+        $transport = Email::Sender::Transport::SMTP->new({
+            host => $smtp_config->{smtp_host},
+            port => $smtp_config->{smtp_port} || 587,
+            ssl => $use_ssl,
+            sasl_username => $smtp_config->{smtp_username},
+            sasl_password => $smtp_config->{smtp_password},
+        });
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+            "SMTP transport created successfully");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "Failed to create SMTP transport: $@");
+        return 0;
+    }
     
     eval {
         Email::Sender::Simple->send($email, { transport => $transport });

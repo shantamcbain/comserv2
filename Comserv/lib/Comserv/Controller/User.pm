@@ -733,7 +733,8 @@ sub do_create_account :Local {
         }
         
         $c->session->{verification_user_id} = $new_user->id;
-        $c->session->{verification_code_display} = $verification_code;
+        # Remove testing code display - verification code only sent via email now
+        # $c->session->{verification_code_display} = $verification_code;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
             "User created with ID: " . $new_user->id . ", verification code: $verification_code");
@@ -764,17 +765,32 @@ sub do_create_account :Local {
     }
     
     # Send verification email to user
+    my $email_sent = 0;
     eval {
-        $self->email_notification->send_verification_email($c, $new_user, $verification_code);
+        $email_sent = $self->email_notification->send_verification_email($c, $new_user, $verification_code);
+        if ($email_sent) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Verification email sent successfully to: " . $new_user->email);
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
             "Failed to send verification email: $@");
+        
+        # Notify admin about email failure
+        eval {
+            $self->send_error_notification($c, "Email Send Failure",
+                "Failed to send verification email to user '" . $new_user->username . "' (" . $new_user->email . "). Error: $@");
+        };
     }
     
-    # Send notification to admin
+    # Send notification to admin about successful registration
     eval {
-        $self->email_notification->send_admin_registration_notification($c, $new_user);
+        my $admin_notified = $self->email_notification->send_admin_registration_notification($c, $new_user);
+        if ($admin_notified) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Admin notification sent for new user: " . $new_user->username);
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_create_account',
