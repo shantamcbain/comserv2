@@ -518,12 +518,14 @@ sub profile :Local {
             if ($user_site_roles_rs && ref($user_site_roles_rs)) {
                 while (my $usr = $user_site_roles_rs->next) {
                     eval {
-                        my $role = $usr->can('role') ? $usr->role : undef;
-                        my $role_name = ($role && $role->can('role_name')) ? $role->role_name : 'Unknown';
-                        my $sitename = $usr->can('sitename') ? ($usr->sitename || 'Unknown') : 'Unknown';
-                        
+                        my $role_name = $usr->role || 'Unknown';
+                        my $site_name = 'Unknown';
+                        if ($usr->site_id) {
+                            my $site = $c->model('DBEncy')->resultset('Site')->find($usr->site_id);
+                            $site_name = $site ? $site->name : "site#" . $usr->site_id;
+                        }
                         push @site_roles, {
-                            sitename => $sitename,
+                            sitename  => $site_name,
                             role_name => $role_name,
                         };
                     };
@@ -865,30 +867,19 @@ sub do_create_account :Local {
         $verification_code = $self->user_verification->generate_verification_code();
         $self->user_verification->create_verification_code($new_user, $verification_code);
         
-        # Create UserSiteRole entry for the current site (if site_roles table exists)
+        # Create UserSiteRole entry for the current site
         eval {
-            my $sitename = $c->stash->{SiteName} || 'CSC';
-            my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+            my $reg_sitename = $c->stash->{SiteName} || 'CSC';
+            my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $reg_sitename })->single;
             
             if ($site) {
-                # Try to look up the 'user' role_id for this site
-                my $user_role = $c->model('DBEncy::SiteRole')->search({
-                    sitename => $sitename,
-                    name => 'user',
-                })->single;
-                
-                if ($user_role) {
-                    $c->model('DBEncy::UserSiteRole')->create({
-                        user_id => $new_user->id,
-                        role_id => $user_role->id,
-                        sitename => $sitename,
-                    });
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                        "Created UserSiteRole for user " . $new_user->id . " on site $sitename with role 'user' (role_id: " . $user_role->id . ")");
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
-                        "No 'user' role found for site $sitename - UserSiteRole not created");
-                }
+                $c->model('DBEncy::UserSiteRole')->create({
+                    user_id => $new_user->id,
+                    site_id => $site->id,
+                    role    => 'user',
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role 'user'");
             }
         };
         if ($@) {
@@ -1109,9 +1100,7 @@ sub admin_create_user :Local {
         @sites = ($site) if $site;
     }
     
-    my @roles = $schema->resultset('SiteRole')->search(
-        $is_csc_admin ? {} : { sitename => $sitename }
-    )->all;
+    my @roles = qw(normal editor developer admin);
     
     if ($c->req->method eq 'POST') {
         my $first_name = $c->req->params->{first_name};
@@ -1181,15 +1170,14 @@ sub admin_create_user :Local {
             $self->user_verification->create_verification_code($user, $code);
             
             foreach my $site_name (@selected_sites) {
-                foreach my $role_id (@selected_roles) {
-                    my $role = $schema->resultset('SiteRole')->find($role_id);
-                    next unless $role && $role->sitename eq $site_name;
-                    
+                my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                next unless $site_obj;
+                foreach my $role_name (@selected_roles) {
                     $schema->resultset('UserSiteRole')->create({
-                        user_id => $user->id,
-                        role_id => $role_id,
-                        sitename => $site_name,
-                        assigned_by => $c->session->{user_id},
+                        user_id    => $user->id,
+                        site_id    => $site_obj->id,
+                        role       => $role_name,
+                        granted_by => $c->session->{user_id},
                     });
                 }
             }
