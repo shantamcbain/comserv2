@@ -4,12 +4,20 @@
    roles = "admin"
    TemplateType = "Application"
    category = "User"
-   page_version = "0.02"
+   page_version = "0.03"
    last_updated = "2026-02-23"
 %]
-[% PageVersion = 'user/edit_user.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% PageVersion = 'user/edit_user.tt,v 0.03 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
+[% END %]
+
+[% SET current_roles = {} %]
+[% IF user.roles %]
+    [% FOREACH r IN user.roles.split(',') %]
+        [% r = r.trim %]
+        [% current_roles.$r = 1 %]
+    [% END %]
 [% END %]
 
 <div class="app-container">
@@ -64,23 +72,49 @@
                     </div>
 
                     <div class="form-section">
-                        <h3>Access & Status</h3>
+                        <h3>Roles</h3>
+                        <p>Select all roles that apply. Hold Ctrl (Windows/Linux) or Cmd (Mac) to select multiple.</p>
 
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="roles">Roles <small>(comma-separated)</small></label>
-                                <input type="text" id="roles" name="roles"
-                                       value="[% user.roles | html %]" class="form-input"
-                                       placeholder="normal, admin, editor, developer">
+                                <select name="roles" id="roles" multiple class="form-input"
+                                        size="[% (available_roles.default_roles.size + available_roles.site_roles.size + 2) > 12 ? 12 : (available_roles.default_roles.size + available_roles.site_roles.size + 2) %]">
+                                    <optgroup label="Application Roles">
+                                        [% FOREACH role IN available_roles.default_roles %]
+                                        <option value="[% role | html %]"
+                                            [% IF current_roles.$role %]selected[% END %]>
+                                            [% role | ucfirst | html %]
+                                        </option>
+                                        [% END %]
+                                    </optgroup>
+                                    [% IF available_roles.site_roles.size > 0 %]
+                                    <optgroup label="Site-Specific Roles">
+                                        [% FOREACH sr IN available_roles.site_roles %]
+                                        <option value="[% sr.name | html %]"
+                                            [% SET sr_name = sr.name %]
+                                            [% IF current_roles.$sr_name %]selected[% END %]>
+                                            [% sr.name | html %][% IF is_csc_admin %] ([% sr.sitename | html %])[% END %]
+                                        </option>
+                                        [% END %]
+                                    </optgroup>
+                                    [% END %]
+                                </select>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Status</h3>
+
+                        <div class="form-row">
                             <div class="form-field">
-                                <label for="status">Status</label>
+                                <label for="status">Account Status</label>
                                 <select id="status" name="status" class="form-input">
                                     [% SET cur_status = user.status || 'active' %]
-                                    <option value="active"              [% IF cur_status == 'active'              %]selected[% END %]>Active</option>
-                                    <option value="suspended"           [% IF cur_status == 'suspended'           %]selected[% END %]>Suspended</option>
-                                    <option value="pending_verification"[% IF cur_status == 'pending_verification'%]selected[% END %]>Pending Verification</option>
-                                    <option value="pending_setup"       [% IF cur_status == 'pending_setup'       %]selected[% END %]>Pending Setup</option>
+                                    <option value="active"               [% IF cur_status == 'active'               %]selected[% END %]>Active</option>
+                                    <option value="suspended"            [% IF cur_status == 'suspended'            %]selected[% END %]>Suspended</option>
+                                    <option value="pending_verification" [% IF cur_status == 'pending_verification' %]selected[% END %]>Pending Verification</option>
+                                    <option value="pending_setup"        [% IF cur_status == 'pending_setup'        %]selected[% END %]>Pending Setup</option>
                                 </select>
                             </div>
                         </div>
