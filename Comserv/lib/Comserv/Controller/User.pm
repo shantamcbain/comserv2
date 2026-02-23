@@ -723,13 +723,24 @@ sub do_create_account :Local {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
         
         if ($site) {
-            $c->model('DBEncy::UserSiteRole')->create({
-                user_id => $new_user->id,
+            # Look up the 'user' role_id for this site
+            my $user_role = $c->model('DBEncy::SiteRole')->search({
                 sitename => $sitename,
-                role => 'user',
-            });
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                "Created UserSiteRole for user " . $new_user->id . " on site $sitename");
+                name => 'user',
+            })->single;
+            
+            if ($user_role) {
+                $c->model('DBEncy::UserSiteRole')->create({
+                    user_id => $new_user->id,
+                    role_id => $user_role->id,
+                    sitename => $sitename,
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                    "Created UserSiteRole for user " . $new_user->id . " on site $sitename with role 'user' (role_id: " . $user_role->id . ")");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                    "No 'user' role found for site $sitename - UserSiteRole not created");
+            }
         }
         
         $c->session->{verification_user_id} = $new_user->id;
