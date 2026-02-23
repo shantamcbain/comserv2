@@ -1475,10 +1475,28 @@ sub edit_user :Local :Args(1) {
 
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
+    my @all_sites;
+    my %user_site_ids;
+    eval {
+        @all_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+
+        my @usr = $schema->resultset('UserSiteRole')->search(
+            { user_id => $user_id },
+            { columns => ['site_id'], distinct => 1 }
+        )->all;
+        for my $sr (@usr) {
+            $user_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+        }
+    };
+
     $c->stash(
         user            => $user,
         available_roles => $available_roles,
         is_csc_admin    => $is_csc_admin,
+        all_sites       => \@all_sites,
+        user_site_ids   => \%user_site_ids,
         template        => 'user/edit_user.tt',
     );
 }
@@ -1524,6 +1542,22 @@ sub do_edit_user :Local :Args(1) {
 
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
+    my @all_sites;
+    my %user_site_ids;
+    eval {
+        @all_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+
+        my @usr = $schema->resultset('UserSiteRole')->search(
+            { user_id => $user_id },
+            { columns => ['site_id'], distinct => 1 }
+        )->all;
+        for my $sr (@usr) {
+            $user_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+        }
+    };
+
     my $username   = $c->req->params->{username} || undef;
     my $first_name = $c->req->params->{first_name};
     my $last_name  = $c->req->params->{last_name};
@@ -1531,12 +1565,15 @@ sub do_edit_user :Local :Args(1) {
     my @roles_arr  = $c->req->param('roles');
     my $roles_str  = join(',', @roles_arr);
     my $status     = $c->req->params->{status};
+    my @new_site_names = $c->req->param('sitenames');
 
     unless ($email) {
         $c->stash(
             user            => $user,
             available_roles => $available_roles,
             is_csc_admin    => $is_csc_admin,
+            all_sites       => \@all_sites,
+            user_site_ids   => \%user_site_ids,
             error_msg       => 'Email is required.',
             template        => 'user/edit_user.tt',
         );
@@ -1553,6 +1590,8 @@ sub do_edit_user :Local :Args(1) {
                 user            => $user,
                 available_roles => $available_roles,
                 is_csc_admin    => $is_csc_admin,
+                all_sites       => \@all_sites,
+                user_site_ids   => \%user_site_ids,
                 error_msg       => "Username '$username' is already taken.",
                 template        => 'user/edit_user.tt',
             );
@@ -1570,6 +1609,8 @@ sub do_edit_user :Local :Args(1) {
                 user            => $user,
                 available_roles => $available_roles,
                 is_csc_admin    => $is_csc_admin,
+                all_sites       => \@all_sites,
+                user_site_ids   => \%user_site_ids,
                 error_msg       => "Email '$email' is already in use.",
                 template        => 'user/edit_user.tt',
             );
@@ -1586,6 +1627,56 @@ sub do_edit_user :Local :Args(1) {
             roles      => $roles_str,
             status     => $status,
         });
+
+        my %allowed_site_ids;
+        for my $s (@all_sites) {
+            $allowed_site_ids{$s->id} = $s->name;
+        }
+
+        my %new_site_ids_wanted;
+        for my $sn (@new_site_names) {
+            my $s = $schema->resultset('Site')->search({ name => $sn })->single;
+            if ($s && exists $allowed_site_ids{$s->id}) {
+                $new_site_ids_wanted{$s->id} = 1;
+            }
+        }
+
+        my @current_sr = $schema->resultset('UserSiteRole')->search(
+            { user_id => $user_id, site_id => { -in => [keys %allowed_site_ids] } }
+        )->all;
+        my %current_site_ids;
+        for my $sr (@current_sr) {
+            $current_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+        }
+
+        for my $sid (keys %current_site_ids) {
+            unless (exists $new_site_ids_wanted{$sid}) {
+                $schema->resultset('UserSiteRole')->search({
+                    user_id => $user_id,
+                    site_id => $sid,
+                })->delete;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+                    "Removed site_id=$sid from user_id=$user_id");
+            }
+        }
+
+        my $admin_uid  = $c->session->{user_id};
+        for my $sid (keys %new_site_ids_wanted) {
+            unless (exists $current_site_ids{$sid}) {
+                for my $role (@roles_arr ? @roles_arr : ('normal')) {
+                    eval {
+                        $schema->resultset('UserSiteRole')->create({
+                            user_id    => $user_id,
+                            site_id    => $sid,
+                            role       => $role,
+                            granted_by => $admin_uid,
+                        });
+                    };
+                }
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
+                    "Added site_id=$sid to user_id=$user_id with roles=$roles_str");
+            }
+        }
     };
 
     if ($@) {
@@ -1595,6 +1686,8 @@ sub do_edit_user :Local :Args(1) {
             user            => $user,
             available_roles => $available_roles,
             is_csc_admin    => $is_csc_admin,
+            all_sites       => \@all_sites,
+            user_site_ids   => \%user_site_ids,
             error_msg       => "An error occurred while saving changes: $@",
             template        => 'user/edit_user.tt',
         );
@@ -1602,7 +1695,7 @@ sub do_edit_user :Local :Args(1) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
-        "User updated by admin: user_id=$user_id email=$email roles=$roles_str status=$status");
+        "User updated by admin: user_id=$user_id email=$email roles=$roles_str status=$status sites=" . join(',', @new_site_names));
 
     $c->flash->{success_msg} = 'User updated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
