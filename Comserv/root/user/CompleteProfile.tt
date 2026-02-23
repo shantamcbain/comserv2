@@ -1,5 +1,13 @@
-[% META title = 'Complete Profile' %]
-[% PageVersion = 'complete_profile.tt,v 0.02 2026/02/22 AI Assistant Exp AI Assistant ' %]
+[% META
+   title = "Complete Profile"
+   description = "Complete your profile to finish registration - Step 3 of 3"
+   roles = ""
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.03"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/CompleteProfile.tt,v 0.03 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
