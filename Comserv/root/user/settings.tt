@@ -1,5 +1,5 @@
 [% PageVersion = 'user/settings.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
+[% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
@@ -56,7 +56,7 @@
                 </div>
                 
                 <div class="form-group checkbox-group">
-                    <input type="checkbox" id="debug_mode" name="debug_mode" [% IF c.session.debug_mode == 1 %]checked[% END %]>
+                    <input type="checkbox" id="debug_mode" name="debug_mode" [% IF debug_mode == 1 %]checked[% END %]>
                     <label for="debug_mode">Enable debug mode</label>
                 </div>
             </div>

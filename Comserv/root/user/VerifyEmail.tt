@@ -1,6 +1,6 @@
 [% META title = 'Verify Email' %]
 [% PageVersion = 'verify_email.tt,v 0.02 2026/02/22 AI Assistant Exp AI Assistant ' %]
-[% IF c.session.debug_mode == 1 %]
+[% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
 
@@ -22,7 +22,7 @@
             </div>
 
             [% IF c.stash.error_msg %]
-                <p class="error">[% c.stash.error_msg %]</p>
+                <div class="error">[% c.stash.error_msg %]</div>
             [% END %]
 
             <div class="form-container">
