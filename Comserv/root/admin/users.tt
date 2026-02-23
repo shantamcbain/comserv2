@@ -9,6 +9,9 @@
     <div class="page-header">
         <h1>User Management</h1>
         <h2 class="page-subtitle">[% IF is_csc_admin %]CSC Admin - All Users[% ELSE %]Site Admin - [% sitename | html %] Users[% END %]</h2>
+        <div class="page-actions">
+            <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-success">Create New User</a>
+        </div>
     </div>
     
     <div class="content-container">
