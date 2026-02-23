@@ -1,70 +1,63 @@
-[% PageVersion = 'register.tt,v 0.02 2026/02/21 AI Assistant Exp AI Assistant ' %]
+[% META
+   title = "Create Account"
+   description = "Register a new account - Step 1 of 3"
+   roles = ""
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.03"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/register.tt,v 0.03 2026/02/23 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
-
 [% END %]
 
-<h2>Create Account - Step 1 of 3</h2>
-<p>Enter your username and email to begin registration.</p>
+<div class="app-container">
 
-[% IF c.stash.error_msg %]
-    <div class="error">[% c.stash.error_msg %]</div>
-[% END %]
+    <div class="page-header">
+        <h1>Create Account</h1>
+        <h2 class="page-subtitle">Step 1 of 3 — Enter your username and email</h2>
+    </div>
 
-<form method="post" action="/user/do_create_account">
-    <label for="username">Username</label>
-    <input type="text" id="username" name="username" value="[% username | html %]" required><br>
+    <div class="content-container">
 
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" value="[% email | html %]" required><br>
+        <div class="content-primary">
 
-    <input type="submit" value="Continue">
-</form>
+            [% IF c.stash.error_msg %]
+                <div class="error">[% c.stash.error_msg %]</div>
+            [% END %]
 
-<p><a href="/user/login">Already have an account? Login here</a></p>
+            <div class="form-container">
+                <form method="POST" action="/user/do_create_account" class="app-form">
 
-<style>
-    .error {
-        color: red;
-        font-weight: bold;
-        padding: 10px;
-        background: #ffe6e6;
-        border: 1px solid red;
-        border-radius: 4px;
-        margin-bottom: 15px;
-    }
-    
-    form {
-        max-width: 400px;
-        margin: 20px 0;
-    }
-    
-    label {
-        display: block;
-        margin-top: 10px;
-        font-weight: bold;
-    }
-    
-    input[type="text"],
-    input[type="email"] {
-        width: 100%;
-        padding: 8px;
-        margin-top: 5px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-    
-    input[type="submit"] {
-        margin-top: 15px;
-        padding: 10px 20px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    input[type="submit"]:hover {
-        background: #0056b3;
-    }
-</style>
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="username">Username</label>
+                                <input type="text" id="username" name="username"
+                                       value="[% username | html %]" class="form-input" required autofocus>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email"
+                                       value="[% email | html %]" class="form-input" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Continue</button>
+                        <a href="/user/login" class="btn btn-secondary">Already have an account?</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
