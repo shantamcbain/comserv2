@@ -165,8 +165,10 @@ sub do_login :Local {
     }
 
     # Get user input
-    my $username = $c->req->body_parameters->{username} || $c->req->param('username') || '';
-    my $password = $c->req->body_parameters->{password} || $c->req->param('password') || '';
+    my $username          = $c->req->body_parameters->{username}          || $c->req->param('username')          || '';
+    my $password          = $c->req->body_parameters->{password}          || $c->req->param('password')          || '';
+    my $verification_code = $c->req->body_parameters->{verification_code} || $c->req->param('verification_code') || '';
+    $verification_code =~ s/\s+//g;
 
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
@@ -236,6 +238,50 @@ sub do_login :Local {
         return;
     }
     
+    # Verification code auth path (admin-invited users with pending_setup status)
+    if ($verification_code =~ /^\d{6}$/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+            "Verification code login attempt for '$username'");
+
+        unless ($user) {
+            $c->flash->{error_msg} = 'Invalid email or username.';
+            $c->res->redirect($c->uri_for('/user/login'));
+            return;
+        }
+
+        my $code_hash = sha256_hex($verification_code);
+        my $code_rec;
+        eval {
+            $code_rec = $user->verification_codes->search({
+                code_hash   => $code_hash,
+                verified_at => undef,
+            })->first;
+        };
+
+        if ($code_rec && !$self->user_verification->is_expired($code_rec)) {
+            if ($user->status && $user->status eq 'pending_setup') {
+                $c->session->{setup_email} = $user->email;
+                my $setup_url = (!$user->username)
+                    ? $c->uri_for('/user/complete_username_setup', { email => $user->email })
+                    : $c->uri_for('/user/complete_password_setup',  { email => $user->email });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Valid code for pending_setup user '" . ($user->email||'') . "', redirecting to setup");
+                $c->res->redirect($setup_url);
+                return;
+            } else {
+                $c->flash->{error_msg} = 'Your account is already set up. Please log in with your password.';
+                $c->res->redirect($c->uri_for('/user/login'));
+                return;
+            }
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Invalid or expired verification code for '$username'");
+            $c->flash->{error_msg} = 'Invalid or expired verification code.';
+            $c->res->redirect($c->uri_for('/user/login'));
+            return;
+        }
+    }
+
     # Check if user exists and password is correct
     if ($user && $user->check_password($password)) {
         # Check if account is suspended
