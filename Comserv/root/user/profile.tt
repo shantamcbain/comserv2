@@ -32,8 +32,9 @@
                 
                 <div class="info-group">
                     <label>Status:</label>
-                    <span class="status-badge status-[% user.status || 'active' %]">
-                        [% user.status || 'active' | ucfirst %]
+                    [% SET user_status = user.status || 'active' %]
+                    <span class="status-badge status-[% user_status %]">
+                        [% user_status | ucfirst %]
                     </span>
                 </div>
                 
@@ -52,7 +53,7 @@
             </div>
         </div>
         
-        [% IF user.site_roles.size %]
+        [% IF user.site_roles && user.site_roles.size > 0 %]
         <div class="profile-section">
             <h2>Site Access</h2>
             <div class="profile-info">

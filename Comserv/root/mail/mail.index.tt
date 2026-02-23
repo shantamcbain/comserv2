@@ -10,6 +10,8 @@
 [% IF is_logged_in %]
     <h3>Hello [% c.session.first_name %] [% c.session.last_name %]! Welcome to [% MailServer %]'s Mail page!</h3>
     
+    <p><a href="[% c.uri_for('/user/profile') %]" class="btn btn-info">View Profile</a></p>
+    
     [% IF has_mail_account %]
         <p>When you click the mail link, you will be prompted for your username and your mail password. 
         Once you are logged into the mail, you will have access to forwarding and spam control functions.</p>
