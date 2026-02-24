@@ -1928,7 +1928,7 @@ sub admin_delete_user :Local :Args(1) {
         ai_convos       => \@ai_convos,
         assignable_users => \@assignable_users,
         is_csc_admin    => $is_csc_admin,
-        template        => 'user/admin_delete_user.tt',
+        template        => 'user/AdminDeleteUser.tt',
     );
 }
 
