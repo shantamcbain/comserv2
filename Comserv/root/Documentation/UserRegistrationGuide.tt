@@ -1,0 +1,318 @@
+[% META
+   title = "User Registration Guide"
+   description = "Step-by-step guide for creating a new account on this site"
+   roles = ""
+   TemplateType = "Documentation"
+   category = "User"
+   page_version = "0.01"
+   last_updated = "2026-02-24"
+%]
+[% PageVersion = 'Documentation/UserRegistrationGuide.tt,v 0.01 2026/02/24 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">User Registration Guide</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-02-24 |
+        Version: 0.01 |
+        Status: Current
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#before-you-start" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Before You Start</a>
+                <a href="#step1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Step 1 — Register</a>
+                <a href="#step2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Step 2 — Verify Email</a>
+                <a href="#step3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Step 3 — Complete Profile</a>
+                <a href="#after-login" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">After Login</a>
+                <a href="#multi-site" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Multiple Sites</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Creating an account is a simple three-step process. Once registered, your single account
+                gives you access to any site on this server that you are granted membership in — you never
+                need a separate account for each site.
+            </p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 0 4px 4px 0;">
+                <strong style="color: var(--text-color);">Registration takes about 2 minutes:</strong>
+                <ol style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0 0 0;">
+                    <li>Enter your username and email address</li>
+                    <li>Confirm your email with a 6-digit code</li>
+                    <li>Set your name and password</li>
+                </ol>
+            </div>
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- BEFORE YOU START -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="before-you-start" style="color: var(--text-color); font-family: var(--header-font);">2. Before You Start</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>A valid email address you can access right now</li>
+                <li>A username you'd like to use (3–50 characters, letters, numbers and underscores only)</li>
+                <li>Your email inbox open or nearby — you'll need the verification code</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">Already have an account?</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Your email address can only be registered once across all sites on this server.
+                If you have an account on any site here, <a href="/user/login" style="color: var(--link-color);">log in with that account</a>
+                instead of registering again. Contact a site administrator if you need access to an additional site.
+            </p>
+        </div>
+    </div>
+    <div class="row"><div class="col-100"><p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p></div></div>
+
+    <!-- STEP 1 -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="step1" style="color: var(--text-color); font-family: var(--header-font);">3. Step 1 — Enter Username &amp; Email</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Go to the <a href="/user/register" style="color: var(--link-color);">registration page</a> and fill in two fields:
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); width: 30%;">Field</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Rules</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Username</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3–50 characters. Letters, numbers, and underscores only. Must be unique.</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Email</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">A valid email you can access. One account per email address across all sites on this server.</td>
+                </tr>
+            </table>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Click <strong>Continue</strong>. Your account is created and a 6-digit verification code is emailed to you.
+            </p>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="step2" style="color: var(--text-color); font-family: var(--header-font);">4. Step 2 — Verify Your Email</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Check your inbox for an email from this site. It contains a <strong>6-digit code</strong>.
+                Enter that code on the verification page and click <strong>Verify</strong>.
+            </p>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Important</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0;">
+                    <li>The code expires after <strong>24 hours</strong>.</li>
+                    <li>Check your spam or junk folder if you don't see the email within a few minutes.</li>
+                    <li>Do not close the verification page — complete this step in the same browser session.</li>
+                </ul>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Once your code is accepted you are taken automatically to Step 3.
+            </p>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="step3" style="color: var(--text-color); font-family: var(--header-font);">5. Step 3 — Complete Your Profile</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Fill in your name and choose a password:
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); width: 30%;">Field</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Notes</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>First Name</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Required.</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Last Name</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Required.</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Password</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Minimum 8 characters. Choose something you will remember.</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Confirm Password</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Must match the password above exactly.</td>
+                </tr>
+            </table>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                Click <strong>Complete Registration</strong>. Your account is now active and you are
+                redirected to the login page.
+            </p>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- AFTER LOGIN -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="after-login" style="color: var(--text-color); font-family: var(--header-font);">6. After You Log In</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                You can log in with either your <strong>username</strong> or your <strong>email address</strong>
+                combined with your password.
+            </p>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">From your profile you can:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Update your first name, last name, and email</li>
+                <li>Change your password (<a href="/user/change_password" style="color: var(--link-color);">Change Password</a>)</li>
+                <li>View which sites you have access to</li>
+            </ul>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                If you forget your password, use the
+                <a href="/user/forgot_password" style="color: var(--link-color);">Forgot Password</a> link on the login page.
+                A reset link will be emailed to you.
+            </p>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MULTI-SITE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="multi-site" style="color: var(--text-color); font-family: var(--header-font);">7. Access to Multiple Sites</h2>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                This server hosts multiple sites (for example: BMaster, CSC, MCoop). Your <strong>one account</strong>
+                can be a member of any number of those sites — you never need a separate account for each.
+            </p>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;">
+                    <strong>To join an additional site:</strong> Contact that site's administrator and give them your email address.
+                    They can grant you access without requiring you to create a new account.
+                </p>
+            </div>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">8. Troubleshooting</h2>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">
+                    "An account with this email address already exists"
+                </h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Cause:</strong> You (or someone else) already registered with that email on this server.
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Solution:</strong> <a href="/user/login" style="color: var(--link-color);">Log in</a> with that email and your existing password.
+                    If you forgot your password, use <a href="/user/forgot_password" style="color: var(--link-color);">Forgot Password</a>.
+                </p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">
+                    "Username already exists"
+                </h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Cause:</strong> Someone else is already using that username.
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Solution:</strong> Choose a different username. Try adding numbers or initials (e.g., <em>jsmith42</em>).
+                </p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">
+                    Verification code not received
+                </h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Steps to try:</strong>
+                </p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check your spam or junk folder</li>
+                    <li>Wait a few minutes and refresh your inbox</li>
+                    <li>Make sure you entered your email address correctly during registration</li>
+                    <li>Contact the site administrator if the problem persists</li>
+                </ul>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">
+                    "Invalid or expired verification code"
+                </h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Cause:</strong> The code is only valid for 24 hours, or was entered incorrectly.
+                </p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">
+                    <strong>Solution:</strong> Start registration again from the
+                    <a href="/user/register" style="color: var(--link-color);">registration page</a>
+                    — your previous username and email are still available to reuse.
+                </p>
+            </div>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/user/register" style="color: var(--link-color);">Registration Form</a></li>
+                    <li><a href="/user/login" style="color: var(--link-color);">Login Page</a></li>
+                    <li><a href="/user/forgot_password" style="color: var(--link-color);">Forgot Password</a></li>
+                    <li><a href="/Documentation/AdminAddUserGuide" style="color: var(--link-color);">Admin: Adding Users Guide</a></li>
+                </ul>
+            </div>
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions, contact the site administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>
