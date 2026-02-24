@@ -7,7 +7,7 @@
    page_version = "0.01"
    last_updated = "2026-02-24"
 %]
-[% PageVersion = 'user/admin_role_list.tt,v 0.01 2026/02/24 AI Assistant Exp AI Assistant ' %]
+[% PageVersion = 'user/AdminRoleList.tt,v 0.02 2026/02/24 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]

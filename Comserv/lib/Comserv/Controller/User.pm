@@ -1912,24 +1912,40 @@ sub admin_delete_user :Local :Args(1) {
 
     my (@todos, @ai_convos, @assignable_users);
     if ($is_csc_admin) {
-        eval { @todos      = $schema->resultset('Todo')->search({ user_id => $user_id })->all };
-        eval { @ai_convos  = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all };
+        eval { @todos = $schema->resultset('Todo')->search({ user_id => $user_id })->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load todos for user_id=$user_id: $@");
+        }
+        eval { @ai_convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load ai_convos for user_id=$user_id: $@");
+        }
         eval {
             @assignable_users = $schema->resultset('User')->search(
                 { id => { '!=' => $user_id }, status => 'active' },
                 { columns => [qw(id username first_name last_name email)], order_by => 'username' }
             )->all;
         };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load assignable_users: $@");
+        }
     }
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_user',
+        "Displaying delete confirmation for user_id=$user_id");
+
     $c->stash(
-        user            => $user,
-        todos           => \@todos,
-        ai_convos       => \@ai_convos,
+        user             => $user,
+        todos            => \@todos,
+        ai_convos        => \@ai_convos,
         assignable_users => \@assignable_users,
-        is_csc_admin    => $is_csc_admin,
-        template        => 'user/AdminDeleteUser.tt',
+        is_csc_admin     => $is_csc_admin,
+        template         => 'user/AdminDeleteUser.tt',
     );
+    $c->forward($c->view('TT'));
 }
 
 sub do_admin_delete_user :Local :Args(1) {
@@ -2452,6 +2468,9 @@ sub admin_manage_roles :Local :Args(1) {
         }
     };
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_manage_roles',
+        "Displaying role management form for user_id=$user_id");
+
     $c->stash(
         user            => $user,
         available_roles => $available_roles,
@@ -2460,6 +2479,7 @@ sub admin_manage_roles :Local :Args(1) {
         user_site_ids   => \%user_site_ids,
         template        => 'user/AdminManageRoles.tt',
     );
+    $c->forward($c->view('TT'));
 }
 
 sub admin_role_list :Local :Args(0) {
@@ -2554,6 +2574,9 @@ sub admin_role_list :Local :Args(0) {
 
     my @system_roles = qw(normal member editor developer admin WorkshopLeader);
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_role_list',
+        "Displaying role list for sitename=$sitename is_csc_admin=$is_csc_admin");
+
     $c->stash(
         site_roles       => \@site_roles,
         system_roles     => \@system_roles,
@@ -2562,6 +2585,7 @@ sub admin_role_list :Local :Args(0) {
         sitename         => $sitename,
         template         => 'user/AdminRoleList.tt',
     );
+    $c->forward($c->view('TT'));
 }
 
 sub admin_delete_site_role :Local :Args(1) {
