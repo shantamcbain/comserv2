@@ -17,6 +17,9 @@
     <div class="page-header">
         <h1>Create Account</h1>
         <h2 class="page-subtitle">Step 1 of 3 — Enter your username and email</h2>
+        <p class="page-subtitle" style="font-size: var(--font-size-small); margin-top: 4px;">
+            <a href="/Documentation/UserRegistrationGuide" target="_blank" style="color: var(--link-color);">&#9432; Registration Help &amp; Tutorial</a>
+        </p>
     </div>
 
     <div class="content-container">
