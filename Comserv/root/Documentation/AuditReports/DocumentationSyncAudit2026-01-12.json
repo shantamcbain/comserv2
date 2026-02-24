@@ -1,0 +1,35 @@
+{
+   "files_changed" : 2,
+   "naming_mismatches" : null,
+   "documentation_files_needing_update" : [
+      {
+         "code_file" : "lib/Comserv/View/TT.pm",
+         "exists" : null,
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/TT.tt",
+         "last_updated" : "Unknown",
+         "version" : "0.01",
+         "documentation_file" : "/Documentation/TT.tt",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/controllers/Documentation.tt",
+         "version" : "0.03",
+         "last_updated" : "2026-01-12",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Documentation.tt",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "exists" : 1,
+         "code_file" : "lib/Comserv/Controller/Documentation.pm"
+      }
+   ],
+   "audit_timestamp" : "2026-01-12T18:45:03Z",
+   "summary" : {
+      "naming_mismatches_found" : "0",
+      "ready_to_sync" : 1,
+      "docs_needing_update" : 2,
+      "total_code_changes" : 2,
+      "docs_missing" : 1
+   },
+   "git_range" : "HEAD~1..HEAD"
+}
