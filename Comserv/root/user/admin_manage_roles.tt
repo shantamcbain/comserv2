@@ -1,0 +1,150 @@
+[% META
+   title = "Manage User Roles"
+   description = "Admin interface for managing user roles and site access"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.01"
+   last_updated = "2026-02-24"
+%]
+[% PageVersion = 'user/admin_manage_roles.tt,v 0.01 2026/02/24 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+[% SET current_roles = {} %]
+[% IF user.roles %]
+    [% FOREACH r IN user.roles.split(',') %]
+        [% r = r.trim %]
+        [% current_roles.$r = 1 %]
+    [% END %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Manage User Roles</h1>
+        <h2 class="page-subtitle">[% user.username || user.email | html %]</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+
+            <div class="form-container">
+                <form method="POST" action="[% c.uri_for('/user/admin_manage_roles', user.id) %]" class="app-form">
+
+                    <div class="form-section">
+                        <h3>Roles</h3>
+                        <p>Select all roles to assign to this user.</p>
+
+                        <div class="form-field">
+                            [% IF available_roles.default_roles.size > 0 %]
+                            <div class="check-pill-group">
+                                [% FOREACH role IN available_roles.default_roles %]
+                                <label class="check-pill">
+                                    <input type="checkbox" name="roles" value="[% role | html %]"
+                                        [% IF current_roles.$role %]checked[% END %]>
+                                    [% role | ucfirst | html %]
+                                </label>
+                                [% END %]
+                            </div>
+                            [% END %]
+
+                            [% IF available_roles.site_roles.size > 0 %]
+                            <div style="margin-top: 8px;">
+                                <small><strong>Site-Specific Roles:</strong></small>
+                                <div class="check-pill-group">
+                                    [% FOREACH sr IN available_roles.site_roles %]
+                                    [% SET sr_name = sr.name %]
+                                    <label class="check-pill">
+                                        <input type="checkbox" name="roles" value="[% sr.name | html %]"
+                                            [% IF current_roles.$sr_name %]checked[% END %]>
+                                        [% sr.name | html %][% IF is_csc_admin %] <small>([% sr.sitename | html %])</small>[% END %]
+                                    </label>
+                                    [% END %]
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Site Access</h3>
+                        <p>Select sites this user should have access to. Removing a site revokes all their roles for that site.</p>
+
+                        <div class="form-field">
+                            [% IF all_sites.size > 0 %]
+                            <div class="check-pill-group">
+                                [% FOREACH site IN all_sites %]
+                                [% SET sid = site.id %]
+                                <label class="check-pill">
+                                    <input type="checkbox" name="sitenames" value="[% site.name | html %]"
+                                        [% IF user_site_ids.item(sid) %]checked[% END %]>
+                                    [% site.name | html %]
+                                </label>
+                                [% END %]
+                            </div>
+                            [% ELSE %]
+                            <p class="empty-state">No sites available.</p>
+                            [% END %]
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Role Changes</button>
+                        <a href="[% c.uri_for('/user/edit_user', user.id) %]" class="btn btn-secondary">Back to Edit User</a>
+                        <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Back to User List</a>
+                    </div>
+
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<style>
+.check-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+.check-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border: 1px solid #bbb;
+    border-radius: 20px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.check-pill:hover {
+    background: #e9ecef;
+    border-color: #888;
+}
+.check-pill input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+.check-pill:has(input:checked) {
+    background: #d0e8ff;
+    border-color: #0066cc;
+    font-weight: bold;
+}
+</style>
