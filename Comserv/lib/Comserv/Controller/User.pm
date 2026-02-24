@@ -2041,15 +2041,30 @@ sub do_admin_delete_user :Local :Args(1) {
     }
 
     # Step 2: Clean up optional FK tables — log each failure but continue
+
+    # user_sites table: schema mismatch (no 'id' column in actual table) — use raw SQL
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            $dbh->do("DELETE FROM user_sites WHERE user_id = ?", undef, $user_id);
+        });
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Raw SQL cleanup of user_sites for user_id=$user_id: $err");
+    }
+
     for my $rs_name (qw(
-        WorkshopRole UserSiteRole UserSite UserGroup UserApiKeys ApiToken
+        WorkshopRole UserSiteRole UserGroup UserApiKeys ApiToken
         EmailVerificationCode PasswordResetToken PlanAudit
         EnvVariableAuditLog WebSearchResult Participant
     )) {
         eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
         if ($@) {
+            my $err = "$@";
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
-                "Cleanup of $rs_name for user_id=$user_id: $@");
+                "Cleanup of $rs_name for user_id=$user_id: $err");
         }
     }
 
