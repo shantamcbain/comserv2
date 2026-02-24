@@ -1,0 +1,39 @@
+<h2>You Have Been Invited to [% sitename || 'Comserv' %]</h2>
+
+<p>Hello [% user.first_name || 'there' %],</p>
+
+<p>
+[% IF admin_name %]
+    [% admin_name %] has created an account for you on [% sitename || 'Comserv' %].
+[% ELSE %]
+    An account has been created for you on [% sitename || 'Comserv' %].
+[% END %]
+</p>
+
+<p>To activate your account and set your password, use the verification code below at the login page:</p>
+
+<div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; text-align: center; border-left: 4px solid #28a745;">
+    <p style="margin: 0; font-size: 14px; color: #555;">Your invitation code is:</p>
+    <p style="margin: 10px 0 0 0; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #28a745;">[% code %]</p>
+</div>
+
+<p><strong>Your account details:</strong></p>
+<ul>
+    <li><strong>Email:</strong> [% user.email %]</li>
+    [% IF user.first_name %]<li><strong>Name:</strong> [% user.first_name %] [% user.last_name || '' %]</li>[% END %]
+    [% IF user.roles %]<li><strong>Role(s):</strong> [% user.roles %]</li>[% END %]
+</ul>
+
+<p><strong>To get started:</strong></p>
+<ol>
+    <li>Go to the login page: <a href="[% login_url %]">[% login_url %]</a></li>
+    <li>Enter your email address and the invitation code above</li>
+    <li>Set your username and password to complete your account setup</li>
+</ol>
+
+<p>This invitation code will expire in <strong>24 hours</strong>.</p>
+
+<p>If you did not expect this invitation or believe this was sent in error, please ignore this email or contact support.</p>
+
+<p>Best regards,<br>
+The [% sitename || 'Comserv' %] Team</p>
