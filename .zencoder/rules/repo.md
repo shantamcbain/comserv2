@@ -69,6 +69,17 @@ Every new `.tt` file MUST comply with ALL of the following before being consider
 [% END %]
 ```
 
+### TT Syntax Rules (common mistakes that cause parse errors)
+
+```
+✅ [% value || 'default' | html %]       # fallback BEFORE filter
+❌ [% value | html || 'default' %]       # WRONG — parse error
+
+✅ [% IF items.size > 0 %]              # .size on arrayref
+✅ [% item.name | html %]               # filter after value, no chained ||
+✅ [% c.flash.error_msg | html %]       # flash access
+```
+
 ### Flash Message Blocks (REQUIRED in every template with user interaction)
 
 ```

@@ -107,7 +107,7 @@
                                 <tbody>
                                 [% FOREACH conv IN ai_convos %]
                                     <tr>
-                                        <td>[% conv.title | html || '(untitled)' %]</td>
+                                        <td>[% conv.title || '(untitled)' | html %]</td>
                                         <td>[% conv.created_at | html %]</td>
                                     </tr>
                                 [% END %]
