@@ -18,6 +18,35 @@ enforcement_status: "🔴 CRITICAL - Mandatory for all Zencoder agents"
 
 ---
 
+## 🔴 MANDATORY FILE NAMING RULE — ENFORCED ON EVERY PROMPT
+
+**ALL new files MUST use PascalCase naming. No exceptions. No reminders required.**
+
+| Type | Correct ✅ | Wrong ❌ |
+|------|-----------|---------|
+| Template | `EditUser.tt` | `edit_user.tt` |
+| Template | `AdminCreateUser.tt` | `admin_create_user.tt` |
+| Template | `VerifyEmail.tt` | `verify_email.tt` |
+| Perl module | `UserVerification.pm` | `user_verification.pm` |
+| Any new file | `MyNewFile.ext` | `my_new_file.ext` |
+
+**Rules**:
+- Split words at logical boundaries, capitalize first letter of each word
+- No underscores, hyphens, or spaces between words
+- Applies to ALL new `.tt`, `.pm`, `.md`, `.yaml`, `.js`, `.css` files
+- After creating a file, verify its name is PascalCase before continuing
+- If you find yourself writing `snake_case` or `kebab-case` — STOP and correct it
+
+**Template paths in controller code must also use PascalCase**:
+```perl
+template => 'user/EditUser.tt',       # ✅ CORRECT
+template => 'user/edit_user.tt',      # ❌ WRONG
+```
+
+Full specification: `coding-standards.yaml` Rule 8 (lines 780-1011)
+
+---
+
 ## Part 1: Repository Information
 
 **NOTE**: Detailed repository structure, language specifications, and dependencies have been migrated to the **SINGLE SOURCE OF TRUTH**.
