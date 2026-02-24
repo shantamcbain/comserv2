@@ -1913,22 +1913,38 @@ sub admin_delete_user :Local :Args(1) {
     my $deleted_username = $user->username // $user->email // "id=$user_id";
 
     eval {
-        my $dbh = $schema->storage->dbh;
-        $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-        eval {
-            $schema->resultset('UserSiteRole')->search({ user_id => $user_id })->delete;
-            $schema->resultset('EmailVerificationCode')->search({ user_id => $user_id })->delete;
-            $schema->resultset('PasswordResetToken')->search({ user_id => $user_id })->delete;
+        $schema->txn_do(sub {
+            my @related = qw(
+                WorkshopRole
+                UserSiteRole
+                UserSite
+                UserGroup
+                UserApiKeys
+                ApiToken
+                EmailVerificationCode
+                PasswordResetToken
+                AiMessage
+                AiConversation
+                PlanAudit
+                Todo
+                EnvVariableAuditLog
+                WebSearchResult
+                Participant
+            );
+            for my $rs_name (@related) {
+                eval {
+                    $schema->resultset($rs_name)->search({ user_id => $user_id })->delete;
+                };
+            }
+            $schema->resultset('User')->search({ created_by => $user_id })
+                ->update({ created_by => undef });
             $user->delete;
-        };
-        my $err = $@;
-        $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-        die $err if $err;
+        });
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_delete_user',
             "Error deleting user_id=$user_id: $@");
-        $c->flash->{error_msg} = 'An error occurred while deleting the account: ' . $@;
+        $c->flash->{error_msg} = "Failed to delete user: $@";
         $c->response->redirect($c->uri_for('/admin/users'));
         return;
     }
