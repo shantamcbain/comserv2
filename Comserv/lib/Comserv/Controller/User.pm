@@ -1910,46 +1910,140 @@ sub admin_delete_user :Local :Args(1) {
         }
     }
 
+    my (@todos, @ai_convos, @assignable_users);
+    if ($is_csc_admin) {
+        eval { @todos      = $schema->resultset('Todo')->search({ user_id => $user_id })->all };
+        eval { @ai_convos  = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all };
+        eval {
+            @assignable_users = $schema->resultset('User')->search(
+                { id => { '!=' => $user_id }, status => 'active' },
+                { columns => [qw(id username first_name last_name email)], order_by => 'username' }
+            )->all;
+        };
+    }
+
+    $c->stash(
+        user            => $user,
+        todos           => \@todos,
+        ai_convos       => \@ai_convos,
+        assignable_users => \@assignable_users,
+        is_csc_admin    => $is_csc_admin,
+        template        => 'user/admin_delete_user.tt',
+    );
+}
+
+sub do_admin_delete_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $user      = $schema->resultset('User')->find($user_id);
+    my $admin_uid = $c->session->{user_id};
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    if ($user_id == $admin_uid) {
+        $c->flash->{error_msg} = 'You cannot delete your own account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
     my $deleted_username = $user->username // $user->email // "id=$user_id";
 
     eval {
         $schema->txn_do(sub {
-            my @related = qw(
-                WorkshopRole
-                UserSiteRole
-                UserSite
-                UserGroup
-                UserApiKeys
-                ApiToken
-                EmailVerificationCode
-                PasswordResetToken
-                AiMessage
-                AiConversation
-                PlanAudit
-                Todo
-                EnvVariableAuditLog
-                WebSearchResult
-                Participant
-            );
-            for my $rs_name (@related) {
+            if ($is_csc_admin) {
+                my $todo_action       = $c->req->params->{todo_action}       || 'delete';
+                my $todo_assignee     = $c->req->params->{todo_assignee}     || $admin_uid;
+                my $aiconv_action     = $c->req->params->{aiconv_action}     || 'delete';
+                my $aiconv_assignee   = $c->req->params->{aiconv_assignee}   || $admin_uid;
+
+                if ($todo_action eq 'reassign') {
+                    eval {
+                        $schema->resultset('Todo')->search({ user_id => $user_id })
+                            ->update({ user_id => $todo_assignee });
+                    };
+                } elsif ($todo_action eq 'flag') {
+                    eval {
+                        $schema->resultset('Todo')->search({ user_id => $user_id })
+                            ->update({ user_id => $admin_uid });
+                    };
+                } else {
+                    eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
+                }
+
+                if ($aiconv_action eq 'reassign') {
+                    eval {
+                        my @convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+                        for my $conv (@convos) {
+                            $conv->update({ user_id => $aiconv_assignee });
+                        }
+                    };
+                } elsif ($aiconv_action eq 'flag') {
+                    eval {
+                        my @convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+                        for my $conv (@convos) {
+                            $conv->update({ user_id => $admin_uid });
+                        }
+                    };
+                } else {
+                    eval {
+                        my @conv_ids = map { $_->id }
+                            $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+                        if (@conv_ids) {
+                            $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
+                        }
+                        $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
+                    };
+                }
+            } else {
+                eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
                 eval {
-                    $schema->resultset($rs_name)->search({ user_id => $user_id })->delete;
+                    my @conv_ids = map { $_->id }
+                        $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+                    if (@conv_ids) {
+                        $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
+                    }
+                    $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
                 };
             }
+
+            for my $rs_name (qw(
+                WorkshopRole UserSiteRole UserSite UserGroup UserApiKeys ApiToken
+                EmailVerificationCode PasswordResetToken PlanAudit
+                EnvVariableAuditLog WebSearchResult Participant
+            )) {
+                eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
+            }
+
             $schema->resultset('User')->search({ created_by => $user_id })
                 ->update({ created_by => undef });
+
             $user->delete;
         });
     };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_delete_user',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
             "Error deleting user_id=$user_id: $@");
         $c->flash->{error_msg} = "Failed to delete user: $@";
         $c->response->redirect($c->uri_for('/admin/users'));
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_user',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_delete_user',
         "User deleted: username=$deleted_username user_id=$user_id by admin_id=$admin_uid");
 
     $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
@@ -2364,7 +2458,7 @@ sub admin_manage_roles :Local :Args(1) {
         is_csc_admin    => $is_csc_admin,
         all_sites       => \@all_sites,
         user_site_ids   => \%user_site_ids,
-        template        => 'user/admin_manage_roles.tt',
+        template        => 'user/AdminManageRoles.tt',
     );
 }
 
@@ -2466,7 +2560,7 @@ sub admin_role_list :Local :Args(0) {
         available_sites  => \@available_sites,
         is_csc_admin     => $is_csc_admin,
         sitename         => $sitename,
-        template         => 'user/admin_role_list.tt',
+        template         => 'user/AdminRoleList.tt',
     );
 }
 
