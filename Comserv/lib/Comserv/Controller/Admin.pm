@@ -4232,20 +4232,94 @@ sub update_result_field_from_table {
 # Helper method to update table schema with result field values
 sub update_table_field_from_result {
     my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
-    
-    # This is a placeholder - actual table schema modification would require
-    # database-specific ALTER TABLE statements and is more complex
-    # For now, we'll just log what would be done
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
-        "Would update table '$table_name' field '$field_name' with result file values: " . 
-        Data::Dumper::Dumper($result_field_info));
-    
-    # In a real implementation, you would:
-    # 1. Generate appropriate ALTER TABLE statement
-    # 2. Execute it against the database
-    # 3. Handle any constraints or dependencies
-    
+        "Adding/modifying column '$field_name' in table '$table_name' (db=$database)");
+
+    my $dbh;
+    if (lc($database) eq 'ency') {
+        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        $dbh = $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        die "Unknown database '$database'";
+    }
+
+    my $data_type    = uc($result_field_info->{data_type} || 'VARCHAR');
+    my $size         = $result_field_info->{size};
+    my $is_nullable  = $result_field_info->{is_nullable};
+    my $is_auto_inc  = $result_field_info->{is_auto_increment};
+    my $default_val  = $result_field_info->{default_value};
+
+    my $col_def = "`$field_name` ";
+
+    if ($data_type eq 'INTEGER' || $data_type eq 'INT') {
+        $col_def .= 'INT';
+    } elsif ($data_type eq 'VARCHAR') {
+        $col_def .= 'VARCHAR(' . ($size || 255) . ')';
+    } elsif ($data_type eq 'TEXT') {
+        $col_def .= 'TEXT';
+    } elsif ($data_type eq 'TINYINT') {
+        $col_def .= 'TINYINT';
+    } elsif ($data_type eq 'BIGINT') {
+        $col_def .= 'BIGINT';
+    } elsif ($data_type eq 'TIMESTAMP') {
+        $col_def .= 'TIMESTAMP';
+    } elsif ($data_type eq 'DATETIME') {
+        $col_def .= 'DATETIME';
+    } elsif ($data_type eq 'DATE') {
+        $col_def .= 'DATE';
+    } elsif ($data_type eq 'BOOLEAN') {
+        $col_def .= 'TINYINT(1)';
+    } else {
+        $col_def .= $data_type;
+        $col_def .= "($size)" if $size;
+    }
+
+    if ($is_auto_inc) {
+        $col_def .= ' NOT NULL AUTO_INCREMENT';
+    } elsif (defined $is_nullable && !$is_nullable) {
+        $col_def .= ' NOT NULL';
+    } else {
+        $col_def .= ' NULL';
+    }
+
+    if (defined $default_val && $default_val ne '') {
+        $col_def .= " DEFAULT '$default_val'";
+    }
+
+    my $check_sth = $dbh->prepare(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS " .
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+    );
+    $check_sth->execute($table_name, $field_name);
+    my ($exists) = $check_sth->fetchrow_array;
+
+    if ($is_auto_inc) {
+        eval { $dbh->do("ALTER TABLE `$table_name` DROP PRIMARY KEY") };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+            "Dropped existing primary key (if any): $@") if $@;
+    }
+
+    my $sql;
+    if ($exists) {
+        $sql = "ALTER TABLE `$table_name` MODIFY COLUMN $col_def";
+    } else {
+        $sql = "ALTER TABLE `$table_name` ADD COLUMN $col_def";
+    }
+
+    if ($is_auto_inc) {
+        $sql .= ", ADD PRIMARY KEY (`$field_name`)";
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Executing SQL: $sql");
+
+    $dbh->do($sql);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Successfully executed: $sql");
+
     return 1;
 }
 
