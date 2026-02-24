@@ -105,16 +105,22 @@ Every new `.tt` file MUST comply with ALL of the following before being consider
 # 1. Always call forward at the end — NEVER omit this
 $c->forward($c->view('TT'));
 
-# 2. All database operations MUST be wrapped in eval with logging
+# 2. All database operations MUST be wrapped in eval with IMMEDIATE $@ capture
+# CRITICAL: $@ is reset by any subsequent eval (including inside logging/send_error_notification)
+# Always stringify and save $@ into a local variable on the very next line after eval
 eval { ... };
-if ($@) {
+my $err = "$@" if $@;   # capture and stringify IMMEDIATELY — next line, no exceptions
+if ($err) {
     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action_name',
-        "Error description: $@");
-    $self->send_error_notification($c, 'Subject', "Error details: $@");
-    $c->stash(error_msg => 'A friendly error message. Please try again.');
+        "Error description: $err");
+    $self->send_error_notification($c, 'Subject', "Error details: $err");
+    $c->stash(error_msg => "A friendly error message: $err");
     $c->forward($c->view('TT'));   # show error IN BROWSER — never let it connection-reset
     return;
 }
+# WRONG — $@ may be empty by the time logging runs:
+# eval { ... };
+# if ($@) { $self->logging->..($@) }   ← DO NOT DO THIS
 
 # 3. Log every action at info level
 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action_name',
