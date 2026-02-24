@@ -47,6 +47,86 @@ Full specification: `coding-standards.yaml` Rule 8 (lines 780-1011)
 
 ---
 
+## 🔴 MANDATORY .tt TEMPLATE STANDARDS — ENFORCED ON EVERY PROMPT
+
+Every new `.tt` file MUST comply with ALL of the following before being considered complete.
+
+### Required Template Structure (audit against `Documentation/ApplicationTtTemplate.tt`)
+
+```
+[% META
+   title = "Page Title"
+   description = "Brief description"
+   roles = "admin"              # or appropriate roles
+   TemplateType = "Application"
+   category = "CategoryName"
+   page_version = "0.01"
+   last_updated = "YYYY-MM-DD"
+%]
+[% PageVersion = 'path/TemplateName.tt,v 0.01 YYYY/MM/DD AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+```
+
+### Flash Message Blocks (REQUIRED in every template with user interaction)
+
+```
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+```
+
+### Theme Compliance (use ONLY global CSS classes — no inline styles except display:none toggles)
+
+- Outer wrapper: `<div class="app-container">`
+- Header: `<div class="page-header"><h1>...</h1></div>`
+- Content: `<div class="content-container"><div class="content-primary">`
+- Sections: `<div class="content-section">`
+- Forms: `class="app-form"`, `class="form-section"`, `class="form-row"`, `class="form-field"`, `class="form-input"`
+- Actions: `<div class="form-actions">`, buttons: `class="btn btn-primary"` etc.
+- Tables: `class="table-container"` → `class="data-table"` → `class="action-cell"`
+- Empty state: `<p class="empty-state">No items found.</p>`
+
+### Controller Requirements for Every Template-Rendering Action
+
+```perl
+# 1. Always call forward at the end — NEVER omit this
+$c->forward($c->view('TT'));
+
+# 2. All database operations MUST be wrapped in eval with logging
+eval { ... };
+if ($@) {
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action_name',
+        "Error description: $@");
+    $self->send_error_notification($c, 'Subject', "Error details: $@");
+    $c->stash(error_msg => 'A friendly error message. Please try again.');
+    $c->forward($c->view('TT'));   # show error IN BROWSER — never let it connection-reset
+    return;
+}
+
+# 3. Log every action at info level
+$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action_name',
+    "Description of what happened");
+```
+
+### Error Reporting Rules (NO connection resets allowed)
+
+- **All errors MUST be shown in the browser** via `$c->stash(error_msg => ...)` + `$c->forward($c->view('TT'))`
+- **All errors MUST be logged** via `$self->logging->log_with_details($c, 'error', ...)` to `/logs/application.log`
+- **Critical errors MUST trigger admin email** via `$self->send_error_notification($c, $subject, $details)`
+- **Never let an unhandled exception cause a connection reset** — every action must have top-level eval or error handling
+
+### Logging Levels
+
+| Level | When to use |
+|-------|-------------|
+| `info` | Normal operations (page load, form submit, record created) |
+| `warn` | Non-fatal issues (optional data missing, table not found) |
+| `error` | Failures that prevented the operation (DB error, permission denied) |
+
+---
+
 ## Part 1: Repository Information
 
 **NOTE**: Detailed repository structure, language specifications, and dependencies have been migrated to the **SINGLE SOURCE OF TRUTH**.
