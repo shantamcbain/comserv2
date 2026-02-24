@@ -5,6 +5,8 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::UserVerification;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
@@ -378,97 +380,296 @@ sub get_system_notifications {
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Starting users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-    
-    # Get filter parameter
-    my $filter = $c->req->param('filter') || 'all';
-    
-    # Get search parameter
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+        "Admin accessing user management - user: " . ($c->session->{username} || 'unknown'));
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
     my $search = $c->req->param('search') || '';
-    
-    # Get page parameter
+    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_role = $c->req->param('filter_role') || '';
+    my $filter_status = $c->req->param('filter_status') || '';
     my $page = $c->req->param('page') || 1;
-    my $users_per_page = 20;
-    
-    # Build search conditions
-    my $search_conditions = {};
-    
-    # Apply filter
-    if ($filter eq 'active') {
-        $search_conditions->{status} = 'active';
-    }
-    elsif ($filter eq 'pending') {
-        $search_conditions->{status} = 'pending';
-    }
-    elsif ($filter eq 'disabled') {
-        $search_conditions->{status} = 'disabled';
-    }
-    
-    # Apply search
-    if ($search) {
-        $search_conditions->{'-or'} = [
-            { username => { 'like', "%$search%" } },
-            { email => { 'like', "%$search%" } },
-            { first_name => { 'like', "%$search%" } },
-            { last_name => { 'like', "%$search%" } }
-        ];
-    }
-    
-    # Get users from database
-    my $users_rs = $c->model('DBEncy::User')->search(
-        $search_conditions,
-        {
-            order_by => { -asc => 'username' },
-            page => $page,
-            rows => $users_per_page
-        }
-    );
-    
-    # Get user roles
-    my %user_roles = ();
+    my $rows_per_page = 50;
+
+    my @users;
+    my $pager;
+    my %stats = ( total => 0, active => 0, suspended => 0, pending => 0, by_role => {} );
+    my @available_sites;
+    my %user_sites_map;
+    my $error_msg;
+
     eval {
-        my @user_role_records = $c->model('DBEncy::UserRole')->search({});
-        foreach my $record (@user_role_records) {
-            push @{$user_roles{$record->user_id}}, $record->role->role;
+        my %search_conditions;
+
+        if ($search) {
+            $search_conditions{'-or'} = [
+                { username    => { like => "%$search%" } },
+                { first_name  => { like => "%$search%" } },
+                { last_name   => { like => "%$search%" } },
+                { email       => { like => "%$search%" } },
+            ];
         }
+
+        $search_conditions{status} = $filter_status if $filter_status;
+
+        if ($filter_role && $filter_role ne 'all') {
+            $search_conditions{roles} = { like => "%$filter_role%" };
+        }
+
+        my $user_rs;
+
+        if ($is_csc_admin) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "CSC admin - showing all users, search='$search' status='$filter_status' role='$filter_role'");
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Site admin ($sitename) - filtering by site");
+
+            if ($filter_site && $filter_site ne $sitename) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+                    "Site admin tried to access filter_site=$filter_site, forcing to $sitename");
+                $filter_site = $sitename;
+            }
+
+            my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+            my @user_ids;
+            if ($site_obj) {
+                @user_ids = $schema->resultset('UserSiteRole')->search(
+                    { site_id => $site_obj->id },
+                    { columns => ['user_id'], distinct => 1 }
+                )->get_column('user_id')->all;
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Found " . scalar(@user_ids) . " user_ids for sitename=$sitename");
+
+            $search_conditions{id} = @user_ids ? { -in => \@user_ids } : { -in => [0] };
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        }
+
+        @users = $user_rs->all;
+        $pager = $user_rs->pager;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Fetched " . scalar(@users) . " users (page $page, total " . $pager->total_entries . ")");
+
+        if (@users) {
+            my @user_ids = map { $_->id } @users;
+            my @site_role_rows = $schema->resultset('UserSiteRole')->search(
+                { user_id => { -in => \@user_ids } },
+                { columns => ['user_id', 'site_id'], distinct => 1 }
+            )->all;
+            my %site_name_cache;
+            for my $sr (@site_role_rows) {
+                my $sid = $sr->site_id;
+                next unless defined $sid;
+                unless (exists $site_name_cache{$sid}) {
+                    my $s = $schema->resultset('Site')->find($sid);
+                    $site_name_cache{$sid} = $s ? $s->name : "site#$sid";
+                }
+                push @{$user_sites_map{$sr->user_id}}, $site_name_cache{$sid};
+            }
+        }
+
+        my $stats_rs = $schema->resultset('User')->search(
+            $is_csc_admin ? {} : \%search_conditions
+        );
+
+        while (my $u = $stats_rs->next) {
+            $stats{total}++;
+            my $status = $u->status || 'active';
+            if    ($status eq 'active')    { $stats{active}++ }
+            elsif ($status eq 'suspended') { $stats{suspended}++ }
+            elsif ($status =~ /pending/)   { $stats{pending}++ }
+
+            if ($u->roles) {
+                for my $role (split /,/, $u->roles) {
+                    $role =~ s/^\s+|\s+$//g;
+                    $stats{by_role}{$role} = ($stats{by_role}{$role} || 0) + 1 if $role;
+                }
+            }
+        }
+
+        @available_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename })->all;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Completed users action - stats: total=$stats{total} active=$stats{active} suspended=$stats{suspended}");
     };
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
-        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
-        push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
+
+    if ($@) {
+        $error_msg = "Database error loading users: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'users', $error_msg);
     }
-    
-    # Pass data to the template
+
     $c->stash(
-        template => 'admin/users.tt',
-        users => [ $users_rs->all ],
-        user_roles => \%user_roles,
-        filter => $filter,
-        search => $search,
-        pager => $users_rs->pager
+        users           => \@users,
+        pager           => $pager,
+        stats           => \%stats,
+        search          => $search,
+        filter_site     => $filter_site,
+        filter_role     => $filter_role,
+        filter_status   => $filter_status,
+        is_csc_admin    => $is_csc_admin,
+        admin_type      => $admin_type,
+        sitename        => $sitename,
+        available_sites => \@available_sites,
+        user_sites_map  => \%user_sites_map,
+        error_msg       => $error_msg,
+        template        => 'admin/users.tt',
     );
+}
+
+# Admin create user
+sub create_user :Path('/admin/create_user') :Args(0) {
+    my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Completed users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    
+    unless ($admin_auth->check_admin_access($c, 'admin_create_user')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
+    if ($c->req->method eq 'POST') {
+        my $first_name = $c->req->param('first_name');
+        my $last_name = $c->req->param('last_name');
+        my $email = $c->req->param('email');
+        my @sitenames = $c->req->param('sitenames');
+        my @roles = $c->req->param('roles');
+
+        unless ($first_name && $last_name && $email) {
+            $c->stash(
+                error_msg => 'First name, last name, and email are required',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        unless (@sitenames && @roles) {
+            $c->stash(
+                error_msg => 'At least one site and role must be selected',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        if (!$is_csc_admin) {
+            foreach my $site (@sitenames) {
+                if ($site ne $sitename) {
+                    $c->flash->{error_msg} = "You can only create users for your site: $sitename";
+                    $c->response->redirect($c->uri_for('/admin/create_user'));
+                    return;
+                }
+            }
+        }
+
+        my $existing_user = $schema->resultset('User')->find({ email => $email });
+        if ($existing_user) {
+            $c->stash(
+                error_msg => "A user with email '$email' already exists",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        eval {
+            my $user = $schema->resultset('User')->create({
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                username => undef,
+                password => undef,
+                status => 'pending_setup',
+                created_by => $c->session->{user_id},
+                creation_context => 'admin_created',
+                roles => 'normal',
+            });
+
+            my $user_verification = Comserv::Util::UserVerification->new();
+            my $code = $user_verification->generate_verification_code();
+            $user_verification->create_verification_code($user, $code);
+
+            foreach my $site_name (@sitenames) {
+                my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                next unless $site_obj;
+                foreach my $role_name (@roles) {
+                    $schema->resultset('UserSiteRole')->create({
+                        user_id    => $user->id,
+                        site_id    => $site_obj->id,
+                        role       => $role_name,
+                        granted_by => $c->session->{user_id},
+                    });
+                }
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_user',
+                "Admin created user: $email with sites: " . join(',', @sitenames) . " roles: " . join(',', @roles));
+
+            $c->session->{invitation_code} = $code;
+            $c->session->{invitation_email} = $email;
+
+            $c->flash->{success_msg} = "User invitation sent to $email. Verification code: $code (testing mode)";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_user',
+                "Error creating user: $@");
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+    }
+
+    my @available_sites;
+    if ($is_csc_admin) {
+        @available_sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    } else {
+        @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
+    }
+
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+
+    $c->stash(
+        available_sites => \@available_sites,
+        available_roles => \@available_roles,
+        is_csc_admin => $is_csc_admin,
+        template => 'admin/create_user.tt',
+    );
 }
 
 # Admin content management
@@ -2581,6 +2782,9 @@ sub get_ency_database_tables {
         die $_;
     };
     
+    # Sort tables alphabetically
+    @tables = sort @tables;
+    
     return \@tables;
 }
 
@@ -2604,6 +2808,9 @@ sub get_forager_database_tables {
             "Error getting forager database tables: $_");
         die $_;
     };
+    
+    # Sort tables alphabetically
+    @tables = sort @tables;
     
     return \@tables;
 }
@@ -3520,10 +3727,29 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has admin role (using session-based check like create_table_from_result)
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
         return;
     }
@@ -3558,11 +3784,20 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Getting field info for table: $table_name, field: $field_name, database: $database");
+        
         # Get table field info
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Field info retrieved: " . Data::Dumper::Dumper($table_field_info));
+        
         # Update result file with table values
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Result file updated successfully for field: $field_name");
         
         $c->stash(json => {
             success => 1,
@@ -3656,21 +3891,42 @@ sub get_table_field_info {
     my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
     my $schema = $c->model($model_name)->schema;
     
-    # Get table information from database
+    # Get table information from database using DESCRIBE (same as get_ency_table_schema)
     my $dbh = $schema->storage->dbh;
-    my $sth = $dbh->column_info(undef, undef, $table_name, $field_name);
-    my $column_info = $sth->fetchrow_hashref;
+    my $sth = $dbh->prepare("DESCRIBE $table_name");
+    $sth->execute();
     
-    if (!$column_info) {
+    my $field_info;
+    while (my $row = $sth->fetchrow_hashref()) {
+        if ($row->{Field} eq $field_name) {
+            $field_info = {
+                data_type => $row->{Type},
+                size => undef,  # Will be parsed from Type
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                default_value => $row->{Default},
+                extra => $row->{Extra},
+            };
+            
+            # Parse size from Type (e.g., "varchar(255)" -> 255)
+            if ($row->{Type} =~ /\((\d+)\)/) {
+                $field_info->{size} = $1;
+            }
+            last;
+        }
+    }
+    
+    unless ($field_info) {
         die "Field '$field_name' not found in table '$table_name'";
     }
     
     return {
-        data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
-        size => $column_info->{COLUMN_SIZE},
-        is_nullable => $column_info->{NULLABLE} ? 1 : 0,
-        is_auto_increment => $column_info->{IS_AUTOINCREMENT} ? 1 : 0,
-        default_value => $column_info->{COLUMN_DEF}
+        data_type => $field_info->{data_type},
+        size => $field_info->{size},
+        is_nullable => $field_info->{is_nullable},
+        is_auto_increment => $field_info->{is_auto_increment},
+        default_value => $field_info->{default_value},
+        extra => $field_info->{extra}
     };
 }
 
@@ -3915,52 +4171,78 @@ sub update_result_field_from_table {
     my $content = read_file($result_file_path);
     
     # Build new field definition
-    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
+    my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}'";
     
     if ($table_field_info->{size}) {
-        $new_field_def .= ", size => $table_field_info->{size}";
+        $new_field_def .= ",\n        size => $table_field_info->{size}";
     }
     
-    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
+    if ($table_field_info->{is_nullable}) {
+        $new_field_def .= ",\n        is_nullable => 1";
+    }
     
     if ($table_field_info->{is_auto_increment}) {
-        $new_field_def .= ", is_auto_increment => 1";
+        $new_field_def .= ",\n        is_auto_increment => 1";
     }
     
     if (defined $table_field_info->{default_value}) {
-        $new_field_def .= ", default_value => '$table_field_info->{default_value}'";
+        my $default = $table_field_info->{default_value};
+        
+        # Handle special timestamp defaults (scalar refs)
+        if ($default =~ /CURRENT_TIMESTAMP/i) {
+            if ($default =~ /ON UPDATE/i) {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'";
+            } else {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP'";
+            }
+        }
+        # Handle NULL default
+        elsif (!defined $default || $default eq '') {
+            # Skip - NULL is default when is_nullable => 1
+        }
+        # Handle numeric defaults
+        elsif ($default =~ /^\d+$/) {
+            $new_field_def .= ",\n        default_value => $default";
+        }
+        # Handle string defaults
+        else {
+            $default =~ s/'/\\'/g;  # Escape single quotes
+            $new_field_def .= ",\n        default_value => '$default'";
+        }
     }
     
-    $new_field_def .= " }";
+    $new_field_def .= ",\n    }";
     
     # Update the field definition in the content
     if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
         my $columns_section = $1;
         my $updated = 0;
         
-        # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
-            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
+        # Try hash format: field_name => { ... } (handles multiline)
+        # Match field_name => { ... } where { ... } can span multiple lines
+        if ($columns_section =~ /(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/s) {
+            $columns_section =~ s/(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/$field_name => $new_field_def/s;
             $updated = 1;
         }
-        # Try array format: "field_name", { ... }
-        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
-            $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+        # Try array format: "field_name", { ... } (handles multiline)
+        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{.*?\}/s) {
+            $columns_section =~ s/["']$field_name["']\s*,\s*\{.*?\}/"$field_name", $new_field_def/s;
             $updated = 1;
         }
         # If not found, append it to the columns section
         else {
-            if ($columns_section =~ /,\s*$/) {
-                $columns_section .= "\n    $field_name => $new_field_def,";
+            # Find the last field definition to insert after
+            if ($columns_section =~ /,\s*$/s) {
+                $columns_section .= "\n    $field_name => $new_field_def";
             } else {
-                $columns_section .= ",\n    $field_name => $new_field_def,";
+                $columns_section .= ",\n    $field_name => $new_field_def";
             }
             $updated = 1;
         }
         
         if ($updated) {
             # Replace in the full content
-            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
+            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns($columns_section\n);/s;
             
             # Write back to file
             write_file($result_file_path, $content);
