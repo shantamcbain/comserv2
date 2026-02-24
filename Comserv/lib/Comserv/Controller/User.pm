@@ -1979,82 +1979,97 @@ sub do_admin_delete_user :Local :Args(1) {
 
     my $deleted_username = $user->username // $user->email // "id=$user_id";
 
-    eval {
-        $schema->txn_do(sub {
-            if ($is_csc_admin) {
-                my $todo_action       = $c->req->params->{todo_action}       || 'delete';
-                my $todo_assignee     = $c->req->params->{todo_assignee}     || $admin_uid;
-                my $aiconv_action     = $c->req->params->{aiconv_action}     || 'delete';
-                my $aiconv_assignee   = $c->req->params->{aiconv_assignee}   || $admin_uid;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_delete_user',
+        "Starting deletion of user_id=$user_id username=$deleted_username by admin_id=$admin_uid");
 
-                if ($todo_action eq 'reassign') {
-                    eval {
-                        $schema->resultset('Todo')->search({ user_id => $user_id })
-                            ->update({ user_id => $todo_assignee });
-                    };
-                } elsif ($todo_action eq 'flag') {
-                    eval {
-                        $schema->resultset('Todo')->search({ user_id => $user_id })
-                            ->update({ user_id => $admin_uid });
-                    };
-                } else {
-                    eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
-                }
+    # Step 1: Handle optional related records BEFORE entering transaction
+    # (avoids MySQL transaction abort from missing tables inside txn_do)
 
-                if ($aiconv_action eq 'reassign') {
-                    eval {
-                        my @convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
-                        for my $conv (@convos) {
-                            $conv->update({ user_id => $aiconv_assignee });
-                        }
-                    };
-                } elsif ($aiconv_action eq 'flag') {
-                    eval {
-                        my @convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
-                        for my $conv (@convos) {
-                            $conv->update({ user_id => $admin_uid });
-                        }
-                    };
-                } else {
-                    eval {
-                        my @conv_ids = map { $_->id }
-                            $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
-                        if (@conv_ids) {
-                            $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
-                        }
-                        $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
-                    };
-                }
+    if ($is_csc_admin) {
+        my $todo_action     = $c->req->params->{todo_action}   || 'delete';
+        my $todo_assignee   = $c->req->params->{todo_assignee} || $admin_uid;
+        my $aiconv_action   = $c->req->params->{aiconv_action}   || 'delete';
+        my $aiconv_assignee = $c->req->params->{aiconv_assignee} || $admin_uid;
+
+        eval {
+            if ($todo_action eq 'reassign') {
+                $schema->resultset('Todo')->search({ user_id => $user_id })
+                    ->update({ user_id => $todo_assignee });
+            } elsif ($todo_action eq 'flag') {
+                $schema->resultset('Todo')->search({ user_id => $user_id })
+                    ->update({ user_id => $admin_uid });
             } else {
-                eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
-                eval {
-                    my @conv_ids = map { $_->id }
-                        $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
-                    if (@conv_ids) {
-                        $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
-                    }
-                    $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
-                };
+                $schema->resultset('Todo')->search({ user_id => $user_id })->delete;
             }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Todo handling result: " . ($@ ? "error: $@" : "ok")) if $@;
 
-            for my $rs_name (qw(
-                WorkshopRole UserSiteRole UserSite UserGroup UserApiKeys ApiToken
-                EmailVerificationCode PasswordResetToken PlanAudit
-                EnvVariableAuditLog WebSearchResult Participant
-            )) {
-                eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
+        eval {
+            my @conv_ids = map { $_->id }
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+            if (@conv_ids) {
+                $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
             }
+            if ($aiconv_action eq 'reassign') {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })
+                    ->update({ user_id => $aiconv_assignee });
+            } elsif ($aiconv_action eq 'flag') {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })
+                    ->update({ user_id => $admin_uid });
+            } else {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "AI conversation handling result: error: $@") if $@;
+    } else {
+        eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Todo delete error: $@") if $@;
 
-            $schema->resultset('User')->search({ created_by => $user_id })
-                ->update({ created_by => undef });
+        eval {
+            my @conv_ids = map { $_->id }
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+            if (@conv_ids) {
+                $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
+            }
+            $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "AiConversation delete error: $@") if $@;
+    }
 
-            $user->delete;
-        });
+    # Step 2: Clean up optional FK tables — log each failure but continue
+    for my $rs_name (qw(
+        WorkshopRole UserSiteRole UserSite UserGroup UserApiKeys ApiToken
+        EmailVerificationCode PasswordResetToken PlanAudit
+        EnvVariableAuditLog WebSearchResult Participant
+    )) {
+        eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+                "Cleanup of $rs_name for user_id=$user_id: $@");
+        }
+    }
+
+    # Step 3: Clear created_by references
+    eval {
+        $schema->resultset('User')->search({ created_by => $user_id })
+            ->update({ created_by => undef });
     };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+        "created_by nullify error: $@") if $@;
+
+    # Step 4: Delete the user record — this is the critical step
+    eval { $user->delete };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
-            "Error deleting user_id=$user_id: $@");
-        $c->flash->{error_msg} = "Failed to delete user: $@";
+            "FAILED to delete user_id=$user_id: $@");
+        $self->send_error_notification($c,
+            "User deletion failed: $deleted_username",
+            "user_id=$user_id error=$@");
+        $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $@";
         $c->response->redirect($c->uri_for('/admin/users'));
         return;
     }
