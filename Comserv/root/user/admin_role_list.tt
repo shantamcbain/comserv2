@@ -1,0 +1,153 @@
+[% META
+   title = "Role Management"
+   description = "Admin interface for managing site-specific roles"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.01"
+   last_updated = "2026-02-24"
+%]
+[% PageVersion = 'user/admin_role_list.tt,v 0.01 2026/02/24 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Role Management</h1>
+        <h2 class="page-subtitle">[% IF is_csc_admin %]CSC Admin - All Sites[% ELSE %]Site Admin - [% sitename | html %][% END %]</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+
+            <!-- System Roles Section -->
+            <div class="content-section">
+                <h3>System Roles</h3>
+                <p>These roles are built-in and cannot be deleted.</p>
+                <div class="data-container">
+                    <div class="badge-group">
+                        [% FOREACH role IN system_roles %]
+                            <span class="badge-primary">[% role | html %]</span>
+                        [% END %]
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Roles Section -->
+            <div class="content-section">
+                <h3>Custom Roles</h3>
+
+                [% IF site_roles.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                [% IF is_csc_admin %]<th>Site</th>[% END %]
+                                <th>Role Name</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH sr IN site_roles %]
+                            <tr>
+                                [% IF is_csc_admin %]
+                                <td>[% sr.sitename | html %]</td>
+                                [% END %]
+                                <td><strong>[% sr.role_name | html %]</strong></td>
+                                <td>[% sr.description | html || '<em>No description</em>' %]</td>
+                                <td>
+                                    [% IF sr.is_system_role %]
+                                        <span class="badge-warning">System</span>
+                                    [% ELSE %]
+                                        <span class="badge-info">Custom</span>
+                                    [% END %]
+                                </td>
+                                <td class="action-cell">
+                                    [% UNLESS sr.is_system_role %]
+                                    <a href="[% c.uri_for('/user/admin_delete_site_role', sr.id) %]"
+                                       class="btn btn-sm btn-delete"
+                                       onclick="return confirm('Delete role [% sr.role_name | html %]? Users with this role will not lose their assignments immediately, but the role will no longer be available for new assignments.');">Delete</a>
+                                    [% ELSE %]
+                                    <span class="empty-state">System role</span>
+                                    [% END %]
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No custom roles defined yet.</p>
+                </div>
+                [% END %]
+            </div>
+
+            <!-- Create Custom Role Section -->
+            <div class="content-section">
+                <h3>Create Custom Role</h3>
+                <div class="form-container">
+                    <form method="POST" action="[% c.uri_for('/user/admin_role_list') %]" class="app-form">
+                        <input type="hidden" name="action" value="create">
+
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="role_name">Role Name *</label>
+                                    <input type="text" id="role_name" name="role_name"
+                                           class="form-input" required
+                                           placeholder="e.g. ContentManager"
+                                           pattern="[a-zA-Z][a-zA-Z0-9_]{1,49}"
+                                           title="Start with a letter, use letters/numbers/underscores, 2-50 characters">
+                                </div>
+
+                                [% IF is_csc_admin && available_sites.size > 0 %]
+                                <div class="form-field">
+                                    <label for="sitename">Site *</label>
+                                    <select id="sitename" name="sitename" class="form-input" required>
+                                        [% FOREACH site IN available_sites %]
+                                        <option value="[% site.name | html %]">[% site.name | html %]</option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                                [% ELSE %]
+                                <input type="hidden" name="sitename" value="[% sitename | html %]">
+                                [% END %]
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="description">Description</label>
+                                    <input type="text" id="description" name="description"
+                                           class="form-input"
+                                           placeholder="Brief description of this role's purpose">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Create Role</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Back to User Management</a>
+            </div>
+
+        </div>
+    </div>
+
+</div>

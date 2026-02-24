@@ -2203,6 +2203,305 @@ sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub admin_manage_roles :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_manage_roles')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $user         = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+    my $admin_uid    = $c->session->{user_id};
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only manage users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    if ($c->req->method eq 'POST') {
+        my @roles_arr      = $c->req->param('roles');
+        my @new_site_names = $c->req->param('sitenames');
+        my $roles_str      = join(',', @roles_arr);
+
+        my @all_sites;
+        eval {
+            @all_sites = $is_csc_admin
+                ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+                : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+        };
+
+        my %allowed_site_ids;
+        for my $s (@all_sites) {
+            $allowed_site_ids{$s->id} = $s->name;
+        }
+
+        eval {
+            $user->update({ roles => $roles_str });
+
+            my %new_site_ids_wanted;
+            for my $sn (@new_site_names) {
+                my $s = $schema->resultset('Site')->search({ name => $sn })->single;
+                if ($s && exists $allowed_site_ids{$s->id}) {
+                    $new_site_ids_wanted{$s->id} = 1;
+                }
+            }
+
+            my @current_sr = $schema->resultset('UserSiteRole')->search(
+                { user_id => $user_id, site_id => { -in => [keys %allowed_site_ids] } }
+            )->all;
+            my %current_site_ids;
+            for my $sr (@current_sr) {
+                $current_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+            }
+
+            for my $sid (keys %current_site_ids) {
+                unless (exists $new_site_ids_wanted{$sid}) {
+                    $schema->resultset('UserSiteRole')->search({
+                        user_id => $user_id,
+                        site_id => $sid,
+                    })->delete;
+                }
+            }
+
+            for my $sid (keys %new_site_ids_wanted) {
+                unless (exists $current_site_ids{$sid}) {
+                    for my $role (@roles_arr ? @roles_arr : ('normal')) {
+                        eval {
+                            $schema->resultset('UserSiteRole')->create({
+                                user_id    => $user_id,
+                                site_id    => $sid,
+                                role       => $role,
+                                granted_by => $admin_uid,
+                            });
+                        };
+                    }
+                }
+            }
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_manage_roles',
+                "Error updating roles for user_id=$user_id: $@");
+            $c->flash->{error_msg} = "An error occurred while saving role changes: $@";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_manage_roles',
+                "Roles updated for user_id=$user_id by admin_id=$admin_uid roles=$roles_str sites=" . join(',', @new_site_names));
+            $c->flash->{success_msg} = 'User roles and site access updated successfully.';
+        }
+
+        $c->response->redirect($c->uri_for('/user/edit_user', $user_id));
+        return;
+    }
+
+    my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
+
+    my @all_sites;
+    my %user_site_ids;
+    eval {
+        @all_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+
+        my @usr = $schema->resultset('UserSiteRole')->search(
+            { user_id => $user_id },
+            { columns => ['site_id'], distinct => 1 }
+        )->all;
+        for my $sr (@usr) {
+            $user_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+        }
+    };
+
+    $c->stash(
+        user            => $user,
+        available_roles => $available_roles,
+        is_csc_admin    => $is_csc_admin,
+        all_sites       => \@all_sites,
+        user_site_ids   => \%user_site_ids,
+        template        => 'user/admin_manage_roles.tt',
+    );
+}
+
+sub admin_role_list :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_role_list')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    if ($c->req->method eq 'POST') {
+        my $action      = $c->req->params->{action} || 'create';
+        my $role_name   = $c->req->params->{role_name};
+        my $description = $c->req->params->{description} || '';
+        my $target_site = $c->req->params->{sitename} || $sitename;
+
+        unless ($is_csc_admin || $target_site eq $sitename) {
+            $c->flash->{error_msg} = 'Access denied. You can only manage roles for your own site.';
+            $c->response->redirect($c->uri_for('/user/admin_role_list'));
+            return;
+        }
+
+        if ($action eq 'create') {
+            unless ($role_name && $role_name =~ /^[a-zA-Z][a-zA-Z0-9_]{1,49}$/) {
+                $c->flash->{error_msg} = 'Invalid role name. Use letters, numbers, underscores (2-50 chars, start with a letter).';
+                $c->response->redirect($c->uri_for('/user/admin_role_list'));
+                return;
+            }
+
+            my @system_roles = qw(normal member editor developer admin);
+            if (grep { $_ eq lc($role_name) } map { lc($_) } @system_roles) {
+                $c->flash->{error_msg} = "Cannot create a custom role with a system role name: $role_name";
+                $c->response->redirect($c->uri_for('/user/admin_role_list'));
+                return;
+            }
+
+            eval {
+                $schema->resultset('SiteRole')->create({
+                    sitename       => $target_site,
+                    role_name      => $role_name,
+                    description    => $description,
+                    is_system_role => 0,
+                });
+            };
+
+            if ($@) {
+                if ($@ =~ /duplicate|Duplicate/i) {
+                    $c->flash->{error_msg} = "Role '$role_name' already exists for site '$target_site'.";
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_role_list',
+                        "Error creating role '$role_name' for site '$target_site': $@");
+                    $c->flash->{error_msg} = "An error occurred while creating the role.";
+                }
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_role_list',
+                    "Created custom role '$role_name' for site '$target_site' by admin=" . ($c->session->{username} || 'unknown'));
+                $c->flash->{success_msg} = "Role '$role_name' created successfully for site '$target_site'.";
+            }
+        }
+
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    my @site_roles;
+    eval {
+        my $rs = $is_csc_admin
+            ? $schema->resultset('SiteRole')->search({}, { order_by => ['sitename', 'role_name'] })
+            : $schema->resultset('SiteRole')->search({ sitename => $sitename }, { order_by => 'role_name' });
+        @site_roles = $rs->all;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_role_list',
+            "Could not load site_roles: $@");
+        $c->flash->{error_msg} = 'Could not load roles. The site_roles table may not exist yet.';
+    }
+
+    my @available_sites;
+    eval {
+        @available_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+    };
+
+    my @system_roles = qw(normal member editor developer admin WorkshopLeader);
+
+    $c->stash(
+        site_roles       => \@site_roles,
+        system_roles     => \@system_roles,
+        available_sites  => \@available_sites,
+        is_csc_admin     => $is_csc_admin,
+        sitename         => $sitename,
+        template         => 'user/admin_role_list.tt',
+    );
+}
+
+sub admin_delete_site_role :Local :Args(1) {
+    my ($self, $c, $role_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    my $role = $schema->resultset('SiteRole')->find($role_id);
+
+    unless ($role) {
+        $c->flash->{error_msg} = 'Role not found.';
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    unless ($is_csc_admin || $role->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Access denied. You can only delete roles for your own site.';
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    if ($role->is_system_role) {
+        $c->flash->{error_msg} = "Cannot delete system role '" . $role->role_name . "'.";
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    my $role_name = $role->role_name;
+    my $role_site = $role->sitename;
+
+    eval {
+        $role->delete;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_delete_site_role',
+            "Error deleting role_id=$role_id: $@");
+        $c->flash->{error_msg} = "An error occurred while deleting the role.";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_site_role',
+            "Deleted custom role '$role_name' for site '$role_site' by admin=" . ($c->session->{username} || 'unknown'));
+        $c->flash->{success_msg} = "Role '$role_name' deleted successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/user/admin_role_list'));
+}
+
 sub _load_available_roles {
     my ($self, $c, $is_csc_admin, $sitename) = @_;
 
