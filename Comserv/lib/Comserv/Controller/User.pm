@@ -286,15 +286,17 @@ sub do_login :Local {
     if ($user && $user->check_password($password)) {
         # Check if account is suspended
         if ($user->status && $user->status eq 'suspended') {
+            my $susp_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                "Login attempt for suspended account: '$username'");
+                "AUDIT: Login denied user_id=" . $user->id . " username='$username' ip=$susp_ip reason=account_suspended");
             $c->flash->{error_msg} = 'Your account has been suspended. Please contact an administrator.';
             $c->res->redirect($c->uri_for('/user/login'));
             return;
         }
         # Manual authentication successful
+        my $client_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
-            "User '$username' successfully authenticated via manual check.");
+            "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
         
         # Get the authenticated user object (already retrieved above)
         
@@ -352,9 +354,10 @@ sub do_login :Local {
         );
     } else {
         # Authentication failed
+        my $fail_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Invalid username or password for '$username'."
+            "AUDIT: Login failed username='$username' ip=$fail_ip reason=invalid_credentials"
         );
 
         # Store error message in flash and redirect back to login page
@@ -721,9 +724,9 @@ sub update_settings :Local {
     $c->session->{theme_name} = $theme;
     $c->session->{debug_mode} = $debug_mode;
 
-    # Log the successful update
+    my $settings_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
-        "User '" . $c->session->{username} . "' settings updated successfully");
+        "AUDIT: Profile updated user_id=" . ($c->session->{user_id} || 'unknown') . " username='" . $c->session->{username} . "' ip=$settings_ip changes=first_name,last_name,email");
 
     # Set success message and redirect
     $c->flash->{success_msg} = "Your settings have been updated successfully.";
@@ -835,8 +838,9 @@ sub do_change_password :Local {
         return;
     }
 
+    my $chpw_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
-        "User '" . $c->session->{username} . "' password changed successfully");
+        "AUDIT: Password changed user_id=" . ($c->session->{user_id} || 'unknown') . " username='" . $c->session->{username} . "' ip=$chpw_ip");
 
     eval {
         my $forgot_password_url = $c->uri_for('/user/forgot_password');
@@ -948,8 +952,9 @@ sub do_create_account :Local {
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
+        my $reg_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-            "User created with ID: " . $new_user->id . ", verification code: $verification_code");
+            "AUDIT: Account created user_id=" . $new_user->id . " username='$username' email='$email' ip=$reg_ip context=self_registration");
     };
     
     if ($@) {
@@ -1031,8 +1036,9 @@ sub verify_email :Local {
         my $verified = $self->user_verification->verify_code($user, $code);
         
         if ($verified) {
+            my $verify_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
-                "Email verified successfully for user ID: $user_id");
+                "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
             delete $c->session->{verification_code_display};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
@@ -1108,8 +1114,9 @@ sub complete_profile :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "Profile completed for user ID: $user_id, status set to active, role set to normal");
+                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active");
         };
         
         if ($@) {
@@ -1253,9 +1260,11 @@ sub admin_create_user :Local {
                 }
             }
 
+            my $create_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
-                "User created by admin: email=$email user_id=" . $user->id
-                . " roles=" . join(',', @selected_roles) . " code=$code");
+                "AUDIT: Admin created user email='$email' new_user_id=" . $user->id
+                . " roles=" . join(',', @selected_roles) . " sites=" . join(',', @selected_sites)
+                . " admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$create_ip");
 
             my $login_url   = $c->uri_for('/user/login');
             my $admin_uname = $c->session->{username} || '';
@@ -1385,8 +1394,9 @@ sub complete_username_setup :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $setup_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_username_setup',
-                "Setup completed for user: $username (email=$email)");
+                "AUDIT: Account setup completed user_id=" . $user->id . " username='$username' email='$email' ip=$setup_ip status=active");
         };
         
         if ($@) {
@@ -1481,8 +1491,9 @@ sub complete_password_setup :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $pw_setup_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_password_setup',
-                "Password setup completed for user: " . $user->username);
+                "AUDIT: Password setup completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' email='$email' ip=$pw_setup_ip status=active");
         };
         
         if ($@) {
@@ -1782,8 +1793,9 @@ sub do_edit_user :Local :Args(1) {
         return;
     }
 
+    my $edit_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
-        "User updated by admin: user_id=$user_id email=$email roles=$roles_str status=$status sites=" . join(',', @new_site_names));
+        "AUDIT: Admin edited user user_id=$user_id email='$email' roles='$roles_str' status='$status' sites='" . join(',', @new_site_names) . "' admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$edit_ip");
 
     $c->flash->{success_msg} = 'User updated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -1840,8 +1852,9 @@ sub admin_suspend_user :Local :Args(1) {
         return;
     }
 
+    my $susp_action_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
-        "User suspended: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+        "AUDIT: Account suspended user_id=$user_id admin_id=$admin_uid sitename='$sitename' ip=$susp_action_ip");
 
     eval {
         $self->email_notification->send_account_suspended_email($c, $user);
@@ -1908,8 +1921,9 @@ sub admin_activate_user :Local :Args(1) {
         return;
     }
 
+    my $act_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_activate_user',
-        "User activated: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+        "AUDIT: Account activated user_id=$user_id admin_id=$admin_uid sitename='$sitename' ip=$act_ip");
 
     $c->flash->{success_msg} = 'User account activated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -2143,8 +2157,9 @@ sub do_admin_delete_user :Local :Args(1) {
         return;
     }
 
+    my $del_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_delete_user',
-        "User deleted: username=$deleted_username user_id=$user_id by admin_id=$admin_uid");
+        "AUDIT: User deleted username='$deleted_username' user_id=$user_id admin_id=$admin_uid ip=$del_ip");
 
     $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -2196,9 +2211,10 @@ sub forgot_password :Local {
                 # Build reset link
                 my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
                 
+                my $reset_req_ip = $c->req->address || 'unknown';
                 $self->logging->log_with_details(
                     $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                    "Password reset token generated for email: $email. Reset link: $reset_link"
+                    "AUDIT: Password reset requested email='$email' ip=$reset_req_ip"
                 );
 
                 $c->session->{reset_token} = $token;
@@ -2324,8 +2340,9 @@ sub reset_password :Local {
             # Mark token as used
             $reset_record->update({ used_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
             
+            my $reset_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
-                "Password successfully reset for user: " . $user->username);
+                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$reset_ip");
         };
 
         if ($@) {
@@ -2533,8 +2550,9 @@ sub admin_manage_roles :Local :Args(1) {
                 "Error updating roles for user_id=$user_id: $@");
             $c->flash->{error_msg} = "An error occurred while saving role changes: $@";
         } else {
+            my $roles_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_manage_roles',
-                "Roles updated for user_id=$user_id by admin_id=$admin_uid roles=$roles_str sites=" . join(',', @new_site_names));
+                "AUDIT: Roles updated user_id=$user_id admin_id=$admin_uid roles='$roles_str' sites='" . join(',', @new_site_names) . "' ip=$roles_ip");
             $c->flash->{success_msg} = 'User roles and site access updated successfully.';
         }
 
@@ -2633,8 +2651,9 @@ sub admin_role_list :Local :Args(0) {
                     $c->flash->{error_msg} = "An error occurred while creating the role.";
                 }
             } else {
+                my $role_create_ip = $c->req->address || 'unknown';
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_role_list',
-                    "Created custom role '$role_name' for site '$target_site' by admin=" . ($c->session->{username} || 'unknown'));
+                    "AUDIT: Custom role created role='$role_name' site='$target_site' admin_id=" . ($c->session->{user_id} || 'unknown') . " admin='" . ($c->session->{username} || 'unknown') . "' ip=$role_create_ip");
                 $c->flash->{success_msg} = "Role '$role_name' created successfully for site '$target_site'.";
             }
         }
@@ -2727,8 +2746,9 @@ sub admin_delete_site_role :Local :Args(1) {
             "Error deleting role_id=$role_id: $@");
         $c->flash->{error_msg} = "An error occurred while deleting the role.";
     } else {
+        my $role_del_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_site_role',
-            "Deleted custom role '$role_name' for site '$role_site' by admin=" . ($c->session->{username} || 'unknown'));
+            "AUDIT: Custom role deleted role='$role_name' site='$role_site' admin_id=" . ($c->session->{user_id} || 'unknown') . " admin='" . ($c->session->{username} || 'unknown') . "' ip=$role_del_ip");
         $c->flash->{success_msg} = "Role '$role_name' deleted successfully.";
     }
 
