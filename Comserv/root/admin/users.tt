@@ -188,6 +188,7 @@
                                     [% ELSIF user_status == 'suspended' %]
                                         <a href="[% c.uri_for('/user/admin_activate_user', user.id) %]" class="btn btn-sm btn-primary">Activate</a>
                                     [% END %]
+                                    <a href="[% c.uri_for('/user/admin_delete_user', user.id) %]" class="btn btn-sm btn-delete">Delete</a>
                                 </td>
                             </tr>
                             [% END %]

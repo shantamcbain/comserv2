@@ -17,6 +17,9 @@
     <div class="page-header">
         <h1>Create User (Admin)</h1>
         <h2 class="page-subtitle">Create a new user account with invitation</h2>
+        <p class="page-subtitle" style="font-size: var(--font-size-small); margin-top: 4px;">
+            <a href="/Documentation/AdminAddUserGuide" target="_blank" style="color: var(--link-color);">&#9432; Admin User Management Guide</a>
+        </p>
     </div>
     
     <div class="content-container">

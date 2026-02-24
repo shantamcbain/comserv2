@@ -679,18 +679,10 @@ sub content :Path('/admin/content') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
         "Starting content action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'content', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'content')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -766,18 +758,10 @@ sub settings :Path('/admin/settings') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
         "Starting settings action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'settings')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -965,18 +949,10 @@ sub system_info :Path('/admin/system_info') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
         "Starting system_info action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'system_info', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'system_info')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -1100,18 +1076,10 @@ sub logs :Path('/admin/logs') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs', 
         "Starting logs action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'logs', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'logs')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -1167,15 +1135,10 @@ sub backup :Path('/admin/backup') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Starting backup action");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
-            "Access denied: User does not have admin role");
-
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri,
-            mid => $c->set_error_msg("You need to be an administrator to access this area.")
-        }));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'backup')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
@@ -3587,18 +3550,10 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
         "Starting git_pull action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth_git = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_git->check_admin_access($c, 'git_pull')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -3823,8 +3778,8 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'sync_result_to_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -4282,20 +4237,94 @@ sub update_result_field_from_table {
 # Helper method to update table schema with result field values
 sub update_table_field_from_result {
     my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
-    
-    # This is a placeholder - actual table schema modification would require
-    # database-specific ALTER TABLE statements and is more complex
-    # For now, we'll just log what would be done
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
-        "Would update table '$table_name' field '$field_name' with result file values: " . 
-        Data::Dumper::Dumper($result_field_info));
-    
-    # In a real implementation, you would:
-    # 1. Generate appropriate ALTER TABLE statement
-    # 2. Execute it against the database
-    # 3. Handle any constraints or dependencies
-    
+        "Adding/modifying column '$field_name' in table '$table_name' (db=$database)");
+
+    my $dbh;
+    if (lc($database) eq 'ency') {
+        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        $dbh = $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        die "Unknown database '$database'";
+    }
+
+    my $data_type    = uc($result_field_info->{data_type} || 'VARCHAR');
+    my $size         = $result_field_info->{size};
+    my $is_nullable  = $result_field_info->{is_nullable};
+    my $is_auto_inc  = $result_field_info->{is_auto_increment};
+    my $default_val  = $result_field_info->{default_value};
+
+    my $col_def = "`$field_name` ";
+
+    if ($data_type eq 'INTEGER' || $data_type eq 'INT') {
+        $col_def .= 'INT';
+    } elsif ($data_type eq 'VARCHAR') {
+        $col_def .= 'VARCHAR(' . ($size || 255) . ')';
+    } elsif ($data_type eq 'TEXT') {
+        $col_def .= 'TEXT';
+    } elsif ($data_type eq 'TINYINT') {
+        $col_def .= 'TINYINT';
+    } elsif ($data_type eq 'BIGINT') {
+        $col_def .= 'BIGINT';
+    } elsif ($data_type eq 'TIMESTAMP') {
+        $col_def .= 'TIMESTAMP';
+    } elsif ($data_type eq 'DATETIME') {
+        $col_def .= 'DATETIME';
+    } elsif ($data_type eq 'DATE') {
+        $col_def .= 'DATE';
+    } elsif ($data_type eq 'BOOLEAN') {
+        $col_def .= 'TINYINT(1)';
+    } else {
+        $col_def .= $data_type;
+        $col_def .= "($size)" if $size;
+    }
+
+    if ($is_auto_inc) {
+        $col_def .= ' NOT NULL AUTO_INCREMENT';
+    } elsif (defined $is_nullable && !$is_nullable) {
+        $col_def .= ' NOT NULL';
+    } else {
+        $col_def .= ' NULL';
+    }
+
+    if (defined $default_val && $default_val ne '') {
+        $col_def .= " DEFAULT '$default_val'";
+    }
+
+    my $check_sth = $dbh->prepare(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS " .
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+    );
+    $check_sth->execute($table_name, $field_name);
+    my ($exists) = $check_sth->fetchrow_array;
+
+    if ($is_auto_inc) {
+        eval { $dbh->do("ALTER TABLE `$table_name` DROP PRIMARY KEY") };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+            "Dropped existing primary key (if any): $@") if $@;
+    }
+
+    my $sql;
+    if ($exists) {
+        $sql = "ALTER TABLE `$table_name` MODIFY COLUMN $col_def";
+    } else {
+        $sql = "ALTER TABLE `$table_name` ADD COLUMN $col_def";
+    }
+
+    if ($is_auto_inc) {
+        $sql .= ", ADD PRIMARY KEY (`$field_name`)";
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Executing SQL: $sql");
+
+    $dbh->do($sql);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Successfully executed: $sql");
+
     return 1;
 }
 
@@ -4535,8 +4564,8 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'create_result_from_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
