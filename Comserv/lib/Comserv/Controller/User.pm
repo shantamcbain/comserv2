@@ -835,11 +835,20 @@ sub do_change_password :Local {
         return;
     }
 
-    # Log the successful password change
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
         "User '" . $c->session->{username} . "' password changed successfully");
 
-    # Set success message and redirect (user remains logged in)
+    eval {
+        my $forgot_password_url = $c->uri_for('/user/forgot_password');
+        $self->email_notification->send_password_changed_email($c, $user, $forgot_password_url);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
+            "Password changed notification sent to: " . $user->email);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_change_password',
+            "Failed to send password changed email: $@");
+    }
+
     $c->flash->{success_msg} = "Your password has been changed successfully.";
     $c->response->redirect($c->uri_for('/user/profile'));
     return;
@@ -1114,7 +1123,19 @@ sub complete_profile :Local {
         }
         
         delete $c->session->{verification_user_id};
-        
+
+        eval {
+            $user->discard_changes;
+            my $login_url = $c->uri_for('/user/login');
+            $self->email_notification->send_welcome_email($c, $user, $login_url);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                "Welcome email sent to: " . $user->email);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
+                "Failed to send welcome email: $@");
+        }
+
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
         $c->response->redirect($c->uri_for('/user/login'));
     } else {
@@ -1236,7 +1257,26 @@ sub admin_create_user :Local {
                 "User created by admin: email=$email user_id=" . $user->id
                 . " roles=" . join(',', @selected_roles) . " code=$code");
 
-            $c->flash->{success_msg} = "User created successfully. Verification code: $code (would be emailed in production)";
+            my $login_url   = $c->uri_for('/user/login');
+            my $admin_uname = $c->session->{username} || '';
+            my $email_sent  = 0;
+            eval {
+                $email_sent = $self->email_notification->send_invitation_email(
+                    $c, $user, $code, $login_url, $admin_uname
+                );
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+                    "Invitation email sent to: $email");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_create_user',
+                    "Failed to send invitation email to $email: $@");
+            }
+
+            my $success = "User created successfully.";
+            $success .= $email_sent
+                ? " An invitation email has been sent to $email."
+                : " Invitation code: $code (email could not be sent - please share manually).";
+            $c->flash->{success_msg} = $success;
             $c->response->redirect($c->uri_for('/admin/users'));
         };
 
@@ -1803,6 +1843,16 @@ sub admin_suspend_user :Local :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
         "User suspended: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
 
+    eval {
+        $self->email_notification->send_account_suspended_email($c, $user);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
+            "Account suspended notification sent to: " . $user->email);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_suspend_user',
+            "Failed to send account suspended email: $@");
+    }
+
     $c->flash->{success_msg} = 'User account suspended successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
 }
@@ -2150,11 +2200,19 @@ sub forgot_password :Local {
                     $c, 'info', __FILE__, __LINE__, 'forgot_password',
                     "Password reset token generated for email: $email. Reset link: $reset_link"
                 );
-                
-                # TODO: Send reset email with $reset_link
-                # For now, store the token in session for testing
+
                 $c->session->{reset_token} = $token;
                 $c->session->{reset_email} = $email;
+
+                eval {
+                    $self->email_notification->send_password_reset_email($c, $user, $reset_link);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                        "Password reset email sent to: $email");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'forgot_password',
+                        "Failed to send password reset email to $email: $@");
+                }
             };
             
             if ($@) {
