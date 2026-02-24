@@ -854,28 +854,30 @@ sub create_account :Local {
 sub do_create_account :Local {
     my ($self, $c) = @_;
     
-    my $username = $c->request->params->{username};
-    my $email = $c->request->params->{email};
-    
+    my $username = $c->request->params->{username} // '';
+    my $email    = $c->request->params->{email}    // '';
+
+    $username =~ s/^\s+|\s+$//g;
+    $email    =~ s/^\s+|\s+$//g;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
         "Step 1 registration attempt for username: $username, email: $email");
-    
+
     unless ($username && $email) {
-        $c->stash(
-            error_msg => 'Username and email are required',
-            template => 'user/register.tt'
-        );
+        $c->stash(error_msg => 'Username and email are required', template => 'user/register.tt');
         return;
     }
-    
-    unless ($email =~ /\@/) {
-        $c->stash(
-            error_msg => 'Please enter a valid email address',
-            template => 'user/register.tt'
-        );
+
+    unless ($username =~ /^[a-zA-Z0-9_]{3,50}$/) {
+        $c->stash(error_msg => 'Username must be 3-50 characters and contain only letters, numbers, or underscores.', template => 'user/register.tt');
         return;
     }
-    
+
+    unless ($email =~ /^[a-zA-Z0-9._%+\-]+\@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/ && length($email) <= 255) {
+        $c->stash(error_msg => 'Please enter a valid email address.', template => 'user/register.tt');
+        return;
+    }
+
     my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
     if ($existing_user) {
         $c->stash(
@@ -1860,6 +1862,74 @@ sub admin_activate_user :Local :Args(1) {
         "User activated: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
 
     $c->flash->{success_msg} = 'User account activated successfully.';
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
+sub admin_delete_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_delete_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $user   = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+    my $admin_uid    = $c->session->{user_id};
+
+    if ($user_id == $admin_uid) {
+        $c->flash->{error_msg} = 'You cannot delete your own account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only delete users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    my $deleted_username = $user->username // $user->email // "id=$user_id";
+
+    eval {
+        $schema->resultset('UserSiteRole')->search({ user_id => $user_id })->delete;
+        $schema->resultset('EmailVerificationCode')->search({ user_id => $user_id })->delete;
+        $schema->resultset('PasswordResetToken')->search({ user_id => $user_id })->delete;
+        $user->delete;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_delete_user',
+            "Error deleting user_id=$user_id: $@");
+        $c->flash->{error_msg} = 'An error occurred while deleting the account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_user',
+        "User deleted: username=$deleted_username user_id=$user_id by admin_id=$admin_uid");
+
+    $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
     $c->response->redirect($c->uri_for('/admin/users'));
 }
 
