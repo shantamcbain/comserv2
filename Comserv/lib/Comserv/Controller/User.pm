@@ -2062,14 +2062,18 @@ sub do_admin_delete_user :Local :Args(1) {
         "created_by nullify error: $@") if $@;
 
     # Step 4: Delete the user record — this is the critical step
+    # Capture $@ immediately — logging/notification calls will reset it
+    my $delete_err;
     eval { $user->delete };
-    if ($@) {
+    $delete_err = "$@" if $@;   # stringify immediately before any other eval runs
+
+    if ($delete_err) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
-            "FAILED to delete user_id=$user_id: $@");
+            "FAILED to delete user_id=$user_id username=$deleted_username: $delete_err");
         $self->send_error_notification($c,
             "User deletion failed: $deleted_username",
-            "user_id=$user_id error=$@");
-        $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $@";
+            "user_id=$user_id\nerror=$delete_err");
+        $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $delete_err";
         $c->response->redirect($c->uri_for('/admin/users'));
         return;
     }
