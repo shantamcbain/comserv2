@@ -1,0 +1,26 @@
+<h2>Welcome to [% sitename || 'Comserv' %]!</h2>
+
+<p>Hello [% user.first_name || user.username || 'there' %],</p>
+
+<p>Your account has been successfully activated. Welcome to [% sitename || 'Comserv' %]!</p>
+
+<p><strong>Your account details:</strong></p>
+<ul>
+    <li><strong>Username:</strong> [% user.username %]</li>
+    <li><strong>Email:</strong> [% user.email %]</li>
+    [% IF user.roles %]<li><strong>Role(s):</strong> [% user.roles %]</li>[% END %]
+</ul>
+
+<p>You can now log in to your account at: <a href="[% login_url %]">[% login_url %]</a></p>
+
+<p>From your account you can:</p>
+<ul>
+    <li>View and update your profile</li>
+    <li>Change your password</li>
+    <li>Access [% sitename || 'Comserv' %] features based on your role</li>
+</ul>
+
+<p>If you have any questions or need assistance, please contact support.</p>
+
+<p>Best regards,<br>
+The [% sitename || 'Comserv' %] Team</p>

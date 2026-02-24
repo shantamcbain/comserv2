@@ -286,15 +286,17 @@ sub do_login :Local {
     if ($user && $user->check_password($password)) {
         # Check if account is suspended
         if ($user->status && $user->status eq 'suspended') {
+            my $susp_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
-                "Login attempt for suspended account: '$username'");
+                "AUDIT: Login denied user_id=" . $user->id . " username='$username' ip=$susp_ip reason=account_suspended");
             $c->flash->{error_msg} = 'Your account has been suspended. Please contact an administrator.';
             $c->res->redirect($c->uri_for('/user/login'));
             return;
         }
         # Manual authentication successful
+        my $client_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
-            "User '$username' successfully authenticated via manual check.");
+            "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
         
         # Get the authenticated user object (already retrieved above)
         
@@ -352,9 +354,10 @@ sub do_login :Local {
         );
     } else {
         # Authentication failed
+        my $fail_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "Login failed: Invalid username or password for '$username'."
+            "AUDIT: Login failed username='$username' ip=$fail_ip reason=invalid_credentials"
         );
 
         # Store error message in flash and redirect back to login page
@@ -721,9 +724,9 @@ sub update_settings :Local {
     $c->session->{theme_name} = $theme;
     $c->session->{debug_mode} = $debug_mode;
 
-    # Log the successful update
+    my $settings_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_settings',
-        "User '" . $c->session->{username} . "' settings updated successfully");
+        "AUDIT: Profile updated user_id=" . ($c->session->{user_id} || 'unknown') . " username='" . $c->session->{username} . "' ip=$settings_ip changes=first_name,last_name,email");
 
     # Set success message and redirect
     $c->flash->{success_msg} = "Your settings have been updated successfully.";
@@ -835,11 +838,21 @@ sub do_change_password :Local {
         return;
     }
 
-    # Log the successful password change
+    my $chpw_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
-        "User '" . $c->session->{username} . "' password changed successfully");
+        "AUDIT: Password changed user_id=" . ($c->session->{user_id} || 'unknown') . " username='" . $c->session->{username} . "' ip=$chpw_ip");
 
-    # Set success message and redirect (user remains logged in)
+    eval {
+        my $forgot_password_url = $c->uri_for('/user/forgot_password');
+        $self->email_notification->send_password_changed_email($c, $user, $forgot_password_url);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password',
+            "Password changed notification sent to: " . $user->email);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_change_password',
+            "Failed to send password changed email: $@");
+    }
+
     $c->flash->{success_msg} = "Your password has been changed successfully.";
     $c->response->redirect($c->uri_for('/user/profile'));
     return;
@@ -854,28 +867,30 @@ sub create_account :Local {
 sub do_create_account :Local {
     my ($self, $c) = @_;
     
-    my $username = $c->request->params->{username};
-    my $email = $c->request->params->{email};
-    
+    my $username = $c->request->params->{username} // '';
+    my $email    = $c->request->params->{email}    // '';
+
+    $username =~ s/^\s+|\s+$//g;
+    $email    =~ s/^\s+|\s+$//g;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
         "Step 1 registration attempt for username: $username, email: $email");
-    
+
     unless ($username && $email) {
-        $c->stash(
-            error_msg => 'Username and email are required',
-            template => 'user/register.tt'
-        );
+        $c->stash(error_msg => 'Username and email are required', template => 'user/register.tt');
         return;
     }
-    
-    unless ($email =~ /\@/) {
-        $c->stash(
-            error_msg => 'Please enter a valid email address',
-            template => 'user/register.tt'
-        );
+
+    unless ($username =~ /^[a-zA-Z0-9_]{3,50}$/) {
+        $c->stash(error_msg => 'Username must be 3-50 characters and contain only letters, numbers, or underscores.', template => 'user/register.tt');
         return;
     }
-    
+
+    unless ($email =~ /^[a-zA-Z0-9._%+\-]+\@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/ && length($email) <= 255) {
+        $c->stash(error_msg => 'Please enter a valid email address.', template => 'user/register.tt');
+        return;
+    }
+
     my $existing_user = $c->model('DBEncy::User')->find({ username => $username });
     if ($existing_user) {
         $c->stash(
@@ -885,15 +900,12 @@ sub do_create_account :Local {
         return;
     }
     
-    # Check if email exists with same username (prevent exact duplicates)
-    # Allow same email with different username for multi-site access
-    my $existing_email_user = $c->model('DBEncy::User')->find({ 
-        email => $email,
-        username => $username 
-    });
+    # Email must be globally unique — one account per person.
+    # The same account can belong to multiple SiteNames via UserSiteRole.
+    my $existing_email_user = $c->model('DBEncy::User')->find({ email => $email });
     if ($existing_email_user) {
         $c->stash(
-            error_msg => 'An account with this username and email already exists. Please login instead.',
+            error_msg => 'An account with this email address already exists. Please log in, or ask your site administrator to grant you access to this site.',
             template => 'user/register.tt'
         );
         return;
@@ -937,8 +949,9 @@ sub do_create_account :Local {
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
+        my $reg_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-            "User created with ID: " . $new_user->id . ", verification code: $verification_code");
+            "AUDIT: Account created user_id=" . $new_user->id . " username='$username' email='$email' ip=$reg_ip context=self_registration");
     };
     
     if ($@) {
@@ -1020,8 +1033,9 @@ sub verify_email :Local {
         my $verified = $self->user_verification->verify_code($user, $code);
         
         if ($verified) {
+            my $verify_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
-                "Email verified successfully for user ID: $user_id");
+                "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
             delete $c->session->{verification_code_display};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
@@ -1097,8 +1111,9 @@ sub complete_profile :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "Profile completed for user ID: $user_id, status set to active, role set to normal");
+                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active");
         };
         
         if ($@) {
@@ -1112,7 +1127,19 @@ sub complete_profile :Local {
         }
         
         delete $c->session->{verification_user_id};
-        
+
+        eval {
+            $user->discard_changes;
+            my $login_url = $c->uri_for('/user/login');
+            $self->email_notification->send_welcome_email($c, $user, $login_url);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                "Welcome email sent to: " . $user->email);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'complete_profile',
+                "Failed to send welcome email: $@");
+        }
+
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
         $c->response->redirect($c->uri_for('/user/login'));
     } else {
@@ -1177,14 +1204,66 @@ sub admin_create_user :Local {
             return;
         }
 
-        my $existing_email = $schema->resultset('User')->search({ email => $email })->count;
-        if ($existing_email) {
-            $c->stash(
-                error_msg       => 'A user with this email already exists',
-                sites           => \@sites,
-                available_roles => $available_roles,
-                template        => 'user/admin_create_user.tt',
-            );
+        # One account per email address (globally unique).
+        # If the email already exists, add that existing user to the selected sites
+        # rather than creating a duplicate account.
+        my $existing_user = $schema->resultset('User')->search({ email => $email })->single;
+
+        if ($existing_user) {
+            # Add the existing user to the selected sites/roles they don't already have
+            my $added_sites  = 0;
+            my $skipped_sites = 0;
+            my $create_ip = $c->req->address || 'unknown';
+            eval {
+                foreach my $site_name (@selected_sites) {
+                    my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                    next unless $site_obj;
+                    foreach my $role_name (@selected_roles) {
+                        my $already = $schema->resultset('UserSiteRole')->search({
+                            user_id => $existing_user->id,
+                            site_id => $site_obj->id,
+                            role    => $role_name,
+                        })->count;
+                        if ($already) {
+                            $skipped_sites++;
+                        } else {
+                            $schema->resultset('UserSiteRole')->create({
+                                user_id    => $existing_user->id,
+                                site_id    => $site_obj->id,
+                                role       => $role_name,
+                                granted_by => $c->session->{user_id},
+                            });
+                            $added_sites++;
+                        }
+                    }
+                }
+            };
+
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_create_user',
+                    "Error adding existing user to sites: $@");
+                $c->stash(
+                    error_msg       => "An error occurred while adding user to sites: $@",
+                    sites           => \@sites,
+                    available_roles => $available_roles,
+                    template        => 'user/admin_create_user.tt',
+                );
+                return;
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+                "AUDIT: Existing user user_id=" . $existing_user->id . " email='$email' added to sites='" . join(',', @selected_sites) . "'"
+                . " roles='" . join(',', @selected_roles) . "' added=$added_sites skipped=$skipped_sites"
+                . " admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$create_ip");
+
+            my $msg = "User '$email' already has an account.";
+            if ($added_sites > 0) {
+                $msg .= " They have been granted access to the selected site(s) with the chosen role(s).";
+            } else {
+                $msg .= " They already have the requested access to all selected site(s) — no changes made.";
+            }
+            $c->flash->{success_msg} = $msg;
+            $c->response->redirect($c->uri_for('/admin/users'));
             return;
         }
 
@@ -1230,11 +1309,32 @@ sub admin_create_user :Local {
                 }
             }
 
+            my $create_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
-                "User created by admin: email=$email user_id=" . $user->id
-                . " roles=" . join(',', @selected_roles) . " code=$code");
+                "AUDIT: Admin created user email='$email' new_user_id=" . $user->id
+                . " roles=" . join(',', @selected_roles) . " sites=" . join(',', @selected_sites)
+                . " admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$create_ip");
 
-            $c->flash->{success_msg} = "User created successfully. Verification code: $code (would be emailed in production)";
+            my $login_url   = $c->uri_for('/user/login');
+            my $admin_uname = $c->session->{username} || '';
+            my $email_sent  = 0;
+            eval {
+                $email_sent = $self->email_notification->send_invitation_email(
+                    $c, $user, $code, $login_url, $admin_uname
+                );
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+                    "Invitation email sent to: $email");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_create_user',
+                    "Failed to send invitation email to $email: $@");
+            }
+
+            my $success = "User created successfully.";
+            $success .= $email_sent
+                ? " An invitation email has been sent to $email."
+                : " Invitation code: $code (email could not be sent - please share manually).";
+            $c->flash->{success_msg} = $success;
             $c->response->redirect($c->uri_for('/admin/users'));
         };
 
@@ -1343,8 +1443,9 @@ sub complete_username_setup :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $setup_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_username_setup',
-                "Setup completed for user: $username (email=$email)");
+                "AUDIT: Account setup completed user_id=" . $user->id . " username='$username' email='$email' ip=$setup_ip status=active");
         };
         
         if ($@) {
@@ -1439,8 +1540,9 @@ sub complete_password_setup :Local {
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
+            my $pw_setup_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_password_setup',
-                "Password setup completed for user: " . $user->username);
+                "AUDIT: Password setup completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' email='$email' ip=$pw_setup_ip status=active");
         };
         
         if ($@) {
@@ -1740,8 +1842,9 @@ sub do_edit_user :Local :Args(1) {
         return;
     }
 
+    my $edit_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_edit_user',
-        "User updated by admin: user_id=$user_id email=$email roles=$roles_str status=$status sites=" . join(',', @new_site_names));
+        "AUDIT: Admin edited user user_id=$user_id email='$email' roles='$roles_str' status='$status' sites='" . join(',', @new_site_names) . "' admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$edit_ip");
 
     $c->flash->{success_msg} = 'User updated successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -1798,8 +1901,19 @@ sub admin_suspend_user :Local :Args(1) {
         return;
     }
 
+    my $susp_action_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
-        "User suspended: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+        "AUDIT: Account suspended user_id=$user_id admin_id=$admin_uid sitename='$sitename' ip=$susp_action_ip");
+
+    eval {
+        $self->email_notification->send_account_suspended_email($c, $user);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_suspend_user',
+            "Account suspended notification sent to: " . $user->email);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_suspend_user',
+            "Failed to send account suspended email: $@");
+    }
 
     $c->flash->{success_msg} = 'User account suspended successfully.';
     $c->response->redirect($c->uri_for('/admin/users'));
@@ -1856,10 +1970,247 @@ sub admin_activate_user :Local :Args(1) {
         return;
     }
 
+    my $act_ip = $c->req->address || 'unknown';
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_activate_user',
-        "User activated: user_id=$user_id by admin_id=$admin_uid sitename=$sitename");
+        "AUDIT: Account activated user_id=$user_id admin_id=$admin_uid sitename='$sitename' ip=$act_ip");
 
     $c->flash->{success_msg} = 'User account activated successfully.';
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
+sub admin_delete_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_delete_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $user   = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+    my $admin_uid    = $c->session->{user_id};
+
+    if ($user_id == $admin_uid) {
+        $c->flash->{error_msg} = 'You cannot delete your own account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only delete users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    my (@todos, @ai_convos, @assignable_users);
+    if ($is_csc_admin) {
+        eval { @todos = $schema->resultset('Todo')->search({ user_id => $user_id })->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load todos for user_id=$user_id: $@");
+        }
+        eval { @ai_convos = $schema->resultset('AiConversation')->search({ user_id => $user_id })->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load ai_convos for user_id=$user_id: $@");
+        }
+        eval {
+            @assignable_users = $schema->resultset('User')->search(
+                { id => { '!=' => $user_id }, status => 'active' },
+                { columns => [qw(id username first_name last_name email)], order_by => 'username' }
+            )->all;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_delete_user',
+                "Could not load assignable_users: $@");
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_user',
+        "Displaying delete confirmation for user_id=$user_id");
+
+    $c->stash(
+        user             => $user,
+        todos            => \@todos,
+        ai_convos        => \@ai_convos,
+        assignable_users => \@assignable_users,
+        is_csc_admin     => $is_csc_admin,
+        template         => 'user/AdminDeleteUser.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub do_admin_delete_user :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $user      = $schema->resultset('User')->find($user_id);
+    my $admin_uid = $c->session->{user_id};
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    if ($user_id == $admin_uid) {
+        $c->flash->{error_msg} = 'You cannot delete your own account.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    my $deleted_username = $user->username // $user->email // "id=$user_id";
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_delete_user',
+        "Starting deletion of user_id=$user_id username=$deleted_username by admin_id=$admin_uid");
+
+    # Step 1: Handle optional related records BEFORE entering transaction
+    # (avoids MySQL transaction abort from missing tables inside txn_do)
+
+    if ($is_csc_admin) {
+        my $todo_action     = $c->req->params->{todo_action}   || 'delete';
+        my $todo_assignee   = $c->req->params->{todo_assignee} || $admin_uid;
+        my $aiconv_action   = $c->req->params->{aiconv_action}   || 'delete';
+        my $aiconv_assignee = $c->req->params->{aiconv_assignee} || $admin_uid;
+
+        eval {
+            if ($todo_action eq 'reassign') {
+                $schema->resultset('Todo')->search({ user_id => $user_id })
+                    ->update({ user_id => $todo_assignee });
+            } elsif ($todo_action eq 'flag') {
+                $schema->resultset('Todo')->search({ user_id => $user_id })
+                    ->update({ user_id => $admin_uid });
+            } else {
+                $schema->resultset('Todo')->search({ user_id => $user_id })->delete;
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Todo handling result: " . ($@ ? "error: $@" : "ok")) if $@;
+
+        eval {
+            my @conv_ids = map { $_->id }
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+            if (@conv_ids) {
+                $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
+            }
+            if ($aiconv_action eq 'reassign') {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })
+                    ->update({ user_id => $aiconv_assignee });
+            } elsif ($aiconv_action eq 'flag') {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })
+                    ->update({ user_id => $admin_uid });
+            } else {
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "AI conversation handling result: error: $@") if $@;
+    } else {
+        eval { $schema->resultset('Todo')->search({ user_id => $user_id })->delete };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Todo delete error: $@") if $@;
+
+        eval {
+            my @conv_ids = map { $_->id }
+                $schema->resultset('AiConversation')->search({ user_id => $user_id })->all;
+            if (@conv_ids) {
+                $schema->resultset('AiMessage')->search({ conversation_id => { -in => \@conv_ids } })->delete;
+            }
+            $schema->resultset('AiConversation')->search({ user_id => $user_id })->delete;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "AiConversation delete error: $@") if $@;
+    }
+
+    # Step 2: Clean up optional FK tables — log each failure but continue
+
+    # user_sites table: schema mismatch (no 'id' column in actual table) — use raw SQL
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            $dbh->do("DELETE FROM user_sites WHERE user_id = ?", undef, $user_id);
+        });
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+            "Raw SQL cleanup of user_sites for user_id=$user_id: $err");
+    }
+
+    for my $rs_name (qw(
+        WorkshopRole UserSiteRole UserGroup UserApiKeys ApiToken
+        EmailVerificationCode PasswordResetToken PlanAudit
+        EnvVariableAuditLog WebSearchResult Participant
+    )) {
+        eval { $schema->resultset($rs_name)->search({ user_id => $user_id })->delete };
+        if ($@) {
+            my $err = "$@";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+                "Cleanup of $rs_name for user_id=$user_id: $err");
+        }
+    }
+
+    # Step 3: Clear created_by references
+    eval {
+        $schema->resultset('User')->search({ created_by => $user_id })
+            ->update({ created_by => undef });
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
+        "created_by nullify error: $@") if $@;
+
+    # Step 4: Delete the user record — this is the critical step
+    # Capture $@ immediately — logging/notification calls will reset it
+    my $delete_err;
+    eval { $user->delete };
+    $delete_err = "$@" if $@;   # stringify immediately before any other eval runs
+
+    if ($delete_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
+            "FAILED to delete user_id=$user_id username=$deleted_username: $delete_err");
+        $self->send_error_notification($c,
+            "User deletion failed: $deleted_username",
+            "user_id=$user_id\nerror=$delete_err");
+        $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $delete_err";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $del_ip = $c->req->address || 'unknown';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_admin_delete_user',
+        "AUDIT: User deleted username='$deleted_username' user_id=$user_id admin_id=$admin_uid ip=$del_ip");
+
+    $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
     $c->response->redirect($c->uri_for('/admin/users'));
 }
 
@@ -1909,15 +2260,24 @@ sub forgot_password :Local {
                 # Build reset link
                 my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
                 
+                my $reset_req_ip = $c->req->address || 'unknown';
                 $self->logging->log_with_details(
                     $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                    "Password reset token generated for email: $email. Reset link: $reset_link"
+                    "AUDIT: Password reset requested email='$email' ip=$reset_req_ip"
                 );
-                
-                # TODO: Send reset email with $reset_link
-                # For now, store the token in session for testing
+
                 $c->session->{reset_token} = $token;
                 $c->session->{reset_email} = $email;
+
+                eval {
+                    $self->email_notification->send_password_reset_email($c, $user, $reset_link);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                        "Password reset email sent to: $email");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'forgot_password',
+                        "Failed to send password reset email to $email: $@");
+                }
             };
             
             if ($@) {
@@ -2029,8 +2389,9 @@ sub reset_password :Local {
             # Mark token as used
             $reset_record->update({ used_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
             
+            my $reset_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
-                "Password successfully reset for user: " . $user->username);
+                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$reset_ip");
         };
 
         if ($@) {
@@ -2133,6 +2494,316 @@ sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub admin_manage_roles :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_manage_roles')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $user         = $schema->resultset('User')->find($user_id);
+
+    unless ($user) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+    my $admin_uid    = $c->session->{user_id};
+
+    unless ($is_csc_admin) {
+        my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+        if ($site_obj) {
+            my $access = $schema->resultset('UserSiteRole')->search({
+                user_id => $user_id,
+                site_id => $site_obj->id,
+            })->count;
+            unless ($access) {
+                $c->flash->{error_msg} = 'Access denied. You can only manage users in your site.';
+                $c->response->redirect($c->uri_for('/admin/users'));
+                return;
+            }
+        }
+    }
+
+    if ($c->req->method eq 'POST') {
+        my @roles_arr      = $c->req->param('roles');
+        my @new_site_names = $c->req->param('sitenames');
+        my $roles_str      = join(',', @roles_arr);
+
+        my @all_sites;
+        eval {
+            @all_sites = $is_csc_admin
+                ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+                : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+        };
+
+        my %allowed_site_ids;
+        for my $s (@all_sites) {
+            $allowed_site_ids{$s->id} = $s->name;
+        }
+
+        eval {
+            $user->update({ roles => $roles_str });
+
+            my %new_site_ids_wanted;
+            for my $sn (@new_site_names) {
+                my $s = $schema->resultset('Site')->search({ name => $sn })->single;
+                if ($s && exists $allowed_site_ids{$s->id}) {
+                    $new_site_ids_wanted{$s->id} = 1;
+                }
+            }
+
+            my @current_sr = $schema->resultset('UserSiteRole')->search(
+                { user_id => $user_id, site_id => { -in => [keys %allowed_site_ids] } }
+            )->all;
+            my %current_site_ids;
+            for my $sr (@current_sr) {
+                $current_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+            }
+
+            for my $sid (keys %current_site_ids) {
+                unless (exists $new_site_ids_wanted{$sid}) {
+                    $schema->resultset('UserSiteRole')->search({
+                        user_id => $user_id,
+                        site_id => $sid,
+                    })->delete;
+                }
+            }
+
+            for my $sid (keys %new_site_ids_wanted) {
+                unless (exists $current_site_ids{$sid}) {
+                    for my $role (@roles_arr ? @roles_arr : ('normal')) {
+                        eval {
+                            $schema->resultset('UserSiteRole')->create({
+                                user_id    => $user_id,
+                                site_id    => $sid,
+                                role       => $role,
+                                granted_by => $admin_uid,
+                            });
+                        };
+                    }
+                }
+            }
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_manage_roles',
+                "Error updating roles for user_id=$user_id: $@");
+            $c->flash->{error_msg} = "An error occurred while saving role changes: $@";
+        } else {
+            my $roles_ip = $c->req->address || 'unknown';
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_manage_roles',
+                "AUDIT: Roles updated user_id=$user_id admin_id=$admin_uid roles='$roles_str' sites='" . join(',', @new_site_names) . "' ip=$roles_ip");
+            $c->flash->{success_msg} = 'User roles and site access updated successfully.';
+        }
+
+        $c->response->redirect($c->uri_for('/user/edit_user', $user_id));
+        return;
+    }
+
+    my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
+
+    my @all_sites;
+    my %user_site_ids;
+    eval {
+        @all_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+
+        my @usr = $schema->resultset('UserSiteRole')->search(
+            { user_id => $user_id },
+            { columns => ['site_id'], distinct => 1 }
+        )->all;
+        for my $sr (@usr) {
+            $user_site_ids{$sr->site_id} = 1 if defined $sr->site_id;
+        }
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_manage_roles',
+        "Displaying role management form for user_id=$user_id");
+
+    $c->stash(
+        user            => $user,
+        available_roles => $available_roles,
+        is_csc_admin    => $is_csc_admin,
+        all_sites       => \@all_sites,
+        user_site_ids   => \%user_site_ids,
+        template        => 'user/AdminManageRoles.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub admin_role_list :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_role_list')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    if ($c->req->method eq 'POST') {
+        my $action      = $c->req->params->{action} || 'create';
+        my $role_name   = $c->req->params->{role_name};
+        my $description = $c->req->params->{description} || '';
+        my $target_site = $c->req->params->{sitename} || $sitename;
+
+        unless ($is_csc_admin || $target_site eq $sitename) {
+            $c->flash->{error_msg} = 'Access denied. You can only manage roles for your own site.';
+            $c->response->redirect($c->uri_for('/user/admin_role_list'));
+            return;
+        }
+
+        if ($action eq 'create') {
+            unless ($role_name && $role_name =~ /^[a-zA-Z][a-zA-Z0-9_]{1,49}$/) {
+                $c->flash->{error_msg} = 'Invalid role name. Use letters, numbers, underscores (2-50 chars, start with a letter).';
+                $c->response->redirect($c->uri_for('/user/admin_role_list'));
+                return;
+            }
+
+            my @system_roles = qw(normal member editor developer admin);
+            if (grep { $_ eq lc($role_name) } map { lc($_) } @system_roles) {
+                $c->flash->{error_msg} = "Cannot create a custom role with a system role name: $role_name";
+                $c->response->redirect($c->uri_for('/user/admin_role_list'));
+                return;
+            }
+
+            eval {
+                $schema->resultset('SiteRole')->create({
+                    sitename       => $target_site,
+                    role_name      => $role_name,
+                    description    => $description,
+                    is_system_role => 0,
+                });
+            };
+
+            if ($@) {
+                if ($@ =~ /duplicate|Duplicate/i) {
+                    $c->flash->{error_msg} = "Role '$role_name' already exists for site '$target_site'.";
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_role_list',
+                        "Error creating role '$role_name' for site '$target_site': $@");
+                    $c->flash->{error_msg} = "An error occurred while creating the role.";
+                }
+            } else {
+                my $role_create_ip = $c->req->address || 'unknown';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_role_list',
+                    "AUDIT: Custom role created role='$role_name' site='$target_site' admin_id=" . ($c->session->{user_id} || 'unknown') . " admin='" . ($c->session->{username} || 'unknown') . "' ip=$role_create_ip");
+                $c->flash->{success_msg} = "Role '$role_name' created successfully for site '$target_site'.";
+            }
+        }
+
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    my @site_roles;
+    eval {
+        my $rs = $is_csc_admin
+            ? $schema->resultset('SiteRole')->search({}, { order_by => ['sitename', 'role_name'] })
+            : $schema->resultset('SiteRole')->search({ sitename => $sitename }, { order_by => 'role_name' });
+        @site_roles = $rs->all;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_role_list',
+            "Could not load site_roles: $@");
+        $c->flash->{error_msg} = 'Could not load roles. The site_roles table may not exist yet.';
+    }
+
+    my @available_sites;
+    eval {
+        @available_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename }, { order_by => 'name' })->all;
+    };
+
+    my @system_roles = qw(normal member editor developer admin WorkshopLeader);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_role_list',
+        "Displaying role list for sitename=$sitename is_csc_admin=$is_csc_admin");
+
+    $c->stash(
+        site_roles       => \@site_roles,
+        system_roles     => \@system_roles,
+        available_sites  => \@available_sites,
+        is_csc_admin     => $is_csc_admin,
+        sitename         => $sitename,
+        template         => 'user/AdminRoleList.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub admin_delete_site_role :Local :Args(1) {
+    my ($self, $c, $role_id) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
+        $c->flash->{error_msg} = 'Access denied. Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema       = $c->model('DBEncy');
+    my $admin_type   = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename     = $c->session->{SiteName};
+
+    my $role = $schema->resultset('SiteRole')->find($role_id);
+
+    unless ($role) {
+        $c->flash->{error_msg} = 'Role not found.';
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    unless ($is_csc_admin || $role->sitename eq $sitename) {
+        $c->flash->{error_msg} = 'Access denied. You can only delete roles for your own site.';
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    if ($role->is_system_role) {
+        $c->flash->{error_msg} = "Cannot delete system role '" . $role->role_name . "'.";
+        $c->response->redirect($c->uri_for('/user/admin_role_list'));
+        return;
+    }
+
+    my $role_name = $role->role_name;
+    my $role_site = $role->sitename;
+
+    eval {
+        $role->delete;
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_delete_site_role',
+            "Error deleting role_id=$role_id: $@");
+        $c->flash->{error_msg} = "An error occurred while deleting the role.";
+    } else {
+        my $role_del_ip = $c->req->address || 'unknown';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_delete_site_role',
+            "AUDIT: Custom role deleted role='$role_name' site='$role_site' admin_id=" . ($c->session->{user_id} || 'unknown') . " admin='" . ($c->session->{username} || 'unknown') . "' ip=$role_del_ip");
+        $c->flash->{success_msg} = "Role '$role_name' deleted successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/user/admin_role_list'));
+}
+
 sub _load_available_roles {
     my ($self, $c, $is_csc_admin, $sitename) = @_;
 
@@ -2171,6 +2842,111 @@ sub _load_available_roles {
         default_roles => \@default_roles,
         site_roles    => \@site_specific,
     };
+}
+
+sub register_project :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new;
+    unless ($admin_auth->check_admin_access($c, 'register_project')) {
+        $c->response->status(403);
+        $c->stash(
+            error_msg => 'Access denied. Admin privileges required.',
+            template  => 'user/RegisterProject.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $project_rs = $schema->resultset('Project');
+
+    my $project_name = 'Users';
+    my $sitename     = 'CSC';
+    my $result       = {};
+
+    eval {
+        my $existing = $project_rs->search(
+            { name => $project_name, sitename => $sitename },
+            { rows => 1 }
+        )->first;
+
+        if ($existing) {
+            $result = {
+                status     => 'exists',
+                project_id => $existing->id,
+                message    => "Project '$project_name' (ID: " . $existing->id . ") already registered for site $sitename.",
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
+                "Project '$project_name' already exists with ID: " . $existing->id);
+        }
+        else {
+            my $wrong_site = $project_rs->search(
+                { name => $project_name },
+                { rows => 1 }
+            )->first;
+
+            if ($wrong_site) {
+                $wrong_site->update({ sitename => $sitename });
+                $result = {
+                    status     => 'updated',
+                    project_id => $wrong_site->id,
+                    message    => "Project '$project_name' (ID: " . $wrong_site->id . ") updated: sitename set to $sitename.",
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
+                    "Updated project '$project_name' ID " . $wrong_site->id . " sitename to $sitename");
+            }
+            else {
+                my $now = DateTime->now;
+                my $new_project = $project_rs->create({
+                    name                => $project_name,
+                    description         => 'User and Admin Management System with email verification, password reset, role management, and site-based access control.',
+                    sitename            => $sitename,
+                    status              => 'In-Process',
+                    project_code        => 'USERS',
+                    start_date          => $now->ymd,
+                    end_date            => $now->clone->add(months => 3)->ymd,
+                    developer_name      => 'Development Team',
+                    client_name         => 'Internal',
+                    estimated_man_hours => 80,
+                    project_size        => 5,
+                    username_of_poster  => $c->session->{username} || 'admin',
+                    group_of_poster     => 'admin',
+                    date_time_posted    => $now->ymd . ' ' . $now->hms,
+                    record_id           => 0,
+                    comments            => 'Registered via register_project action.',
+                });
+                $result = {
+                    status     => 'created',
+                    project_id => $new_project->id,
+                    message    => "Project '$project_name' created with ID: " . $new_project->id . " for site $sitename.",
+                };
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
+                    "Created project '$project_name' with ID: " . $new_project->id);
+            }
+        }
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'register_project',
+            "Error registering project: $err");
+        $self->send_error_notification($c, 'Project Registration Error', "Error: $err");
+        $c->stash(
+            error_msg => "Failed to register project: $err",
+            template  => 'user/RegisterProject.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
+        "register_project completed: $result->{message}");
+
+    $c->stash(
+        result   => $result,
+        template => 'user/RegisterProject.tt',
+    );
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;
