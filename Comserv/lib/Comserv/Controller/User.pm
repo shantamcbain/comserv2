@@ -900,15 +900,12 @@ sub do_create_account :Local {
         return;
     }
     
-    # Check if email exists with same username (prevent exact duplicates)
-    # Allow same email with different username for multi-site access
-    my $existing_email_user = $c->model('DBEncy::User')->find({ 
-        email => $email,
-        username => $username 
-    });
+    # Email must be globally unique — one account per person.
+    # The same account can belong to multiple SiteNames via UserSiteRole.
+    my $existing_email_user = $c->model('DBEncy::User')->find({ email => $email });
     if ($existing_email_user) {
         $c->stash(
-            error_msg => 'An account with this username and email already exists. Please login instead.',
+            error_msg => 'An account with this email address already exists. Please log in, or ask your site administrator to grant you access to this site.',
             template => 'user/register.tt'
         );
         return;
@@ -1207,14 +1204,66 @@ sub admin_create_user :Local {
             return;
         }
 
-        my $existing_email = $schema->resultset('User')->search({ email => $email })->count;
-        if ($existing_email) {
-            $c->stash(
-                error_msg       => 'A user with this email already exists',
-                sites           => \@sites,
-                available_roles => $available_roles,
-                template        => 'user/admin_create_user.tt',
-            );
+        # One account per email address (globally unique).
+        # If the email already exists, add that existing user to the selected sites
+        # rather than creating a duplicate account.
+        my $existing_user = $schema->resultset('User')->search({ email => $email })->single;
+
+        if ($existing_user) {
+            # Add the existing user to the selected sites/roles they don't already have
+            my $added_sites  = 0;
+            my $skipped_sites = 0;
+            my $create_ip = $c->req->address || 'unknown';
+            eval {
+                foreach my $site_name (@selected_sites) {
+                    my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                    next unless $site_obj;
+                    foreach my $role_name (@selected_roles) {
+                        my $already = $schema->resultset('UserSiteRole')->search({
+                            user_id => $existing_user->id,
+                            site_id => $site_obj->id,
+                            role    => $role_name,
+                        })->count;
+                        if ($already) {
+                            $skipped_sites++;
+                        } else {
+                            $schema->resultset('UserSiteRole')->create({
+                                user_id    => $existing_user->id,
+                                site_id    => $site_obj->id,
+                                role       => $role_name,
+                                granted_by => $c->session->{user_id},
+                            });
+                            $added_sites++;
+                        }
+                    }
+                }
+            };
+
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'admin_create_user',
+                    "Error adding existing user to sites: $@");
+                $c->stash(
+                    error_msg       => "An error occurred while adding user to sites: $@",
+                    sites           => \@sites,
+                    available_roles => $available_roles,
+                    template        => 'user/admin_create_user.tt',
+                );
+                return;
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_create_user',
+                "AUDIT: Existing user user_id=" . $existing_user->id . " email='$email' added to sites='" . join(',', @selected_sites) . "'"
+                . " roles='" . join(',', @selected_roles) . "' added=$added_sites skipped=$skipped_sites"
+                . " admin_id=" . ($c->session->{user_id} || 'unknown') . " ip=$create_ip");
+
+            my $msg = "User '$email' already has an account.";
+            if ($added_sites > 0) {
+                $msg .= " They have been granted access to the selected site(s) with the chosen role(s).";
+            } else {
+                $msg .= " They already have the requested access to all selected site(s) — no changes made.";
+            }
+            $c->flash->{success_msg} = $msg;
+            $c->response->redirect($c->uri_for('/admin/users'));
             return;
         }
 
