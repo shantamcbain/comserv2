@@ -1,0 +1,18 @@
+<h2>Your Account Has Been Suspended</h2>
+
+<p>Hello [% user.first_name || user.username || 'there' %],</p>
+
+<p>Your [% sitename || 'Comserv' %] account has been suspended.</p>
+
+<ul>
+    <li><strong>Account:</strong> [% user.username %] ([% user.email %])</li>
+    [% IF suspended_at %]<li><strong>Suspended at:</strong> [% suspended_at %]</li>[% END %]
+    [% IF reason %]<li><strong>Reason:</strong> [% reason %]</li>[% END %]
+</ul>
+
+<p>While your account is suspended, you will not be able to log in to [% sitename || 'Comserv' %].</p>
+
+<p>If you believe this suspension was made in error or you would like to appeal, please contact the site administrator.</p>
+
+<p>Best regards,<br>
+The [% sitename || 'Comserv' %] Team</p>
