@@ -1,0 +1,229 @@
+[% META 
+   title = "User Management"
+   description = "Admin interface for managing user accounts, roles, and site access"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.02"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'admin/users.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>User Management</h1>
+        <h2 class="page-subtitle">[% IF is_csc_admin %]CSC Admin - All Users[% ELSE %]Site Admin - [% sitename | html %] Users[% END %]</h2>
+        <div class="page-actions">
+            <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-success">Create New User</a>
+        </div>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% ELSIF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg %]</div>
+            [% END %]
+            
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg %]</div>
+            [% END %]
+            
+            <!-- Statistics Section -->
+            <div class="content-section">
+                <h3>Statistics</h3>
+                <div class="data-container">
+                    <table class="data-table">
+                        <tbody>
+                            <tr>
+                                <td><strong>Total Users:</strong></td>
+                                <td>[% stats.total %]</td>
+                                <td><strong>Active:</strong></td>
+                                <td><span class="badge-success">[% stats.active %]</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Suspended:</strong></td>
+                                <td><span class="badge-danger">[% stats.suspended %]</span></td>
+                                <td><strong>Pending:</strong></td>
+                                <td><span class="badge-warning">[% stats.pending %]</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    [% IF stats.by_role.keys.size > 0 %]
+                    <h4>Users by Role</h4>
+                    <div class="badge-group">
+                        [% FOREACH role IN stats.by_role.keys.sort %]
+                            <span class="badge-primary">[% role | html %]: [% stats.by_role.$role %]</span>
+                        [% END %]
+                    </div>
+                    [% END %]
+                </div>
+            </div>
+            
+            <!-- Search and Filters Section -->
+            <div class="content-section">
+                <h3>Search & Filters</h3>
+                <div class="form-container">
+                    <form method="get" action="[% c.uri_for('/admin/users') %]" class="app-form">
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="search">Search (Username, Name, Email)</label>
+                                    <input type="text" id="search" name="search" class="form-input" value="[% search | html %]" placeholder="Search users...">
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="filter_status">Status</label>
+                                    <select id="filter_status" name="filter_status" class="form-input">
+                                        <option value="">All Statuses</option>
+                                        <option value="active" [% IF filter_status == 'active' %]selected[% END %]>Active</option>
+                                        <option value="suspended" [% IF filter_status == 'suspended' %]selected[% END %]>Suspended</option>
+                                        <option value="pending_verification" [% IF filter_status == 'pending_verification' %]selected[% END %]>Pending Verification</option>
+                                        <option value="pending_setup" [% IF filter_status == 'pending_setup' %]selected[% END %]>Pending Setup</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-field">
+                                    <label for="filter_role">Role</label>
+                                    <select id="filter_role" name="filter_role" class="form-input">
+                                        <option value="all">All Roles</option>
+                                        <option value="admin" [% IF filter_role == 'admin' %]selected[% END %]>Admin</option>
+                                        <option value="editor" [% IF filter_role == 'editor' %]selected[% END %]>Editor</option>
+                                        <option value="developer" [% IF filter_role == 'developer' %]selected[% END %]>Developer</option>
+                                        <option value="WorkshopLeader" [% IF filter_role == 'WorkshopLeader' %]selected[% END %]>Workshop Leader</option>
+                                        <option value="normal" [% IF filter_role == 'normal' %]selected[% END %]>Normal</option>
+                                    </select>
+                                </div>
+                                
+                                [% IF is_csc_admin && available_sites.size > 0 %]
+                                <div class="form-field">
+                                    <label for="filter_site">Site</label>
+                                    <select id="filter_site" name="filter_site" class="form-input">
+                                        <option value="">All Sites</option>
+                                        [% FOREACH site IN available_sites %]
+                                            <option value="[% site.name | html %]" [% IF filter_site == site.name %]selected[% END %]>[% site.name | html %]</option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                                [% END %]
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Clear Filters</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Users List Section -->
+            <div class="content-section">
+                <h3>Users ([% pager ? pager.total_entries : 0 %] total)</h3>
+                
+                [% IF users.size > 0 %]
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Roles</th>
+                                <th>Status</th>
+                                <th>Site Access</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% FOREACH user IN users %]
+                            <tr>
+                                <td>[% user.username | html %]</td>
+                                <td>[% user.first_name | html %] [% user.last_name | html %]</td>
+                                <td>[% user.email | html %]</td>
+                                <td>
+                                    [% IF user.roles %]
+                                        [% SET user_roles = user.roles.split(',') %]
+                                        [% FOREACH role IN user_roles %]
+                                            <span class="badge-primary">[% role.trim | html %]</span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        <span class="badge-primary">normal</span>
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% SET user_status = user.status || 'active' %]
+                                    [% IF user_status == 'active' %]
+                                        <span class="badge-success">[% user_status | ucfirst %]</span>
+                                    [% ELSIF user_status == 'suspended' %]
+                                        <span class="badge-danger">[% user_status | ucfirst %]</span>
+                                    [% ELSE %]
+                                        <span class="badge-warning">[% user_status.replace('_', ' ') | ucfirst %]</span>
+                                    [% END %]
+                                </td>
+                                <td>
+                                    [% SET user_sites = user_sites_map.item(user.id) %]
+                                    [% IF user_sites && user_sites.size > 0 %]
+                                        [% FOREACH sn IN user_sites %]
+                                            <span class="badge-info">[% sn | html %]</span>
+                                        [% END %]
+                                    [% ELSE %]
+                                        <span class="empty-state">No sites</span>
+                                    [% END %]
+                                </td>
+                                <td class="action-cell">
+                                    <a href="[% c.uri_for('/user/edit_user', user.id) %]" class="btn btn-sm btn-edit">Edit</a>
+                                    [% IF user_status == 'active' %]
+                                        <a href="[% c.uri_for('/user/admin_suspend_user', user.id) %]" class="btn btn-sm btn-delete" onclick="return confirm('Suspend this user?');">Suspend</a>
+                                    [% ELSIF user_status == 'suspended' %]
+                                        <a href="[% c.uri_for('/user/admin_activate_user', user.id) %]" class="btn btn-sm btn-primary">Activate</a>
+                                    [% END %]
+                                </td>
+                            </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                [% IF pager && pager.last_page > 1 %]
+                <div class="pagination">
+                    [% IF pager.previous_page %]
+                        <a href="[% c.uri_for('/admin/users', { page => pager.previous_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">« Previous</a>
+                    [% END %]
+                    
+                    <span class="page-info">Page [% pager.current_page %] of [% pager.last_page %]</span>
+                    
+                    [% IF pager.next_page %]
+                        <a href="[% c.uri_for('/admin/users', { page => pager.next_page, search => search, filter_site => filter_site, filter_role => filter_role, filter_status => filter_status }) %]" class="btn btn-sm btn-secondary">Next »</a>
+                    [% END %]
+                </div>
+                [% END %]
+                
+                [% ELSE %]
+                <div class="empty-state">
+                    <p>No users found matching your criteria.</p>
+                </div>
+                [% END %]
+            </div>
+            
+            <div class="form-actions">
+                <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-primary">Create New User</a>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">Back to Admin Dashboard</a>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
