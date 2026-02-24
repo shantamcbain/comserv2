@@ -1,6 +1,6 @@
 [% PageVersion = '/user/welcome.tt,v 0.01 2024/11/24 shanta Exp shanta ' %]
 [% META title = 'Welcome' %]
-[% IF c.session.debug_mode == 1 %]
+[% IF debug_mode == 1 %]
   [% PageVersion %]
   [% INCLUDE 'debug.tt' %]
 [% END %]
