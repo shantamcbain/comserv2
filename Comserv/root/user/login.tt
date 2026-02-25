@@ -55,7 +55,7 @@
                                 <input type="password" id="password" name="password" class="form-input"
                                        autocomplete="current-password">
                                 <small style="color: var(--text-muted-color, #666); display: block; margin-top: 4px;">
-                                    If you received a <strong>6-digit code</strong> by email, enter it here instead of a password.
+                                    New user? Enter your <strong>6-digit verification code</strong> here to continue registration.
                                 </small>
                             </div>
                         </div>
