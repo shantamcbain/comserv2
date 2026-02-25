@@ -262,7 +262,10 @@ sub do_login :Local {
         };
 
         if ($code_rec && !$self->user_verification->is_expired($code_rec)) {
-            if ($user->status && $user->status eq 'pending_setup') {
+            my $status = $user->status || '';
+
+            if ($status eq 'pending_setup') {
+                # Admin-invited user — redirect to username/password setup
                 $c->session->{setup_email} = $user->email;
                 my $setup_url = (!$user->username)
                     ? $c->uri_for('/user/complete_username_setup', { email => $user->email })
@@ -271,8 +274,19 @@ sub do_login :Local {
                     "Valid code for pending_setup user '" . ($user->email||'') . "', redirecting to setup");
                 $c->res->redirect($setup_url);
                 return;
+
+            } elsif ($status eq 'pending_verification') {
+                # Self-registered user entering verification code at login screen
+                # (e.g. session expired between steps 1 and 2)
+                # Re-establish session context and redirect to complete_profile
+                $c->session->{verification_user_id} = $user->id;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Valid code for pending_verification user '" . ($user->email||'') . "', redirecting to complete_profile");
+                $c->res->redirect($c->uri_for('/user/complete_profile'));
+                return;
+
             } else {
-                $c->flash->{error_msg} = 'Your account is already set up. Please log in with your password.';
+                $c->flash->{error_msg} = 'Your account is already active. Please log in with your password.';
                 $c->res->redirect($c->uri_for('/user/login'));
                 return;
             }
@@ -365,12 +379,12 @@ sub do_login :Local {
             # User account exists — check specific status and site access
 
             if ($user->status && $user->status eq 'pending_verification') {
-                $fail_msg = 'Your account is not yet verified. Please check your email for the verification code and complete registration.';
+                $fail_msg = 'Your registration is not yet complete. Enter your 6-digit verification code (from your confirmation email) in the password field above to continue setting up your account.';
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_verification");
 
             } elsif ($user->status && $user->status eq 'pending_setup') {
-                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it here to finish setting up your account.';
+                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it in the password field above to finish setting up your account.';
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
                     "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_setup");
 
