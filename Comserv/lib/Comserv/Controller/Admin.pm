@@ -27,7 +27,7 @@ sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->instance();
 }
-
+# adding code to force restart
 # Begin method to check if the user has admin role
 sub begin : Private {
     my ($self, $c) = @_;
@@ -36,8 +36,7 @@ sub begin : Private {
     my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
-    
-    # Initialize debug_msg array if it doesn't exist and debug mode is enabled
+     # Initialize debug_msg array if it doesn't exist and debug mode is enabled
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         
