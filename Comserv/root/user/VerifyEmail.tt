@@ -48,6 +48,7 @@
 
             <div class="form-container">
                 <form method="post" action="[% c.uri_for('/user/verify_email') %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <div class="form-section">
                         <div class="form-row">
                             <div class="form-field">
