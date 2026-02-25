@@ -32,6 +32,7 @@
             
             <div class="form-container">
                 <form method="POST" action="[% c.uri_for('/user/admin_create_user') %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
                     <div class="form-section">
                         <h3>User Information</h3>
