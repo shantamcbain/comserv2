@@ -2429,136 +2429,133 @@ sub forgot_password :Local {
 sub reset_password :Local {
     my ($self, $c) = @_;
 
-    # Get token from URL parameter
-    my $token = $c->req->param('token');
+    my $token     = $c->req->param('token');
+    my $home_path = '/' . lc($c->stash->{SiteName} || $c->session->{SiteName} || '');
+    $home_path = '/' if $home_path eq '/';
 
-    # Log access to reset password page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
         "Accessing reset password page with token: " . ($token ? 'present' : 'missing'));
 
-    if ($c->req->method eq 'POST') {
-        # Process the password reset form
-        my $new_password = $c->req->param('new_password');
-        my $password_confirm = $c->req->param('password_confirm');
-
-        # Validate inputs
-        if (!$token) {
-            $c->stash(error_msg => 'Invalid or missing reset token', template => 'user/reset_password.tt');
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        if (!$new_password || !$password_confirm) {
-            $c->stash(error_msg => 'Please enter and confirm your new password',
-                template => 'user/reset_password.tt', token => $token);
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Validate passwords match
-        if ($new_password ne $password_confirm) {
-            $c->stash(error_msg => 'Passwords do not match',
-                template => 'user/reset_password.tt', token => $token);
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Validate password length
-        if (length($new_password) < 8) {
-            $c->stash(error_msg => 'Password must be at least 8 characters long',
-                template => 'user/reset_password.tt', token => $token);
-            $c->forward($c->view('TT'));
-            return;
-        }
-
-        # Verify the reset token
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
-
-        if (!$reset_record) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
-                "Invalid or expired reset token");
-            $c->stash(
-                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
-                template => 'user/reset_password.tt'
-            );
-            return;
-        }
-
-        # Get the user
-        my $user = $c->model('DBEncy::User')->find({ id => $reset_record->user_id });
-
-        if (!$user) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
-                "User not found for reset token");
-            $c->stash(
-                error_msg => 'User account not found',
-                template => 'user/reset_password.tt'
-            );
-            return;
-        }
-
-        # Hash the new password
-        my $password_hash = sha256_hex($new_password);
-
-        # Update user password — also activate account if it was in a non-suspended pending state
-        # (handles pre-existing accounts and accounts where email verification was skipped)
-        eval {
-            my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
-            my $status = $user->status || '';
-            my %updates = ( password => $password_hash );
-            unless ($status eq 'suspended') {
-                $updates{status} = 'active';
-                $updates{email_verified_at} = $now_str unless $user->email_verified_at;
+    # ── GET ──────────────────────────────────────────────────────────────────
+    if ($c->req->method ne 'POST') {
+        # If the user is already logged in and the token is invalid/used,
+        # redirect home instead of showing a confusing error.
+        if ($c->session->{username}) {
+            my $record = $token
+                ? $self->user_verification->verify_reset_token($c->model('DBEncy'), $token)
+                : undef;
+            unless ($record) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
+                    "Already logged in; token invalid/used — redirecting home");
+                $c->res->redirect($c->uri_for($home_path));
+                return;
             }
-            $user->update(\%updates);
-
-            # Mark token as used
-            $reset_record->update({ used_at => $now_str });
-
-            my $reset_ip = $c->req->address || 'unknown';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
-                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' status_set=active ip=$reset_ip");
-        };
-
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
-                "Error resetting password: $@");
-            $c->stash(
-                error_msg => 'An error occurred while resetting your password. Please try again.',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
+        } elsif (!$token) {
+            $c->flash->{error_msg} = 'No reset link provided. Please use the link from your email.';
+            $c->res->redirect($c->uri_for('/user/forgot_password'));
             return;
+        } else {
+            my $record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
+            unless ($record) {
+                $c->stash(
+                    error_msg => 'This reset link has already been used or has expired. Please request a new one.',
+                    template  => 'user/reset_password.tt',
+                );
+                $c->forward($c->view('TT'));
+                return;
+            }
         }
 
-        # Clear session data
-        delete $c->session->{reset_token};
-        delete $c->session->{reset_email};
-
-        # Redirect to login with success message
-        $c->flash->{success_msg} = 'Your password has been successfully reset. You can now login with your new password.';
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->stash(template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
         return;
     }
 
-    # Validate token for GET request
-    if ($token) {
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
-        if (!$reset_record) {
-            $c->stash(error_msg => 'Invalid or expired reset token. Please request a new password reset.',
-                template => 'user/reset_password.tt');
-            $c->forward($c->view('TT'));
-            return;
-        }
-    } else {
-        $c->stash(error_msg => 'No reset token provided. Please use the link from your email.',
+    # ── POST ─────────────────────────────────────────────────────────────────
+    my $new_password    = $c->req->param('new_password')    || '';
+    my $password_confirm = $c->req->param('password_confirm') || '';
+
+    unless ($token) {
+        $c->stash(error_msg => 'Missing reset token.', template => 'user/reset_password.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+    unless ($new_password && $password_confirm) {
+        $c->stash(error_msg => 'Please enter and confirm your new password.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+    if ($new_password ne $password_confirm) {
+        $c->stash(error_msg => 'Passwords do not match.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+    if (length($new_password) < 8) {
+        $c->stash(error_msg => 'Password must be at least 8 characters.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
+    unless ($reset_record) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
+            "POST: invalid/expired/used reset token");
+        $c->stash(error_msg => 'This reset link has already been used or has expired. Please request a new one.',
             template => 'user/reset_password.tt');
         $c->forward($c->view('TT'));
         return;
     }
 
-    $c->stash(template => 'user/reset_password.tt', token => $token);
-    $c->forward($c->view('TT'));
+    my $user = $c->model('DBEncy::User')->find({ id => $reset_record->user_id });
+    unless ($user) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+            "User not found for reset token user_id=" . $reset_record->user_id);
+        $c->stash(error_msg => 'Account not found.', template => 'user/reset_password.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $update_err;
+    eval {
+        my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+        my $status  = $user->status || '';
+        my %updates = ( password => sha256_hex($new_password) );
+        unless ($status eq 'suspended') {
+            $updates{status}           = 'active';
+            $updates{email_verified_at} = $now_str unless $user->email_verified_at;
+        }
+        $user->update(\%updates);
+        $reset_record->update({ used_at => $now_str });
+
+        my $ip = $c->req->address || 'unknown';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
+            "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$ip");
+    };
+    $update_err = "$@" if $@;
+
+    if ($update_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+            "Error resetting password: $update_err");
+        $c->stash(error_msg => 'An error occurred. Please try again.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    delete $c->session->{reset_token};
+    delete $c->session->{reset_email};
+
+    # Redirect to home if already logged in, otherwise to login page
+    if ($c->session->{username}) {
+        $c->flash->{success_msg} = 'Your password has been updated successfully.';
+        $c->res->redirect($c->uri_for($home_path));
+    } else {
+        $c->flash->{success_msg} = 'Password reset successful. You can now log in with your new password.';
+        $c->res->redirect($c->uri_for('/user/login'));
+    }
 }
 
 sub change_password_request :Local {
