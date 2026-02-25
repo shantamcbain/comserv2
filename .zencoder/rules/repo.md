@@ -47,6 +47,24 @@ Full specification: `coding-standards.yaml` Rule 8 (lines 780-1011)
 
 ---
 
+## 🔴 MANDATORY: DocumentConfig.json — NEVER EDIT DIRECTLY
+
+**`DocumentConfig.json` must NEVER be created or edited by AI agents.** This file is managed exclusively by the Documentation system's own code.
+
+**How it works**:
+- The Documentation system scans `.tt` files in the `Documentation/` directory
+- It reads the `[% META ... %]` block in each file (title, description, roles, TemplateType, category, etc.)
+- It builds and updates `DocumentConfig.json` automatically from that metadata
+- To trigger a rescan, use the **Refresh** button in the admin UI, or call the API endpoint that activates the documentation refresh code
+
+**Rules for AI agents**:
+- ✅ Create/edit `.tt` files in `Documentation/` with correct `META` blocks — the scan picks them up automatically
+- ✅ Trigger a documentation refresh via the API if needed after adding new files
+- ❌ **NEVER** directly create, edit, or overwrite `DocumentConfig.json`
+- ❌ **NEVER** add `DocumentConfig.json` entries by hand — doing so causes git conflicts and breaks the documentation system
+
+---
+
 ## 🔴 MANDATORY .tt TEMPLATE STANDARDS — ENFORCED ON EVERY PROMPT
 
 Every new `.tt` file MUST comply with ALL of the following before being considered complete.
