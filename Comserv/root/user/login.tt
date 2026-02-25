@@ -4,10 +4,10 @@
    roles = ""
    TemplateType = "Application"
    category = "User"
-   page_version = "0.02"
-   last_updated = "2026-02-23"
+   page_version = "0.03"
+   last_updated = "2026-02-24"
 %]
-[% PageVersion = 'user/login.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% PageVersion = 'user/login.tt,v 0.03 2026/02/24 AI Assistant Exp AI Assistant ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
 [% END %]
@@ -16,7 +16,7 @@
 
     <div class="page-header">
         <h1>Sign In</h1>
-        <h2 class="page-subtitle">Enter your credentials to access your account</h2>
+        <h2 class="page-subtitle">Enter your credentials to access [% c.stash.SiteName || 'your account' %]</h2>
     </div>
 
     <div class="content-container">
@@ -24,44 +24,39 @@
         <div class="content-primary">
 
             [% IF c.session.success_msg %]
-                <div class="success">[% c.session.success_msg %]</div>
+                <div class="success">[% c.session.success_msg | html %]</div>
             [% END %]
             [% IF c.flash.success_msg %]
-                <div class="success">[% c.flash.success_msg %]</div>
+                <div class="success">[% c.flash.success_msg | html %]</div>
             [% END %]
             [% IF c.flash.error_msg %]
-                <div class="error">[% c.flash.error_msg %]</div>
+                <div class="error">[% c.flash.error_msg | html %]</div>
             [% END %]
             [% IF c.stash.error_msg %]
-                <div class="error">[% c.stash.error_msg %]</div>
+                <div class="error">[% c.stash.error_msg | html %]</div>
             [% END %]
 
             <div class="form-container">
-                <form method="POST" action="/user/do_login" class="app-form">
+                <form method="POST" action="/user/do_login" class="app-form" id="login-form">
                     <input type="hidden" name="form_source" value="login_form">
 
                     <div class="form-section">
                         <div class="form-row">
                             <div class="form-field">
                                 <label for="username">Username or Email</label>
-                                <input type="text" id="username" name="username" class="form-input" required autofocus>
+                                <input type="text" id="username" name="username" class="form-input"
+                                       value="[% prefill_username | html %]" required autofocus autocomplete="username">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="password">Password</label>
-                                <input type="password" id="password" name="password" class="form-input">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-field">
-                                <label for="verification_code">Verification Code <small>(if you received one by email)</small></label>
-                                <input type="text" id="verification_code" name="verification_code" class="form-input"
-                                       maxlength="6" pattern="\d{6}" placeholder="6-digit code"
-                                       autocomplete="one-time-code">
-                                <small style="color:#666;">Enter your 6-digit code <em>instead of</em> your password if this is your first time logging in.</small>
+                                <label for="password">Password or Verification Code</label>
+                                <input type="password" id="password" name="password" class="form-input"
+                                       autocomplete="current-password">
+                                <small style="color: var(--text-muted-color, #666); display: block; margin-top: 4px;">
+                                    If you received a <strong>6-digit code</strong> by email, enter it here instead of a password.
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -72,7 +67,7 @@
                     </div>
 
                     <div style="margin-top: 12px; text-align: center;">
-                        <a href="/user/change_password_request">Forgot your password?</a>
+                        <a href="#" id="forgot-pw-link">Forgot your password?</a>
                     </div>
 
                 </form>
@@ -83,3 +78,15 @@
     </div>
 
 </div>
+
+<script>
+document.getElementById('forgot-pw-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    var val = document.getElementById('username').value.trim();
+    var url = '/user/forgot_password';
+    if (val) {
+        url += '?email=' + encodeURIComponent(val);
+    }
+    window.location.href = url;
+});
+</script>
