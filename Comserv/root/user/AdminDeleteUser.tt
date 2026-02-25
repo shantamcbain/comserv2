@@ -46,6 +46,7 @@
             </div>
 
             <form method="post" action="[% c.uri_for('/user/do_admin_delete_user', user.id) %]" class="app-form">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
 
                 [% IF is_csc_admin %]
 
