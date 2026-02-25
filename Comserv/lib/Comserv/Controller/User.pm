@@ -164,11 +164,14 @@ sub do_login :Local {
         return;
     }
 
-    # Get user input
-    my $username          = $c->req->body_parameters->{username}          || $c->req->param('username')          || '';
-    my $password          = $c->req->body_parameters->{password}          || $c->req->param('password')          || '';
-    my $verification_code = $c->req->body_parameters->{verification_code} || $c->req->param('verification_code') || '';
-    $verification_code =~ s/\s+//g;
+    # Get user input — password field also accepts a 6-digit verification code
+    my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
+    my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
+    $credential =~ s/\s+//g;
+
+    # Determine whether the credential is a 6-digit verification code or a password
+    my $password          = ($credential =~ /^\d{6}$/) ? '' : $credential;
+    my $verification_code = ($credential =~ /^\d{6}$/) ? $credential : '';
 
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
@@ -353,16 +356,89 @@ sub do_login :Local {
             "Final roles in session: $roles_debug"
         );
     } else {
-        # Authentication failed
-        my $fail_ip = $c->req->address || 'unknown';
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "AUDIT: Login failed username='$username' ip=$fail_ip reason=invalid_credentials"
-        );
+        # Authentication failed — determine the specific reason for better UX
+        my $fail_ip  = $c->req->address || 'unknown';
+        my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $fail_msg = 'Invalid username or password.';
 
-        # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg} = 'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login'));
+        if ($user) {
+            # User account exists — check specific status and site access
+
+            if ($user->status && $user->status eq 'pending_verification') {
+                $fail_msg = 'Your account is not yet verified. Please check your email for the verification code and complete registration.';
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_verification");
+
+            } elsif ($user->status && $user->status eq 'pending_setup') {
+                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it here to finish setting up your account.';
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_setup");
+
+            } else {
+                # Active account — check if they have access to the current SiteName
+                my $has_site_access = 0;
+                eval {
+                    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+                    if ($site) {
+                        $has_site_access = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                            user_id => $user->id,
+                            site_id => $site->id,
+                        })->count;
+                    } else {
+                        $has_site_access = 1;
+                    }
+                };
+
+                if (!$has_site_access) {
+                    $fail_msg = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "AUDIT: Login denied user_id=" . $user->id . " username='" . ($user->username||'') . "' ip=$fail_ip reason=no_site_access sitename=$sitename");
+
+                    # Notify the SiteName admin about this access attempt
+                    eval {
+                        my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+                        my $admin_email = ($site_obj && $site_obj->mail_to_admin)
+                            ? $site_obj->mail_to_admin
+                            : 'helpdesk@computersystemconsulting.ca';
+                        my $display_name = ($user->first_name || '') . ' ' . ($user->last_name || '');
+                        $display_name =~ s/^\s+|\s+$//g;
+                        $display_name ||= $user->username || $user->email || 'unknown';
+                        $self->email_notification->send_error_notification($c, $admin_email,
+                            "Login attempt — no $sitename access",
+                            "A registered user attempted to log in to $sitename but does not have site access.\n\n"
+                            . "User: $display_name\n"
+                            . "Email: " . ($user->email || 'N/A') . "\n"
+                            . "Username: " . ($user->username || 'N/A') . "\n"
+                            . "IP Address: $fail_ip\n\n"
+                            . "If this person should have access, grant it via the Admin User Management screen."
+                        );
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                            "Could not send no-site-access notification to admin: $@");
+                    }
+                } else {
+                    # Has site access but wrong password
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
+                    # Generic message — don't reveal that the user exists
+                    $fail_msg = 'Invalid username or password.';
+                }
+            }
+        } else {
+            # User not found at all
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
+            # Generic message — don't reveal whether the user exists
+            $fail_msg = 'Invalid username or password.';
+        }
+
+        $c->stash(
+            error_msg        => $fail_msg,
+            prefill_username => $username,
+            template         => 'user/login.tt',
+        );
+        $c->forward($c->view('TT'));
         return;
     }
 
@@ -2235,71 +2311,88 @@ sub forgot_password :Local {
     # Log access to the forgot password page
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password', 'Accessing forgot password page');
 
-    if ($c->req->method eq 'POST') {
-        # Process the form submission
-        my $email = $c->req->params->{email};
+    # Pre-fill from query param (set by the login form's JS forgot-password link)
+    my $prefill = $c->req->param('email') || '';
 
-        # Validate email
-        if (!$email) {
-            $c->stash(error_msg => 'Please enter your email address');
-            $c->stash(template => 'user/forgot_password.tt');
+    if ($c->req->method eq 'POST') {
+        my $input = $c->req->params->{email} || '';
+        $input =~ s/^\s+|\s+$//g;
+
+        if (!$input) {
+            $c->stash(
+                error_msg    => 'Please enter your username or email address.',
+                prefill_email => $input,
+                template     => 'user/forgot_password.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
 
-        # Find user with the provided email
-        my $user = $c->model('DBEncy::User')->find({ email => $email });
+        # Find user by email or username
+        my $user;
+        eval {
+            if ($input =~ /@/) {
+                $user = $c->model('DBEncy::User')->find({ email => $input });
+            } else {
+                $user = $c->model('DBEncy::User')->find({ username => $input });
+                # If not found by username, try email anyway
+                $user ||= $c->model('DBEncy::User')->find({ email => $input });
+            }
+        };
+        my $lookup_err = "$@" if $@;
+        if ($lookup_err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'forgot_password',
+                "DB error looking up user '$input': $lookup_err");
+        }
 
         if ($user) {
-            # Generate a 32-char hex reset token
-            my $token = $self->user_verification->generate_reset_token();
-            
-            # Store hashed token in database (expires in 24 hours)
+            my $reset_err;
             eval {
-                my $reset_record = $self->user_verification->create_reset_token($user, $token);
-                
-                # Build reset link
+                my $token = $self->user_verification->generate_reset_token();
+                $self->user_verification->create_reset_token($user, $token);
+
                 my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
-                
-                my $reset_req_ip = $c->req->address || 'unknown';
-                $self->logging->log_with_details(
-                    $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                    "AUDIT: Password reset requested email='$email' ip=$reset_req_ip"
-                );
+                my $req_ip = $c->req->address || 'unknown';
+
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                    "AUDIT: Password reset requested user_id=" . $user->id . " input='$input' ip=$req_ip");
 
                 $c->session->{reset_token} = $token;
-                $c->session->{reset_email} = $email;
+                $c->session->{reset_email} = $user->email;
 
                 eval {
                     $self->email_notification->send_password_reset_email($c, $user, $reset_link);
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
-                        "Password reset email sent to: $email");
+                        "Password reset email sent to: " . ($user->email||''));
                 };
                 if ($@) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'forgot_password',
-                        "Failed to send password reset email to $email: $@");
+                        "Failed to send password reset email: $@");
                 }
             };
-            
-            if ($@) {
-                $self->logging->log_with_details(
-                    $c, 'error', __FILE__, __LINE__, 'forgot_password',
-                    "Error generating reset token for email $email: $@"
-                );
+            $reset_err = "$@" if $@;
+            if ($reset_err) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'forgot_password',
+                    "Error generating reset token for '$input': $reset_err");
             }
         } else {
-            # Don't reveal that the email doesn't exist (security best practice)
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                "Password reset requested for non-existent email: $email"
-            );
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                "Password reset requested for unknown input: '$input'");
         }
-        
-        # Always show generic success message (security)
-        $c->stash(success_msg => 'If an account exists with that email, password reset instructions have been sent.');
+
+        # Always show generic success message (security — don't reveal whether user exists)
+        $c->stash(success_msg => 'If an account exists with that username or email, reset instructions have been sent.');
+        $c->stash(template => 'user/forgot_password.tt');
+        $c->forward($c->view('TT'));
+        return;
     }
 
-    # Display the forgot password form
-    $c->stash(template => 'user/forgot_password.tt');
+    # GET — display form, pre-filled if query param provided
+    $c->stash(
+        prefill_email => $prefill,
+        template      => 'user/forgot_password.tt',
+    );
+    $c->forward($c->view('TT'));
 }
 
 sub reset_password :Local {
@@ -2319,37 +2412,31 @@ sub reset_password :Local {
 
         # Validate inputs
         if (!$token) {
-            $c->stash(error_msg => 'Invalid or missing reset token');
-            $c->stash(template => 'user/reset_password.tt');
+            $c->stash(error_msg => 'Invalid or missing reset token', template => 'user/reset_password.tt');
+            $c->forward($c->view('TT'));
             return;
         }
 
         if (!$new_password || !$password_confirm) {
-            $c->stash(
-                error_msg => 'Please enter and confirm your new password',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
+            $c->stash(error_msg => 'Please enter and confirm your new password',
+                template => 'user/reset_password.tt', token => $token);
+            $c->forward($c->view('TT'));
             return;
         }
 
         # Validate passwords match
         if ($new_password ne $password_confirm) {
-            $c->stash(
-                error_msg => 'Passwords do not match',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
+            $c->stash(error_msg => 'Passwords do not match',
+                template => 'user/reset_password.tt', token => $token);
+            $c->forward($c->view('TT'));
             return;
         }
 
         # Validate password length
         if (length($new_password) < 8) {
-            $c->stash(
-                error_msg => 'Password must be at least 8 characters long',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
+            $c->stash(error_msg => 'Password must be at least 8 characters long',
+                template => 'user/reset_password.tt', token => $token);
+            $c->forward($c->view('TT'));
             return;
         }
 
@@ -2418,80 +2505,37 @@ sub reset_password :Local {
     # Validate token for GET request
     if ($token) {
         my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
-        
         if (!$reset_record) {
-            $c->stash(
-                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
-                template => 'user/reset_password.tt'
-            );
+            $c->stash(error_msg => 'Invalid or expired reset token. Please request a new password reset.',
+                template => 'user/reset_password.tt');
+            $c->forward($c->view('TT'));
             return;
         }
     } else {
-        $c->stash(
-            error_msg => 'No reset token provided. Please use the link from your email.',
-            template => 'user/reset_password.tt'
-        );
-        return;
-    }
-
-    # Display the reset password form
-    $c->stash(
-        template => 'user/reset_password.tt',
-        token => $token
-    );
-}
-
-sub change_password_request :Local {
-    my ($self, $c) = @_;
-
-    # Log access to the change password request page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password_request', 'Accessing change password request page');
-
-    # Display the change password request form
-    $c->stash(template => 'user/change_password_request.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the password change request
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password_request', 'Processing change password request');
-
-    # Get the email from the form
-    my $email = $c->req->params->{email} || '';
-
-    # Validate email
-    if (!$email) {
-        $c->stash(
-            error_msg => 'Please enter your email address',
-            template => 'user/change_password_request.tt'
-        );
+        $c->stash(error_msg => 'No reset token provided. Please use the link from your email.',
+            template => 'user/reset_password.tt');
         $c->forward($c->view('TT'));
         return;
     }
 
-    # Find user with the provided email
-    my $user = $c->model('DBEncy::User')->find({ email => $email });
-
-    if ($user) {
-        # In a real implementation, you would:
-        # 1. Generate a unique token
-        # 2. Store it in the database with an expiration time
-        # 3. Send an email with a link containing the token
-
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_change_password_request',
-            "Password change requested for email: $email"
-        );
-    }
-
-    # Always show success message (even if email not found) for security
-    $c->stash(
-        success_msg => 'If an account exists with that email, password reset instructions have been sent.',
-        template => 'user/change_password_request.tt'
-    );
+    $c->stash(template => 'user/reset_password.tt', token => $token);
     $c->forward($c->view('TT'));
+}
+
+sub change_password_request :Local {
+    my ($self, $c) = @_;
+    # Legacy route — redirect to the active forgot_password flow
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password_request',
+        'Legacy change_password_request accessed — redirecting to forgot_password');
+    $c->res->redirect($c->uri_for('/user/forgot_password'));
+}
+
+sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
+    my ($self, $c) = @_;
+    # Legacy route — redirect to the active forgot_password flow
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password_request',
+        'Legacy do_change_password_request accessed — redirecting to forgot_password');
+    $c->res->redirect($c->uri_for('/user/forgot_password'));
 }
 
 sub admin_manage_roles :Local :Args(1) {
