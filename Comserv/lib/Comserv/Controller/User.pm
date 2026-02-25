@@ -314,9 +314,26 @@ sub do_login :Local {
         my $client_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
-        
-        # Get the authenticated user object (already retrieved above)
-        
+
+        # Auto-activate pre-existing accounts that lack a status (created before the status column)
+        # or accounts stuck in pending_verification that somehow still have a correct password
+        my $acct_status = $user->status || '';
+        if ($acct_status eq '' || $acct_status eq 'pending_verification') {
+            eval {
+                my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+                $user->update({
+                    status => 'active',
+                    email_verified_at => $now_str,
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Auto-activated account user_id=" . $user->id . " (was: '" . ($acct_status||'NULL') . "')");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "Could not auto-activate account: $@");
+            }
+        }
+
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
         $c->session->{user_id}  = $user->id;
@@ -2455,7 +2472,7 @@ sub reset_password :Local {
         }
 
         # Verify the reset token
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
+        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
 
         if (!$reset_record) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
@@ -2483,16 +2500,24 @@ sub reset_password :Local {
         # Hash the new password
         my $password_hash = sha256_hex($new_password);
 
-        # Update user password
+        # Update user password — also activate account if it was in a non-suspended pending state
+        # (handles pre-existing accounts and accounts where email verification was skipped)
         eval {
-            $user->update({ password => $password_hash });
-            
+            my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+            my $status = $user->status || '';
+            my %updates = ( password => $password_hash );
+            unless ($status eq 'suspended') {
+                $updates{status} = 'active';
+                $updates{email_verified_at} = $now_str unless $user->email_verified_at;
+            }
+            $user->update(\%updates);
+
             # Mark token as used
-            $reset_record->update({ used_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
-            
+            $reset_record->update({ used_at => $now_str });
+
             my $reset_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
-                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$reset_ip");
+                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' status_set=active ip=$reset_ip");
         };
 
         if ($@) {
@@ -2518,7 +2543,7 @@ sub reset_password :Local {
 
     # Validate token for GET request
     if ($token) {
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
+        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
         if (!$reset_record) {
             $c->stash(error_msg => 'Invalid or expired reset token. Please request a new password reset.',
                 template => 'user/reset_password.tt');
