@@ -75,9 +75,10 @@
                                 </td>
                                 <td class="action-cell">
                                     [% UNLESS sr.is_system_role %]
-                                    <a href="[% c.uri_for('/user/admin_delete_site_role', sr.id) %]"
-                                       class="btn btn-sm btn-delete"
-                                       onclick="return confirm('Delete role [% sr.role_name | html %]? Users with this role will not lose their assignments immediately, but the role will no longer be available for new assignments.');">Delete</a>
+                                    <form method="POST" action="[% c.uri_for('/user/admin_delete_site_role', sr.id) %]" style="display:inline;" onsubmit="return confirm('Delete role [% sr.role_name | html %]? Users with this role will not lose their assignments immediately, but the role will no longer be available for new assignments.');">
+                                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                                        <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+                                    </form>
                                     [% ELSE %]
                                     <span class="empty-state">System role</span>
                                     [% END %]
@@ -99,6 +100,7 @@
                 <h3>Create Custom Role</h3>
                 <div class="form-container">
                     <form method="POST" action="[% c.uri_for('/user/admin_role_list') %]" class="app-form">
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <input type="hidden" name="action" value="create">
 
                         <div class="form-section">
