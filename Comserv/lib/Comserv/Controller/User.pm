@@ -10,6 +10,7 @@ use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::CSRF;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -50,6 +51,12 @@ sub send_error_notification {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_error_notification',
             "Failed to send error notification: $@");
     }
+}
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
+    return 1;
 }
 
 sub login :Local {
@@ -164,11 +171,16 @@ sub do_login :Local {
         return;
     }
 
-    # Get user input
-    my $username          = $c->req->body_parameters->{username}          || $c->req->param('username')          || '';
-    my $password          = $c->req->body_parameters->{password}          || $c->req->param('password')          || '';
-    my $verification_code = $c->req->body_parameters->{verification_code} || $c->req->param('verification_code') || '';
-    $verification_code =~ s/\s+//g;
+    return unless $self->_validate_csrf($c, 'do_login', '/user/login');
+
+    # Get user input — password field also accepts a 6-digit verification code
+    my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
+    my $credential = $c->req->body_parameters->{password} || $c->req->param('password') || '';
+    $credential =~ s/\s+//g;
+
+    # Determine whether the credential is a 6-digit verification code or a password
+    my $password          = ($credential =~ /^\d{6}$/) ? '' : $credential;
+    my $verification_code = ($credential =~ /^\d{6}$/) ? $credential : '';
 
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'do_login',
@@ -259,7 +271,10 @@ sub do_login :Local {
         };
 
         if ($code_rec && !$self->user_verification->is_expired($code_rec)) {
-            if ($user->status && $user->status eq 'pending_setup') {
+            my $status = $user->status || '';
+
+            if ($status eq 'pending_setup') {
+                # Admin-invited user — redirect to username/password setup
                 $c->session->{setup_email} = $user->email;
                 my $setup_url = (!$user->username)
                     ? $c->uri_for('/user/complete_username_setup', { email => $user->email })
@@ -268,8 +283,19 @@ sub do_login :Local {
                     "Valid code for pending_setup user '" . ($user->email||'') . "', redirecting to setup");
                 $c->res->redirect($setup_url);
                 return;
+
+            } elsif ($status eq 'pending_verification') {
+                # Self-registered user entering verification code at login screen
+                # (e.g. session expired between steps 1 and 2)
+                # Re-establish session context and redirect to complete_profile
+                $c->session->{verification_user_id} = $user->id;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Valid code for pending_verification user '" . ($user->email||'') . "', redirecting to complete_profile");
+                $c->res->redirect($c->uri_for('/user/complete_profile'));
+                return;
+
             } else {
-                $c->flash->{error_msg} = 'Your account is already set up. Please log in with your password.';
+                $c->flash->{error_msg} = 'Your account is already active. Please log in with your password.';
                 $c->res->redirect($c->uri_for('/user/login'));
                 return;
             }
@@ -297,9 +323,26 @@ sub do_login :Local {
         my $client_ip = $c->req->address || 'unknown';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
-        
-        # Get the authenticated user object (already retrieved above)
-        
+
+        # Auto-activate pre-existing accounts that lack a status (created before the status column)
+        # or accounts stuck in pending_verification that somehow still have a correct password
+        my $acct_status = $user->status || '';
+        if ($acct_status eq '' || $acct_status eq 'pending_verification') {
+            eval {
+                my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+                $user->update({
+                    status => 'active',
+                    email_verified_at => $now_str,
+                });
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                    "Auto-activated account user_id=" . $user->id . " (was: '" . ($acct_status||'NULL') . "')");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "Could not auto-activate account: $@");
+            }
+        }
+
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
         $c->session->{user_id}  = $user->id;
@@ -353,16 +396,89 @@ sub do_login :Local {
             "Final roles in session: $roles_debug"
         );
     } else {
-        # Authentication failed
-        my $fail_ip = $c->req->address || 'unknown';
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'do_login',
-            "AUDIT: Login failed username='$username' ip=$fail_ip reason=invalid_credentials"
-        );
+        # Authentication failed — determine the specific reason for better UX
+        my $fail_ip  = $c->req->address || 'unknown';
+        my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $fail_msg = 'Invalid username or password.';
 
-        # Store error message in flash and redirect back to login page
-        $c->flash->{error_msg} = 'Invalid username or password.';
-        $c->response->redirect($c->uri_for('/user/login'));
+        if ($user) {
+            # User account exists — check specific status and site access
+
+            if ($user->status && $user->status eq 'pending_verification') {
+                $fail_msg = 'Your registration is not yet complete. Enter your 6-digit verification code (from your confirmation email) in the password field above to continue setting up your account.';
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_verification");
+
+            } elsif ($user->status && $user->status eq 'pending_setup') {
+                $fail_msg = 'Your account setup is incomplete. Please check your invitation email for the 6-digit code and enter it in the password field above to finish setting up your account.';
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                    "AUDIT: Login denied user_id=" . $user->id . " ip=$fail_ip reason=pending_setup");
+
+            } else {
+                # Active account — check if they have access to the current SiteName
+                my $has_site_access = 0;
+                eval {
+                    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+                    if ($site) {
+                        $has_site_access = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                            user_id => $user->id,
+                            site_id => $site->id,
+                        })->count;
+                    } else {
+                        $has_site_access = 1;
+                    }
+                };
+
+                if (!$has_site_access) {
+                    $fail_msg = "You do not currently have access to $sitename. Please contact the site administrator to request access.";
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "AUDIT: Login denied user_id=" . $user->id . " username='" . ($user->username||'') . "' ip=$fail_ip reason=no_site_access sitename=$sitename");
+
+                    # Notify the SiteName admin about this access attempt
+                    eval {
+                        my $site_obj = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+                        my $admin_email = ($site_obj && $site_obj->mail_to_admin)
+                            ? $site_obj->mail_to_admin
+                            : 'helpdesk@computersystemconsulting.ca';
+                        my $display_name = ($user->first_name || '') . ' ' . ($user->last_name || '');
+                        $display_name =~ s/^\s+|\s+$//g;
+                        $display_name ||= $user->username || $user->email || 'unknown';
+                        $self->email_notification->send_error_notification($c, $admin_email,
+                            "Login attempt — no $sitename access",
+                            "A registered user attempted to log in to $sitename but does not have site access.\n\n"
+                            . "User: $display_name\n"
+                            . "Email: " . ($user->email || 'N/A') . "\n"
+                            . "Username: " . ($user->username || 'N/A') . "\n"
+                            . "IP Address: $fail_ip\n\n"
+                            . "If this person should have access, grant it via the Admin User Management screen."
+                        );
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                            "Could not send no-site-access notification to admin: $@");
+                    }
+                } else {
+                    # Has site access but wrong password
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                        "AUDIT: Login failed user_id=" . $user->id . " ip=$fail_ip reason=wrong_password sitename=$sitename");
+                    # Generic message — don't reveal that the user exists
+                    $fail_msg = 'Invalid username or password.';
+                }
+            }
+        } else {
+            # User not found at all
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "AUDIT: Login failed username='$username' ip=$fail_ip reason=user_not_found");
+            # Generic message — don't reveal whether the user exists
+            $fail_msg = 'Invalid username or password.';
+        }
+
+        $c->stash(
+            error_msg        => $fail_msg,
+            prefill_username => $username,
+            template         => 'user/login.tt',
+        );
+        $c->forward($c->view('TT'));
         return;
     }
 
@@ -395,6 +511,24 @@ sub do_login :Local {
 sub hash_password {
     my ($self, $password) = @_;
     return sha256_hex($password);
+}
+
+sub _validate_csrf {
+    my ($self, $c, $action_name, $redirect_to, $template) = @_;
+    $redirect_to //= '/user/login';
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
+            'CSRF token validation failed');
+        if ($template) {
+            $c->stash(error_msg => 'Invalid form submission. Please try again.', template => $template);
+            $c->forward($c->view('TT'));
+        } else {
+            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->response->redirect($c->uri_for($redirect_to));
+        }
+        return 0;
+    }
+    return 1;
 }
 
 sub logout :Local {
@@ -653,6 +787,8 @@ sub settings :Local {
 sub update_settings :Local {
     my ($self, $c) = @_;
 
+    return unless $self->_validate_csrf($c, 'update_settings', '/user/settings');
+
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to update settings.";
@@ -755,6 +891,8 @@ sub change_password :Local {
 
 sub do_change_password :Local {
     my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_change_password', '/user/change_password');
 
     # Check if user is logged in
     unless ($c->session->{username}) {
@@ -866,7 +1004,9 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
-    
+
+    return unless $self->_validate_csrf($c, 'do_create_account', undef, 'user/register.tt');
+
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1018,6 +1158,7 @@ sub verify_email :Local {
     }
     
     if ($c->request->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'verify_email', undef, 'user/VerifyEmail.tt');
         my $code = $c->request->params->{code};
         my $user_id = $c->session->{verification_user_id};
         
@@ -1070,6 +1211,7 @@ sub complete_profile :Local {
     }
     
     if ($c->request->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_profile', undef, 'user/CompleteProfile.tt');
         my $first_name = $c->request->params->{first_name};
         my $last_name = $c->request->params->{last_name};
         my $password = $c->request->params->{password};
@@ -1177,6 +1319,7 @@ sub admin_create_user :Local {
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_create_user', '/admin/users');
         my $first_name     = $c->req->params->{first_name};
         my $last_name      = $c->req->params->{last_name};
         my $email          = $c->req->params->{email};
@@ -1379,6 +1522,7 @@ sub complete_username_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_username_setup', undef, 'user/complete_username_setup.tt');
         my $input_code = $c->req->params->{code};
         my $username = $c->req->params->{username};
         my $first_name = $c->req->params->{first_name};
@@ -1492,6 +1636,7 @@ sub complete_password_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_password_setup', undef, 'user/complete_password_setup.tt');
         my $input_code = $c->req->params->{code};
         my $password = $c->req->params->{password};
         my $password_confirm = $c->req->params->{password_confirm};
@@ -1651,6 +1796,8 @@ sub edit_user :Local :Args(1) {
 
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_edit_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_edit_user')) {
@@ -1853,6 +2000,8 @@ sub do_edit_user :Local :Args(1) {
 sub admin_suspend_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
 
+    return unless $self->_validate_csrf($c, 'admin_suspend_user', '/admin/users');
+
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_suspend_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -1921,6 +2070,8 @@ sub admin_suspend_user :Local :Args(1) {
 
 sub admin_activate_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
+
+    return unless $self->_validate_csrf($c, 'admin_activate_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_activate_user')) {
@@ -2063,6 +2214,8 @@ sub admin_delete_user :Local :Args(1) {
 
 sub do_admin_delete_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_admin_delete_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
@@ -2235,263 +2388,238 @@ sub forgot_password :Local {
     # Log access to the forgot password page
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password', 'Accessing forgot password page');
 
-    if ($c->req->method eq 'POST') {
-        # Process the form submission
-        my $email = $c->req->params->{email};
+    # Pre-fill from query param (set by the login form's JS forgot-password link)
+    my $prefill = $c->req->param('email') || '';
 
-        # Validate email
-        if (!$email) {
-            $c->stash(error_msg => 'Please enter your email address');
-            $c->stash(template => 'user/forgot_password.tt');
+    if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'forgot_password', undef, 'user/forgot_password.tt');
+        my $input = $c->req->params->{email} || '';
+        $input =~ s/^\s+|\s+$//g;
+
+        if (!$input) {
+            $c->stash(
+                error_msg    => 'Please enter your username or email address.',
+                prefill_email => $input,
+                template     => 'user/forgot_password.tt',
+            );
+            $c->forward($c->view('TT'));
             return;
         }
 
-        # Find user with the provided email
-        my $user = $c->model('DBEncy::User')->find({ email => $email });
+        # Find user by email or username
+        my $user;
+        eval {
+            if ($input =~ /@/) {
+                $user = $c->model('DBEncy::User')->find({ email => $input });
+            } else {
+                $user = $c->model('DBEncy::User')->find({ username => $input });
+                # If not found by username, try email anyway
+                $user ||= $c->model('DBEncy::User')->find({ email => $input });
+            }
+        };
+        my $lookup_err = "$@" if $@;
+        if ($lookup_err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'forgot_password',
+                "DB error looking up user '$input': $lookup_err");
+        }
 
         if ($user) {
-            # Generate a 32-char hex reset token
-            my $token = $self->user_verification->generate_reset_token();
-            
-            # Store hashed token in database (expires in 24 hours)
+            my $reset_err;
             eval {
-                my $reset_record = $self->user_verification->create_reset_token($user, $token);
-                
-                # Build reset link
+                my $token = $self->user_verification->generate_reset_token();
+                $self->user_verification->create_reset_token($user, $token);
+
                 my $reset_link = $c->uri_for('/user/reset_password', { token => $token });
-                
-                my $reset_req_ip = $c->req->address || 'unknown';
-                $self->logging->log_with_details(
-                    $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                    "AUDIT: Password reset requested email='$email' ip=$reset_req_ip"
-                );
+                my $req_ip = $c->req->address || 'unknown';
+
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                    "AUDIT: Password reset requested user_id=" . $user->id . " input='$input' ip=$req_ip");
 
                 $c->session->{reset_token} = $token;
-                $c->session->{reset_email} = $email;
+                $c->session->{reset_email} = $user->email;
 
                 eval {
                     $self->email_notification->send_password_reset_email($c, $user, $reset_link);
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
-                        "Password reset email sent to: $email");
+                        "Password reset email sent to: " . ($user->email||''));
                 };
                 if ($@) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'forgot_password',
-                        "Failed to send password reset email to $email: $@");
+                        "Failed to send password reset email: $@");
                 }
             };
-            
-            if ($@) {
-                $self->logging->log_with_details(
-                    $c, 'error', __FILE__, __LINE__, 'forgot_password',
-                    "Error generating reset token for email $email: $@"
-                );
+            $reset_err = "$@" if $@;
+            if ($reset_err) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'forgot_password',
+                    "Error generating reset token for '$input': $reset_err");
             }
         } else {
-            # Don't reveal that the email doesn't exist (security best practice)
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'forgot_password',
-                "Password reset requested for non-existent email: $email"
-            );
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'forgot_password',
+                "Password reset requested for unknown input: '$input'");
         }
-        
-        # Always show generic success message (security)
-        $c->stash(success_msg => 'If an account exists with that email, password reset instructions have been sent.');
+
+        # Always show generic success message (security — don't reveal whether user exists)
+        $c->stash(success_msg => 'If an account exists with that username or email, reset instructions have been sent.');
+        $c->stash(template => 'user/forgot_password.tt');
+        $c->forward($c->view('TT'));
+        return;
     }
 
-    # Display the forgot password form
-    $c->stash(template => 'user/forgot_password.tt');
+    # GET — display form, pre-filled if query param provided
+    $c->stash(
+        prefill_email => $prefill,
+        template      => 'user/forgot_password.tt',
+    );
+    $c->forward($c->view('TT'));
 }
 
 sub reset_password :Local {
     my ($self, $c) = @_;
 
-    # Get token from URL parameter
-    my $token = $c->req->param('token');
+    my $token     = $c->req->param('token');
+    my $home_path = '/' . lc($c->stash->{SiteName} || $c->session->{SiteName} || '');
+    $home_path = '/' if $home_path eq '/';
 
-    # Log access to reset password page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
         "Accessing reset password page with token: " . ($token ? 'present' : 'missing'));
 
-    if ($c->req->method eq 'POST') {
-        # Process the password reset form
-        my $new_password = $c->req->param('new_password');
-        my $password_confirm = $c->req->param('password_confirm');
-
-        # Validate inputs
-        if (!$token) {
-            $c->stash(error_msg => 'Invalid or missing reset token');
-            $c->stash(template => 'user/reset_password.tt');
+    # ── GET ──────────────────────────────────────────────────────────────────
+    if ($c->req->method ne 'POST') {
+        # If the user is already logged in and the token is invalid/used,
+        # redirect home instead of showing a confusing error.
+        if ($c->session->{username}) {
+            my $record = $token
+                ? $self->user_verification->verify_reset_token($c->model('DBEncy'), $token)
+                : undef;
+            unless ($record) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
+                    "Already logged in; token invalid/used — redirecting home");
+                $c->res->redirect($c->uri_for($home_path));
+                return;
+            }
+        } elsif (!$token) {
+            $c->flash->{error_msg} = 'No reset link provided. Please use the link from your email.';
+            $c->res->redirect($c->uri_for('/user/forgot_password'));
             return;
+        } else {
+            my $record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
+            unless ($record) {
+                $c->stash(
+                    error_msg => 'This reset link has already been used or has expired. Please request a new one.',
+                    template  => 'user/reset_password.tt',
+                );
+                $c->forward($c->view('TT'));
+                return;
+            }
         }
 
-        if (!$new_password || !$password_confirm) {
-            $c->stash(
-                error_msg => 'Please enter and confirm your new password',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
-            return;
-        }
-
-        # Validate passwords match
-        if ($new_password ne $password_confirm) {
-            $c->stash(
-                error_msg => 'Passwords do not match',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
-            return;
-        }
-
-        # Validate password length
-        if (length($new_password) < 8) {
-            $c->stash(
-                error_msg => 'Password must be at least 8 characters long',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
-            return;
-        }
-
-        # Verify the reset token
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
-
-        if (!$reset_record) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
-                "Invalid or expired reset token");
-            $c->stash(
-                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
-                template => 'user/reset_password.tt'
-            );
-            return;
-        }
-
-        # Get the user
-        my $user = $c->model('DBEncy::User')->find({ id => $reset_record->user_id });
-
-        if (!$user) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
-                "User not found for reset token");
-            $c->stash(
-                error_msg => 'User account not found',
-                template => 'user/reset_password.tt'
-            );
-            return;
-        }
-
-        # Hash the new password
-        my $password_hash = sha256_hex($new_password);
-
-        # Update user password
-        eval {
-            $user->update({ password => $password_hash });
-            
-            # Mark token as used
-            $reset_record->update({ used_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
-            
-            my $reset_ip = $c->req->address || 'unknown';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
-                "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$reset_ip");
-        };
-
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
-                "Error resetting password: $@");
-            $c->stash(
-                error_msg => 'An error occurred while resetting your password. Please try again.',
-                template => 'user/reset_password.tt',
-                token => $token
-            );
-            return;
-        }
-
-        # Clear session data
-        delete $c->session->{reset_token};
-        delete $c->session->{reset_email};
-
-        # Redirect to login with success message
-        $c->flash->{success_msg} = 'Your password has been successfully reset. You can now login with your new password.';
-        $c->response->redirect($c->uri_for('/user/login'));
-        return;
-    }
-
-    # Validate token for GET request
-    if ($token) {
-        my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy')->schema, $token);
-        
-        if (!$reset_record) {
-            $c->stash(
-                error_msg => 'Invalid or expired reset token. Please request a new password reset.',
-                template => 'user/reset_password.tt'
-            );
-            return;
-        }
-    } else {
-        $c->stash(
-            error_msg => 'No reset token provided. Please use the link from your email.',
-            template => 'user/reset_password.tt'
-        );
-        return;
-    }
-
-    # Display the reset password form
-    $c->stash(
-        template => 'user/reset_password.tt',
-        token => $token
-    );
-}
-
-sub change_password_request :Local {
-    my ($self, $c) = @_;
-
-    # Log access to the change password request page
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password_request', 'Accessing change password request page');
-
-    # Display the change password request form
-    $c->stash(template => 'user/change_password_request.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Log the password change request
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password_request', 'Processing change password request');
-
-    # Get the email from the form
-    my $email = $c->req->params->{email} || '';
-
-    # Validate email
-    if (!$email) {
-        $c->stash(
-            error_msg => 'Please enter your email address',
-            template => 'user/change_password_request.tt'
-        );
+        $c->stash(template => 'user/reset_password.tt', token => $token);
         $c->forward($c->view('TT'));
         return;
     }
 
-    # Find user with the provided email
-    my $user = $c->model('DBEncy::User')->find({ email => $email });
+    # ── POST ─────────────────────────────────────────────────────────────────
+    return unless $self->_validate_csrf($c, 'reset_password', undef, 'user/reset_password.tt');
+    my $new_password    = $c->req->param('new_password')    || '';
+    my $password_confirm = $c->req->param('password_confirm') || '';
 
-    if ($user) {
-        # In a real implementation, you would:
-        # 1. Generate a unique token
-        # 2. Store it in the database with an expiration time
-        # 3. Send an email with a link containing the token
-
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'do_change_password_request',
-            "Password change requested for email: $email"
-        );
+    unless ($token) {
+        $c->stash(error_msg => 'Missing reset token.', template => 'user/reset_password.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+    unless ($new_password && $password_confirm) {
+        $c->stash(error_msg => 'Please enter and confirm your new password.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+    if ($new_password ne $password_confirm) {
+        $c->stash(error_msg => 'Passwords do not match.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+    if (length($new_password) < 8) {
+        $c->stash(error_msg => 'Password must be at least 8 characters.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
     }
 
-    # Always show success message (even if email not found) for security
-    $c->stash(
-        success_msg => 'If an account exists with that email, password reset instructions have been sent.',
-        template => 'user/change_password_request.tt'
-    );
-    $c->forward($c->view('TT'));
+    my $reset_record = $self->user_verification->verify_reset_token($c->model('DBEncy'), $token);
+    unless ($reset_record) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'reset_password',
+            "POST: invalid/expired/used reset token");
+        $c->stash(error_msg => 'This reset link has already been used or has expired. Please request a new one.',
+            template => 'user/reset_password.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $user = $c->model('DBEncy::User')->find({ id => $reset_record->user_id });
+    unless ($user) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+            "User not found for reset token user_id=" . $reset_record->user_id);
+        $c->stash(error_msg => 'Account not found.', template => 'user/reset_password.tt');
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $update_err;
+    eval {
+        my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
+        my $status  = $user->status || '';
+        my %updates = ( password => sha256_hex($new_password) );
+        unless ($status eq 'suspended') {
+            $updates{status}           = 'active';
+            $updates{email_verified_at} = $now_str unless $user->email_verified_at;
+        }
+        $user->update(\%updates);
+        $reset_record->update({ used_at => $now_str });
+
+        my $ip = $c->req->address || 'unknown';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reset_password',
+            "AUDIT: Password reset completed user_id=" . $user->id . " username='" . ($user->username || 'N/A') . "' ip=$ip");
+    };
+    $update_err = "$@" if $@;
+
+    if ($update_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reset_password',
+            "Error resetting password: $update_err");
+        $c->stash(error_msg => 'An error occurred. Please try again.',
+            template => 'user/reset_password.tt', token => $token);
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    delete $c->session->{reset_token};
+    delete $c->session->{reset_email};
+
+    # Redirect to home if already logged in, otherwise to login page
+    if ($c->session->{username}) {
+        $c->flash->{success_msg} = 'Your password has been updated successfully.';
+        $c->res->redirect($c->uri_for($home_path));
+    } else {
+        $c->flash->{success_msg} = 'Password reset successful. You can now log in with your new password.';
+        $c->res->redirect($c->uri_for('/user/login'));
+    }
+}
+
+sub change_password_request :Local {
+    my ($self, $c) = @_;
+    # Legacy route — redirect to the active forgot_password flow
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'change_password_request',
+        'Legacy change_password_request accessed — redirecting to forgot_password');
+    $c->res->redirect($c->uri_for('/user/forgot_password'));
+}
+
+sub do_change_password_request :Path('/do_change_password_request') :Args(0) {
+    my ($self, $c) = @_;
+    # Legacy route — redirect to the active forgot_password flow
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_change_password_request',
+        'Legacy do_change_password_request accessed — redirecting to forgot_password');
+    $c->res->redirect($c->uri_for('/user/forgot_password'));
 }
 
 sub admin_manage_roles :Local :Args(1) {
@@ -2534,6 +2662,7 @@ sub admin_manage_roles :Local :Args(1) {
     }
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_manage_roles', '/admin/users');
         my @roles_arr      = $c->req->param('roles');
         my @new_site_names = $c->req->param('sitenames');
         my $roles_str      = join(',', @roles_arr);
@@ -2657,6 +2786,7 @@ sub admin_role_list :Local :Args(0) {
     my $sitename     = $c->session->{SiteName};
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_role_list', '/user/admin_role_list');
         my $action      = $c->req->params->{action} || 'create';
         my $role_name   = $c->req->params->{role_name};
         my $description = $c->req->params->{description} || '';
@@ -2751,6 +2881,8 @@ sub admin_role_list :Local :Args(0) {
 sub admin_delete_site_role :Local :Args(1) {
     my ($self, $c, $role_id) = @_;
 
+    return unless $self->_validate_csrf($c, 'admin_delete_site_role', '/user/admin_role_list');
+
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2842,111 +2974,6 @@ sub _load_available_roles {
         default_roles => \@default_roles,
         site_roles    => \@site_specific,
     };
-}
-
-sub register_project :Local :Args(0) {
-    my ($self, $c) = @_;
-
-    my $admin_auth = Comserv::Util::AdminAuth->new;
-    unless ($admin_auth->check_admin_access($c, 'register_project')) {
-        $c->response->status(403);
-        $c->stash(
-            error_msg => 'Access denied. Admin privileges required.',
-            template  => 'user/RegisterProject.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    my $schema = $c->model('DBEncy');
-    my $project_rs = $schema->resultset('Project');
-
-    my $project_name = 'Users';
-    my $sitename     = 'CSC';
-    my $result       = {};
-
-    eval {
-        my $existing = $project_rs->search(
-            { name => $project_name, sitename => $sitename },
-            { rows => 1 }
-        )->first;
-
-        if ($existing) {
-            $result = {
-                status     => 'exists',
-                project_id => $existing->id,
-                message    => "Project '$project_name' (ID: " . $existing->id . ") already registered for site $sitename.",
-            };
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-                "Project '$project_name' already exists with ID: " . $existing->id);
-        }
-        else {
-            my $wrong_site = $project_rs->search(
-                { name => $project_name },
-                { rows => 1 }
-            )->first;
-
-            if ($wrong_site) {
-                $wrong_site->update({ sitename => $sitename });
-                $result = {
-                    status     => 'updated',
-                    project_id => $wrong_site->id,
-                    message    => "Project '$project_name' (ID: " . $wrong_site->id . ") updated: sitename set to $sitename.",
-                };
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-                    "Updated project '$project_name' ID " . $wrong_site->id . " sitename to $sitename");
-            }
-            else {
-                my $now = DateTime->now;
-                my $new_project = $project_rs->create({
-                    name                => $project_name,
-                    description         => 'User and Admin Management System with email verification, password reset, role management, and site-based access control.',
-                    sitename            => $sitename,
-                    status              => 'In-Process',
-                    project_code        => 'USERS',
-                    start_date          => $now->ymd,
-                    end_date            => $now->clone->add(months => 3)->ymd,
-                    developer_name      => 'Development Team',
-                    client_name         => 'Internal',
-                    estimated_man_hours => 80,
-                    project_size        => 5,
-                    username_of_poster  => $c->session->{username} || 'admin',
-                    group_of_poster     => 'admin',
-                    date_time_posted    => $now->ymd . ' ' . $now->hms,
-                    record_id           => 0,
-                    comments            => 'Registered via register_project action.',
-                });
-                $result = {
-                    status     => 'created',
-                    project_id => $new_project->id,
-                    message    => "Project '$project_name' created with ID: " . $new_project->id . " for site $sitename.",
-                };
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-                    "Created project '$project_name' with ID: " . $new_project->id);
-            }
-        }
-    };
-    my $err = "$@" if $@;
-    if ($err) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'register_project',
-            "Error registering project: $err");
-        $self->send_error_notification($c, 'Project Registration Error', "Error: $err");
-        $c->stash(
-            error_msg => "Failed to register project: $err",
-            template  => 'user/RegisterProject.tt',
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register_project',
-        "register_project completed: $result->{message}");
-
-    $c->stash(
-        result   => $result,
-        template => 'user/RegisterProject.tt',
-    );
-    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;
