@@ -10,6 +10,7 @@ use Email::Sender::Transport::SMTP;
 use Comserv::Util::UserVerification;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::CSRF;
 use DateTime;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -50,6 +51,12 @@ sub send_error_notification {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_error_notification',
             "Failed to send error notification: $@");
     }
+}
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
+    return 1;
 }
 
 sub login :Local {
@@ -163,6 +170,8 @@ sub do_login :Local {
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
+
+    return unless $self->_validate_csrf($c, 'do_login', '/user/login');
 
     # Get user input — password field also accepts a 6-digit verification code
     my $username   = $c->req->body_parameters->{username} || $c->req->param('username') || '';
@@ -504,6 +513,24 @@ sub hash_password {
     return sha256_hex($password);
 }
 
+sub _validate_csrf {
+    my ($self, $c, $action_name, $redirect_to, $template) = @_;
+    $redirect_to //= '/user/login';
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
+            'CSRF token validation failed');
+        if ($template) {
+            $c->stash(error_msg => 'Invalid form submission. Please try again.', template => $template);
+            $c->forward($c->view('TT'));
+        } else {
+            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->response->redirect($c->uri_for($redirect_to));
+        }
+        return 0;
+    }
+    return 1;
+}
+
 sub logout :Local {
     my ($self, $c) = @_;
 
@@ -760,6 +787,8 @@ sub settings :Local {
 sub update_settings :Local {
     my ($self, $c) = @_;
 
+    return unless $self->_validate_csrf($c, 'update_settings', '/user/settings');
+
     # Check if user is logged in
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "You must be logged in to update settings.";
@@ -862,6 +891,8 @@ sub change_password :Local {
 
 sub do_change_password :Local {
     my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_change_password', '/user/change_password');
 
     # Check if user is logged in
     unless ($c->session->{username}) {
@@ -973,7 +1004,9 @@ sub create_account :Local {
 }
 sub do_create_account :Local {
     my ($self, $c) = @_;
-    
+
+    return unless $self->_validate_csrf($c, 'do_create_account', undef, 'user/register.tt');
+
     my $username = $c->request->params->{username} // '';
     my $email    = $c->request->params->{email}    // '';
 
@@ -1125,6 +1158,7 @@ sub verify_email :Local {
     }
     
     if ($c->request->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'verify_email', undef, 'user/VerifyEmail.tt');
         my $code = $c->request->params->{code};
         my $user_id = $c->session->{verification_user_id};
         
@@ -1177,6 +1211,7 @@ sub complete_profile :Local {
     }
     
     if ($c->request->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_profile', undef, 'user/CompleteProfile.tt');
         my $first_name = $c->request->params->{first_name};
         my $last_name = $c->request->params->{last_name};
         my $password = $c->request->params->{password};
@@ -1284,6 +1319,7 @@ sub admin_create_user :Local {
     my $available_roles = $self->_load_available_roles($c, $is_csc_admin, $sitename);
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_create_user', '/admin/users');
         my $first_name     = $c->req->params->{first_name};
         my $last_name      = $c->req->params->{last_name};
         my $email          = $c->req->params->{email};
@@ -1486,6 +1522,7 @@ sub complete_username_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_username_setup', undef, 'user/complete_username_setup.tt');
         my $input_code = $c->req->params->{code};
         my $username = $c->req->params->{username};
         my $first_name = $c->req->params->{first_name};
@@ -1599,6 +1636,7 @@ sub complete_password_setup :Local {
     }
     
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'complete_password_setup', undef, 'user/complete_password_setup.tt');
         my $input_code = $c->req->params->{code};
         my $password = $c->req->params->{password};
         my $password_confirm = $c->req->params->{password_confirm};
@@ -1758,6 +1796,8 @@ sub edit_user :Local :Args(1) {
 
 sub do_edit_user :Local :Args(1) {
     my ($self, $c) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_edit_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_edit_user')) {
@@ -1960,6 +2000,8 @@ sub do_edit_user :Local :Args(1) {
 sub admin_suspend_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
 
+    return unless $self->_validate_csrf($c, 'admin_suspend_user', '/admin/users');
+
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_suspend_user')) {
         $c->flash->{error_msg} = 'Access denied. Admin access required.';
@@ -2028,6 +2070,8 @@ sub admin_suspend_user :Local :Args(1) {
 
 sub admin_activate_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
+
+    return unless $self->_validate_csrf($c, 'admin_activate_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_activate_user')) {
@@ -2170,6 +2214,8 @@ sub admin_delete_user :Local :Args(1) {
 
 sub do_admin_delete_user :Local :Args(1) {
     my ($self, $c, $user_id) = @_;
+
+    return unless $self->_validate_csrf($c, 'do_admin_delete_user', '/admin/users');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'do_admin_delete_user')) {
@@ -2346,6 +2392,7 @@ sub forgot_password :Local {
     my $prefill = $c->req->param('email') || '';
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'forgot_password', undef, 'user/forgot_password.tt');
         my $input = $c->req->params->{email} || '';
         $input =~ s/^\s+|\s+$//g;
 
@@ -2472,6 +2519,7 @@ sub reset_password :Local {
     }
 
     # ── POST ─────────────────────────────────────────────────────────────────
+    return unless $self->_validate_csrf($c, 'reset_password', undef, 'user/reset_password.tt');
     my $new_password    = $c->req->param('new_password')    || '';
     my $password_confirm = $c->req->param('password_confirm') || '';
 
@@ -2614,6 +2662,7 @@ sub admin_manage_roles :Local :Args(1) {
     }
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_manage_roles', '/admin/users');
         my @roles_arr      = $c->req->param('roles');
         my @new_site_names = $c->req->param('sitenames');
         my $roles_str      = join(',', @roles_arr);
@@ -2737,6 +2786,7 @@ sub admin_role_list :Local :Args(0) {
     my $sitename     = $c->session->{SiteName};
 
     if ($c->req->method eq 'POST') {
+        return unless $self->_validate_csrf($c, 'admin_role_list', '/user/admin_role_list');
         my $action      = $c->req->params->{action} || 'create';
         my $role_name   = $c->req->params->{role_name};
         my $description = $c->req->params->{description} || '';
@@ -2830,6 +2880,8 @@ sub admin_role_list :Local :Args(0) {
 
 sub admin_delete_site_role :Local :Args(1) {
     my ($self, $c, $role_id) = @_;
+
+    return unless $self->_validate_csrf($c, 'admin_delete_site_role', '/user/admin_role_list');
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'admin_delete_site_role')) {
