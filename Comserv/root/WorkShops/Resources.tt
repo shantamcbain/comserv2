@@ -150,6 +150,13 @@
     [% IF c.flash.success_msg %]
         <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
     [% END %]
+    [% IF db_error %]
+        <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:16px;">
+            <strong>Note:</strong> The resource database table may not exist yet.
+            The system will create it automatically. If this message persists, contact an administrator.
+            [% IF c.session.debug_mode == 1 %]<br><small>[% db_error | html %]</small>[% END %]
+        </div>
+    [% END %]
 
     <!-- Upload Panel -->
     <details class="upload-panel" id="upload-panel">
@@ -210,8 +217,8 @@
         [% SET is_audio  = (ext == 'mp3' || ext == 'wav' || ext == 'ogg') %]
         [% SET ftype_class = is_image ? 'image' : is_office ? 'office' : is_pdf ? 'pdf' : is_video ? 'video' : is_audio ? 'audio' : 'other' %]
         [% SET icon = is_image ? '🖼️' : is_office ? '📊' : is_pdf ? '📄' : is_video ? '🎬' : is_audio ? '🎵' : '📦' %]
-        [% SET size_kb = r.file_size ? (r.file_size / 1024).int : 0 %]
-        [% SET size_label = size_kb > 1024 ? (size_kb / 1024).int _ ' MB' : size_kb _ ' KB' %]
+        [% SET size_raw = r.file_size ? r.file_size / 1024 : 0; SET size_kb = size_raw.int %]
+        [% SET size_mb = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb.int _ ' MB' : size_kb _ ' KB' %]
         [% SET uploader_name = r.uploader ? (r.uploader.first_name _ ' ' _ r.uploader.last_name) : 'Unknown' %]
 
         <div class="resource-card" data-ftype="[% ftype_class %]" data-name="[% r.file_name | lower | html %]">
