@@ -7,7 +7,7 @@
    page_version = "0.01"
    last_updated = "2026-02-26"
 %]
-[% PageVersion = 'WorkShops/Resources.tt,v 0.01 2026/02/26 shanta Exp' %]
+[% PageVersion = 'WorkShops/Resources.tt,v 0.02 2026/02/26 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 [% SET image_types  = ['jpg','jpeg','png','gif','svg'] %]
@@ -164,9 +164,16 @@
         </div>
     [% END %]
 
+    [% IF is_admin %]
+    <div class="alert alert-info" style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:0.9em;">
+        <strong>Admin view:</strong> Browsing full NFS storage at <code>[% scan_root | html %]</code>.
+        Workshop leaders see the <code>apis</code> subdirectory only.
+    </div>
+    [% END %]
+
     <!-- Upload Panel -->
     <details class="upload-panel" id="upload-panel">
-        <summary style="cursor:pointer; font-weight:bold; font-size:1.05em;">⬆️ Upload New File</summary>
+        <summary style="cursor:pointer; font-weight:bold; font-size:1.05em;">⬆️ Upload File to NFS</summary>
         <div style="margin-top:14px;">
         <form method="POST" action="/workshop/resource_upload" enctype="multipart/form-data">
             <div class="upload-row">
@@ -197,6 +204,43 @@
         </div>
     </details>
 
+    <!-- External Link Panel -->
+    <details class="upload-panel" style="margin-top:10px;">
+        <summary style="cursor:pointer; font-weight:bold; font-size:1.05em;">🔗 Add External Link</summary>
+        <div style="margin-top:14px;">
+        <p style="font-size:0.85em;color:var(--text-muted-color);margin:0 0 10px;">
+            Add a link to an off-site resource (book, PDF, video, article) without storing a copy locally.
+        </p>
+        <form method="POST" action="/workshop/resource_add_url">
+            <div class="upload-row">
+                <div class="form-group" style="flex:3; min-width:280px;">
+                    <label>URL <em>(http:// or https://)</em></label>
+                    <input type="url" name="external_url" placeholder="https://example.com/beekeeping-guide.pdf" required>
+                </div>
+                <div class="form-group" style="flex:2; min-width:200px;">
+                    <label>Title <em>(optional — auto-detected)</em></label>
+                    <input type="text" name="title" placeholder="Beekeeping Guide 2024">
+                </div>
+                <div class="form-group" style="flex:2; min-width:200px;">
+                    <label>Description <em>(optional)</em></label>
+                    <input type="text" name="description" placeholder="Brief description">
+                </div>
+                <div class="form-group" style="min-width:160px;">
+                    <label>Access</label>
+                    <select name="access_level">
+                        <option value="site_only">My Site Only</option>
+                        <option value="all_leaders">All Leaders</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn btn-primary">Add Link</button>
+                </div>
+            </div>
+        </form>
+        </div>
+    </details>
+
     <!-- File Type Filter -->
     <div style="margin-bottom: 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <strong>Filter:</strong>
@@ -207,6 +251,7 @@
         <button class="btn btn-sm filter-btn" data-filter="video">🎬 Video</button>
         <button class="btn btn-sm filter-btn" data-filter="audio">🎵 Audio</button>
         <button class="btn btn-sm filter-btn" data-filter="other">📦 Other</button>
+        <button class="btn btn-sm filter-btn" data-filter="link">🔗 Links</button>
         &nbsp;|&nbsp;
         <input type="text" id="search-box" placeholder="Search by name..." style="padding:4px 8px; border:1px solid #ccc; border-radius:4px;">
     </div>
@@ -221,14 +266,16 @@
         [% SET is_pdf    = (ext == 'pdf') %]
         [% SET is_video  = (ext == 'mp4' || ext == 'mov' || ext == 'avi') %]
         [% SET is_audio  = (ext == 'mp3' || ext == 'wav' || ext == 'ogg') %]
-        [% SET ftype_class = is_image ? 'image' : is_office ? 'office' : is_pdf ? 'pdf' : is_video ? 'video' : is_audio ? 'audio' : 'other' %]
-        [% SET icon = is_image ? '🖼️' : is_office ? '📊' : is_pdf ? '📄' : is_video ? '🎬' : is_audio ? '🎵' : '📦' %]
+        [% SET is_link   = r.external_url ? 1 : 0 %]
+        [% SET ftype_class = is_link ? 'link' : is_image ? 'image' : is_office ? 'office' : is_pdf ? 'pdf' : is_video ? 'video' : is_audio ? 'audio' : 'other' %]
+        [% SET icon = is_link ? '🔗' : is_image ? '🖼️' : is_office ? '📊' : is_pdf ? '📄' : is_video ? '🎬' : is_audio ? '🎵' : '📦' %]
         [% SET size_raw = r.file_size ? r.file_size / 1024 : 0; SET size_kb = size_raw.int %]
-        [% SET size_mb = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb.int _ ' MB' : size_kb _ ' KB' %]
+        [% SET size_mb_raw = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb_raw.int _ ' MB' : size_kb > 0 ? size_kb _ ' KB' : '' %]
         [% SET uploader_name = r.uploaded_by ? r.uploaded_by : 'Unknown' %]
+        [% SET thumb_click = r.id ? "openResourceModal(" _ r.id _ ", '" _ r.file_name _ "', '" _ ftype_class _ "')" : '' %]
 
         <div class="resource-card" data-ftype="[% ftype_class %]" data-name="[% r.file_name | lower | html %]">
-            <div class="resource-thumb" [% IF r.id %]onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" style="cursor:pointer"[% END %]>
+            <div class="resource-thumb" [% IF thumb_click %]onclick="[% thumb_click %]" style="cursor:pointer"[% END %]>
                 [% IF is_image && r.id %]
                     <img src="/workshop/resource_view/[% r.id %]" alt="[% r.file_name | html %]" loading="lazy">
                 [% ELSE %]
@@ -242,10 +289,16 @@
                 [% IF r.description %]
                 <div class="file-meta" style="margin-bottom:4px;">[% r.description | html %]</div>
                 [% END %]
+                [% IF is_link %]
+                <div class="file-meta" style="word-break:break-all;">
+                    <a href="[% r.external_url | html %]" target="_blank" rel="noopener noreferrer" style="font-size:0.8em;">[% r.external_url | html %]</a>
+                </div>
+                [% ELSE %]
                 <div class="file-meta">
-                    [% size_label %] &bull; [% r.file_ext | upper %]
+                    [% IF size_label %][% size_label %] &bull; [% END %][% r.file_ext | upper %]
                     [% IF r.sitename %] &bull; [% r.sitename | html %][% END %]
                 </div>
+                [% END %]
                 <div class="file-meta">By [% uploader_name | html %]</div>
                 [% IF r.access_level == 'all_leaders' %]
                     <span class="badge-access badge-all">All Leaders</span>
@@ -256,11 +309,21 @@
                 [% END %]
             </div>
             <div class="resource-actions">
-                [% IF r.id %]
+                [% IF is_link %]
+                <a href="[% r.external_url | html %]" target="_blank" rel="noopener noreferrer" class="btn btn-sm" title="Open Link">🔗 Open</a>
+                [% SET cur_uid = c.session.user_id %]
+                [% SET can_delete = is_csc || (r.id && r.uploaded_by == cur_uid) %]
+                [% IF can_delete && r.id %]
+                <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
+                      onsubmit="return confirm('Remove link [% r.file_name | html %]?');">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Remove">🗑️</button>
+                </form>
+                [% END %]
+                [% ELSIF r.id %]
                 <a href="/workshop/resource_download/[% r.id %]" class="btn btn-sm" title="Download">⬇️</a>
                 <button class="btn btn-sm" onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" title="View Info">🔍</button>
                 [% SET cur_uid = c.session.user_id %]
-                [% SET can_delete = is_csc || (r.in_db && r.uploaded_by == cur_uid) %]
+                [% SET can_delete = is_csc || r.uploaded_by == cur_uid %]
                 [% IF can_delete %]
                 <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                       onsubmit="return confirm('Delete [% r.file_name | html %]?');">
