@@ -1424,7 +1424,26 @@ sub download :Local :Args(1) {
 }
 
 sub _nfs_root {
-    return $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+    return $configured if -d $configured;
+
+    # Fallback for dev environments where NFS is not mounted:
+    # try /opt/comserv/workshop_resources, then ~/workshop_resources
+    for my $fallback (
+        '/opt/comserv/workshop_resources',
+        ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
+    ) {
+        if (-d $fallback) {
+            return $fallback;
+        }
+        # Auto-create the fallback dir if we can write to its parent
+        my $parent = $fallback =~ s{/[^/]+$}{}r;
+        if (-d $parent && -w $parent) {
+            mkdir($fallback, 0755) and return $fallback;
+        }
+    }
+
+    return $configured;  # Return configured path even if not mounted
 }
 
 sub _can_manage_resource {
