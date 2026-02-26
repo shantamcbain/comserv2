@@ -150,10 +150,16 @@
     [% IF c.flash.success_msg %]
         <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
     [% END %]
-    [% IF db_error %]
+    [% IF NOT nfs_available %]
         <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:16px;">
-            <strong>Note:</strong> The resource database table may not exist yet.
-            The system will create it automatically. If this message persists, contact an administrator.
+            <strong>NFS share not mounted.</strong> The shared file storage at <code>[% nfs_root | html %]</code>
+            is not available. Files cannot be browsed or uploaded until the share is mounted.
+            Contact the server administrator to mount <code>192.168.1.175:/data/apis</code>.
+        </div>
+    [% ELSIF db_error %]
+        <div class="alert alert-info" style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px;border-radius:4px;margin-bottom:16px;">
+            <strong>Note:</strong> The resource database table is not yet created — showing filesystem files only.
+            Descriptions and access levels will be available after the first upload.
             [% IF c.session.debug_mode == 1 %]<br><small>[% db_error | html %]</small>[% END %]
         </div>
     [% END %]
@@ -219,11 +225,11 @@
         [% SET icon = is_image ? '🖼️' : is_office ? '📊' : is_pdf ? '📄' : is_video ? '🎬' : is_audio ? '🎵' : '📦' %]
         [% SET size_raw = r.file_size ? r.file_size / 1024 : 0; SET size_kb = size_raw.int %]
         [% SET size_mb = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb.int _ ' MB' : size_kb _ ' KB' %]
-        [% SET uploader_name = r.uploader ? (r.uploader.first_name _ ' ' _ r.uploader.last_name) : 'Unknown' %]
+        [% SET uploader_name = r.uploaded_by ? r.uploaded_by : 'Unknown' %]
 
         <div class="resource-card" data-ftype="[% ftype_class %]" data-name="[% r.file_name | lower | html %]">
-            <div class="resource-thumb" onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')">
-                [% IF is_image %]
+            <div class="resource-thumb" [% IF r.id %]onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" style="cursor:pointer"[% END %]>
+                [% IF is_image && r.id %]
                     <img src="/workshop/resource_view/[% r.id %]" alt="[% r.file_name | html %]" loading="lazy">
                 [% ELSE %]
                     [% icon %]
@@ -250,15 +256,26 @@
                 [% END %]
             </div>
             <div class="resource-actions">
+                [% IF r.id %]
                 <a href="/workshop/resource_download/[% r.id %]" class="btn btn-sm" title="Download">⬇️</a>
                 <button class="btn btn-sm" onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" title="View Info">🔍</button>
-                [% SET user_id = c.session.user_id %]
-                [% SET can_delete = (r.uploaded_by == user_id) || is_csc || (c.session.admin_type == 'standard' && r.sitename == sitename) %]
+                [% SET cur_uid = c.session.user_id %]
+                [% SET can_delete = is_csc || (r.in_db && r.uploaded_by == cur_uid) %]
                 [% IF can_delete %]
                 <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                       onsubmit="return confirm('Delete [% r.file_name | html %]?');">
                     <button type="submit" class="btn btn-sm btn-danger" title="Delete">🗑️</button>
                 </form>
+                [% END %]
+                [% ELSE %]
+                <a href="/workshop/resource_fs_download?path=[% r.file_path | uri %]" class="btn btn-sm" title="Download">⬇️</a>
+                [% IF is_csc %]
+                <form method="POST" action="/workshop/resource_fs_delete" style="display:inline;"
+                      onsubmit="return confirm('Delete [% r.file_name | html %] from NFS?');">
+                    <input type="hidden" name="path" value="[% r.file_path | html %]">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Delete from NFS">🗑️</button>
+                </form>
+                [% END %]
                 [% END %]
             </div>
         </div>

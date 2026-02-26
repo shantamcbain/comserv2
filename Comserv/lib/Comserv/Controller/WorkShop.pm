@@ -1489,8 +1489,10 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $nfs_root   = $self->_nfs_root();
 
-    my @resources;
+    # Build a lookup of DB records keyed by file_path for metadata enrichment
+    my %db_by_path;
     my $db_error;
     eval {
         my $schema = $c->model('DBEncy');
@@ -1504,23 +1506,94 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 ]
             };
         }
-        @resources = $schema->resultset('WorkshopResource')->search(
+        my @db_rows = $schema->resultset('WorkshopResource')->search(
             $filter,
-            { order_by => { -desc => 'created_at' }, prefetch => 'uploader' }
+            { order_by => { -desc => 'created_at' } }
         )->all;
+        for my $row (@db_rows) {
+            $db_by_path{ $row->file_path } = $row;
+        }
     };
     if ($@) {
         $db_error = $@;
         $c->log->error("Resource library DB error: $db_error");
     }
 
+    # Scan NFS filesystem directly so existing files always appear
+    my @resources;
+    my $nfs_available = -d $nfs_root;
+    if ($nfs_available) {
+        my @fs_files;
+        eval {
+            my $scan;
+            $scan = sub {
+                my ($dir, $rel_prefix) = @_;
+                return unless opendir(my $dh, $dir);
+                while (my $entry = readdir($dh)) {
+                    next if $entry =~ /^\./;
+                    my $full = "$dir/$entry";
+                    my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
+                    if (-d $full) {
+                        $scan->($full, $rel);
+                    } elsif (-f $full) {
+                        my ($ext) = ($entry =~ /\.([^.]+)$/);
+                        $ext = lc($ext // '');
+                        my $size = -s $full;
+                        my $db_row = $db_by_path{$rel};
+                        push @fs_files, {
+                            id          => $db_row ? $db_row->id : undef,
+                            file_name   => $entry,
+                            file_path   => $rel,
+                            file_ext    => $ext,
+                            file_size   => $size,
+                            file_type   => $MIME_MAP{$ext} // 'application/octet-stream',
+                            description => $db_row ? ($db_row->description // '') : '',
+                            access_level=> $db_row ? ($db_row->access_level // 'site_only') : 'site_only',
+                            sitename    => $db_row ? ($db_row->sitename // '') : '',
+                            uploaded_by => '',
+                            in_db       => $db_row ? 1 : 0,
+                            full_path   => $full,
+                        };
+                    }
+                }
+                closedir($dh);
+            };
+            $scan->($nfs_root, '');
+        };
+        if ($@) {
+            $c->log->error("NFS scan error: $@");
+        }
+        # Sort newest first by filesystem mtime fallback, then name
+        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @fs_files;
+    } else {
+        # NFS not mounted — fall back to DB records only
+        for my $row (values %db_by_path) {
+            push @resources, {
+                id          => $row->id,
+                file_name   => $row->file_name,
+                file_path   => $row->file_path,
+                file_ext    => $row->file_ext // '',
+                file_size   => $row->file_size // 0,
+                file_type   => $row->file_type // 'application/octet-stream',
+                description => $row->description // '',
+                access_level=> $row->access_level // 'site_only',
+                sitename    => $row->sitename // '',
+                uploaded_by => '',
+                in_db       => 1,
+                full_path   => "$nfs_root/" . $row->file_path,
+            };
+        }
+        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @resources;
+    }
+
     $c->stash(
-        resources  => \@resources,
-        is_csc     => $is_csc,
-        sitename   => $sitename,
-        nfs_root   => $self->_nfs_root(),
-        db_error   => $db_error,
-        template   => 'WorkShops/Resources.tt',
+        resources     => \@resources,
+        is_csc        => $is_csc,
+        sitename      => $sitename,
+        nfs_root      => $nfs_root,
+        nfs_available => $nfs_available,
+        db_error      => $db_error,
+        template      => 'WorkShops/Resources.tt',
     );
 }
 
@@ -1775,6 +1848,97 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
         $c->flash->{error_msg} = "Failed to remove database record: $@";
     } else {
         $c->flash->{success_msg} = "File '$name' deleted.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
+sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to download files.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $rel_path = $c->req->param('path') // '';
+    $rel_path =~ s{\.\.}{}g;  # strip path traversal
+    $rel_path =~ s{^/+}{};
+
+    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    unless (-f $full_path) {
+        $c->flash->{error_msg} = 'File not found on storage.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my ($filename) = ($rel_path =~ m{([^/]+)$});
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    my $content_type = $MIME_MAP{ lc($ext // '') } // 'application/octet-stream';
+
+    my $data;
+    eval {
+        open my $fh, '<:raw', $full_path or die "Cannot open: $!";
+        $data = do { local $/; <$fh> };
+        close $fh;
+    };
+    if ($@) {
+        $c->log->error("resource_fs_download read error: $@");
+        $c->flash->{error_msg} = "Could not read file: $@";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    $c->response->content_type($content_type);
+    $c->response->header('Content-Disposition' => 'attachment; filename="' . $filename . '"');
+    $c->response->body($data);
+}
+
+sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($admin_type eq 'csc' || $admin_type eq 'special') {
+        $c->flash->{error_msg} = 'Only CSC admins can delete NFS files directly.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $rel_path = $c->req->param('path') // '';
+    $rel_path =~ s{\.\.}{}g;
+    $rel_path =~ s{^/+}{};
+
+    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    my ($filename) = ($rel_path =~ m{([^/]+)$});
+
+    if (-f $full_path) {
+        unlink($full_path) or do {
+            $c->flash->{error_msg} = "Could not delete '$filename': $!";
+            $c->response->redirect($c->uri_for('/workshop/resources'));
+            return;
+        };
+        $c->flash->{success_msg} = "File '$filename' deleted from NFS.";
+    } else {
+        $c->flash->{error_msg} = "File not found: $rel_path";
     }
 
     $c->response->redirect($c->uri_for('/workshop/resources'));
