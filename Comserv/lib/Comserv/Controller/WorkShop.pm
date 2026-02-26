@@ -589,9 +589,9 @@ sub _check_workshop_access {
     }
     
     # For non-view access or private workshops, user must be logged in
-    return 0 unless $c->user_exists;
-    
+    # Use session data - this app uses session-based auth, not Catalyst::Plugin::Authentication
     my $user_id = $c->session->{user_id};
+    return 0 unless $user_id;
     my $sitename = $c->session->{SiteName};
     my $roles = $c->session->{roles} || [];
     
@@ -655,9 +655,8 @@ sub _check_workshop_access {
 sub _is_workshop_leader {
     my ($self, $c, $workshop) = @_;
     
-    return 0 unless $c->user_exists;
-    
     my $user_id = $c->session->{user_id};
+    return 0 unless $user_id;
     
     $c->log->info("_is_workshop_leader check:");
     $c->log->info("  user_id: " . ($user_id || 'NULL'));
