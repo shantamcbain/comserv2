@@ -496,8 +496,15 @@ sub edit :Path('/workshop/edit') :Args(1) {
 
     # For GET requests, display the edit form
     if ($c->request->method eq 'GET') {
-        # Format the date to 'YYYY-MM-DD'
-        my $formatted_date = $workshop->date->strftime('%Y-%m-%d');
+        my $raw_date = $workshop->date;
+        my $formatted_date = '';
+        if ($raw_date) {
+            if (ref($raw_date) && $raw_date->can('strftime')) {
+                $formatted_date = $raw_date->strftime('%Y-%m-%d');
+            } else {
+                ($formatted_date = "$raw_date") =~ s/ .*$//;
+            }
+        }
 
         $c->stash(
             workshop => $workshop,
@@ -941,8 +948,14 @@ sub register :Local :Args(1) {
             my $base_uri = $c->req->base;
             my $full_url = $base_uri . $workshop_url;
             
-            my $formatted_date = $workshop->date ? $workshop->date->strftime('%Y-%m-%d') : 'TBD';
-            my $formatted_time = $workshop->time ? $workshop->time->strftime('%H:%M') : 'TBD';
+            my $formatted_date = do {
+                my $d = $workshop->date;
+                $d ? (ref($d) && $d->can('strftime') ? $d->strftime('%Y-%m-%d') : do { (my $s = "$d") =~ s/ .*$//; $s }) : 'TBD';
+            };
+            my $formatted_time = do {
+                my $t = $workshop->time;
+                $t ? (ref($t) && $t->can('strftime') ? $t->strftime('%H:%M') : substr("$t", 0, 5)) : 'TBD';
+            };
             my $formatted_end_time = $workshop->end_time || '';
             
             my $user_name = '';
@@ -1747,8 +1760,14 @@ sub send_email :Local :Args(1) {
     my $base_uri = $c->req->base;
     my $full_url = $base_uri . $workshop_url;
     
-    my $formatted_date = $workshop->date ? $workshop->date->strftime('%Y-%m-%d') : 'TBD';
-    my $formatted_time = $workshop->time ? $workshop->time->strftime('%H:%M') : 'TBD';
+    my $formatted_date = do {
+        my $d = $workshop->date;
+        $d ? (ref($d) && $d->can('strftime') ? $d->strftime('%Y-%m-%d') : do { (my $s = "$d") =~ s/ .*$//; $s }) : 'TBD';
+    };
+    my $formatted_time = do {
+        my $t = $workshop->time;
+        $t ? (ref($t) && $t->can('strftime') ? $t->strftime('%H:%M') : substr("$t", 0, 5)) : 'TBD';
+    };
     my $formatted_end_time = $workshop->end_time || '';
     
     my $sent_count = 0;
