@@ -12,6 +12,7 @@ services:
       CATALYST_DEBUG: 1
       WEB_PORT: 3000
       TZ: UTC
+      CATALYST_SERVER_IP: "${CATALYST_SERVER_IP:-192.168.1.199}"
       # Database credentials from K8s Secrets or .env file (gitignored)
       # Load from: kubernetes secrets -> environment variables -> .env file (local dev)
       # Never use hardcoded defaults in this file - require explicit configuration

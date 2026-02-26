@@ -176,18 +176,19 @@ Returns the name of the application directory (workflow)
 sub get_app_workflow {
     my ($class, $app_home) = @_;
     
-    # CRITICAL: Ensure we have a valid app_home
     return 'Unknown' if !$app_home;
     
     my $workflow = 'Unknown';
     eval {
-        require File::Spec;
         require File::Basename;
+        require Cwd;
         
-        # If app_home is /home/shanta/PycharmProjects/comserv2/Comserv
-        # catdir(.., '..') gives /home/shanta/PycharmProjects/comserv2
-        # basename gives 'comserv2'
-        $workflow = File::Basename::basename(File::Spec->catdir($app_home, '..'));
+        # Use dirname + abs_path to properly resolve the parent directory
+        # e.g. /home/user/.zenflow/worktrees/workshops-7d21/Comserv -> workshops-7d21
+        # e.g. /opt/comserv -> opt (production Docker)
+        my $parent = File::Basename::dirname($app_home);
+        my $resolved = Cwd::abs_path($parent) || $parent;
+        $workflow = File::Basename::basename($resolved);
     };
     
     return $workflow || 'Unknown';

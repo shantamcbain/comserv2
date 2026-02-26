@@ -677,9 +677,11 @@ sub auto :Private {
             "system_info->{ip}='" . (defined $system_info->{ip} ? $system_info->{ip} : 'UNDEF') . "', " .
             "db_host='$db_host'");
         
-        # Set server_hostname to the actual database host (primary server)
-        # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
-        my $display_hostname = $db_host ne 'Unknown' ? $db_host : $system_info->{hostname};
+        # Set server_hostname to the Catalyst web server's IP (NOT the database host).
+        # The database host is already shown in the Databases section of the debug bar.
+        # Allow override via CATALYST_SERVER_IP env var (useful in Docker to show host LAN IP).
+        my $catalyst_ip = $ENV{CATALYST_SERVER_IP} || $system_info->{ip};
+        my $display_hostname = ($catalyst_ip && $catalyst_ip ne 'Unknown') ? $catalyst_ip : $system_info->{hostname};
         # Final safety check - ensure it's never empty or undef
         $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
         
