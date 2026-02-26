@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.71' %]
-[% date_iso = '2026/02/21' %]
-[% formatted_date = 'February 21, 2026' %]
-[% time = '07:52:00' %]
-[% change_log = 'WorkShops: Added theme-compliant status styling with project terminology (Requested, Public, In-Progress, Testing, Delivered). Enhanced status badges with icons and theme CSS variables for consistency across all project containers.' %]
+[% version = '0.72' %]
+[% date_iso = '2026/02/26' %]
+[% formatted_date = 'February 26, 2026' %]
+[% time = '10:15:00' %]
+[% change_log = 'Docker section: Added Environment Variables Admin UI sub-project (delivered). Added jump link EnvVarsAdmin. Created Documentation/EnvironmentVariablesManagement.tt tutorial.' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -222,7 +222,8 @@ last_updated = '2026/02/08'
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-docker-k8s" class="jump-link">✅ Docker Bug (COMPLETED)</a></strong>:
-                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a>
+                        <a href="#anchor-dockerbug-completed" class="jump-link">DockerBugFix</a> |
+                        <a href="#anchor-env-vars-admin" class="jump-link">EnvVarsAdmin</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-arch" class="jump-link">🏗️ Architecture & Infrastructure</a></strong>:
@@ -466,6 +467,31 @@ last_updated = '2026/02/08'
                             <p><strong>✅ RESOLVED:</strong> Docker containers now start successfully on both development (port 3000) and production (port 5000).</p>
                         </div>
                         <p><strong>Lessons Learned:</strong> Explicit dependencies in cpanfile, correct secrets mount paths, and using <code>DBD::MariaDB</code> instead of <code>DBD::mysql</code>.</p>
+                    </div>
+                </details>
+
+                <!-- Sub-project: Environment Variables Admin UI (DELIVERED) -->
+                <div id="anchor-env-vars-admin" class="nav-anchor"></div>
+                <details id="env-vars-admin" class="priority-container">
+                    <summary class="priority-summary">✅ Environment Variables Admin UI - DELIVERED (Feb 2026)</summary>
+                    <div class="priority-content">
+                        <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                            <p><strong>✅ DELIVERED:</strong> Administrators can now manage the <code>.env</code> file via the web UI at
+                            <a href="/admin/environment_variables">/admin/environment_variables</a> without needing SSH or direct file access.</p>
+                        </div>
+                        <p><strong>Features delivered:</strong></p>
+                        <ul>
+                            <li>List all <code>.env</code> variables with secret masking (PASSWORD, SECRET, TOKEN, KEY, PASS patterns)</li>
+                            <li>Create, edit, and delete variables through the browser</li>
+                            <li>Export the full <code>.env</code> file for backup or transfer</li>
+                            <li>Automatic backup before each write operation</li>
+                            <li>All actions logged at INFO level with admin identity</li>
+                            <li><code>CATALYST_SERVER_IP</code> override — fixes Docker containers showing internal IP (e.g. <code>172.20.0.2</code>) in the admin debug bar instead of the host LAN IP</li>
+                        </ul>
+                        <p><strong>Related fixes:</strong> Admin debug bar now shows a single <strong>"Server: &lt;workflow&gt; (&lt;ip&gt;)"</strong> field instead of the duplicate "Catalyst Server" + "Server IP" that were both showing the DB host IP.</p>
+                        <p><strong>Documentation:</strong> <a href="/Documentation/EnvironmentVariablesManagement" target="_blank">Environment Variables Management Tutorial</a></p>
+                        <p><strong>Controller:</strong> <code>Comserv/lib/Comserv/Controller/Admin/EnvironmentVariables.pm</code><br>
+                           <strong>Utility:</strong> <code>Comserv/lib/Comserv/Util/EnvFileManager.pm</code></p>
                     </div>
                 </details>
 
