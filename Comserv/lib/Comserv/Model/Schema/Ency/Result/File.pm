@@ -63,6 +63,42 @@ __PACKAGE__->add_columns(
     user_id => {
         data_type => 'integer',
     },
+    nfs_path => {
+        data_type   => 'varchar',
+        size        => 1000,
+        is_nullable => 1,
+    },
+    external_url => {
+        data_type   => 'varchar',
+        size        => 1000,
+        is_nullable => 1,
+    },
+    access_level => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 1,
+        default_value => 'site_only',
+    },
+    source_type => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 1,
+        default_value => 'nfs',
+    },
+    sitename => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    is_duplicate => {
+        data_type     => 'tinyint',
+        default_value => 0,
+        is_nullable   => 1,
+    },
+    duplicate_of => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(
