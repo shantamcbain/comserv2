@@ -14,6 +14,8 @@ services:
       TZ: UTC
       # Set in .env file: CATALYST_SERVER_IP=192.168.1.199  (host LAN IP, shown in admin bar)
       CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"
+      # NFS resource library path. Dev: local dir; Prod: /data/apis (NFS mount)
+      WORKSHOP_RESOURCES_PATH: "${WORKSHOP_RESOURCES_PATH:-/opt/comserv/workshop_resources}"
       # Database credentials from K8s Secrets or .env file (gitignored)
       # Load from: kubernetes secrets -> environment variables -> .env file (local dev)
       # Never use hardcoded defaults in this file - require explicit configuration

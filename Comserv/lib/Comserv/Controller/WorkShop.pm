@@ -1423,6 +1423,296 @@ sub download :Local :Args(1) {
     $c->response->body($file_data);
 }
 
+sub _nfs_root {
+    return $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+}
+
+sub _can_manage_resource {
+    my ($self, $c, $resource) = @_;
+    my $user_id  = $c->session->{user_id} // return 0;
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    return 1 if $admin_type eq 'csc' || $admin_type eq 'special';
+    my $sitename = $c->session->{SiteName} // '';
+    return 1 if $admin_type eq 'standard' && $sitename eq ($resource->sitename // '');
+    return 1 if ($resource->uploaded_by // -1) == $user_id;
+    return 0;
+}
+
+sub _can_access_resources {
+    my ($self, $c) = @_;
+    my $user_id = $c->session->{user_id} // return 0;
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    return 1 if $admin_type && $admin_type ne 'none';
+    my $roles = $c->session->{roles} || [];
+    return 1 if ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+    return 0;
+}
+
+my %MIME_MAP = (
+    pdf  => 'application/pdf',
+    ppt  => 'application/vnd.ms-powerpoint',
+    pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    doc  => 'application/msword',
+    docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls  => 'application/vnd.ms-excel',
+    xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    jpg  => 'image/jpeg',
+    jpeg => 'image/jpeg',
+    png  => 'image/png',
+    gif  => 'image/gif',
+    svg  => 'image/svg+xml',
+    mp4  => 'video/mp4',
+    mp3  => 'audio/mpeg',
+    zip  => 'application/zip',
+    txt  => 'text/plain',
+);
+
+sub resources :Path('/workshop/resources') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $user_id   = $c->session->{user_id};
+    my $sitename  = $c->session->{SiteName} // '';
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc    = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    my $schema = $c->model('DBEncy');
+    my $filter = {};
+    unless ($is_csc) {
+        $filter = {
+            -or => [
+                { access_level => 'all_leaders' },
+                { sitename => $sitename },
+                { uploaded_by => $user_id },
+            ]
+        };
+    }
+
+    my @resources = $schema->resultset('WorkshopResource')->search(
+        $filter,
+        { order_by => { -desc => 'created_at' }, prefetch => 'uploader' }
+    )->all;
+
+    $c->stash(
+        resources  => \@resources,
+        is_csc     => $is_csc,
+        sitename   => $sitename,
+        nfs_root   => $self->_nfs_root(),
+        template   => 'WorkShops/Resources.tt',
+    );
+}
+
+sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_can_access_resources($c)) {
+        $c->response->status(403);
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    return unless $c->req->method eq 'POST';
+
+    my $upload    = $c->req->upload('file');
+    my $desc      = $c->req->param('description') // '';
+    my $access    = $c->req->param('access_level') // 'site_only';
+    my $user_id   = $c->session->{user_id};
+    my $sitename  = $c->session->{SiteName} // '';
+    my $nfs_root  = $self->_nfs_root();
+
+    unless ($upload) {
+        $c->flash->{error_msg} = 'No file selected.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $filename = $upload->filename;
+    $filename =~ s/[^A-Za-z0-9._-]/_/g;
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+
+    my $subdir = $sitename || 'shared';
+    my $dest_dir = "$nfs_root/$subdir";
+    unless (-d $dest_dir) {
+        eval { mkdir $dest_dir, 0755 };
+        if ($@) {
+            $c->flash->{error_msg} = "Cannot create directory '$subdir' on NFS: $@";
+            $c->response->redirect($c->uri_for('/workshop/resources'));
+            return;
+        }
+    }
+
+    my $dest_path = "$dest_dir/$filename";
+    if (-e $dest_path) {
+        my $ts = time();
+        $dest_path = "$dest_dir/${ts}_$filename";
+        $filename  = "${ts}_$filename";
+    }
+
+    eval { $upload->copy_to($dest_path) };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to write file to NFS: $@";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $rel_path  = "$subdir/$filename";
+    my $file_size = -s $dest_path;
+    my $mime_type = $MIME_MAP{$ext} // 'application/octet-stream';
+
+    eval {
+        $c->model('DBEncy')->resultset('WorkshopResource')->create({
+            file_name    => $filename,
+            file_path    => $rel_path,
+            file_type    => $mime_type,
+            file_ext     => $ext,
+            file_size    => $file_size,
+            description  => $desc,
+            uploaded_by  => $user_id,
+            sitename     => $sitename,
+            access_level => $access,
+        });
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "File written to NFS but DB record failed: $@";
+    } else {
+        $c->flash->{success_msg} = "File '$filename' uploaded successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
+sub resource_download :Path('/workshop/resource_download') :Args(1) {
+    my ($self, $c, $resource_id) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to download files.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $resource = $c->model('DBEncy::WorkshopResource')->find($resource_id);
+    unless ($resource) {
+        $c->flash->{error_msg} = 'Resource not found.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    unless (-f $full_path) {
+        $c->flash->{error_msg} = 'File not found on storage: ' . $resource->file_path;
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $content_type = $resource->file_type || 'application/octet-stream';
+    open my $fh, '<:raw', $full_path or do {
+        $c->flash->{error_msg} = "Cannot read file: $!";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    };
+    my $data = do { local $/; <$fh> };
+    close $fh;
+
+    $c->response->content_type($content_type);
+    $c->response->header('Content-Disposition' => 'attachment; filename="' . $resource->file_name . '"');
+    $c->response->body($data);
+}
+
+sub resource_view :Path('/workshop/resource_view') :Args(1) {
+    my ($self, $c, $resource_id) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body('{"error":"Not logged in"}');
+        return;
+    }
+
+    my $resource = $c->model('DBEncy::WorkshopResource')->find($resource_id);
+    unless ($resource) {
+        $c->response->status(404);
+        $c->response->content_type('application/json');
+        $c->response->body('{"error":"Not found"}');
+        return;
+    }
+
+    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    my $is_image  = ($resource->file_type // '') =~ m{^image/};
+
+    if ($is_image && -f $full_path) {
+        my $content_type = $resource->file_type;
+        open my $fh, '<:raw', $full_path or do {
+            $c->response->status(500);
+            $c->response->body('Cannot read image');
+            return;
+        };
+        my $data = do { local $/; <$fh> };
+        close $fh;
+        $c->response->content_type($content_type);
+        $c->response->body($data);
+    } else {
+        use POSIX qw(strftime);
+        my $size_kb = int(($resource->file_size || 0) / 1024);
+        my $uploader = $resource->uploader;
+        my $uploader_name = $uploader
+            ? (($uploader->first_name || '') . ' ' . ($uploader->last_name || '') || $uploader->username)
+            : 'Unknown';
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(
+            '{"file_name":"' . ($resource->file_name // '') . '",' .
+            '"file_type":"' . ($resource->file_type // '') . '",' .
+            '"file_ext":"'  . ($resource->file_ext  // '') . '",' .
+            '"file_size_kb":' . $size_kb . ',' .
+            '"description":"' . ($resource->description // '') . '",' .
+            '"sitename":"' . ($resource->sitename // '') . '",' .
+            '"access_level":"' . ($resource->access_level // '') . '",' .
+            '"uploaded_by":"' . $uploader_name . '"}'
+        );
+    }
+}
+
+sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
+    my ($self, $c, $resource_id) = @_;
+
+    my $resource = $c->model('DBEncy::WorkshopResource')->find($resource_id);
+    unless ($resource) {
+        $c->flash->{error_msg} = 'Resource not found.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($self->_can_manage_resource($c, $resource)) {
+        $c->flash->{error_msg} = 'Access denied. Only the file owner or site admin can delete files.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    if (-f $full_path) {
+        unlink $full_path or $c->log->warn("Could not delete NFS file: $!");
+    }
+
+    my $name = $resource->file_name;
+    eval { $resource->delete };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to remove DB record: $@";
+    } else {
+        $c->flash->{success_msg} = "File '$name' deleted.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
 sub content :Local :Args(1) {
     my ($self, $c, $id) = @_;
     
