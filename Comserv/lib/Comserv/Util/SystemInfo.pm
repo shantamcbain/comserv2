@@ -48,6 +48,13 @@ Returns the IP address of the server
 sub get_server_ip {
     my $ip;
     
+    # Method 0: Operator-supplied override via env var.
+    # Used in Docker where the container IP is internal and meaningless to admins.
+    # Set CATALYST_SERVER_IP=192.168.1.x in the .env file alongside docker-compose.
+    if ($ENV{CATALYST_SERVER_IP} && $ENV{CATALYST_SERVER_IP} ne '') {
+        return $ENV{CATALYST_SERVER_IP};
+    }
+    
     # Try multiple methods to get the server IP
     
     # Method 1: Check for Docker environment and get container IP
