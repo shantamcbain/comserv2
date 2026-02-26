@@ -1428,8 +1428,9 @@ sub _nfs_root {
     return $configured if -d $configured;
 
     # Fallback for dev environments where NFS is not mounted:
-    # try /opt/comserv/workshop_resources, then ~/workshop_resources
+    # try ~/nfs (dev NFS mount), /opt/comserv/workshop_resources, then ~/workshop_resources
     for my $fallback (
+        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
         '/opt/comserv/workshop_resources',
         ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
     ) {
