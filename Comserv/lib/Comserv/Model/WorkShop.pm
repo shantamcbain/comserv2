@@ -35,18 +35,15 @@ sub get_active_workshops {
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
-                    date   => { '>=' => DateTime->today->ymd },
-                    status => { '!=' => 'draft' },
+                    'me.date'   => { '>=' => DateTime->today->ymd },
+                    'me.status' => { '!=' => 'draft' },
                 },
                 { 
-                    order_by => { -asc => 'date' },
+                    order_by => { -asc => 'me.date' },
                     prefetch => 'creator'
                 }
             );
         } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
-            # Site admin and workshop leaders see:
-            # 1. All published workshops (public + their site)
-            # 2. Their own draft workshops (in Dashboard only — excluded from index via status filter above)
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
@@ -54,30 +51,26 @@ sub get_active_workshops {
             }
             
             my $search_filter = {
-                date => { '>=' => DateTime->today->ymd },
-                -or => [
-                    { status => 'published' },
-                    { created_by => $user_id }
-                ]
+                'me.date' => { '>=' => DateTime->today->ymd },
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
-                    { share => 'public', status => 'published' },
-                    { 'site_associations.site_id' => $site_id, status => 'published' },
-                    { created_by => $user_id }
+                    { 'me.share' => 'public', 'me.status' => 'published' },
+                    { 'site_associations.site_id' => $site_id, 'me.status' => 'published' },
+                    { 'me.created_by' => $user_id }
                 ];
             } else {
                 $search_filter->{-or} = [
-                    { share => 'public', status => 'published' },
-                    { created_by => $user_id }
+                    { 'me.share' => 'public', 'me.status' => 'published' },
+                    { 'me.created_by' => $user_id }
                 ];
             }
             
             @workshops = $rs->search(
                 $search_filter,
                 { 
-                    order_by => { -asc => 'date' },
+                    order_by => { -asc => 'me.date' },
                     prefetch => 'creator',
                     join => 'site_associations',
                     distinct => 1
@@ -92,23 +85,23 @@ sub get_active_workshops {
             }
             
             my $search_filter = {
-                date => { '>=' => DateTime->today->ymd },
-                status => 'published',
+                'me.date'   => { '>=' => DateTime->today->ymd },
+                'me.status' => 'published',
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
-                    { share => 'public' },
+                    { 'me.share' => 'public' },
                     { 'site_associations.site_id' => $site_id }
                 ];
             } else {
-                $search_filter->{share} = 'public';
+                $search_filter->{'me.share'} = 'public';
             }
             
             @workshops = $rs->search(
                 $search_filter,
                 { 
-                    order_by => { -asc => 'date' },
+                    order_by => { -asc => 'me.date' },
                     prefetch => 'creator',
                     join => 'site_associations',
                     distinct => 1
@@ -169,17 +162,15 @@ sub get_past_workshops {
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
-                    date   => { '<' => DateTime->today->ymd },
-                    status => { '!=' => 'draft' },
+                    'me.date'   => { '<' => DateTime->today->ymd },
+                    'me.status' => { '!=' => 'draft' },
                 },
                 { 
-                    order_by => { -desc => 'date' },
+                    order_by => { -desc => 'me.date' },
                     prefetch => 'creator'
                 }
             );
         } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
-            # Site admin and workshop leaders see published workshops from their site
-            # (drafts belong in the Dashboard, not the public listing)
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
@@ -187,25 +178,25 @@ sub get_past_workshops {
             }
             
             my $search_filter = {
-                date   => { '<' => DateTime->today->ymd },
-                status => { '!=' => 'draft' },
+                'me.date'   => { '<' => DateTime->today->ymd },
+                'me.status' => { '!=' => 'draft' },
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
-                    { share => 'public', status => 'published' },
-                    { 'site_associations.site_id' => $site_id, status => 'published' },
+                    { 'me.share' => 'public', 'me.status' => 'published' },
+                    { 'site_associations.site_id' => $site_id, 'me.status' => 'published' },
                 ];
             } else {
                 $search_filter->{-or} = [
-                    { share => 'public', status => 'published' },
+                    { 'me.share' => 'public', 'me.status' => 'published' },
                 ];
             }
             
             @workshops = $rs->search(
                 $search_filter,
                 { 
-                    order_by => { -desc => 'date' },
+                    order_by => { -desc => 'me.date' },
                     prefetch => 'creator',
                     join => 'site_associations',
                     distinct => 1
@@ -220,23 +211,23 @@ sub get_past_workshops {
             }
             
             my $search_filter = {
-                date => { '<' => DateTime->today->ymd },
-                status => 'published',
+                'me.date'   => { '<' => DateTime->today->ymd },
+                'me.status' => 'published',
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
-                    { share => 'public' },
+                    { 'me.share' => 'public' },
                     { 'site_associations.site_id' => $site_id }
                 ];
             } else {
-                $search_filter->{share} = 'public';
+                $search_filter->{'me.share'} = 'public';
             }
             
             @workshops = $rs->search(
                 $search_filter,
                 { 
-                    order_by => { -desc => 'date' },
+                    order_by => { -desc => 'me.date' },
                     prefetch => 'creator',
                     join => 'site_associations',
                     distinct => 1
