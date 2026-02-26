@@ -34,6 +34,7 @@
             <div class="form-actions">
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
                 <a href="/workshop/add" class="btn btn-primary">Create New Workshop</a>
+                <a href="/workshop/resources" class="btn btn-secondary">📁 Resource Library</a>
             </div>
             
             <div class="data-container">

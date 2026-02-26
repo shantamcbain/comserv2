@@ -33,6 +33,7 @@ __PACKAGE__->register_class('WorkshopContent', 'Comserv::Model::Schema::Ency::Re
 __PACKAGE__->register_class('WorkshopEmail', 'Comserv::Model::Schema::Ency::Result::WorkshopEmail');
 __PACKAGE__->register_class('WorkshopRole', 'Comserv::Model::Schema::Ency::Result::WorkshopRole');
 __PACKAGE__->register_class('SiteWorkshop', 'Comserv::Model::Schema::Ency::Result::SiteWorkshop');
+__PACKAGE__->register_class('WorkshopResource', 'Comserv::Model::Schema::Ency::Result::WorkshopResource');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;
