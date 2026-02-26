@@ -30,11 +30,13 @@ sub get_active_workshops {
             $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
         }
         
-        # CSC admin (god-level) sees all workshops including drafts
+        # CSC admin (god-level) sees all non-draft workshops in the public listing.
+        # Drafts are only visible in the Dashboard.
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
-                    date => { '>=' => DateTime->today->ymd },
+                    date   => { '>=' => DateTime->today->ymd },
+                    status => { '!=' => 'draft' },
                 },
                 { 
                     order_by => { -asc => 'date' },
@@ -44,7 +46,7 @@ sub get_active_workshops {
         } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
             # Site admin and workshop leaders see:
             # 1. All published workshops (public + their site)
-            # 2. Their own draft workshops
+            # 2. Their own draft workshops (in Dashboard only — excluded from index via status filter above)
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
@@ -162,11 +164,13 @@ sub get_past_workshops {
             $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
         }
         
-        # CSC admin (god-level) sees all workshops including drafts
+        # CSC admin sees all non-draft past workshops in the public listing.
+        # Drafts are only visible in the Dashboard.
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
-                    date => { '<' => DateTime->today->ymd },
+                    date   => { '<' => DateTime->today->ymd },
+                    status => { '!=' => 'draft' },
                 },
                 { 
                     order_by => { -desc => 'date' },
@@ -174,9 +178,8 @@ sub get_past_workshops {
                 }
             );
         } elsif ($admin_type eq 'standard' || $is_workshop_leader) {
-            # Site admin and workshop leaders see:
-            # 1. All published workshops (public + their site)
-            # 2. Their own draft workshops
+            # Site admin and workshop leaders see published workshops from their site
+            # (drafts belong in the Dashboard, not the public listing)
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
@@ -184,19 +187,18 @@ sub get_past_workshops {
             }
             
             my $search_filter = {
-                date => { '<' => DateTime->today->ymd },
+                date   => { '<' => DateTime->today->ymd },
+                status => { '!=' => 'draft' },
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
                     { share => 'public', status => 'published' },
                     { 'site_associations.site_id' => $site_id, status => 'published' },
-                    { created_by => $user_id }
                 ];
             } else {
                 $search_filter->{-or} = [
                     { share => 'public', status => 'published' },
-                    { created_by => $user_id }
                 ];
             }
             
