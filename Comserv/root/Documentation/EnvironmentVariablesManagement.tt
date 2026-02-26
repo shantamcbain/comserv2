@@ -1,0 +1,441 @@
+[% META
+   title = 'Environment Variables Management - Admin Tutorial'
+   description = 'Tutorial for managing environment variables via the Admin UI: viewing, creating, editing, and deleting .env file entries without direct server access. Covers the CATALYST_SERVER_IP override and Docker deployment usage.'
+   roles = 'admin'
+   TemplateType = 'Documentation'
+   category = 'admin,configuration,environment,docker'
+   page_version = '1.0'
+   last_updated = '2026/02/26'
+   site_specific = 'false'
+%]
+[% PageVersion = 'Documentation/EnvironmentVariablesManagement.tt,v 1.0 2026/02/26 zencoder Exp - Initial tutorial for Environment Variables admin UI' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+
+<h1 style="color: var(--text-color); font-family: var(--header-font);">Environment Variables Management</h1>
+
+<div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: 20px;">
+    Last Updated: 2026-02-26 | Version: 1.0 | Status: Active
+</div>
+
+<div id="toc" style="margin: 20px 0; background-color: var(--light-color); padding: 15px; border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <h2 style="margin-top: 0;">Contents</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <a href="#overview" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Overview</a>
+        <a href="#accessing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Accessing the UI</a>
+        <a href="#viewing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Viewing Variables</a>
+        <a href="#creating" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Creating Variables</a>
+        <a href="#editing" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Editing Variables</a>
+        <a href="#deleting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Deleting Variables</a>
+        <a href="#secrets" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Secret Variables</a>
+        <a href="#catalyst-server-ip" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">CATALYST_SERVER_IP</a>
+        <a href="#docker" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Docker Usage</a>
+        <a href="#exporting" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Exporting .env</a>
+        <a href="#restart" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">When to Restart</a>
+        <a href="#security" style="color: var(--link-color); padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color);">Security Notes</a>
+    </div>
+</div>
+
+<!-- OVERVIEW -->
+<div id="overview" style="scroll-margin-top: 180px;">
+<details open>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Overview</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>The <strong>Environment Variables Management</strong> admin page lets authorized administrators
+view and manage the application's <code>.env</code> file entries through the web UI — without
+needing SSH or direct file system access.</p>
+
+<p>Environment variables control runtime behavior such as:</p>
+<ul>
+    <li>Database connection details (<code>DB_HOST</code>, <code>DB_USER</code>, <code>DB_PASS</code>)</li>
+    <li>Mail server credentials (<code>MAIL_USER</code>, <code>MAIL_PASSWORD</code>)</li>
+    <li>Server IP override for the admin debug bar (<code>CATALYST_SERVER_IP</code>)</li>
+    <li>Feature flags, API keys, and integration credentials</li>
+    <li>Port and network configuration</li>
+</ul>
+
+<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>⚠️ Important:</strong> Changes to <code>.env</code> take effect only after a server or container
+    restart. The page displays a reminder when you save a variable.
+</div>
+
+</div>
+</details>
+</div>
+
+<!-- ACCESSING -->
+<div id="accessing" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Accessing the Environment Variables UI</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>Navigate to: <strong><a href="/admin/environment_variables">/admin/environment_variables</a></strong></p>
+
+<p>You can also reach it from:</p>
+<ul>
+    <li><strong>Admin Dashboard</strong> → Environment Variables link</li>
+    <li>Direct URL: <code>http://&lt;server&gt;:&lt;port&gt;/admin/environment_variables</code></li>
+</ul>
+
+<p><strong>Required permission:</strong> Administrator role (CSC admin or site admin with admin privileges).</p>
+
+<p>Non-administrators are redirected to the home page with an "Access denied" message.</p>
+
+</div>
+</details>
+</div>
+
+<!-- VIEWING -->
+<div id="viewing" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Viewing Environment Variables</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>The list page shows all variables currently defined in the <code>.env</code> file:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+    <thead>
+        <tr style="background: var(--table-header-bg);">
+            <th style="padding: 8px; border: 1px solid var(--border-color);">Column</th>
+            <th style="padding: 8px; border: 1px solid var(--border-color);">Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>Key</strong></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">The variable name (e.g. <code>DB_HOST</code>)</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>Value</strong></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">The variable value — hidden as <code>••••••</code> for secret variables</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>Type</strong></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><em>Secret</em> (masked) or <em>Plain</em></td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><strong>Actions</strong></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">Edit or Delete buttons for each variable</td>
+        </tr>
+    </tbody>
+</table>
+
+<p style="margin-top: 10px;">The page also shows the path of the active <code>.env</code> file at the top.</p>
+
+</div>
+</details>
+</div>
+
+<!-- CREATING -->
+<div id="creating" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Creating a New Variable</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<ol>
+    <li>Go to <a href="/admin/environment_variables">/admin/environment_variables</a></li>
+    <li>Click <strong>"Add Variable"</strong> (or navigate to <code>/admin/environment_variables/create</code>)</li>
+    <li>Enter the <strong>Key</strong> — must start with a letter or underscore, and contain only
+        letters, numbers, and underscores (e.g. <code>MY_SETTING</code>)</li>
+    <li>Enter the <strong>Value</strong></li>
+    <li>Click <strong>"Save"</strong></li>
+</ol>
+
+<div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>✅ Naming convention:</strong> Use ALL_CAPS_WITH_UNDERSCORES for environment variable keys.
+    This is the standard Unix convention and ensures compatibility.
+</div>
+
+<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>⚠️ Restart required:</strong> The new variable will not be active until the
+    server or Docker container is restarted.
+</div>
+
+</div>
+</details>
+</div>
+
+<!-- EDITING -->
+<div id="editing" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Editing an Existing Variable</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<ol>
+    <li>Go to <a href="/admin/environment_variables">/admin/environment_variables</a></li>
+    <li>Find the variable in the list</li>
+    <li>Click <strong>"Edit"</strong> next to the variable</li>
+    <li>Update the <strong>Value</strong> (the key cannot be changed — delete and recreate if needed)</li>
+    <li>Click <strong>"Save"</strong></li>
+</ol>
+
+<p><strong>Note for secret variables:</strong> The value field will be empty when you open the edit form
+(to avoid displaying the secret in the browser). Enter the new value completely — if you leave it
+blank, it will save as blank. The system does not retain and re-use the previous value.</p>
+
+</div>
+</details>
+</div>
+
+<!-- DELETING -->
+<div id="deleting" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Deleting a Variable</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<ol>
+    <li>Go to <a href="/admin/environment_variables">/admin/environment_variables</a></li>
+    <li>Click <strong>"Delete"</strong> next to the variable</li>
+    <li>The variable is immediately removed from the <code>.env</code> file</li>
+</ol>
+
+<div style="background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>⚠️ Warning:</strong> Deletion is immediate and not reversible through the UI.
+    If you need to recover a deleted variable, use the exported backup <code>.env</code> file
+    (see <a href="#exporting">Exporting</a> below) or check the server's backup directory.
+    The system creates a backup of <code>.env</code> before each write operation.
+</div>
+
+</div>
+</details>
+</div>
+
+<!-- SECRETS -->
+<div id="secrets" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Secret Variables (Auto-Detection)</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>The system automatically detects secret variables based on their key names.
+Any variable whose name contains one of these patterns (case-insensitive) is treated as a secret:</p>
+
+<ul>
+    <li><code>PASSWORD</code></li>
+    <li><code>SECRET</code></li>
+    <li><code>TOKEN</code></li>
+    <li><code>KEY</code></li>
+    <li><code>PASS</code></li>
+</ul>
+
+<p><strong>Examples of auto-detected secrets:</strong></p>
+<ul>
+    <li><code>DB_PASSWORD</code> → Secret ✅</li>
+    <li><code>MAIL_PASSWORD</code> → Secret ✅</li>
+    <li><code>API_SECRET_KEY</code> → Secret ✅</li>
+    <li><code>ACCESS_TOKEN</code> → Secret ✅</li>
+    <li><code>DB_HOST</code> → Plain (not a secret)</li>
+    <li><code>CATALYST_SERVER_IP</code> → Plain (not a secret)</li>
+</ul>
+
+<p>Secret variable values are displayed as <code>••••••</code> in the list view and the edit form
+starts empty. The actual value is stored in the <code>.env</code> file in plaintext — the masking
+is only in the browser UI to prevent shoulder-surfing.</p>
+
+</div>
+</details>
+</div>
+
+<!-- CATALYST_SERVER_IP -->
+<div id="catalyst-server-ip" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">CATALYST_SERVER_IP — Debug Bar IP Override</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>When running the application inside a Docker container, the auto-detected server IP shows the
+container's internal network address (e.g. <code>172.20.0.2</code>) rather than the host machine's
+LAN IP. This makes it difficult for admins to know which physical server is running the code.</p>
+
+<p>The <code>CATALYST_SERVER_IP</code> environment variable overrides the auto-detected IP with
+whatever value you set. This is displayed in the admin debug bar at the top of all pages:</p>
+
+<pre style="background: var(--light-color); padding: 10px; border-radius: 4px; overflow-x: auto;">
+Domain: workstation.local | Client IP: 127.0.0.1 | Server: workshops-7d21 (192.168.1.199) | ...
+                                                                             ↑
+                                                                 CATALYST_SERVER_IP value shown here
+</pre>
+
+<h4>Setting CATALYST_SERVER_IP</h4>
+<ol>
+    <li>Go to <a href="/admin/environment_variables">/admin/environment_variables</a></li>
+    <li>Click <strong>"Add Variable"</strong></li>
+    <li>Set Key: <code>CATALYST_SERVER_IP</code></li>
+    <li>Set Value: the LAN IP of the host machine (e.g. <code>192.168.1.199</code> for workstation,
+        <code>192.168.1.126</code> for production)</li>
+    <li>Click <strong>"Save"</strong></li>
+    <li>Restart the container or server process</li>
+</ol>
+
+<h4>When to set this</h4>
+<ul>
+    <li><strong>Docker on workstation (dev):</strong> Set to <code>192.168.1.199</code></li>
+    <li><strong>Docker on production server:</strong> Set to <code>192.168.1.126</code></li>
+    <li><strong>Running directly (not in Docker):</strong> Not needed — auto-detection works correctly</li>
+</ul>
+
+<div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>✅ Tip:</strong> Both <code>docker-compose.dev.yml</code> and <code>docker-compose.prod.yml</code>
+    are configured to pass <code>CATALYST_SERVER_IP</code> from the host's <code>.env</code> file into
+    the container automatically. You only need to set it once in the <code>.env</code> file on each host.
+</div>
+
+</div>
+</details>
+</div>
+
+<!-- DOCKER USAGE -->
+<div id="docker" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Docker Deployment Usage</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>In Docker deployments, the <code>.env</code> file lives on the <strong>host machine</strong>
+(not inside the container). The docker-compose configuration passes selected variables into the
+container at startup.</p>
+
+<h4>Workflow for Docker environments</h4>
+<ol>
+    <li>Use the admin UI (or SSH) to edit the <code>.env</code> file on the host</li>
+    <li>Restart the container: <code>docker-compose restart web</code> or
+        <code>docker compose up -d --force-recreate</code></li>
+    <li>The new variable values will be active in the running container</li>
+</ol>
+
+<h4>Key Docker-specific variables</h4>
+<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+    <thead>
+        <tr style="background: var(--table-header-bg);">
+            <th style="padding: 8px; border: 1px solid var(--border-color);">Variable</th>
+            <th style="padding: 8px; border: 1px solid var(--border-color);">Purpose</th>
+            <th style="padding: 8px; border: 1px solid var(--border-color);">Example</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>CATALYST_SERVER_IP</code></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">Host LAN IP shown in debug bar</td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>192.168.1.199</code></td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>WEB_PORT</code></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">Port the container listens on (host side)</td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>3000</code></td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>CATALYST_ENV</code></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">Environment name (development/production)</td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>production</code></td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>DB_HOST</code></td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);">Database server address (reachable from container)</td>
+            <td style="padding: 8px; border: 1px solid var(--border-color);"><code>192.168.1.198</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<div style="background: #cce5ff; border: 1px solid #007bff; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>ℹ️ Note:</strong> Container names differ between servers. On the workstation the running
+    container may be named <code>comserv2-web-1</code>, while on production it is
+    <code>comserv2-web-prod</code>. Container names are set in the docker-compose file and do not
+    affect the environment variable mechanism.
+</div>
+
+</div>
+</details>
+</div>
+
+<!-- EXPORTING -->
+<div id="exporting" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Exporting the .env File</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>The admin page includes an <strong>Export</strong> button that downloads the current
+<code>.env</code> file as a plain text file. Use this to:</p>
+<ul>
+    <li>Create a backup before making changes</li>
+    <li>Transfer the configuration to another server</li>
+    <li>Review all current settings in one file</li>
+</ul>
+
+<p>The download is named <code>.env</code> and contains all variables (including secrets in plaintext).
+<strong>Store this file securely</strong> — do not share it or commit it to version control.</p>
+
+<p>The system also creates automatic backups before each write in the backup directory
+alongside the <code>.env</code> file.</p>
+
+</div>
+</details>
+</div>
+
+<!-- WHEN TO RESTART -->
+<div id="restart" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">When to Restart After Changes</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<p>Environment variables are read at <strong>startup time</strong> only. Any change you make
+through the admin UI (or directly to the <code>.env</code> file) requires a restart to take effect.</p>
+
+<h4>Development server (command line)</h4>
+<pre style="background: var(--light-color); padding: 10px; border-radius: 4px;">
+# Stop the current server (Ctrl+C), then restart:
+cd Comserv
+perl script/comserv_server.pl -p 4004 -r
+</pre>
+
+<h4>Docker container</h4>
+<pre style="background: var(--light-color); padding: 10px; border-radius: 4px;">
+# Restart the web container:
+docker compose restart web
+
+# Or force-recreate to pick up .env changes:
+docker compose up -d --force-recreate web
+</pre>
+
+<h4>Production with supervisord</h4>
+<pre style="background: var(--light-color); padding: 10px; border-radius: 4px;">
+# Inside the container or on the host:
+supervisorctl restart comserv-server
+</pre>
+
+</div>
+</details>
+</div>
+
+<!-- SECURITY -->
+<div id="security" style="scroll-margin-top: 180px;">
+<details>
+<summary style="cursor: pointer; font-weight: bold; font-size: 1.2em; padding: 10px; background: var(--secondary-color); border-radius: 4px; margin: 15px 0 5px 0;">Security Notes</summary>
+<div style="padding: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
+
+<ul>
+    <li><strong>Access control:</strong> Only administrators can access the environment variables pages.
+        All access attempts are logged with the admin's username and IP address.</li>
+    <li><strong>Secret masking:</strong> Secret variables (those matching PASSWORD, SECRET, TOKEN, KEY, PASS
+        patterns) are masked in the browser UI. The underlying <code>.env</code> file stores plaintext.</li>
+    <li><strong>File security:</strong> Ensure the <code>.env</code> file on the server is not
+        readable by other users: <code>chmod 600 .env</code></li>
+    <li><strong>Version control:</strong> Never commit the <code>.env</code> file to Git.
+        Verify it is listed in <code>.gitignore</code>.</li>
+    <li><strong>Backups:</strong> Automatic backups are created before each write. Review the backup
+        directory periodically and remove old backups that are no longer needed.</li>
+    <li><strong>Audit log:</strong> All create, edit, and delete actions are written to the
+        application log at INFO level with the acting administrator's identity.</li>
+</ul>
+
+<div style="background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; padding: 10px; margin-top: 10px;">
+    <strong>⚠️ Production warning:</strong> Editing environment variables on a live production server
+    requires a container or service restart, which causes a brief outage. Plan changes during
+    maintenance windows when possible.
+</div>
+
+</div>
+</details>
+</div>
+
+</div>
