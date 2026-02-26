@@ -49,6 +49,15 @@ __PACKAGE__->add_columns(
         default_value => 'site_only',
         extra         => { list => ['all_leaders', 'site_only', 'workshop_specific'] },
     },
+    external_url => {
+        data_type   => 'varchar',
+        size        => 1000,
+        is_nullable => 1,
+    },
+    file_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     workshop_id => {
         data_type   => 'integer',
         is_nullable => 1,
@@ -77,6 +86,12 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     workshop => 'Comserv::Model::Schema::Ency::Result::WorkShop',
     { 'foreign.id' => 'self.workshop_id' },
+    { join_type => 'LEFT' },
+);
+
+__PACKAGE__->belongs_to(
+    file => 'Comserv::Model::Schema::Ency::Result::File',
+    { 'foreign.id' => 'self.file_id' },
     { join_type => 'LEFT' },
 );
 
