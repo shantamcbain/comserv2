@@ -1428,8 +1428,9 @@ sub _nfs_root {
     return $configured if -d $configured;
 
     # Fallback for dev environments where NFS is not mounted:
-    # try /opt/comserv/workshop_resources, then ~/workshop_resources
+    # try ~/nfs (full NFS mount), /opt/comserv/workshop_resources, then ~/workshop_resources
     for my $fallback (
+        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
         '/opt/comserv/workshop_resources',
         ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
     ) {
@@ -1508,7 +1509,15 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $is_admin   = $admin_type && $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
+
+    # Admin sees full NFS drive; workshop leaders scoped to apis subdir only
+    my $scan_root  = $nfs_root;
+    unless ($is_admin) {
+        my $apis_dir = "$nfs_root/apis";
+        $scan_root = -d $apis_dir ? $apis_dir : $nfs_root;
+    }
 
     # Build a lookup of DB records keyed by file_path for metadata enrichment
     my %db_by_path;
@@ -1538,9 +1547,9 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $c->log->error("Resource library DB error: $db_error");
     }
 
-    # Scan NFS filesystem directly so existing files always appear
+    # Scan filesystem directly so existing files always appear
     my @resources;
-    my $nfs_available = -d $nfs_root;
+    my $nfs_available = -d $scan_root;
     if ($nfs_available) {
         my @fs_files;
         eval {
@@ -1577,7 +1586,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 }
                 closedir($dh);
             };
-            $scan->($nfs_root, '');
+            $scan->($scan_root, '');
         };
         if ($@) {
             $c->log->error("NFS scan error: $@");
@@ -1605,11 +1614,52 @@ sub resources :Path('/workshop/resources') :Args(0) {
         @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @resources;
     }
 
+    # Always append external URL records from DB (they have no NFS path to scan)
+    unless ($db_error) {
+        eval {
+            my $schema = $c->model('DBEncy');
+            my $filter = { external_url => { '!=' => undef } };
+            unless ($is_csc) {
+                $filter = {
+                    external_url => { '!=' => undef },
+                    -or => [
+                        { access_level => 'all_leaders' },
+                        { sitename     => $sitename },
+                        { uploaded_by  => $user_id },
+                    ]
+                };
+            }
+            my @url_rows = $schema->resultset('WorkshopResource')->search(
+                $filter, { order_by => { -asc => 'file_name' } }
+            )->all;
+            for my $row (@url_rows) {
+                next if $db_by_path{ $row->file_path // '' };
+                push @resources, {
+                    id           => $row->id,
+                    file_name    => $row->file_name,
+                    file_path    => '',
+                    file_ext     => $row->file_ext // '',
+                    file_size    => 0,
+                    file_type    => $row->file_type // '',
+                    description  => $row->description // '',
+                    access_level => $row->access_level // 'site_only',
+                    sitename     => $row->sitename // '',
+                    uploaded_by  => '',
+                    in_db        => 1,
+                    external_url => $row->external_url,
+                };
+            }
+        };
+        $c->log->error("External URL fetch error: $@") if $@;
+    }
+
     $c->stash(
         resources     => \@resources,
         is_csc        => $is_csc,
+        is_admin      => $is_admin,
         sitename      => $sitename,
         nfs_root      => $nfs_root,
+        scan_root     => $scan_root,
         nfs_available => $nfs_available,
         db_error      => $db_error,
         template      => 'WorkShops/Resources.tt',
@@ -1706,6 +1756,71 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
         $c->flash->{error_msg} = "File saved to storage but database record failed: $@. Please contact the administrator.";
     } else {
         $c->flash->{success_msg} = "File '$filename' uploaded successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
+sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $url      = $c->req->param('external_url') // '';
+    my $title    = $c->req->param('title')         // '';
+    my $desc     = $c->req->param('description')   // '';
+    my $access   = $c->req->param('access_level')  // 'site_only';
+    my $user_id  = $c->session->{user_id};
+    my $sitename = $c->session->{SiteName} // '';
+
+    unless ($url =~ m{^https?://}i) {
+        $c->flash->{error_msg} = 'URL must start with http:// or https://';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($title) {
+        ($title) = ($url =~ m{/([^/?#]+)(?:[?#].*)?$});
+        $title //= $url;
+    }
+
+    my ($ext) = ($title =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+
+    eval {
+        $c->model('DBEncy')->resultset('WorkshopResource')->create({
+            file_name    => $title,
+            file_path    => '',
+            external_url => $url,
+            file_type    => $MIME_MAP{$ext} // 'application/octet-stream',
+            file_ext     => $ext,
+            file_size    => 0,
+            description  => $desc,
+            uploaded_by  => $user_id,
+            sitename     => $sitename,
+            access_level => $access,
+        });
+    };
+    if ($@) {
+        $c->log->error("resource_add_url DB error: $@");
+        $c->flash->{error_msg} = "Failed to save link: $@";
+    } else {
+        $c->flash->{success_msg} = "Link '$title' added successfully.";
     }
 
     $c->response->redirect($c->uri_for('/workshop/resources'));
