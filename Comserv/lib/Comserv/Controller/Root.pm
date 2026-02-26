@@ -678,10 +678,10 @@ sub auto :Private {
             "db_host='$db_host'");
         
         # Set server_hostname to the Catalyst web server's IP (NOT the database host).
-        # The database host is already shown in the Databases section of the debug bar.
-        # Allow override via CATALYST_SERVER_IP env var (useful in Docker to show host LAN IP).
-        my $catalyst_ip = $ENV{CATALYST_SERVER_IP} || $system_info->{ip};
-        my $display_hostname = ($catalyst_ip && $catalyst_ip ne 'Unknown') ? $catalyst_ip : $system_info->{hostname};
+        # The database host is already shown separately in the Databases section.
+        # system_info->{ip} returns the actual IP of the machine running Catalyst.
+        my $display_hostname = ($system_info->{ip} && $system_info->{ip} ne 'Unknown')
+            ? $system_info->{ip} : $system_info->{hostname};
         # Final safety check - ensure it's never empty or undef
         $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
         
