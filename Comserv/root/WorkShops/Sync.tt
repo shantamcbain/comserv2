@@ -1,0 +1,258 @@
+[%
+   title = "NFS → Database Sync"
+   description = "Configure and run an NFS filesystem scan to populate the files and workshop_resource tables"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-02-27"
+%]
+[% PageVersion = 'WorkShops/Sync.tt,v 0.01 2026/02/27 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sync-section {
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background: var(--card-bg, #fff);
+}
+.sync-section h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    border-bottom: 2px solid var(--primary-color, #007bff);
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+.form-field { display: flex; flex-direction: column; }
+.form-field label { font-size: 0.85em; font-weight: bold; margin-bottom: 4px; }
+.form-field input, .form-field select, .form-field textarea {
+    border: 1px solid var(--border-color, #dee2e6);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 0.9em;
+}
+.form-field .hint { font-size: 0.78em; color: var(--text-muted-color, #6c757d); margin-top: 3px; }
+.schema-table { width: 100%; border-collapse: collapse; font-size: 0.82em; margin-top: 8px; }
+.schema-table th { background: var(--table-header-bg, #e9ecef); padding: 6px 10px; text-align: left; border-bottom: 2px solid var(--border-color, #dee2e6); }
+.schema-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-color, #dee2e6); }
+.badge-auto   { background: #d4edda; color: #155724; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+.badge-form   { background: #cce5ff; color: #004085; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+.badge-upload { background: #fff3cd; color: #856404; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+.badge-na     { background: #f8d7da; color: #721c24; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+</style>
+
+<div class="container">
+    <h2>🔄 NFS → Database Sync Tool</h2>
+    <p style="color:var(--text-muted-color,#6c757d);">
+        Scan an NFS directory and register files in the database. Choose which table(s) to populate,
+        apply filters, and set default values for all created records.
+        This operation is incremental — files already in the database are skipped.
+    </p>
+
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success" style="background:#d4edda;border:1px solid #c3e6cb;padding:12px;border-radius:4px;margin-bottom:16px;">[% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger" style="background:#f8d7da;border:1px solid #f5c6cb;padding:12px;border-radius:4px;margin-bottom:16px;">[% c.flash.error_msg | html %]</div>
+    [% END %]
+
+    [% UNLESS nfs_available %]
+    <div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;border-radius:4px;margin-bottom:16px;">
+        <strong>⚠ NFS not mounted.</strong>
+        The share at <code>[% nfs_root | html %]</code> is not available.
+        File scanning will not work until the share is mounted.
+        You can still use the form to understand the field mappings.
+    </div>
+    [% END %]
+
+    <form method="POST" action="/workshop/resource_scan_nfs"
+          onsubmit="return confirm('Start NFS scan with these settings?');">
+
+        <!-- Scan Source -->
+        <div class="sync-section">
+            <h3>📁 Scan Source</h3>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>NFS Root</label>
+                    <input type="text" readonly value="[% nfs_root | html %]"
+                           style="background:var(--table-header-bg,#f8f9fa);">
+                    <span class="hint">
+                        [% IF nfs_available %]<span style="color:#155724;">✓ Mounted</span>[% ELSE %]<span style="color:#721c24;">✗ Not mounted</span>[% END %]
+                    </span>
+                </div>
+                <div class="form-field">
+                    <label for="scan_dir">Subdirectory to scan</label>
+                    <select name="scan_dir" id="scan_dir">
+                        <option value="full">-- Full NFS drive (slow) --</option>
+                        [% IF nfs_available %]
+                            [% FOREACH d IN subdirs %]
+                            <option value="[% d | html %]"[% IF d == 'apis' %] selected[% END %]>[% d | html %][% IF d == 'apis' %] (recommended — workshop files)[% END %]</option>
+                            [% END %]
+                        [% ELSE %]
+                            <option value="apis" selected>apis/ (workshop files)</option>
+                        [% END %]
+                    </select>
+                    <span class="hint">Choose <em>apis/</em> for workshop resources. Use <em>Full NFS drive</em> for a global inventory scan.</span>
+                </div>
+                <div class="form-field">
+                    <label for="max_files">Max files per run</label>
+                    <select name="max_files" id="max_files">
+                        <option value="500">500 (test run)</option>
+                        <option value="2000" selected>2,000</option>
+                        <option value="5000">5,000</option>
+                        <option value="10000">10,000 (max)</option>
+                    </select>
+                    <span class="hint">Prevents HTTP timeout. Run again to continue from where it stopped.</span>
+                </div>
+                <div class="form-field">
+                    <label for="ext_filter">File extension filter</label>
+                    <input type="text" name="ext_filter" id="ext_filter"
+                           placeholder="e.g. pdf, ppt, mp4 (blank = all)">
+                    <span class="hint">Comma-separated extensions to include. Leave blank to include all file types.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Target Table -->
+        <div class="sync-section">
+            <h3>🎯 Target Table(s)</h3>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="target_table">Insert records into</label>
+                    <select name="target_table" id="target_table">
+                        <option value="files" selected>files — general file inventory</option>
+                        <option value="workshop_resource">workshop_resource — workshop resources only</option>
+                        <option value="both">both tables (links records together)</option>
+                    </select>
+                    <span class="hint">
+                        <strong>files</strong>: the primary file inventory table.<br>
+                        <strong>workshop_resource</strong>: links files to workshop leader use.<br>
+                        <strong>both</strong>: creates a <em>files</em> record and a linked <em>workshop_resource</em> record.
+                    </span>
+                </div>
+                <div class="form-field">
+                    <label for="workshop_id">Associate with workshop (optional)</label>
+                    <select name="workshop_id" id="workshop_id">
+                        <option value="">-- None --</option>
+                        [% FOREACH w IN workshops %]
+                        <option value="[% w.id %]">[% w.sitename | html %] — [% w.title | html %]</option>
+                        [% END %]
+                    </select>
+                    <span class="hint">If set, new records in <em>workshop_resource</em> will be linked to this workshop.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Default Values -->
+        <div class="sync-section">
+            <h3>⚙️ Default Values for New Records</h3>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="access_level">Access level</label>
+                    <select name="access_level" id="access_level">
+                        <option value="site_only" selected>Site Only</option>
+                        <option value="all_leaders">All Leaders</option>
+                        <option value="workshop_specific">Workshop Specific</option>
+                    </select>
+                    <span class="hint">Who can see these files in the resource library.</span>
+                </div>
+                <div class="form-field">
+                    <label for="sitename">Site name</label>
+                    <select name="sitename" id="sitename">
+                        <option value="">-- Current site ([% c.session.SiteName | html %]) --</option>
+                        [% FOREACH s IN sitenames %]
+                        <option value="[% s | html %]">[% s | html %]</option>
+                        [% END %]
+                    </select>
+                    <span class="hint">Defaults to your current site if left blank.</span>
+                </div>
+                <div class="form-field">
+                    <label for="file_status">File status</label>
+                    <select name="file_status" id="file_status">
+                        <option value="active" selected>Active</option>
+                        <option value="pending">Pending review</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                    <span class="hint">Applies to the <em>files</em> table only.</span>
+                </div>
+                <div class="form-field">
+                    <label for="description">Description (optional)</label>
+                    <input type="text" name="description" id="description"
+                           placeholder="Applied to all new records">
+                    <span class="hint">Leave blank with Auto-categorize to derive description from directory name.</span>
+                </div>
+                <div class="form-field" style="justify-content:flex-end;padding-top:8px;">
+                    <label style="display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer;">
+                        <input type="checkbox" name="auto_categorize" value="1"> Auto-categorize by directory name
+                    </label>
+                    <span class="hint">If description is blank, uses the first directory component as the description (e.g. <em>apis</em>, <em>books</em>, <em>manuals</em>).</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
+            <button type="submit" class="btn btn-primary"
+                    [% UNLESS nfs_available %]disabled title="NFS not mounted"[% END %]>
+                ▶ Run NFS Scan
+            </button>
+            <a href="/workshop/resources" class="btn btn-secondary">← Back to Resource Library</a>
+            [% UNLESS nfs_available %]
+            <span style="color:#856404;font-size:0.9em;">⚠ NFS not mounted — scan disabled</span>
+            [% END %]
+        </div>
+    </form>
+
+    <!-- Schema Reference -->
+    <div style="margin-top:40px;">
+        <details>
+            <summary style="cursor:pointer;font-weight:bold;font-size:1em;padding:10px 0;">
+                📋 Field Mapping Reference — <em>files</em> table
+            </summary>
+            <table class="schema-table">
+                <tr><th>Column</th><th>Description</th><th>Source</th></tr>
+                [% FOREACH col IN files_columns %]
+                <tr>
+                    <td><code>[% col.col | html %]</code></td>
+                    <td>[% col.desc | html %]</td>
+                    <td>
+                        [% IF col.source == 'auto' %]<span class="badge-auto">auto</span>
+                        [% ELSIF col.source == 'form' %]<span class="badge-form">form</span>
+                        [% ELSIF col.source == 'upload' %]<span class="badge-upload">upload only</span>
+                        [% ELSE %]<span class="badge-na">not mapped</span>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </table>
+        </details>
+
+        <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-weight:bold;font-size:1em;padding:10px 0;">
+                📋 Field Mapping Reference — <em>workshop_resource</em> table
+            </summary>
+            <table class="schema-table">
+                <tr><th>Column</th><th>Description</th><th>Source</th></tr>
+                [% FOREACH col IN wr_columns %]
+                <tr>
+                    <td><code>[% col.col | html %]</code></td>
+                    <td>[% col.desc | html %]</td>
+                    <td>
+                        [% IF col.source == 'auto' %]<span class="badge-auto">auto</span>
+                        [% ELSIF col.source == 'form' %]<span class="badge-form">form</span>
+                        [% ELSE %]<span class="badge-na">not mapped</span>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+            </table>
+        </details>
+    </div>
+</div>

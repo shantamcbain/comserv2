@@ -2047,6 +2047,107 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     $c->response->redirect($c->uri_for('/workshop/resources'));
 }
 
+sub resource_sync :Path('/workshop/resource_sync') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to access the sync tool.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($admin_type eq 'csc' || $admin_type eq 'special') {
+        $c->flash->{error_msg} = 'Only CSC admins can access the NFS sync tool.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $nfs_root      = $self->_nfs_root();
+    my $nfs_available = -d $nfs_root;
+    my @subdirs;
+
+    if ($nfs_available) {
+        eval {
+            opendir(my $dh, $nfs_root) or die "Cannot open $nfs_root: $!";
+            while (my $entry = readdir($dh)) {
+                next if $entry =~ /^\./;
+                push @subdirs, $entry if -d "$nfs_root/$entry";
+            }
+            closedir($dh);
+            @subdirs = sort @subdirs;
+        };
+    }
+
+    my @workshops = eval {
+        $c->model('DBEncy')->resultset('WorkShop')->search(
+            {},
+            { columns => ['id', 'title', 'sitename'], order_by => 'title' }
+        )->all;
+    };
+
+    my @sitenames;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('WorkShop')->search(
+            {}, { columns => ['sitename'], distinct => 1, order_by => 'sitename' }
+        )->all;
+        @sitenames = map { $_->sitename } grep { $_->sitename } @rows;
+    };
+
+    my $files_columns = [
+        { col => 'file_name',    desc => 'File name (required)',               source => 'auto' },
+        { col => 'file_type',    desc => 'MIME type',                           source => 'auto' },
+        { col => 'file_format',  desc => 'File extension (auto)',               source => 'auto' },
+        { col => 'file_size',    desc => 'File size in bytes (auto)',           source => 'auto' },
+        { col => 'nfs_path',     desc => 'Full NFS path (auto)',                source => 'auto' },
+        { col => 'file_path',    desc => 'File path (same as nfs_path)',        source => 'auto' },
+        { col => 'source_type',  desc => 'Source: nfs / upload / external',    source => 'form' },
+        { col => 'access_level', desc => 'Access: site_only / all_leaders',    source => 'form' },
+        { col => 'sitename',     desc => 'Site the file belongs to',           source => 'form' },
+        { col => 'user_id',      desc => 'Owner (logged-in user)',             source => 'auto' },
+        { col => 'upload_date',  desc => 'Upload timestamp (NOW)',             source => 'auto' },
+        { col => 'is_duplicate', desc => 'Duplicate flag (auto-detected)',     source => 'auto' },
+        { col => 'duplicate_of', desc => 'ID of original if duplicate',        source => 'auto' },
+        { col => 'description',  desc => 'Human-readable description',         source => 'form' },
+        { col => 'workshop_id',  desc => 'Link to a workshop (optional)',      source => 'form' },
+        { col => 'site_id',      desc => 'Site ID (not currently mapped)',     source => 'n/a'  },
+        { col => 'category_id',  desc => 'Category ID (not currently mapped)', source => 'n/a'  },
+        { col => 'share_id',     desc => 'Share ID (not currently mapped)',    source => 'n/a'  },
+        { col => 'reference_id', desc => 'Reference ID (not currently mapped)',source => 'n/a'  },
+        { col => 'file_url',     desc => 'Public URL (set if external_url)',   source => 'auto' },
+        { col => 'file_status',  desc => 'Status (active by default)',         source => 'form' },
+        { col => 'external_url', desc => 'External URL for off-site links',    source => 'form' },
+        { col => 'file_data',    desc => 'Binary blob (upload only)',          source => 'upload'},
+    ];
+
+    my $wr_columns = [
+        { col => 'file_name',    desc => 'File name',                          source => 'auto' },
+        { col => 'file_path',    desc => 'Full NFS path',                      source => 'auto' },
+        { col => 'file_ext',     desc => 'Extension',                          source => 'auto' },
+        { col => 'file_type',    desc => 'MIME type',                          source => 'auto' },
+        { col => 'file_size',    desc => 'File size in bytes',                 source => 'auto' },
+        { col => 'external_url', desc => 'External URL',                       source => 'form' },
+        { col => 'description',  desc => 'Description',                        source => 'form' },
+        { col => 'uploaded_by',  desc => 'Uploader user ID (logged-in user)',  source => 'auto' },
+        { col => 'sitename',     desc => 'Site name',                          source => 'form' },
+        { col => 'access_level', desc => 'Access level',                       source => 'form' },
+        { col => 'file_id',      desc => 'Link to files table ID (auto)',      source => 'auto' },
+        { col => 'workshop_id',  desc => 'Associated workshop (optional)',      source => 'form' },
+    ];
+
+    $c->stash(
+        nfs_root      => $nfs_root,
+        nfs_available => $nfs_available,
+        subdirs       => \@subdirs,
+        workshops     => \@workshops,
+        sitenames     => \@sitenames,
+        files_columns => $files_columns,
+        wr_columns    => $wr_columns,
+        template      => 'WorkShops/Sync.tt',
+    );
+}
+
 sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     my ($self, $c) = @_;
 
@@ -2081,11 +2182,30 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     my $user_id   = $c->session->{user_id};
     my $sitename  = $c->session->{SiteName} // '';
 
-    # Allow admin to select which subdirectory to scan; default to apis/
-    my $sub_dir   = $c->req->param('scan_dir') // 'apis';
-    my $max_files = int($c->req->param('max_files') // 2000);
-    $max_files    = 10000 if $max_files > 10000;
-    $max_files    = 100   if $max_files < 100;
+    # Parameters — accept from both the old inline form and the new Sync.tt form
+    my $sub_dir      = $c->req->param('scan_dir')      // 'apis';
+    my $max_files    = int($c->req->param('max_files') // 2000);
+    my $target_table = $c->req->param('target_table')  // 'files';
+    my $ext_filter   = $c->req->param('ext_filter')    // '';
+    my $form_sitename= $c->req->param('sitename')       || $sitename;
+    my $access_level = $c->req->param('access_level')  // 'site_only';
+    my $workshop_id  = $c->req->param('workshop_id')   // undef;
+    my $auto_cat     = $c->req->param('auto_categorize') // 0;
+    my $file_status  = $c->req->param('file_status')   // 'active';
+    my $description  = $c->req->param('description')   // '';
+
+    $max_files  = 10000 if $max_files > 10000;
+    $max_files  = 100   if $max_files < 100;
+    $workshop_id = undef unless $workshop_id && $workshop_id =~ /^\d+$/;
+
+    # Build allowed extensions lookup from comma-separated filter
+    my %allowed_exts;
+    if ($ext_filter) {
+        for my $e (split /[\s,]+/, lc($ext_filter)) {
+            $e =~ s/^\.//;
+            $allowed_exts{$e} = 1 if $e;
+        }
+    }
 
     my $scan_root;
     if ($sub_dir eq 'full') {
@@ -2097,21 +2217,35 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
 
     unless (-d $scan_root) {
         $c->flash->{error_msg} = "Scan directory not available: $scan_root";
-        $c->response->redirect($c->uri_for('/workshop/resources'));
+        $c->response->redirect($c->uri_for('/workshop/resource_sync'));
         return;
     }
 
     # Build lookup of existing nfs_path records to detect duplicates
-    my %existing;
+    my %existing_files;
     eval {
         my @rows = $files_rs->search(
             { nfs_path => { '!=' => undef } },
             { columns => ['id', 'nfs_path', 'file_name', 'file_size'] }
         )->all;
         for my $r (@rows) {
-            $existing{ $r->nfs_path } = $r;
+            $existing_files{ $r->nfs_path } = $r;
         }
     };
+
+    my $wr_rs = $schema->resultset('WorkshopResource');
+    my %existing_wr;
+    if ($target_table ne 'files') {
+        eval {
+            my @rows = $wr_rs->search(
+                { file_path => { '!=' => undef } },
+                { columns => ['id', 'file_path'] }
+            )->all;
+            for my $r (@rows) {
+                $existing_wr{ $r->file_path } = $r;
+            }
+        };
+    }
 
     my ($inserted, $skipped, $duplicates, $errors, $total_seen) = (0, 0, 0, 0, 0);
     my $limit_hit = 0;
@@ -2135,43 +2269,85 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                 }
                 my ($ext) = ($entry =~ /\.([^.]+)$/);
                 $ext = lc($ext // '');
+
+                # Apply extension filter if set
+                next if %allowed_exts && !$allowed_exts{$ext};
+
                 my $size = -s $full;
                 my $mime = $MIME_MAP{$ext} // 'application/octet-stream';
 
-                if ($existing{$full}) {
-                    $skipped++;
-                    next;
+                # Auto-categorize by directory name if requested
+                my $cat_desc = $description;
+                if ($auto_cat && !$cat_desc) {
+                    my ($dir_part) = ($full =~ m{$nfs_root/([^/]+)/});
+                    $cat_desc = $dir_part // '';
                 }
 
-                my $dup_check;
-                eval {
-                    $dup_check = $files_rs->search(
-                        { file_name => $entry, file_size => $size, nfs_path => { '!=' => $full } },
-                        { rows => 1 }
-                    )->first;
-                };
+                if ($target_table eq 'files' || $target_table eq 'both') {
+                    if ($existing_files{$full}) {
+                        $skipped++;
+                    } else {
+                        my $dup_check;
+                        eval {
+                            $dup_check = $files_rs->search(
+                                { file_name => $entry, file_size => $size, nfs_path => { '!=' => $full } },
+                                { rows => 1 }
+                            )->first;
+                        };
+                        my $new_file_id;
+                        eval {
+                            my $rec = $files_rs->create({
+                                file_name    => $entry,
+                                nfs_path     => $full,
+                                file_path    => $full,
+                                file_type    => $mime,
+                                file_format  => $ext,
+                                file_size    => $size,
+                                source_type  => 'nfs',
+                                sitename     => $form_sitename,
+                                access_level => $access_level,
+                                user_id      => $user_id,
+                                workshop_id  => $workshop_id,
+                                file_status  => $file_status,
+                                description  => $cat_desc || undef,
+                                is_duplicate => ($dup_check ? 1 : 0),
+                                duplicate_of => ($dup_check ? $dup_check->id : undef),
+                                upload_date  => \'NOW()',
+                            });
+                            $new_file_id = $rec->id;
+                            $dup_check ? $duplicates++ : $inserted++;
+                            $existing_files{$full} = $rec;
+                        };
+                        if ($@) {
+                            $c->log->error("resource_scan_nfs files insert error for $full: $@");
+                            $errors++;
+                        }
+                    }
+                }
 
-                eval {
-                    $files_rs->create({
-                        file_name    => $entry,
-                        nfs_path     => $full,
-                        file_path    => $full,
-                        file_type    => $mime,
-                        file_format  => $ext,
-                        file_size    => $size,
-                        source_type  => 'nfs',
-                        sitename     => $sitename,
-                        access_level => 'site_only',
-                        user_id      => $user_id,
-                        is_duplicate => ($dup_check ? 1 : 0),
-                        duplicate_of => ($dup_check ? $dup_check->id : undef),
-                        upload_date  => \'NOW()',
-                    });
-                    $dup_check ? $duplicates++ : $inserted++;
-                };
-                if ($@) {
-                    $c->log->error("resource_scan_nfs insert error for $full: $@");
-                    $errors++;
+                if ($target_table eq 'workshop_resource' || $target_table eq 'both') {
+                    next if $existing_wr{$full};
+                    my $linked_file_id = $existing_files{$full} ? $existing_files{$full}->id : undef;
+                    eval {
+                        $wr_rs->create({
+                            file_name    => $entry,
+                            file_path    => $full,
+                            file_ext     => $ext,
+                            file_type    => $mime,
+                            file_size    => $size,
+                            sitename     => $form_sitename,
+                            access_level => $access_level,
+                            uploaded_by  => $user_id,
+                            workshop_id  => $workshop_id,
+                            description  => $cat_desc || undef,
+                            file_id      => $linked_file_id,
+                        });
+                        $inserted++ if $target_table eq 'workshop_resource';
+                    };
+                    if ($@) {
+                        $c->log->error("resource_scan_nfs workshop_resource insert error for $full: $@");
+                        $errors++ if $target_table eq 'workshop_resource';
+                    }
                 }
             }
         }
@@ -2181,10 +2357,11 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     eval { $scan->($scan_root) };
     $c->log->error("NFS scan failed: $@") if $@;
 
-    my $msg = "NFS scan of '$scan_root': $inserted new, $skipped already in DB, $duplicates duplicates, $errors errors.";
+    my $target_label = $target_table eq 'both' ? 'files + workshop_resource' : $target_table;
+    my $msg = "NFS scan of '$scan_root' → $target_label: $inserted new, $skipped already in DB, $duplicates duplicates, $errors errors.";
     $msg   .= " (Limit of $max_files files reached — run again to continue.)" if $limit_hit;
     $c->flash->{success_msg} = $msg;
-    $c->response->redirect($c->uri_for('/workshop/resources'));
+    $c->response->redirect($c->uri_for('/workshop/resource_sync'));
 }
 
 sub content :Local :Args(1) {
