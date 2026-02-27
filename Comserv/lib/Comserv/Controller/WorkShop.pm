@@ -2847,8 +2847,8 @@ sub edit_content :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
-            content_record => $content_record,
-            template => 'WorkShops/edit_content.tt',
+            content => $content_record,
+            template => 'WorkShops/AddContent.tt',
         );
         return;
     }
@@ -2862,9 +2862,9 @@ sub edit_content :Local :Args(1) {
         $c->stash->{error_msg} = 'Title is required.';
         $c->stash(
             workshop => $workshop,
-            content_record => $content_record,
+            content => $content_record,
             form_data => $params,
-            template => 'WorkShops/edit_content.tt',
+            template => 'WorkShops/AddContent.tt',
         );
         return;
     }

@@ -1,0 +1,87 @@
+[% META 
+   title = "Add Participant"
+   description = "Manually add a participant to a workshop"
+   roles = "admin,workshop_leader"
+   TemplateType = "Application"
+   category = "WorkShops"
+   page_version = "0.01"
+   last_updated = "2026-02-27"
+%]
+
+[% PageVersion = 'WorkShops/AddParticipant.tt,v 0.01 2026/02/27 AI Exp AI' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Add Participant</h1>
+        <h2 class="page-subtitle">Workshop: [% workshop.title | html %]</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg | html %]</div>
+            [% END %]
+            
+            <div class="form-container">
+                <form method="POST" action="/workshop/add_participant/[% workshop.id %]" class="app-form">
+                    
+                    <div class="form-section">
+                        <h3>Participant Information</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="name">Full Name: *</label>
+                                <input type="text" id="name" name="name" value="[% form_data.name || '' | html %]" class="form-input" required>
+                                <small>First and last name of the participant.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="email">Email Address: *</label>
+                                <input type="email" id="email" name="email" value="[% form_data.email || '' | html %]" class="form-input" required>
+                                <small>Used for workshop communications and confirmations.</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="site_affiliation">Site/Affiliation:</label>
+                                <input type="text" id="site_affiliation" name="site_affiliation" value="[% form_data.site_affiliation || '' | html %]" class="form-input">
+                                <small>Optional: Which site or organization this participant belongs to.</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    [% IF workshop.max_participants %]
+                    <div class="content-section">
+                        <p><strong>Workshop Capacity:</strong> [% workshop.current_participants %] / [% workshop.max_participants %] registered</p>
+                        [% IF workshop.is_full %]
+                        <p class="warning">This workshop is at capacity. The participant will be added to the waitlist.</p>
+                        [% END %]
+                    </div>
+                    [% END %]
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add Participant</button>
+                        <a href="/workshop/participants/[% workshop.id %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
