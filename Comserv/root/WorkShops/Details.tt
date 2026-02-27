@@ -209,8 +209,11 @@
                         </thead>
                         <tbody>
                             [% FOREACH file IN workshop_files %]
-                            [% SET fsize_kb = file.file_size > 0 ? (file.file_size / 1024).int : 0 %]
-                            [% SET fsize_label = fsize_kb > 1024 ? (fsize_kb / 1024).int _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
+                            [% SET fsize_raw = file.file_size > 0 ? file.file_size / 1024 : 0 %]
+                            [% SET fsize_kb  = fsize_raw.int %]
+                            [% SET fsize_mb_raw = fsize_kb > 1024 ? fsize_kb / 1024 : 0 %]
+                            [% SET fsize_mb  = fsize_mb_raw.int %]
+                            [% SET fsize_label = fsize_kb > 1024 ? fsize_mb _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
                             <tr>
                                 <td><strong>[% file.file_name | html %]</strong></td>
                                 <td><code>[% file.file_type | upper | html %]</code></td>
