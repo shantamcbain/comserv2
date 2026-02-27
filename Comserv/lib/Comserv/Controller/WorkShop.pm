@@ -1513,11 +1513,12 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $nfs_root   = $self->_nfs_root();
     my $nfs_available = -d $nfs_root;
 
-    # Load only DB records — no filesystem scan on page load
+    my $schema = $c->model('DBEncy');
+
+    # --- Workshop resources (attached to workshops) ---
     my @resources;
     my $db_error;
     eval {
-        my $schema = $c->model('DBEncy');
         my $filter = {};
         unless ($is_csc) {
             $filter = {
@@ -1535,6 +1536,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
         for my $row (@db_rows) {
             push @resources, {
                 id           => $row->id,
+                file_id      => $row->file_id,
                 file_name    => $row->file_name,
                 file_path    => $row->file_path // '',
                 file_ext     => $row->file_ext // '',
@@ -1548,6 +1550,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
                     : 'Unknown',
                 in_db        => 1,
                 external_url => $row->external_url,
+                workshop_id  => $row->workshop_id,
             };
         }
     };
@@ -1556,8 +1559,96 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $c->log->error("Resource library DB error: $db_error");
     }
 
+    # --- File library (files table) with pagination + search ---
+    my $lib_search = $c->req->param('lib_search') // '';
+    my $lib_page   = int($c->req->param('lib_page') // 1);
+    $lib_page = 1 if $lib_page < 1;
+    my $lib_per_page = 40;
+
+    my @file_library;
+    my ($file_count, $file_pages, $lib_error) = (0, 0, undef);
+    eval {
+        my $file_filter = {};
+        unless ($is_csc) {
+            $file_filter = {
+                -or => [
+                    { 'me.access_level' => 'all_leaders' },
+                    { 'me.sitename'     => $sitename },
+                    { 'me.user_id'      => $user_id },
+                ]
+            };
+        }
+        if ($lib_search) {
+            my $like = "%$lib_search%";
+            $file_filter = {
+                %$file_filter,
+                -and => [
+                    -or => [
+                        { 'me.file_name'   => { like => $like } },
+                        { 'me.description' => { like => $like } },
+                        { 'me.file_format' => { like => $like } },
+                        { 'me.nfs_path'    => { like => $like } },
+                    ]
+                ]
+            };
+        }
+        my $files_rs = $schema->resultset('File');
+        $file_count  = $files_rs->search($file_filter)->count;
+        $file_pages  = int(($file_count + $lib_per_page - 1) / $lib_per_page) || 1;
+        $lib_page    = $file_pages if $lib_page > $file_pages;
+
+        my @rows = $files_rs->search(
+            $file_filter,
+            {
+                order_by => { -desc => 'me.upload_date' },
+                rows     => $lib_per_page,
+                offset   => ($lib_page - 1) * $lib_per_page,
+                columns  => [qw(id file_name file_format file_size nfs_path file_path external_url
+                                access_level sitename description file_type upload_date file_status)],
+            }
+        )->all;
+
+        for my $f (@rows) {
+            my $ext  = lc($f->file_format // '');
+            my $size = $f->file_size // 0;
+            push @file_library, {
+                id           => $f->id,
+                file_name    => $f->file_name // '',
+                file_ext     => $ext,
+                file_size    => $size,
+                file_type    => $f->file_type // '',
+                nfs_path     => $f->nfs_path // $f->file_path // '',
+                external_url => $f->external_url // '',
+                access_level => $f->access_level // 'site_only',
+                sitename     => $f->sitename // '',
+                description  => $f->description // '',
+            };
+        }
+    };
+    if ($@) {
+        $lib_error = $@;
+        $c->log->error("File library DB error: $lib_error");
+    }
+
+    # --- Workshops list for "Attach to Workshop" dropdown ---
+    my @workshops;
+    eval {
+        @workshops = $schema->resultset('WorkShop')->search(
+            {},
+            { columns => ['id', 'title', 'sitename'], order_by => 'title' }
+        )->all;
+    };
+
     $c->stash(
         resources     => \@resources,
+        file_library  => \@file_library,
+        file_count    => $file_count,
+        file_pages    => $file_pages,
+        lib_page      => $lib_page,
+        lib_per_page  => $lib_per_page,
+        lib_search    => $lib_search,
+        lib_error     => $lib_error,
+        workshops     => \@workshops,
         is_csc        => $is_csc,
         is_admin      => $is_admin,
         sitename      => $sitename,
@@ -2362,6 +2453,89 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     $msg   .= " (Limit of $max_files files reached — run again to continue.)" if $limit_hit;
     $c->flash->{success_msg} = $msg;
     $c->response->redirect($c->uri_for('/workshop/resource_sync'));
+}
+
+sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $file_id     = $c->req->param('file_id');
+    my $workshop_id = $c->req->param('workshop_id');
+    my $access_level= $c->req->param('access_level') // 'site_only';
+    my $user_id     = $c->session->{user_id};
+    my $sitename    = $c->session->{SiteName} // '';
+
+    unless ($file_id && $file_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid file ID.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+
+    # Check file exists
+    my $file = eval { $schema->resultset('File')->find($file_id) };
+    unless ($file) {
+        $c->flash->{error_msg} = "File #$file_id not found.";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    # Check not already attached to this workshop
+    my $already = eval {
+        my $filter = { file_id => $file_id };
+        $filter->{workshop_id} = $workshop_id if $workshop_id && $workshop_id =~ /^\d+$/;
+        $schema->resultset('WorkshopResource')->search($filter, { rows => 1 })->first;
+    };
+    if ($already) {
+        $c->flash->{error_msg} = 'This file is already attached' . ($workshop_id ? ' to that workshop.' : '.');
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $ext  = lc($file->file_format // ($file->file_name =~ /\.([^.]+)$/ ? $1 : ''));
+    my $mime = $file->file_type // 'application/octet-stream';
+
+    eval {
+        $schema->resultset('WorkshopResource')->create({
+            file_name    => $file->file_name,
+            file_path    => $file->nfs_path // $file->file_path // '',
+            file_ext     => $ext,
+            file_type    => $mime,
+            file_size    => $file->file_size,
+            sitename     => $file->sitename // $sitename,
+            access_level => $access_level,
+            uploaded_by  => $user_id,
+            workshop_id  => ($workshop_id && $workshop_id =~ /^\d+$/) ? $workshop_id : undef,
+            description  => $file->description,
+            file_id      => $file_id,
+        });
+    };
+    if ($@) {
+        $c->log->error("resource_attach error: $@");
+        $c->flash->{error_msg} = 'Failed to attach file: ' . (split /\n/, $@)[0];
+    } else {
+        my $ws_label = ($workshop_id && $workshop_id =~ /^\d+$/) ? " to workshop #$workshop_id" : '';
+        $c->flash->{success_msg} = "File '" . $file->file_name . "' attached$ws_label successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
 }
 
 sub content :Local :Args(1) {
