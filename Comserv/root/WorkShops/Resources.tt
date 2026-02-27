@@ -323,10 +323,140 @@
     </div>
     [% END %]
 
+    <!-- File Library — all files from the files table -->
+    <div style="margin-top:32px;border-top:2px solid var(--border-color,#dee2e6);padding-top:20px;">
+        <h2 style="margin-bottom:4px;">📚 File Library
+            <span style="font-size:0.75em;font-weight:normal;color:var(--text-muted-color);">[% file_count %] file(s) total</span>
+        </h2>
+        <p style="color:var(--text-muted-color);font-size:0.88em;margin-top:0;">
+            Browse all scanned NFS files. Use <strong>📎 Attach</strong> to add a file to the Workshop Resource library.
+        </p>
+
+        [% IF lib_error %]
+        <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:12px;">
+            <strong>File library error:</strong>
+            [% IF c.session.debug_mode == 1 %]<small>[% lib_error | html %]</small>[% ELSE %] Could not load file records.[% END %]
+        </div>
+        [% END %]
+
+        <!-- Search + pagination -->
+        <form method="GET" action="/workshop/resources" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+            <input type="text" name="lib_search" value="[% lib_search | html %]"
+                   placeholder="Search by name, extension, path…"
+                   style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;flex:1;min-width:220px;">
+            <button type="submit" class="btn btn-sm btn-primary">🔍 Search</button>
+            [% IF lib_search %]
+            <a href="/workshop/resources" class="btn btn-sm">✕ Clear</a>
+            [% END %]
+        </form>
+
+        [% IF file_library.size > 0 %]
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85em;">
+            <thead>
+                <tr style="background:var(--table-header-bg,#e9ecef);">
+                    <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border-color,#dee2e6);">File</th>
+                    <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border-color,#dee2e6);">Type</th>
+                    <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border-color,#dee2e6);">Size</th>
+                    <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border-color,#dee2e6);">Site</th>
+                    <th style="padding:7px 10px;text-align:left;border-bottom:2px solid var(--border-color,#dee2e6);">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH f IN file_library %]
+            [% SET fext = f.file_ext | upper %]
+            [% SET fsize_kb_raw = f.file_size > 0 ? f.file_size / 1024 : 0 %]
+            [% SET fsize_kb = fsize_kb_raw ? fsize_kb_raw.int : 0 %]
+            [% SET fsize_mb_raw = fsize_kb > 0 ? fsize_kb / 1024 : 0 %]
+            [% SET fsize_mb = fsize_mb_raw ? fsize_mb_raw.int : 0 %]
+            [% SET fsize_label = fsize_kb > 1024 ? fsize_mb _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
+            <tr style="border-bottom:1px solid var(--border-color,#dee2e6);" onmouseover="this.style.background='var(--row-hover-bg,#f5f5f5)'" onmouseout="this.style.background=''">
+                <td style="padding:5px 10px;max-width:300px;overflow:hidden;">
+                    <span title="[% f.nfs_path | html %]" style="font-weight:bold;word-break:break-word;">[% f.file_name | html %]</span>
+                    [% IF f.description %]<br><small style="color:var(--text-muted-color);">[% f.description | html %]</small>[% END %]
+                </td>
+                <td style="padding:5px 10px;white-space:nowrap;"><code>[% fext || '—' %]</code></td>
+                <td style="padding:5px 10px;white-space:nowrap;">[% fsize_label %]</td>
+                <td style="padding:5px 10px;white-space:nowrap;">[% f.sitename | html %]</td>
+                <td style="padding:5px 10px;white-space:nowrap;">
+                    [% IF f.external_url %]
+                        <a href="[% f.external_url | html %]" target="_blank" class="btn btn-sm">🔗 Open</a>
+                    [% ELSIF f.nfs_path %]
+                        <a href="/workshop/resource_fs_download?path=[% f.nfs_path | uri | html %]" class="btn btn-sm">⬇️</a>
+                    [% END %]
+                    <!-- Attach to Workshop -->
+                    <span style="position:relative;display:inline-block;">
+                        <button class="btn btn-sm"
+                                style="background:#28a745;color:#fff;"
+                                onclick="toggleAttachForm([% f.id %])"
+                                title="Attach to Workshop">📎</button>
+                        <div id="attach-form-[% f.id %]"
+                             style="display:none;position:absolute;right:0;top:100%;z-index:200;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:260px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                            <form method="POST" action="/workshop/resource_attach">
+                                <input type="hidden" name="file_id" value="[% f.id %]">
+                                <div style="margin-bottom:8px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:3px;">Workshop <em>(optional)</em></label>
+                                    <select name="workshop_id" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.85em;">
+                                        <option value="">— No specific workshop —</option>
+                                        [% FOREACH w IN workshops %]
+                                        <option value="[% w.id %]">[% w.sitename | html %] — [% w.title | html %]</option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                                <div style="margin-bottom:10px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:3px;">Access</label>
+                                    <select name="access_level" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.85em;">
+                                        <option value="site_only">My Site Only</option>
+                                        <option value="all_leaders">All Leaders</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex;gap:6px;">
+                                    <button type="submit" class="btn btn-sm" style="background:#28a745;color:#fff;flex:1;">📎 Attach</button>
+                                    <button type="button" class="btn btn-sm" onclick="toggleAttachForm([% f.id %])">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </span>
+                </td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
+        </div>
+
+        <!-- Pagination -->
+        [% IF file_pages > 1 %]
+        <div style="display:flex;gap:6px;align-items:center;margin-top:14px;flex-wrap:wrap;">
+            <span style="font-size:0.85em;color:var(--text-muted-color);">Page [% lib_page %] of [% file_pages %]</span>
+            [% IF lib_page > 1 %]
+            <a href="/workshop/resources?lib_page=[% lib_page - 1 %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">‹ Prev</a>
+            [% END %]
+            [% FOREACH p IN [1 .. file_pages] %]
+                [% IF p == lib_page %]
+                <span class="btn btn-sm" style="background:var(--primary-color,#007bff);color:#fff;">[% p %]</span>
+                [% ELSIF p == 1 || p == file_pages || (p >= lib_page - 2 && p <= lib_page + 2) %]
+                <a href="/workshop/resources?lib_page=[% p %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">[% p %]</a>
+                [% ELSIF p == lib_page - 3 || p == lib_page + 3 %]
+                <span style="padding:0 4px;">…</span>
+                [% END %]
+            [% END %]
+            [% IF lib_page < file_pages %]
+            <a href="/workshop/resources?lib_page=[% lib_page + 1 %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">Next ›</a>
+            [% END %]
+        </div>
+        [% END %]
+
+        [% ELSE %]
+        <p style="color:var(--text-muted-color);padding:20px 0;">
+            [% IF lib_search %]No files match "<strong>[% lib_search | html %]</strong>". <a href="/workshop/resources">Clear search</a>.[% ELSE %]No files in the library yet. Use the <a href="/workshop/resource_sync">NFS Sync Tool</a> to scan and import files.[% END %]
+        </p>
+        [% END %]
+    </div>
+
     [% IF is_admin %]
     <!-- Admin: lazy NFS filesystem browser -->
-    <details id="nfs-browser-section">
-        <summary>🗂️ Browse NFS Filesystem (Admin)
+    <details id="nfs-browser-section" style="margin-top:24px;">
+        <summary>🗂️ Browse NFS Filesystem Raw (Admin)
             <span id="nfs-count-badge" style="font-size:0.8em;font-weight:normal;color:var(--text-muted-color);margin-left:8px;"></span>
         </summary>
         <input type="text" id="nfs-search" placeholder="Filter by filename…">
@@ -349,6 +479,22 @@
     [% END %]
 
 </div>
+<script>
+function toggleAttachForm(id) {
+    var el = document.getElementById('attach-form-' + id);
+    if (!el) return;
+    var showing = el.style.display !== 'none';
+    // Close all open attach forms first
+    document.querySelectorAll('[id^="attach-form-"]').forEach(function(f) { f.style.display = 'none'; });
+    if (!showing) el.style.display = 'block';
+}
+// Close attach forms when clicking elsewhere
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[id^="attach-form-"]') && !e.target.closest('button[onclick^="toggleAttachForm"]')) {
+        document.querySelectorAll('[id^="attach-form-"]').forEach(function(f) { f.style.display = 'none'; });
+    }
+});
+</script>
 
 <!-- View/Info Modal -->
 <div id="resource-modal">
