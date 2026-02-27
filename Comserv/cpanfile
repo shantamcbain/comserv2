@@ -65,6 +65,11 @@ requires 'File::Slurp';
 requires 'Archive::Tar';
 
 # Network related
+requires 'Protocol::WebSocket';
+requires 'AnyEvent';
+requires 'AnyEvent::Handle';
+requires 'Twiggy';
+requires 'IO::Pty';
 
 # Cryptography and Security
 requires 'Crypt::CBC';

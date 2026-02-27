@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.72' %]
-[% date_iso = '2026/02/26' %]
-[% formatted_date = 'February 26, 2026' %]
-[% time = '10:15:00' %]
-[% change_log = 'Docker section: Added Environment Variables Admin UI sub-project (delivered). Added jump link EnvVarsAdmin. Created Documentation/EnvironmentVariablesManagement.tt tutorial.' %]
+[% version = '0.74' %]
+[% date_iso = '2026/02/21' %]
+[% formatted_date = 'February 21, 2026' %]
+[% time = '16:30:00' %]
+[% change_log = 'Users: 3-Step Self-Registration COMPLETE - Refactored existing register.tt and do_create_account, created VerifyEmail.tt and CompleteProfile.tt (PascalCase). Clean URLs (/register, /verify_email, /complete_profile). Reused existing code, deleted duplicates. Phase 2 in progress. Next: Enhanced login (email/username support).' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -71,78 +71,10 @@ last_updated = '2026/02/08'
         line-height: 1.6;
     }
 
-    /* Project Status Badges - Theme-Compliant */
-    .project-status {
-        font-weight: bold;
-        padding: 4px 10px;
-        border-radius: 4px;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 0.9em;
-        border: 1px solid;
-    }
-    
-    /* Status: Requested (Initial Request) */
-    .status-requested {
-        color: var(--warning-text, #856404);
-        background: var(--warning-bg, #fff3cd);
-        border-color: var(--warning-border, #ffc107);
-    }
-    .status-requested::before { content: "📋"; }
-    
-    /* Status: Public (Approved/Published) */
-    .status-public {
-        color: var(--info-text, #004085);
-        background: var(--info-bg, #cce5ff);
-        border-color: var(--info-border, #0056b3);
-    }
-    .status-public::before { content: "🌐"; }
-    
-    /* Status: In-Progress (Active Development) */
-    .status-in-progress {
-        color: var(--primary-text, #155724);
-        background: var(--primary-bg, #d4edda);
-        border-color: var(--primary-border, #28a745);
-    }
-    .status-in-progress::before { content: "⏳"; }
-    
-    /* Status: Testing (QA/Review) */
-    .status-testing {
-        color: var(--secondary-text, #383d41);
-        background: var(--secondary-bg, #e2e3e5);
-        border-color: var(--secondary-border, #6c757d);
-    }
-    .status-testing::before { content: "🧪"; }
-    
-    /* Status: Delivered (Completed/Released) */
-    .status-delivered {
-        color: var(--success-text, #004085);
-        background: var(--success-bg, #d1ecf1);
-        border-color: var(--success-border, #17a2b8);
-    }
-    .status-delivered::before { content: "✅"; }
-    
-    /* Legacy status classes for backward compatibility */
-    .status-pending { 
-        color: var(--warning-text, #856404);
-        background: var(--warning-bg, #fff3cd);
-        border-color: var(--warning-border, #ffc107);
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    .status-pending::before { content: "📋 "; }
-    
-    .status-completed {
-        color: var(--success-text, #004085);
-        background: var(--success-bg, #d1ecf1);
-        border-color: var(--success-border, #17a2b8);
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    .status-completed::before { content: "✅ "; }
+    /* Status styling classes */
+    .status-pending { color: #dc3545; font-weight: bold; background: #f8d7da; padding: 2px 6px; border-radius: 3px; }
+    .status-in-progress { color: #856404; font-weight: bold; background: #fff3cd; padding: 2px 6px; border-radius: 3px; }
+    .status-completed { color: #155724; font-weight: bold; background: #d4edda; padding: 2px 6px; border-radius: 3px; }
     .jump-line {
         margin-bottom: 4px;
     }
@@ -261,6 +193,10 @@ last_updated = '2026/02/08'
                         <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-users" class="jump-link">👥 Users System</a></strong>:
+                        <a href="#anchor-users-project" class="jump-link">UsersProject</a>
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-ai" class="jump-link">🤖 AI Systems</a></strong>:
                         <a href="#anchor-aichat-system" class="jump-link">AIChatSystem</a>
                     </div>
@@ -299,6 +235,7 @@ last_updated = '2026/02/08'
                 <li><strong>SchemaManagement:</strong> <a href="[% base_url %]4002/Documentation/DailyPlan" target="_blank">schema-management-system-7eb3</a> <em>(port 4002)</em> - Database Schema Management</li>
                 <li><strong>InfrastructureHA:</strong> <a href="[% base_url %]4003/Documentation/DailyPlan" target="_blank">new-task-9cf1</a> <em>(port 4003)</em> - High Availability & Disaster Recovery</li>
                 <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/workshop" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
+                <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
             </ul>
             
@@ -1492,7 +1429,7 @@ last_updated = '2026/02/08'
             <summary class="group-header">🎓 WorkShops Advertising System</summary>
             <div class="priority-content">
 
-            <p><strong>Status:</strong> <span class="status-in-progress">In-Progress - Phase 8B</span> | <strong>Priority:</strong> <span class="status-requested">HIGH</span></p>
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
             <p><strong>Zenflow Task:</strong> <code>workshops-7d21</code> (port 4004) | <strong>Branch:</strong> <code>workshops-7d21</code></p>
 
             <p><strong>Objective:</strong> Comprehensive platform for managing and advertising educational workshops across multiple sites with role-based access control, participant management, PowerPoint integration, mailing lists, and content development tools.</p>
@@ -1776,6 +1713,361 @@ last_updated = '2026/02/08'
                 <li><a href="/project/details?project_id=8">WorkShops Module (ID 8)</a></li>
                 <li><a href="/Documentation/project/details?project_id=157">API System Setup & Domain Migration (ID 157)</a></li>
             </ul>
+            </div>
+        </details>
+
+        <!-- Group 3.7: Users System -->
+        <div id="anchor-users-system" class="nav-anchor"></div>
+        <details id="group-users" class="priority-group-container" open>
+            <summary class="group-header">👥 User & Admin Management System</summary>
+            <div class="priority-content">
+
+            <div id="anchor-users-project" class="nav-anchor"></div>
+            <details id="users-project" class="priority-container" open>
+                <summary class="priority-summary">👥 User & Admin Management System</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 1 Complete, Phase 2 Started</span> | <strong>Priority:</strong> <span class="status-in-progress">HIGH</span></p>
+                    <p><strong>Zenflow Task:</strong> <code>users-e5b8</code> (port 4005) | <strong>Branch:</strong> <code>users-e5b8</code></p>
+
+                    <p><strong>Objective:</strong> Comprehensive user and admin management system with email verification, password reset, role management, and site-based access control.</p>
+
+                    <h4>📋 Overview</h4>
+                    <p>Enhance existing user management with complete self-service and administrative capabilities:</p>
+                    <ul>
+                        <li>Self-registration with email verification (3-step process)</li>
+                        <li>Admin-created accounts with invitation workflow</li>
+                        <li>Password management (change, reset via email)</li>
+                        <li>Enhanced login (email OR username, password OR verification code)</li>
+                        <li>User dashboard (profile view/edit, site roles)</li>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Role management (assign/remove roles per site)</li>
+                        <li>Account suspension/activation</li>
+                        <li>Site-based access control (CSC admin vs site admin)</li>
+                        <li>Audit logging for all user/admin actions</li>
+                    </ul>
+
+                    <h4>📊 Users Project from Database</h4>
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET users_project = schema.resultset('Project').find(184) %]
+
+                        [% IF users_project %]
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                    <h3>[% users_project.name %] (Project ID: [% users_project.id %])</h3>
+                                    <ul>
+                                        <li><strong>Description:</strong> [% users_project.description || 'User and Admin Management System with email verification and role management' %]</li>
+                                        <li><strong>Start Date:</strong> [% users_project.start_date || '2026-02-18' %]</li>
+                                        <li><strong>End Date:</strong> [% users_project.end_date || 'TBD' %]</li>
+                                        <li><strong>Status:</strong> [% users_project.status || 'In-Process' %]</li>
+                                        <li><strong>Project Code:</strong> [% users_project.project_code || 'USERS' %]</li>
+                                        <li><strong>Project Size:</strong> [% users_project.project_size || 'Medium' %]</li>
+                                        <li><strong>Estimated Man Hours:</strong> [% users_project.estimated_man_hours || '80' %]</li>
+                                        <li><strong>Developer Name:</strong> [% users_project.developer_name || 'Development Team' %]</li>
+                                        <li><strong>Client Name:</strong> [% users_project.client_name || 'Internal' %]</li>
+                                        <li><strong>Comments:</strong> [% users_project.comments || 'User management system with email verification, role management, and site-based access control' %]</li>
+                                    </ul>
+
+                                    <p>
+                                        <a href="/project/details?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">View Details</a> |
+                                        <a href="/project/editproject?project_id=[% users_project.id %]" target="_blank" style="color: #007bff;">Edit Project</a>
+                                    </p>
+
+                                    [% SET users_todos = users_project.todos.search({}, { order_by => 'sort_order' }) %]
+                                    [% IF users_todos.count > 0 %]
+                                        <h4>📋 Todos for [% users_project.name %] ([% users_todos.count %])</h4>
+                                        <ul style="list-style-type: none; padding-left: 0;">
+                                            [% FOREACH todo IN users_todos.all %]
+                                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #007bff; background: #fafafa;">
+                                                    [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
+                                                    [% todo.subject %]
+                                                    <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                                    <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
+                                                    <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
+                                                </li>
+                                            [% END %]
+                                        </ul>
+                                    [% ELSE %]
+                                        <p>No todos found for this project. <a href="/todo/addtodo?project_id=[% users_project.id %]">Add a todo</a></p>
+                                    [% END %]
+                            </div>
+                        [% ELSE %]
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 10px 0;">
+                                <strong>Note:</strong> Project ID 184 not found in database. Please ensure the project record exists.
+                                <a href="/project/addproject" style="color: #007bff;">Create Project</a>
+                            </div>
+                        [% END %]
+                    [% CATCH %]
+                        <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 10px; margin: 10px 0;">
+                            <strong>Error loading project:</strong> [% error.info %]
+                        </div>
+                    [% END %]
+
+                    <h4>🎯 Current Phase: Phase 2 - User Self-Service Features</h4>
+                    <ul>
+                        <li>✅ Requirements document created</li>
+                        <li>✅ Technical specification complete</li>
+                        <li>✅ Implementation plan created (23 steps across 5 phases)</li>
+                        <li>✅ EmailVerificationCode Result file created</li>
+                        <li>✅ PasswordResetToken Result file created</li>
+                        <li>✅ User Result file modified (8 new columns, 4 relationships)</li>
+                        <li>✅ Fixed schema_compare bugs (CURRENT_TIMESTAMP, JSON serialization)</li>
+                        <li>✅ Database schema changes verified (all 3 tables created/modified, DBIx::Class relationships active)</li>
+                        <li>✅ UserVerification utility module created (SHA256 hashing, code/token generation, 24h expiry)</li>
+                        <li>✅ 3-step self-registration workflow implemented (refactored existing code, PascalCase templates)</li>
+                        <li>⏳ **NEXT**: Enhance login with email/username support</li>
+                    </ul>
+
+                    <h4>🔧 Issues Resolved</h4>
+                    <ul>
+                        <li>✅ Fixed duplicate User.pm files (<code>User.pm</code> vs <code>User/User.pm</code>)</li>
+                        <li>✅ Updated package references in Documentation.pm and Content.pm</li>
+                        <li>✅ Added <code>check_password()</code> and <code>display_name()</code> methods to User.pm</li>
+                        <li>✅ Fixed schema_compare CURRENT_TIMESTAMP handling (was generating <code>SCALAR(0x...)</code>)</li>
+                        <li>✅ Fixed schema_compare JSON serialization (scalar reference dereferencing)</li>
+                        <li>✅ Fixed regex in <code>parse_result_file_columns()</code> to capture last column</li>
+                    </ul>
+
+                    <h4>🔨 Latest Implementation: 3-Step Self-Registration Workflow</h4>
+                    <div style="padding: 10px; background: #d4edda; border: 1px solid #28a745; border-radius: 4px; margin: 10px 0;">
+                        <p><strong>Status:</strong> ✅ COMPLETE - Ready for testing</p>
+                        <p><strong>Access:</strong> <a href="http://workstation.local:4005/user/register" target="_blank">http://workstation.local:4005/user/register</a></p>
+
+                        <p><strong>Implementation Approach:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li><strong>Reused Existing Code:</strong> Refactored <code>register</code> action and <code>register.tt</code> template instead of creating duplicates</li>
+                            <li><strong>Followed PascalCase:</strong> New templates named <code>VerifyEmail.tt</code> and <code>CompleteProfile.tt</code></li>
+                            <li><strong>Clean URLs:</strong> <code>/user/register</code> (not /register_step1), <code>/user/verify_email</code>, <code>/user/complete_profile</code></li>
+                            <li><strong>Deleted Orphans:</strong> Removed duplicate templates (<code>create_account.tt</code>, <code>register_step1.tt</code>) and orphaned actions</li>
+                            <li><strong>Backward Compatible:</strong> <code>/user/create_account</code> redirects to <code>/user/register</code></li>
+                        </ul>
+
+                        <p><strong>Workflow (3 Steps):</strong></p>
+                        <ol style="margin-top: 5px;">
+                            <li><strong>Step 1 - Register (<code>/user/register</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters username + email</li>
+                                    <li>Validates uniqueness (username & email)</li>
+                                    <li>Creates user with <code>status='pending_verification'</code></li>
+                                    <li>Generates 6-digit code (SHA256 hashed)</li>
+                                    <li>Stores in <code>email_verification_codes</code> table</li>
+                                    <li>Displays code in session for testing (placeholder for email)</li>
+                                    <li>Redirects to Step 2</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 2 - Verify Email (<code>/user/verify_email</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters 6-digit code</li>
+                                    <li>Validates against hashed value</li>
+                                    <li>Checks 24-hour expiry via <code>UserVerification::is_expired()</code></li>
+                                    <li>Marks <code>verified_at</code> timestamp</li>
+                                    <li>Redirects to Step 3</li>
+                                </ul>
+                            </li>
+                            <li><strong>Step 3 - Complete Profile (<code>/user/complete_profile</code>):</strong>
+                                <ul style="font-size: 0.9em; margin-top: 3px;">
+                                    <li>User enters first name, last name, password (2x)</li>
+                                    <li>Validates password length (≥8 chars) and match</li>
+                                    <li>Hashes password with SHA256</li>
+                                    <li>Updates user: <code>status='active'</code>, <code>email_verified_at</code>, name, password</li>
+                                    <li>Clears session verification data</li>
+                                    <li>Redirects to login with success message</li>
+                                </ul>
+                            </li>
+                        </ol>
+
+                        <p><strong>Files Modified/Created:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ <code>User.pm</code> - Refactored <code>do_create_account</code> for Step 1, added <code>verify_email</code> and <code>complete_profile</code> actions</li>
+                            <li>✅ <code>register.tt</code> - Refactored to show only username + email (removed password, name fields)</li>
+                            <li>✅ <code>VerifyEmail.tt</code> - Created (PascalCase) with code entry form and testing helper</li>
+                            <li>✅ <code>CompleteProfile.tt</code> - Created (PascalCase) with name + password form</li>
+                            <li>❌ Deleted: <code>create_account.tt</code>, <code>register_step1.tt</code> (duplicates)</li>
+                        </ul>
+
+                        <p><strong>Security Features:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>✅ SHA256 hashing for verification codes (never stored plain text)</li>
+                            <li>✅ SHA256 hashing for passwords</li>
+                            <li>✅ 24-hour expiry on verification codes</li>
+                            <li>✅ Server-side validation (username uniqueness, email format, password strength)</li>
+                            <li>✅ Session-based workflow (prevents skipping steps)</li>
+                        </ul>
+
+                        <p><strong>Testing Notes:</strong></p>
+                        <ul style="margin-top: 5px;">
+                            <li>⚠️ <strong>Database schema must be applied</strong> via schema_compare before testing</li>
+                            <li>📧 Email sending is placeholder (code displayed on screen for testing)</li>
+                            <li>🔧 Syntax verified with <code>perl -Ilib -c</code></li>
+                            <li>🔄 Server restart required after schema changes</li>
+                        </ul>
+
+                        <p><strong>Next Step:</strong> Enhance login to accept email OR username (currently username only)</p>
+                    </div>
+
+                    <h4>🚀 Implementation Phases (6 weeks)</h4>
+                    <p><strong>Phase 1: Database Schema (Week 1) - ✅ COMPLETE</strong></p>
+                    <ul>
+                        <li>✅ Create EmailVerificationCode Result file</li>
+                        <li>✅ Create PasswordResetToken Result file</li>
+                        <li>✅ Modify User Result file (add 8 columns: email_notifications, status, email_verified_at, created_by, creation_context, created_at, updated_at; add relationships)</li>
+                        <li>✅ Database schema changes verified
+                            <ul>
+                                <li>✅ <code>email_verification_codes</code> table created (6 columns)</li>
+                                <li>✅ <code>password_reset_tokens</code> table created (6 columns)</li>
+                                <li>✅ <code>users</code> table modified (7 new columns added)</li>
+                                <li>✅ All DBIx::Class relationships active and functional</li>
+                                <li>✅ Schema validation confirmed via DBIx::Class queries</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <p><strong>Phase 2: User Self-Service (Week 2-3) - ⏳ IN PROGRESS</strong></p>
+                    <ul>
+                        <li>✅ UserVerification utility (code/token generation and validation)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Moose-based utility class with SHA256 hashing</li>
+                                <li>6-digit verification codes & 32-char hex reset tokens</li>
+                                <li>24-hour expiry for all codes/tokens</li>
+                                <li>Methods: generate_verification_code(), create_verification_code(), verify_code(), generate_reset_token(), create_reset_token(), verify_reset_token(), is_expired()</li>
+                                <li>Full integration with DBIx::Class relationships (EmailVerificationCode, PasswordResetToken)</li>
+                            </ul>
+                        </li>
+                        <li>✅ 3-step registration (email → verify code → complete profile)
+                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                <li>Refactored existing register.tt and do_create_account (reuse over new)</li>
+                                <li>Created VerifyEmail.tt and CompleteProfile.tt (PascalCase naming)</li>
+                                <li>Clean URLs: /user/register, /user/verify_email, /user/complete_profile</li>
+                                <li>Session-based workflow prevents step skipping</li>
+                                <li>Full validation: username/email uniqueness, password strength, code expiry</li>
+                                <li>Deleted orphaned duplicates: create_account.tt, register_step1.tt</li>
+                            </ul>
+                        </li>
+                        <li>⏳ **NEXT**: Enhanced login (email/username, password/code)</li>
+                        <li>Password management (change, reset)</li>
+                        <li>Profile view/edit</li>
+                        <li>Email templates (verification, reset, welcome)</li>
+                    </ul>
+
+                    <p><strong>Phase 3: Admin Features (Week 4-5)</strong></p>
+                    <ul>
+                        <li>Admin dashboard (user list, filters, search)</li>
+                        <li>Admin user creation (with invitation email)</li>
+                        <li>User edit/suspend/activate</li>
+                        <li>Role management (assign/remove UserSiteRole)</li>
+                        <li>Site role management (SiteRole CRUD)</li>
+                    </ul>
+
+                    <p><strong>Phase 4: Integration & Polish (Week 6)</strong></p>
+                    <ul>
+                        <li>Project registration via API</li>
+                        <li>Comprehensive audit logging</li>
+                        <li>Manual testing of all workflows</li>
+                        <li>Production deployment</li>
+                    </ul>
+
+                    <h4>📁 Documentation & Resources</h4>
+                    <ul>
+                        <li>Zenflow Task: <code>users-e5b8</code></li>
+                        <li>Requirements: <a href="/.zenflow/tasks/users-e5b8/requirements.md" target="_blank">requirements.md</a></li>
+                        <li>Technical Spec: <a href="/.zenflow/tasks/users-e5b8/spec.md" target="_blank">spec.md</a></li>
+                        <li>Implementation Plan: <a href="/.zenflow/tasks/users-e5b8/plan.md" target="_blank">plan.md</a></li>
+                        <li>API Access: <a href="http://api.workstation.local:4005/user/dashboard" target="_blank">api.workstation.local:4005</a></li>
+                    </ul>
+
+                    <h4>🗄️ Database Schema Changes</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>New Tables & Modifications</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <p><strong>User Table Modifications:</strong></p>
+                            <ul>
+                                <li><code>username</code> - Change to nullable (admin-created accounts)</li>
+                                <li><code>status</code> - New field (pending_verification, pending_setup, active, suspended)</li>
+                                <li><code>email_verified_at</code> - Timestamp</li>
+                                <li><code>created_by</code> - User ID of creator (for admin-created accounts)</li>
+                                <li><code>creation_context</code> - self_registration, workshop_invitation, admin_created</li>
+                            </ul>
+                            <p><strong>New Tables:</strong></p>
+                            <ul>
+                                <li><code>email_verification_codes</code> - Email verification workflow</li>
+                                <li><code>password_reset_tokens</code> - Password reset workflow</li>
+                            </ul>
+                            <p><strong>Existing Tables (No Changes):</strong></p>
+                            <ul>
+                                <li><code>user_site_roles</code> - Links users to roles and sites</li>
+                                <li><code>site_roles</code> - Defines available roles per site</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔌 Key Features</h4>
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>User Self-Service</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Self-Registration</strong>
+                                    <br><small style="color: #666;">3-step process: Enter username+email → Verify 6-digit code → Complete profile with password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Enhanced Login</strong>
+                                    <br><small style="color: #666;">Accepts email OR username, password OR verification code (for admin-created accounts)</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Password Management</strong>
+                                    <br><small style="color: #666;">Change password (while logged in) | Reset via email link with 24-hour token</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Profile Management</strong>
+                                    <br><small style="color: #666;">View profile with site roles | Edit name and email | Username read-only</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details open>
+                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Admin Features</strong></summary>
+                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                            <ul style="list-style: none; padding-left: 0;">
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Dashboard</strong>
+                                    <br><small style="color: #666;">List all users | Filter by site, role, status | Search by username, email | CSC admins see all, site admins see their site only</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Creation</strong>
+                                    <br><small style="color: #666;">Admin creates account with email only | Sends invitation email with verification code | User sets own username and password</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>User Management</strong>
+                                    <br><small style="color: #666;">Edit user details | Suspend/activate accounts | View audit logs</small>
+                                </li>
+                                <li style="margin-bottom: 8px;">
+                                    <strong>Role Management</strong>
+                                    <br><small style="color: #666;">Assign/remove roles per site | Manage site-specific role list | Standard roles: normal, editor, developer, WorkshopLeader, admin</small>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <h4>🔒 Security Features</h4>
+                    <ul>
+                        <li>All passwords hashed with SHA256 (existing pattern)</li>
+                        <li>Verification codes and reset tokens hashed before storage</li>
+                        <li>24-hour expiry enforced on all tokens</li>
+                        <li>Single-use tokens for password reset</li>
+                        <li>Site-based access control (AdminAuth utility)</li>
+                        <li>Comprehensive audit logging (Logging utility)</li>
+                    </ul>
+
+                    <h4>🔗 Related Systems</h4>
+                    <ul>
+                        <li><a href="/user/login" target="_blank">Login Page</a></li>
+                        <li><a href="/user/profile" target="_blank">User Profile</a></li>
+                        <li><a href="/user/dashboard" target="_blank">Admin Dashboard (Admin Only)</a></li>
+                        <li><a href="/user/create_account" target="_blank">Create Account</a></li>
+                        <li><a href="/user/forgot_password" target="_blank">Password Reset</a></li>
+                    </ul>
+                </div>
+            </details>
             </div>
         </details>
 

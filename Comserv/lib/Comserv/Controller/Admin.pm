@@ -5,8 +5,10 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::UserVerification;
 use Data::Dumper;
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Try::Tiny;
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
@@ -25,7 +27,7 @@ sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->instance();
 }
-
+# adding code to force restart
 # Begin method to check if the user has admin role
 sub begin : Private {
     my ($self, $c) = @_;
@@ -34,8 +36,7 @@ sub begin : Private {
     my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
-    
-    # Initialize debug_msg array if it doesn't exist and debug mode is enabled
+     # Initialize debug_msg array if it doesn't exist and debug mode is enabled
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         
@@ -207,6 +208,11 @@ sub index :Path :Args(0) {
         "Completed Admin index action");
 }
 
+sub docker_containers :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->redirect($c->uri_for('/admin/infrastructure'));
+}
+
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
@@ -373,97 +379,296 @@ sub get_system_notifications {
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Starting users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-    
-    # Get filter parameter
-    my $filter = $c->req->param('filter') || 'all';
-    
-    # Get search parameter
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+        "Admin accessing user management - user: " . ($c->session->{username} || 'unknown'));
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
     my $search = $c->req->param('search') || '';
-    
-    # Get page parameter
+    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_role = $c->req->param('filter_role') || '';
+    my $filter_status = $c->req->param('filter_status') || '';
     my $page = $c->req->param('page') || 1;
-    my $users_per_page = 20;
-    
-    # Build search conditions
-    my $search_conditions = {};
-    
-    # Apply filter
-    if ($filter eq 'active') {
-        $search_conditions->{status} = 'active';
-    }
-    elsif ($filter eq 'pending') {
-        $search_conditions->{status} = 'pending';
-    }
-    elsif ($filter eq 'disabled') {
-        $search_conditions->{status} = 'disabled';
-    }
-    
-    # Apply search
-    if ($search) {
-        $search_conditions->{'-or'} = [
-            { username => { 'like', "%$search%" } },
-            { email => { 'like', "%$search%" } },
-            { first_name => { 'like', "%$search%" } },
-            { last_name => { 'like', "%$search%" } }
-        ];
-    }
-    
-    # Get users from database
-    my $users_rs = $c->model('DBEncy::User')->search(
-        $search_conditions,
-        {
-            order_by => { -asc => 'username' },
-            page => $page,
-            rows => $users_per_page
-        }
-    );
-    
-    # Get user roles
-    my %user_roles = ();
+    my $rows_per_page = 50;
+
+    my @users;
+    my $pager;
+    my %stats = ( total => 0, active => 0, suspended => 0, pending => 0, by_role => {} );
+    my @available_sites;
+    my %user_sites_map;
+    my $error_msg;
+
     eval {
-        my @user_role_records = $c->model('DBEncy::UserRole')->search({});
-        foreach my $record (@user_role_records) {
-            push @{$user_roles{$record->user_id}}, $record->role->role;
+        my %search_conditions;
+
+        if ($search) {
+            $search_conditions{'-or'} = [
+                { username    => { like => "%$search%" } },
+                { first_name  => { like => "%$search%" } },
+                { last_name   => { like => "%$search%" } },
+                { email       => { like => "%$search%" } },
+            ];
         }
+
+        $search_conditions{status} = $filter_status if $filter_status;
+
+        if ($filter_role && $filter_role ne 'all') {
+            $search_conditions{roles} = { like => "%$filter_role%" };
+        }
+
+        my $user_rs;
+
+        if ($is_csc_admin) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "CSC admin - showing all users, search='$search' status='$filter_status' role='$filter_role'");
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Site admin ($sitename) - filtering by site");
+
+            if ($filter_site && $filter_site ne $sitename) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+                    "Site admin tried to access filter_site=$filter_site, forcing to $sitename");
+                $filter_site = $sitename;
+            }
+
+            my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+            my @user_ids;
+            if ($site_obj) {
+                @user_ids = $schema->resultset('UserSiteRole')->search(
+                    { site_id => $site_obj->id },
+                    { columns => ['user_id'], distinct => 1 }
+                )->get_column('user_id')->all;
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Found " . scalar(@user_ids) . " user_ids for sitename=$sitename");
+
+            $search_conditions{id} = @user_ids ? { -in => \@user_ids } : { -in => [0] };
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        }
+
+        @users = $user_rs->all;
+        $pager = $user_rs->pager;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Fetched " . scalar(@users) . " users (page $page, total " . $pager->total_entries . ")");
+
+        if (@users) {
+            my @user_ids = map { $_->id } @users;
+            my @site_role_rows = $schema->resultset('UserSiteRole')->search(
+                { user_id => { -in => \@user_ids } },
+                { columns => ['user_id', 'site_id'], distinct => 1 }
+            )->all;
+            my %site_name_cache;
+            for my $sr (@site_role_rows) {
+                my $sid = $sr->site_id;
+                next unless defined $sid;
+                unless (exists $site_name_cache{$sid}) {
+                    my $s = $schema->resultset('Site')->find($sid);
+                    $site_name_cache{$sid} = $s ? $s->name : "site#$sid";
+                }
+                push @{$user_sites_map{$sr->user_id}}, $site_name_cache{$sid};
+            }
+        }
+
+        my $stats_rs = $schema->resultset('User')->search(
+            $is_csc_admin ? {} : \%search_conditions
+        );
+
+        while (my $u = $stats_rs->next) {
+            $stats{total}++;
+            my $status = $u->status || 'active';
+            if    ($status eq 'active')    { $stats{active}++ }
+            elsif ($status eq 'suspended') { $stats{suspended}++ }
+            elsif ($status =~ /pending/)   { $stats{pending}++ }
+
+            if ($u->roles) {
+                for my $role (split /,/, $u->roles) {
+                    $role =~ s/^\s+|\s+$//g;
+                    $stats{by_role}{$role} = ($stats{by_role}{$role} || 0) + 1 if $role;
+                }
+            }
+        }
+
+        @available_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename })->all;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Completed users action - stats: total=$stats{total} active=$stats{active} suspended=$stats{suspended}");
     };
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
-        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
-        push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
+
+    if ($@) {
+        $error_msg = "Database error loading users: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'users', $error_msg);
     }
-    
-    # Pass data to the template
+
     $c->stash(
-        template => 'admin/users.tt',
-        users => [ $users_rs->all ],
-        user_roles => \%user_roles,
-        filter => $filter,
-        search => $search,
-        pager => $users_rs->pager
+        users           => \@users,
+        pager           => $pager,
+        stats           => \%stats,
+        search          => $search,
+        filter_site     => $filter_site,
+        filter_role     => $filter_role,
+        filter_status   => $filter_status,
+        is_csc_admin    => $is_csc_admin,
+        admin_type      => $admin_type,
+        sitename        => $sitename,
+        available_sites => \@available_sites,
+        user_sites_map  => \%user_sites_map,
+        error_msg       => $error_msg,
+        template        => 'admin/users.tt',
     );
+}
+
+# Admin create user
+sub create_user :Path('/admin/create_user') :Args(0) {
+    my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Completed users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    
+    unless ($admin_auth->check_admin_access($c, 'admin_create_user')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
+    if ($c->req->method eq 'POST') {
+        my $first_name = $c->req->param('first_name');
+        my $last_name = $c->req->param('last_name');
+        my $email = $c->req->param('email');
+        my @sitenames = $c->req->param('sitenames');
+        my @roles = $c->req->param('roles');
+
+        unless ($first_name && $last_name && $email) {
+            $c->stash(
+                error_msg => 'First name, last name, and email are required',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        unless (@sitenames && @roles) {
+            $c->stash(
+                error_msg => 'At least one site and role must be selected',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        if (!$is_csc_admin) {
+            foreach my $site (@sitenames) {
+                if ($site ne $sitename) {
+                    $c->flash->{error_msg} = "You can only create users for your site: $sitename";
+                    $c->response->redirect($c->uri_for('/admin/create_user'));
+                    return;
+                }
+            }
+        }
+
+        my $existing_user = $schema->resultset('User')->find({ email => $email });
+        if ($existing_user) {
+            $c->stash(
+                error_msg => "A user with email '$email' already exists",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        eval {
+            my $user = $schema->resultset('User')->create({
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                username => undef,
+                password => undef,
+                status => 'pending_setup',
+                created_by => $c->session->{user_id},
+                creation_context => 'admin_created',
+                roles => 'normal',
+            });
+
+            my $user_verification = Comserv::Util::UserVerification->new();
+            my $code = $user_verification->generate_verification_code();
+            $user_verification->create_verification_code($user, $code);
+
+            foreach my $site_name (@sitenames) {
+                my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                next unless $site_obj;
+                foreach my $role_name (@roles) {
+                    $schema->resultset('UserSiteRole')->create({
+                        user_id    => $user->id,
+                        site_id    => $site_obj->id,
+                        role       => $role_name,
+                        granted_by => $c->session->{user_id},
+                    });
+                }
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_user',
+                "Admin created user: $email with sites: " . join(',', @sitenames) . " roles: " . join(',', @roles));
+
+            $c->session->{invitation_code} = $code;
+            $c->session->{invitation_email} = $email;
+
+            $c->flash->{success_msg} = "User invitation sent to $email. Verification code: $code (testing mode)";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_user',
+                "Error creating user: $@");
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+    }
+
+    my @available_sites;
+    if ($is_csc_admin) {
+        @available_sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    } else {
+        @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
+    }
+
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+
+    $c->stash(
+        available_sites => \@available_sites,
+        available_roles => \@available_roles,
+        is_csc_admin => $is_csc_admin,
+        template => 'admin/create_user.tt',
+    );
 }
 
 # Admin content management
@@ -473,18 +678,10 @@ sub content :Path('/admin/content') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
         "Starting content action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'content', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'content')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -560,18 +757,10 @@ sub settings :Path('/admin/settings') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
         "Starting settings action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'settings')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -759,18 +948,10 @@ sub system_info :Path('/admin/system_info') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
         "Starting system_info action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'system_info', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'system_info')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -894,18 +1075,10 @@ sub logs :Path('/admin/logs') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs', 
         "Starting logs action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'logs', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'logs')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -961,15 +1134,10 @@ sub backup :Path('/admin/backup') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Starting backup action");
 
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
-            "Access denied: User does not have admin role");
-
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri,
-            mid => $c->set_error_msg("You need to be an administrator to access this area.")
-        }));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'backup')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
@@ -2576,6 +2744,9 @@ sub get_ency_database_tables {
         die $_;
     };
     
+    # Sort tables alphabetically
+    @tables = sort @tables;
+    
     return \@tables;
 }
 
@@ -2599,6 +2770,9 @@ sub get_forager_database_tables {
             "Error getting forager database tables: $_");
         die $_;
     };
+    
+    # Sort tables alphabetically
+    @tables = sort @tables;
     
     return \@tables;
 }
@@ -3375,18 +3549,10 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
         "Starting git_pull action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && ($c->check_user_roles('admin') || $c->session->{username} eq 'Shanta')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth_git = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_git->check_admin_access($c, 'git_pull')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -3515,10 +3681,29 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has admin role (using session-based check like create_table_from_result)
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
         return;
     }
@@ -3553,11 +3738,20 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Getting field info for table: $table_name, field: $field_name, database: $database");
+        
         # Get table field info
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Field info retrieved: " . Data::Dumper::Dumper($table_field_info));
+        
         # Update result file with table values
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Result file updated successfully for field: $field_name");
         
         $c->stash(json => {
             success => 1,
@@ -3583,8 +3777,8 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'sync_result_to_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -3651,21 +3845,42 @@ sub get_table_field_info {
     my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
     my $schema = $c->model($model_name)->schema;
     
-    # Get table information from database
+    # Get table information from database using DESCRIBE (same as get_ency_table_schema)
     my $dbh = $schema->storage->dbh;
-    my $sth = $dbh->column_info(undef, undef, $table_name, $field_name);
-    my $column_info = $sth->fetchrow_hashref;
+    my $sth = $dbh->prepare("DESCRIBE $table_name");
+    $sth->execute();
     
-    if (!$column_info) {
+    my $field_info;
+    while (my $row = $sth->fetchrow_hashref()) {
+        if ($row->{Field} eq $field_name) {
+            $field_info = {
+                data_type => $row->{Type},
+                size => undef,  # Will be parsed from Type
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                default_value => $row->{Default},
+                extra => $row->{Extra},
+            };
+            
+            # Parse size from Type (e.g., "varchar(255)" -> 255)
+            if ($row->{Type} =~ /\((\d+)\)/) {
+                $field_info->{size} = $1;
+            }
+            last;
+        }
+    }
+    
+    unless ($field_info) {
         die "Field '$field_name' not found in table '$table_name'";
     }
     
     return {
-        data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
-        size => $column_info->{COLUMN_SIZE},
-        is_nullable => $column_info->{NULLABLE} ? 1 : 0,
-        is_auto_increment => $column_info->{IS_AUTOINCREMENT} ? 1 : 0,
-        default_value => $column_info->{COLUMN_DEF}
+        data_type => $field_info->{data_type},
+        size => $field_info->{size},
+        is_nullable => $field_info->{is_nullable},
+        is_auto_increment => $field_info->{is_auto_increment},
+        default_value => $field_info->{default_value},
+        extra => $field_info->{extra}
     };
 }
 
@@ -3910,52 +4125,78 @@ sub update_result_field_from_table {
     my $content = read_file($result_file_path);
     
     # Build new field definition
-    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
+    my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}'";
     
     if ($table_field_info->{size}) {
-        $new_field_def .= ", size => $table_field_info->{size}";
+        $new_field_def .= ",\n        size => $table_field_info->{size}";
     }
     
-    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
+    if ($table_field_info->{is_nullable}) {
+        $new_field_def .= ",\n        is_nullable => 1";
+    }
     
     if ($table_field_info->{is_auto_increment}) {
-        $new_field_def .= ", is_auto_increment => 1";
+        $new_field_def .= ",\n        is_auto_increment => 1";
     }
     
     if (defined $table_field_info->{default_value}) {
-        $new_field_def .= ", default_value => '$table_field_info->{default_value}'";
+        my $default = $table_field_info->{default_value};
+        
+        # Handle special timestamp defaults (scalar refs)
+        if ($default =~ /CURRENT_TIMESTAMP/i) {
+            if ($default =~ /ON UPDATE/i) {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'";
+            } else {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP'";
+            }
+        }
+        # Handle NULL default
+        elsif (!defined $default || $default eq '') {
+            # Skip - NULL is default when is_nullable => 1
+        }
+        # Handle numeric defaults
+        elsif ($default =~ /^\d+$/) {
+            $new_field_def .= ",\n        default_value => $default";
+        }
+        # Handle string defaults
+        else {
+            $default =~ s/'/\\'/g;  # Escape single quotes
+            $new_field_def .= ",\n        default_value => '$default'";
+        }
     }
     
-    $new_field_def .= " }";
+    $new_field_def .= ",\n    }";
     
     # Update the field definition in the content
     if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
         my $columns_section = $1;
         my $updated = 0;
         
-        # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
-            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
+        # Try hash format: field_name => { ... } (handles multiline)
+        # Match field_name => { ... } where { ... } can span multiple lines
+        if ($columns_section =~ /(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/s) {
+            $columns_section =~ s/(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/$field_name => $new_field_def/s;
             $updated = 1;
         }
-        # Try array format: "field_name", { ... }
-        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
-            $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+        # Try array format: "field_name", { ... } (handles multiline)
+        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{.*?\}/s) {
+            $columns_section =~ s/["']$field_name["']\s*,\s*\{.*?\}/"$field_name", $new_field_def/s;
             $updated = 1;
         }
         # If not found, append it to the columns section
         else {
-            if ($columns_section =~ /,\s*$/) {
-                $columns_section .= "\n    $field_name => $new_field_def,";
+            # Find the last field definition to insert after
+            if ($columns_section =~ /,\s*$/s) {
+                $columns_section .= "\n    $field_name => $new_field_def";
             } else {
-                $columns_section .= ",\n    $field_name => $new_field_def,";
+                $columns_section .= ",\n    $field_name => $new_field_def";
             }
             $updated = 1;
         }
         
         if ($updated) {
             # Replace in the full content
-            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
+            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns($columns_section\n);/s;
             
             # Write back to file
             write_file($result_file_path, $content);
@@ -3995,20 +4236,94 @@ sub update_result_field_from_table {
 # Helper method to update table schema with result field values
 sub update_table_field_from_result {
     my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
-    
-    # This is a placeholder - actual table schema modification would require
-    # database-specific ALTER TABLE statements and is more complex
-    # For now, we'll just log what would be done
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
-        "Would update table '$table_name' field '$field_name' with result file values: " . 
-        Data::Dumper::Dumper($result_field_info));
-    
-    # In a real implementation, you would:
-    # 1. Generate appropriate ALTER TABLE statement
-    # 2. Execute it against the database
-    # 3. Handle any constraints or dependencies
-    
+        "Adding/modifying column '$field_name' in table '$table_name' (db=$database)");
+
+    my $dbh;
+    if (lc($database) eq 'ency') {
+        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        $dbh = $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        die "Unknown database '$database'";
+    }
+
+    my $data_type    = uc($result_field_info->{data_type} || 'VARCHAR');
+    my $size         = $result_field_info->{size};
+    my $is_nullable  = $result_field_info->{is_nullable};
+    my $is_auto_inc  = $result_field_info->{is_auto_increment};
+    my $default_val  = $result_field_info->{default_value};
+
+    my $col_def = "`$field_name` ";
+
+    if ($data_type eq 'INTEGER' || $data_type eq 'INT') {
+        $col_def .= 'INT';
+    } elsif ($data_type eq 'VARCHAR') {
+        $col_def .= 'VARCHAR(' . ($size || 255) . ')';
+    } elsif ($data_type eq 'TEXT') {
+        $col_def .= 'TEXT';
+    } elsif ($data_type eq 'TINYINT') {
+        $col_def .= 'TINYINT';
+    } elsif ($data_type eq 'BIGINT') {
+        $col_def .= 'BIGINT';
+    } elsif ($data_type eq 'TIMESTAMP') {
+        $col_def .= 'TIMESTAMP';
+    } elsif ($data_type eq 'DATETIME') {
+        $col_def .= 'DATETIME';
+    } elsif ($data_type eq 'DATE') {
+        $col_def .= 'DATE';
+    } elsif ($data_type eq 'BOOLEAN') {
+        $col_def .= 'TINYINT(1)';
+    } else {
+        $col_def .= $data_type;
+        $col_def .= "($size)" if $size;
+    }
+
+    if ($is_auto_inc) {
+        $col_def .= ' NOT NULL AUTO_INCREMENT';
+    } elsif (defined $is_nullable && !$is_nullable) {
+        $col_def .= ' NOT NULL';
+    } else {
+        $col_def .= ' NULL';
+    }
+
+    if (defined $default_val && $default_val ne '') {
+        $col_def .= " DEFAULT '$default_val'";
+    }
+
+    my $check_sth = $dbh->prepare(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS " .
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+    );
+    $check_sth->execute($table_name, $field_name);
+    my ($exists) = $check_sth->fetchrow_array;
+
+    if ($is_auto_inc) {
+        eval { $dbh->do("ALTER TABLE `$table_name` DROP PRIMARY KEY") };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+            "Dropped existing primary key (if any): $@") if $@;
+    }
+
+    my $sql;
+    if ($exists) {
+        $sql = "ALTER TABLE `$table_name` MODIFY COLUMN $col_def";
+    } else {
+        $sql = "ALTER TABLE `$table_name` ADD COLUMN $col_def";
+    }
+
+    if ($is_auto_inc) {
+        $sql .= ", ADD PRIMARY KEY (`$field_name`)";
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Executing SQL: $sql");
+
+    $dbh->do($sql);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Successfully executed: $sql");
+
     return 1;
 }
 
@@ -4248,8 +4563,8 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'create_result_from_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -4415,6 +4730,691 @@ sub generate_result_file_content {
     $content .= "1;\n";
     
     return $content;
+}
+
+=head2 Docker Container Management Routes
+
+=cut
+
+sub docker_containers :Path('/admin/docker-containers') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
+        "Docker containers management page accessed");
+    
+    # Check if we're inside a Docker container
+    my $docker_available = ! -f '/.dockerenv';
+    
+    # Check authentication status (allow page view, but operations will require login)
+    my $authenticated = $c->user_exists ? 1 : 0;
+    
+    $c->stash(
+        template => 'admin/docker_containers.tt',
+        docker_available => $docker_available,
+        authenticated => $authenticated
+    );
+}
+
+sub docker_list :Path('/admin/docker-list') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
+        "Docker list API called");
+    
+    # Check if we're inside a Docker container
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Run docker compose ps to get container status
+    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse JSON output (one JSON object per line)
+    my @containers;
+    foreach my $line (split /\n/, $output) {
+        next unless $line =~ /^\{/;
+        eval {
+            my $container = decode_json($line);
+            push @containers, {
+                name => $container->{Name} || '',
+                service => $container->{Service} || '',
+                state => $container->{State} || 'unknown',
+                status => $container->{Status} || '',
+                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
+                image => $container->{Image} || ''
+            };
+        };
+    }
+    
+    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_restart :Path('/admin/docker-restart') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
+        "Docker restart requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all' 
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_start :Path('/admin/docker-start') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
+        "Docker start requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_stop :Path('/admin/docker-stop') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
+        "Docker stop requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_up :Path('/admin/docker-up') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
+        "Docker up requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_logs :Path('/admin/docker-logs') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
+        "Docker logs requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Get lines parameter from query string, default to 100
+    my $lines = $c->req->params->{lines} || 100;
+    
+    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_rebuild',
+        "Docker rebuild requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Rebuild with --no-cache and --progress=plain for detailed output
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_prune :Path('/admin/docker-prune') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
+        "Docker prune requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Prune stopped containers, dangling images, and unused networks
+    my $output = '';
+    
+    # Remove stopped containers
+    $output .= "=== Removing stopped containers ===\n";
+    $output .= `docker container prune -f 2>&1`;
+    
+    # Remove dangling images
+    $output .= "\n=== Removing dangling images ===\n";
+    $output .= `docker image prune -f 2>&1`;
+    
+    # Remove unused networks
+    $output .= "\n=== Removing unused networks ===\n";
+    $output .= `docker network prune -f 2>&1`;
+    
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_system_df',
+        "Docker system df requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $output = `docker system df 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_save_image',
+        "Docker save image requested for service: $service");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $timestamp = time();
+    my $export_dir = "$ENV{HOME}/docker-exports";
+    system("mkdir -p $export_dir") unless -d $export_dir;
+    
+    my $image_name = "comserv2-$service";
+    my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
+    
+    my $cmd = "docker save -o $tar_file $image_name 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        tar_file => $tar_file,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_test_ssh',
+        "Docker SSH connection test requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $save_credentials = $c->req->params->{save_credentials} || '';
+    
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Check if sshpass is installed
+    my $sshpass_check = `which sshpass 2>/dev/null`;
+    unless ($sshpass_check) {
+        $c->response->body('{"success": false, "error": "sshpass not installed. Install with: sudo apt-get install sshpass"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Use sshpass for password-based SSH
+    my $cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    # Save credentials if requested
+    if ($save_credentials eq 'yes' && $exit_code == 0) {
+        my $secrets_dir = "$ENV{HOME}/.comserv/secrets";
+        my $credentials_file = "$secrets_dir/ssh_credentials.json";
+        
+        unless (-d $secrets_dir) {
+            system("mkdir -p $secrets_dir");
+            system("chmod 700 $secrets_dir");
+        }
+        
+        my $credentials = {
+            ssh_target => $ssh_target,
+            ssh_port => $ssh_port,
+            ssh_password => $ssh_password,
+            last_updated => time(),
+            last_test_success => time()
+        };
+        
+        if (open my $fh, '>', $credentials_file) {
+            print $fh encode_json($credentials);
+            close $fh;
+            chmod 0600, $credentials_file;
+            
+            $result->{credentials_saved} = \1;
+            $result->{credentials_path} = $credentials_file;
+        }
+    }
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Docker deploy to production requested");
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
+    my $service = $c->req->params->{service} || 'web-prod';
+    
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse user@host format
+    my ($user, $host) = $ssh_target =~ /^([^@]+)@(.+)$/;
+    unless ($user && $host) {
+        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
+    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_ssh_terminal',
+        "SSH Terminal WebSocket requested");
+    
+    # Get parameters from query string
+    my $ssh_target = $c->req->params->{ssh_target} || 'ubuntu@192.168.1.126';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    
+    # Check if this is a WebSocket upgrade request
+    my $upgrade = $c->req->header('Upgrade') || '';
+    my $connection = $c->req->header('Connection') || '';
+    
+    unless ($upgrade eq 'websocket' && $connection =~ /Upgrade/i) {
+        $c->response->status(400);
+        $c->response->body('WebSocket upgrade required');
+        return;
+    }
+    
+    # Load saved credentials if no password provided
+    if (!$ssh_password) {
+        my $credentials_file = "$ENV{HOME}/.comserv/secrets/ssh_credentials.json";
+        if (-f $credentials_file) {
+            if (open my $fh, '<', $credentials_file) {
+                local $/;
+                my $json = <$fh>;
+                close $fh;
+                my $creds = eval { decode_json($json) };
+                $ssh_password = $creds->{ssh_password} if $creds;
+            }
+        }
+    }
+    
+    unless ($ssh_password) {
+        $c->response->status(400);
+        $c->response->body('SSH password required');
+        return;
+    }
+    
+    # Import WebSocket modules
+    require Protocol::WebSocket::Handshake::Server;
+    require AnyEvent;
+    require AnyEvent::Handle;
+    
+    # Get the raw IO handle
+    my $io = $c->req->io_fh;
+    
+    # Perform WebSocket handshake
+    my $hs = Protocol::WebSocket::Handshake::Server->new;
+    
+    # Parse the handshake from request headers
+    my $env = $c->req->env;
+    my $handshake_request = 
+        "GET " . $env->{REQUEST_URI} . " HTTP/1.1\r\n" .
+        "Host: " . $env->{HTTP_HOST} . "\r\n" .
+        "Upgrade: " . ($env->{HTTP_UPGRADE} || 'websocket') . "\r\n" .
+        "Connection: " . ($env->{HTTP_CONNECTION} || 'Upgrade') . "\r\n" .
+        "Sec-WebSocket-Key: " . ($env->{HTTP_SEC_WEBSOCKET_KEY} || '') . "\r\n" .
+        "Sec-WebSocket-Version: " . ($env->{HTTP_SEC_WEBSOCKET_VERSION} || '13') . "\r\n" .
+        "\r\n";
+    
+    $hs->parse($handshake_request);
+    
+    # Send handshake response
+    my $handshake_response = $hs->to_string;
+    print $io $handshake_response;
+    
+    # Create AnyEvent handle for WebSocket
+    my $handle = AnyEvent::Handle->new(
+        fh => $io,
+        on_error => sub {
+            my ($hdl, $fatal, $msg) = @_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'websocket_error',
+                "WebSocket error: $msg");
+            $hdl->destroy;
+        }
+    );
+    
+    # Spawn SSH process
+    require IPC::Run3;
+    
+    my $ssh_cmd;
+    if ($ssh_password) {
+        $ssh_cmd = ['sshpass', '-p', $ssh_password, 'ssh', '-p', $ssh_port, 
+                    '-o', 'StrictHostKeyChecking=no', 
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    $ssh_target];
+    } else {
+        $ssh_cmd = ['ssh', '-p', $ssh_port, $ssh_target];
+    }
+    
+    # Use pseudo-terminal for interactive SSH
+    require IO::Pty;
+    my $pty = IO::Pty->new;
+    
+    my $pid = fork();
+    
+    if (!defined $pid) {
+        $c->response->status(500);
+        $c->response->body('Failed to fork SSH process');
+        return;
+    }
+    
+    if ($pid == 0) {
+        # Child process
+        $pty->make_slave_controlling_terminal();
+        my $slave = $pty->slave();
+        
+        close STDIN;
+        close STDOUT;
+        close STDERR;
+        
+        open STDIN, '<&', $slave->fileno() or die "Can't redirect STDIN: $!";
+        open STDOUT, '>&', $slave->fileno() or die "Can't redirect STDOUT: $!";
+        open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
+        
+        exec(@$ssh_cmd) or die "Can't exec SSH: $!";
+    }
+    
+    # Parent process - proxy between WebSocket and PTY
+    $pty->close_slave();
+    $pty->set_raw();
+    
+    # Create frame parser
+    require Protocol::WebSocket::Frame;
+    my $frame = Protocol::WebSocket::Frame->new;
+    
+    # Declare pty_watcher variable for use in closure
+    my $pty_watcher;
+    
+    # Read from PTY and send to WebSocket
+    $pty_watcher = AnyEvent->io(
+        fh => $pty,
+        poll => 'r',
+        cb => sub {
+            my $buf;
+            my $n = sysread($pty, $buf, 4096);
+            if ($n) {
+                my $ws_frame = Protocol::WebSocket::Frame->new(buffer => $buf, type => 'binary');
+                $handle->push_write($ws_frame->to_bytes);
+            } elsif (defined $n) {
+                # EOF - SSH process exited
+                $handle->destroy;
+                undef $pty_watcher;
+                waitpid($pid, 0);
+            }
+        }
+    );
+    
+    # Read from WebSocket and send to PTY
+    $handle->on_read(sub {
+        my ($hdl) = @_;
+        
+        $frame->append(delete $hdl->{rbuf});
+        
+        while (my $message = $frame->next_bytes) {
+            # Write to PTY
+            syswrite($pty, $message);
+        }
+    });
+    
+    # Clean up on disconnect
+    $handle->on_eof(sub {
+        undef $pty_watcher;
+        undef $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+    });
+    
+    # Enter event loop - this blocks until connection closes
+    my $cv = AnyEvent->condvar;
+    
+    # Set up cleanup when connection ends
+    my $cleanup = sub {
+        undef $pty_watcher;
+        $handle->destroy if $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+        $cv->send;
+    };
+    
+    # Monitor SSH process
+    my $child_watcher = AnyEvent->child(
+        pid => $pid,
+        cb => sub {
+            my ($pid, $status) = @_;
+            $cleanup->();
+        }
+    );
+    
+    # Wait for connection to close
+    $cv->recv;
+    
+    # Prevent template rendering
+    $c->detach();
+}
+
+sub end : Private {
+    my ($self, $c) = @_;
+    
+    # Skip template rendering for WebSocket endpoints
+    if ($c->req->path =~ m{/admin/docker-ssh-terminal}) {
+        return;
+    }
+    
+    # Normal template rendering for other requests
+    $c->forward($c->view('TT')) unless $c->response->body;
 }
 
 # Helper method to convert table name to class name

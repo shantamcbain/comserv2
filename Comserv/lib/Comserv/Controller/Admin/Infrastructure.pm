@@ -71,6 +71,7 @@ sub index :Path('/admin/infrastructure') :Args(0) {
     
     $c->stash(
         clusters => \@cluster_status,
+        env => $ENV{CATALYST_ENV} || 'development',
         template => 'admin/infrastructure/index.tt'
     );
 }
