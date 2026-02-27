@@ -1397,65 +1397,77 @@ sub upload :Local :Args(1) {
 
 sub download :Local :Args(1) {
     my ($self, $c, $file_id) = @_;
-    
-    my $file = $c->model('DBEncy::File')->find($file_id);
-    
+
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = 'Please log in to download workshop files.';
+        $c->response->redirect($c->uri_for('/login'));
+        return;
+    }
+
+    my $file = eval { $c->model('DBEncy::File')->find($file_id) };
     unless ($file) {
         $c->flash->{error_msg} = 'File not found.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
-    
-    unless ($file->workshop_id) {
-        $c->flash->{error_msg} = 'File is not associated with a workshop.';
-        $c->response->redirect($c->uri_for($self->action_for('index')));
+
+    my $workshop_id = $file->workshop_id;
+    my $back_url    = $workshop_id
+        ? $c->uri_for('/workshop/details', { id => $workshop_id })
+        : $c->uri_for($self->action_for('index'));
+
+    # Access: admin, file owner, workshop leader, or registered attendee
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
+    my $is_owner   = ($file->user_id && $file->user_id == $user_id);
+
+    my ($is_leader, $is_registered) = (0, 0);
+    if ($workshop_id) {
+        my $workshop = eval { $c->model('DBEncy::WorkShop')->find($workshop_id) };
+        if ($workshop) {
+            $is_leader = $self->_is_workshop_leader($c, $workshop);
+            my $p = eval {
+                $c->model('DBEncy')->resultset('Participant')->search({
+                    workshop_id => $workshop_id,
+                    user_id     => $user_id,
+                    status      => { -in => ['registered', 'attended', 'waitlist'] },
+                })->first;
+            };
+            $is_registered = 1 if $p;
+        }
+    }
+
+    unless ($is_admin || $is_owner || $is_leader || $is_registered) {
+        $c->flash->{error_msg} = 'Access denied. You must be registered for this workshop to download its files.';
+        $c->response->redirect($back_url);
         return;
     }
-    
-    my $workshop = $c->model('DBEncy::WorkShop')->find($file->workshop_id);
-    
-    unless ($workshop) {
-        $c->flash->{error_msg} = 'Associated workshop not found.';
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
-    
-    # Allow ALL users to download workshop files (especially for past workshops)
-    # No access restrictions needed for educational materials
-    
+
     my $file_data;
     if ($file->file_data) {
         $file_data = $file->file_data;
     } elsif ($file->file_path && -f $file->file_path) {
-        open my $fh, '<', $file->file_path or do {
-            $c->log->error("Cannot read file: $!");
-            $c->flash->{error_msg} = 'Failed to read file.';
-            $c->response->redirect($c->uri_for($self->action_for('files'), [$workshop->id]));
-            return;
+        eval {
+            open my $fh, '<:raw', $file->file_path or die $!;
+            $file_data = do { local $/; <$fh> };
+            close $fh;
         };
-        binmode $fh;
-        $file_data = do { local $/; <$fh> };
-        close $fh;
+        if ($@) {
+            $c->log->error("download read error: $@");
+            $c->flash->{error_msg} = 'Failed to read file.';
+            $c->response->redirect($back_url);
+            return;
+        }
     } else {
         $c->flash->{error_msg} = 'File data not available.';
-        $c->response->redirect($c->uri_for($self->action_for('files'), [$workshop->id]));
+        $c->response->redirect($back_url);
         return;
     }
-    
-    my $content_type = 'application/octet-stream';
-    if ($file->file_type) {
-        my $ext = lc($file->file_type);
-        if ($ext eq '.pdf') {
-            $content_type = 'application/pdf';
-        } elsif ($ext eq '.ppt') {
-            $content_type = 'application/vnd.ms-powerpoint';
-        } elsif ($ext eq '.pptx') {
-            $content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-        }
-    }
-    
+
+    my $content_type = $file->file_type || 'application/octet-stream';
     $c->response->content_type($content_type);
-    $c->response->header('Content-Disposition' => 'attachment; filename="' . $file->file_name . '"');
+    $c->response->header('Content-Disposition' => 'attachment; filename="' . ($file->file_name // 'file') . '"');
     $c->response->body($file_data);
 }
 
@@ -1933,9 +1945,10 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
 sub resource_download :Path('/workshop/resource_download') :Args(1) {
     my ($self, $c, $resource_id) = @_;
 
-    unless ($c->session->{user_id}) {
-        $c->flash->{error_msg} = 'Please log in to download files.';
-        $c->response->redirect($c->uri_for('/'));
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = 'Please log in to download workshop files.';
+        $c->response->redirect($c->uri_for('/login'));
         return;
     }
 
@@ -1945,17 +1958,60 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
 
     if ($find_err || !$resource) {
         $c->log->error("resource_download find error: " . ($find_err || 'not found'));
-        $c->flash->{error_msg} = $find_err
-            ? "Database error looking up file: $find_err"
-            : 'File record not found.';
-        $c->response->redirect($c->uri_for('/workshop/resources'));
+        $c->flash->{error_msg} = 'File not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
 
-    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    # Determine the associated workshop (if any)
+    my $workshop_id = $resource->workshop_id;
+    my $back_url    = $workshop_id
+        ? $c->uri_for('/workshop/details', { id => $workshop_id })
+        : $c->uri_for($self->action_for('index'));
+
+    # Access: admin, workshop leader, file owner, or registered attendee
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    my $is_owner   = ($resource->uploaded_by && $resource->uploaded_by == $user_id);
+
+    my $is_leader  = 0;
+    my $is_registered = 0;
+    if ($workshop_id) {
+        my $workshop = eval { $c->model('DBEncy::WorkShop')->find($workshop_id) };
+        if ($workshop) {
+            $is_leader = $self->_is_workshop_leader($c, $workshop);
+            my $participant = eval {
+                $c->model('DBEncy')->resultset('Participant')->search({
+                    workshop_id => $workshop_id,
+                    user_id     => $user_id,
+                    status      => { -in => ['registered', 'attended', 'waitlist'] },
+                })->first;
+            };
+            $is_registered = 1 if $participant;
+        }
+    }
+
+    unless ($is_admin || $is_owner || $is_leader || $is_registered) {
+        $c->flash->{error_msg} = 'Access denied. You must be registered for this workshop to download its files.';
+        $c->response->redirect($back_url);
+        return;
+    }
+
+    # Serve the file
+    my $full_path = ($resource->file_path // '') =~ m{^/}
+        ? $resource->file_path
+        : $self->_nfs_root() . '/' . ($resource->file_path // '');
+
+    if ($resource->external_url) {
+        $c->response->redirect($resource->external_url);
+        return;
+    }
+
     unless (-f $full_path) {
-        $c->flash->{error_msg} = 'File not found on storage (' . $resource->file_path . '). It may have been moved or deleted.';
-        $c->response->redirect($c->uri_for('/workshop/resources'));
+        $c->flash->{error_msg} = 'File not found on storage. It may have been moved or deleted.';
+        $c->response->redirect($back_url);
         return;
     }
 
@@ -1967,14 +2023,14 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     };
     if ($@) {
         $c->log->error("resource_download read error: $@");
-        $c->flash->{error_msg} = "Could not read file: $@";
-        $c->response->redirect($c->uri_for('/workshop/resources'));
+        $c->flash->{error_msg} = "Could not read file.";
+        $c->response->redirect($back_url);
         return;
     }
 
     my $content_type = $resource->file_type || 'application/octet-stream';
     $c->response->content_type($content_type);
-    $c->response->header('Content-Disposition' => 'attachment; filename="' . $resource->file_name . '"');
+    $c->response->header('Content-Disposition' => 'attachment; filename="' . ($resource->file_name // 'file') . '"');
     $c->response->body($data);
 }
 
