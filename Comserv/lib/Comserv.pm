@@ -167,44 +167,43 @@ warn "Email functionality may not work correctly.\n";
 # LAYER 3: Global Application Error Handler
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {
-    my ($orig, $self, $c) = @_;
-    
+    my ($orig, $c) = @_;
+
     # Log all unhandled errors with context
-    if ($c->error && @{$c->error}) {
-        my $error = $c->error->[0];
-        my $error_msg = ref $error ? $error->message : $error;
-        my $logger = Comserv::Util::Logging->instance;
-        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-            "[GLOBAL ERROR] Unhandled exception: $error_msg");
-    }
-    
-    # If error.tt hasn't been rendered yet, render it now
-    unless ($c->response->body) {
-        $c->response->status(500) unless $c->response->status;
-        
-        # Set up error template stash if not already set
-        $c->stash->{error_title} ||= 'Application Error';
-        $c->stash->{error_msg} ||= 'An unexpected error occurred.';
-        $c->stash->{technical_details} ||= join(', ', @{$c->error});
-        $c->stash->{template} = 'error.tt';
-        
-        # Try to render error page
-        eval {
-            my $view = $c->view('TT');
-            $view->process($c);
-        };
-        
-        # If that fails, send a plain text error response
-        if ($@) {
-            $c->response->content_type('text/plain; charset=utf-8');
-            $c->response->body("Internal Server Error\n\n" . 
-                               "An error occurred and we were unable to render the error page.\n" .
-                               "Please contact the system administrator.");
+    eval {
+        if ($c && $c->error && @{$c->error}) {
+            my $error = $c->error->[0];
+            my $error_msg = ref $error ? $error->message : "$error";
+            my $logger = Comserv::Util::Logging->instance;
+            $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
+                "[GLOBAL ERROR] Unhandled exception: $error_msg");
         }
-    }
-    
+    };
+
+    # If error.tt hasn't been rendered yet, render it now
+    eval {
+        if ($c && !$c->response->body) {
+            $c->response->status(500) unless $c->response->status;
+
+            $c->stash->{error_title} ||= 'Application Error';
+            $c->stash->{error_msg}   ||= 'An unexpected error occurred.';
+            $c->stash->{technical_details} ||= join(', ', @{$c->error // []});
+            $c->stash->{template} = 'error.tt';
+
+            eval {
+                my $view = $c->view('TT');
+                $view->process($c);
+            };
+
+            if ($@) {
+                $c->response->content_type('text/plain; charset=utf-8');
+                $c->response->body("Internal Server Error\n\nAn error occurred and we were unable to render the error page.\nPlease contact the system administrator.");
+            }
+        }
+    };
+
     # Call the original finalize_error to complete response processing
-    $self->$orig($c);
+    $c->$orig();
 };
 
 __PACKAGE__->_initialize_database_config();
