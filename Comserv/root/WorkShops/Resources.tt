@@ -154,31 +154,7 @@
             [% IF nfs_available %]— <span style="color:#155724;">✓ mounted</span>[% ELSE %]— <span style="color:#721c24;">✗ not mounted</span>[% END %]
         </span>
         [% IF is_csc %]
-        <details style="display:inline-block;margin:0;">
-            <summary style="cursor:pointer;background:#17a2b8;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:0.85em;list-style:none;">🔍 Sync NFS → Files DB</summary>
-            <div style="position:absolute;z-index:100;background:#fff;border:1px solid #bee5eb;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.15);margin-top:4px;">
-            <form method="POST" action="/workshop/resource_scan_nfs"
-                  onsubmit="return confirm('Scan NFS and add files to the Files database?');">
-                <div style="margin-bottom:8px;">
-                    <label style="font-size:0.85em;font-weight:bold;">Directory to scan:</label><br>
-                    <select name="scan_dir" style="width:100%;padding:4px;margin-top:2px;border:1px solid #ccc;border-radius:4px;">
-                        <option value="apis">apis/ (workshop files — fast)</option>
-                        <option value="full">Full NFS drive (slow — use with caution)</option>
-                    </select>
-                </div>
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:0.85em;font-weight:bold;">Max files per run:</label><br>
-                    <select name="max_files" style="width:100%;padding:4px;margin-top:2px;border:1px solid #ccc;border-radius:4px;">
-                        <option value="500">500</option>
-                        <option value="2000" selected>2,000</option>
-                        <option value="5000">5,000</option>
-                        <option value="10000">10,000</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-sm" style="background:#17a2b8;color:#fff;border:none;width:100%;">▶ Run Sync</button>
-            </form>
-            </div>
-        </details>
+        <a href="/workshop/resource_sync" class="btn btn-sm" style="background:#17a2b8;color:#fff;text-decoration:none;">🔄 NFS Sync Tool</a>
         [% END %]
     </div>
     [% END %]
