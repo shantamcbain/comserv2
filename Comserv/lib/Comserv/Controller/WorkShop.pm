@@ -166,7 +166,7 @@ sub dashboard :Local {
     my @my_workshops = $schema->resultset('WorkShop')->search(
         $search_filter,
         { 
-            order_by => { -desc => 'created_at' },
+            order_by => { -desc => 'me.created_at' },
             prefetch => 'creator'
         }
     )->all;
