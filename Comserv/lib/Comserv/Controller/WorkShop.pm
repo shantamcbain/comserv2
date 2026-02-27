@@ -1511,16 +1511,10 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
     my $is_admin   = $admin_type && $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
+    my $nfs_available = -d $nfs_root;
 
-    # Admin sees full NFS drive; workshop leaders scoped to apis subdir only
-    my $scan_root  = $nfs_root;
-    unless ($is_admin) {
-        my $apis_dir = "$nfs_root/apis";
-        $scan_root = -d $apis_dir ? $apis_dir : $nfs_root;
-    }
-
-    # Build a lookup of DB records keyed by file_path for metadata enrichment
-    my %db_by_path;
+    # Load only DB records — no filesystem scan on page load
+    my @resources;
     my $db_error;
     eval {
         my $schema = $c->model('DBEncy');
@@ -1536,121 +1530,30 @@ sub resources :Path('/workshop/resources') :Args(0) {
         }
         my @db_rows = $schema->resultset('WorkshopResource')->search(
             $filter,
-            { order_by => { -desc => 'created_at' } }
+            { order_by => { -desc => 'created_at' }, prefetch => 'uploader' }
         )->all;
         for my $row (@db_rows) {
-            $db_by_path{ $row->file_path } = $row;
+            push @resources, {
+                id           => $row->id,
+                file_name    => $row->file_name,
+                file_path    => $row->file_path // '',
+                file_ext     => $row->file_ext // '',
+                file_size    => $row->file_size // 0,
+                file_type    => $row->file_type // '',
+                description  => $row->description // '',
+                access_level => $row->access_level // 'site_only',
+                sitename     => $row->sitename // '',
+                uploaded_by  => $row->uploader
+                    ? ($row->uploader->first_name // $row->uploader->username // 'Unknown')
+                    : 'Unknown',
+                in_db        => 1,
+                external_url => $row->external_url,
+            };
         }
     };
     if ($@) {
         $db_error = $@;
         $c->log->error("Resource library DB error: $db_error");
-    }
-
-    # Scan filesystem directly so existing files always appear
-    my @resources;
-    my $nfs_available = -d $scan_root;
-    if ($nfs_available) {
-        my @fs_files;
-        eval {
-            my $scan;
-            $scan = sub {
-                my ($dir, $rel_prefix) = @_;
-                return unless opendir(my $dh, $dir);
-                while (my $entry = readdir($dh)) {
-                    next if $entry =~ /^\./;
-                    my $full = "$dir/$entry";
-                    my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
-                    if (-d $full) {
-                        $scan->($full, $rel);
-                    } elsif (-f $full) {
-                        my ($ext) = ($entry =~ /\.([^.]+)$/);
-                        $ext = lc($ext // '');
-                        my $size = -s $full;
-                        my $db_row = $db_by_path{$rel};
-                        push @fs_files, {
-                            id          => $db_row ? $db_row->id : undef,
-                            file_name   => $entry,
-                            file_path   => $rel,
-                            file_ext    => $ext,
-                            file_size   => $size,
-                            file_type   => $MIME_MAP{$ext} // 'application/octet-stream',
-                            description => $db_row ? ($db_row->description // '') : '',
-                            access_level=> $db_row ? ($db_row->access_level // 'site_only') : 'site_only',
-                            sitename    => $db_row ? ($db_row->sitename // '') : '',
-                            uploaded_by => '',
-                            in_db       => $db_row ? 1 : 0,
-                            full_path   => $full,
-                        };
-                    }
-                }
-                closedir($dh);
-            };
-            $scan->($scan_root, '');
-        };
-        if ($@) {
-            $c->log->error("NFS scan error: $@");
-        }
-        # Sort newest first by filesystem mtime fallback, then name
-        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @fs_files;
-    } else {
-        # NFS not mounted — fall back to DB records only
-        for my $row (values %db_by_path) {
-            push @resources, {
-                id          => $row->id,
-                file_name   => $row->file_name,
-                file_path   => $row->file_path,
-                file_ext    => $row->file_ext // '',
-                file_size   => $row->file_size // 0,
-                file_type   => $row->file_type // 'application/octet-stream',
-                description => $row->description // '',
-                access_level=> $row->access_level // 'site_only',
-                sitename    => $row->sitename // '',
-                uploaded_by => '',
-                in_db       => 1,
-                full_path   => "$nfs_root/" . $row->file_path,
-            };
-        }
-        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @resources;
-    }
-
-    # Always append external URL records from DB (they have no NFS path to scan)
-    unless ($db_error) {
-        eval {
-            my $schema = $c->model('DBEncy');
-            my $filter = { external_url => { '!=' => undef } };
-            unless ($is_csc) {
-                $filter = {
-                    external_url => { '!=' => undef },
-                    -or => [
-                        { access_level => 'all_leaders' },
-                        { sitename     => $sitename },
-                        { uploaded_by  => $user_id },
-                    ]
-                };
-            }
-            my @url_rows = $schema->resultset('WorkshopResource')->search(
-                $filter, { order_by => { -asc => 'file_name' } }
-            )->all;
-            for my $row (@url_rows) {
-                next if $db_by_path{ $row->file_path // '' };
-                push @resources, {
-                    id           => $row->id,
-                    file_name    => $row->file_name,
-                    file_path    => '',
-                    file_ext     => $row->file_ext // '',
-                    file_size    => 0,
-                    file_type    => $row->file_type // '',
-                    description  => $row->description // '',
-                    access_level => $row->access_level // 'site_only',
-                    sitename     => $row->sitename // '',
-                    uploaded_by  => '',
-                    in_db        => 1,
-                    external_url => $row->external_url,
-                };
-            }
-        };
-        $c->log->error("External URL fetch error: $@") if $@;
     }
 
     $c->stash(
@@ -1659,11 +1562,77 @@ sub resources :Path('/workshop/resources') :Args(0) {
         is_admin      => $is_admin,
         sitename      => $sitename,
         nfs_root      => $nfs_root,
-        scan_root     => $scan_root,
         nfs_available => $nfs_available,
         db_error      => $db_error,
         template      => 'WorkShops/Resources.tt',
     );
+}
+
+sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->res->header('Content-Type', 'application/json');
+
+    unless ($c->session->{user_id}) {
+        $c->stash(json => { error => 'Not authenticated' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($is_admin) {
+        $c->stash(json => { error => 'Admin access required' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root();
+    unless (-d $nfs_root) {
+        $c->stash(json => { error => 'NFS not available', nfs_available => 0, files => [] });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my @files;
+    my $scan;
+    $scan = sub {
+        my ($dir, $rel_prefix) = @_;
+        return unless opendir(my $dh, $dir);
+        while (my $entry = readdir($dh)) {
+            next if $entry =~ /^\./;
+            my $full = "$dir/$entry";
+            my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
+            if (-d $full) {
+                $scan->($full, $rel);
+            } elsif (-f $full) {
+                my ($ext) = ($entry =~ /\.([^.]+)$/);
+                $ext = lc($ext // '');
+                push @files, {
+                    file_name => $entry,
+                    file_path => $rel,
+                    file_ext  => $ext,
+                    file_size => (-s $full) + 0,
+                };
+            }
+        }
+        closedir($dh);
+    };
+    eval { $scan->($nfs_root, '') };
+    $c->log->error("NFS scan error: $@") if $@;
+
+    @files = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @files;
+
+    $c->stash(json => {
+        files         => \@files,
+        nfs_available => 1,
+        nfs_root      => $nfs_root,
+        count         => scalar(@files),
+        error         => $@ ? "$@" : undef,
+    });
+    $c->forward('View::JSON');
 }
 
 sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
