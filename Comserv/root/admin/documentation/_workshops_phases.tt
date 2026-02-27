@@ -150,7 +150,7 @@
             </div>
             
             <div style="margin: 10px 0; padding: 10px; border: 1px solid #28a745; background: #f0fff0;">
-                <h5>✅ Recent Fixes (2026-02-20/21)</h5>
+                <h5>✅ Recent Fixes (2026-02-20/21/25)</h5>
                 <ul>
                     <li>✅ Fixed edit permission denied errors (NULL created_by handling, admin fallback)</li>
                     <li>✅ Fixed dashboard access (workshop_leader role now allowed)</li>
@@ -161,13 +161,14 @@
                     <li>✅ Fixed Register button visibility logic</li>
                     <li>✅ Added comprehensive authorization debug logging</li>
                     <li>✅ Clarified Site Sharing labels (My Site Only / Shared Across All Sites)</li>
+                    <li>✅ Added deterministic backfill script: <code>script/backfill_workshop_created_by.pl</code> (dry-run default, transaction-safe live mode)</li>
+                    <li>✅ Executed created_by backfill on <code>production_server</code>: 8 rows updated, 0 NULL remaining (verified 2026-02-25)</li>
                 </ul>
             </div>
             
             <div style="margin: 10px 0; padding: 10px; border: 1px solid #ffc107; background: #fff3cd;">
                 <h5>⏳ Remaining Tasks</h5>
                 <ul>
-                    <li>⏳ Update database: Set created_by for existing workshops</li>
                     <li>⏳ Manual testing: Full workshop lifecycle (create → publish → register → complete)</li>
                     <li>⏳ Performance testing: Workshop listing load time verification</li>
                     <li>⏳ Run lint/typecheck commands if available</li>
@@ -243,5 +244,6 @@
     <li><strong>Requirements:</strong> <code>.zenflow/tasks/workshops-7d21/requirements.md</code></li>
     <li><strong>Technical Spec:</strong> <code>.zenflow/tasks/workshops-7d21/spec.md</code></li>
     <li><strong>Implementation Plan:</strong> <code>.zenflow/tasks/workshops-7d21/plan.md</code></li>
+    <li><strong>Backfill Script:</strong> <code>Comserv/script/backfill_workshop_created_by.pl</code></li>
     <li><strong>API Access:</strong> <a href="http://api.workstation.local:4004/workshop" target="_blank">api.workstation.local:4004</a></li>
 </ul>

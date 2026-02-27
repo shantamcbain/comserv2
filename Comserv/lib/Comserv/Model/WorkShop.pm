@@ -2,6 +2,8 @@ package Comserv::Model::WorkShop;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Logging;
+use DateTime;
 
 extends 'Catalyst::Model';
 
@@ -23,12 +25,7 @@ sub get_active_workshops {
         my $sitename = $c->session->{SiteName};
         my $user_id = $c->session->{user_id};
         my $roles = $c->session->{roles} || [];
-        
-        # Check if user is workshop leader
-        my $is_workshop_leader = 0;
-        if (ref $roles eq 'ARRAY') {
-            $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
-        }
+        my $is_workshop_leader = _has_workshop_leader_role($roles);
         
         # CSC admin (god-level) sees all non-draft workshops in the public listing.
         # Drafts are only visible in the Dashboard.
@@ -77,7 +74,7 @@ sub get_active_workshops {
                 }
             );
         } else {
-            # Regular users see only published workshops
+            # Regular users see all non-draft past workshops they can access.
             my $site_id;
             if ($sitename) {
                 my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
@@ -111,6 +108,8 @@ sub get_active_workshops {
     };
     if ($@) {
         $error = "Error fetching active workshops: $@";
+        my $logger = Comserv::Util::Logging->instance;
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'get_active_workshops', $error);
     }
 
     return (\@workshops, $error);
@@ -150,20 +149,13 @@ sub get_past_workshops {
         my $sitename = $c->session->{SiteName};
         my $user_id = $c->session->{user_id};
         my $roles = $c->session->{roles} || [];
+        my $is_workshop_leader = _has_workshop_leader_role($roles);
         
-        # Check if user is workshop leader
-        my $is_workshop_leader = 0;
-        if (ref $roles eq 'ARRAY') {
-            $is_workshop_leader = grep { $_ eq 'workshop_leader' } @$roles;
-        }
-        
-        # CSC admin sees all non-draft past workshops in the public listing.
-        # Drafts are only visible in the Dashboard.
+        # CSC admin sees all past workshops.
         if ($admin_type eq 'csc' || $admin_type eq 'special') {
             @workshops = $rs->search(
                 {
                     'me.date'   => { '<' => DateTime->today->ymd },
-                    'me.status' => { '!=' => 'draft' },
                 },
                 { 
                     order_by => { -desc => 'me.date' },
@@ -179,17 +171,18 @@ sub get_past_workshops {
             
             my $search_filter = {
                 'me.date'   => { '<' => DateTime->today->ymd },
-                'me.status' => { '!=' => 'draft' },
             };
             
             if ($site_id) {
                 $search_filter->{-or} = [
-                    { 'me.share' => 'public', 'me.status' => 'published' },
-                    { 'site_associations.site_id' => $site_id, 'me.status' => 'published' },
+                    { 'me.share' => 'public' },
+                    { 'site_associations.site_id' => $site_id },
+                    { 'me.created_by' => $user_id },
                 ];
             } else {
                 $search_filter->{-or} = [
-                    { 'me.share' => 'public', 'me.status' => 'published' },
+                    { 'me.share' => 'public' },
+                    { 'me.created_by' => $user_id },
                 ];
             }
             
@@ -212,7 +205,7 @@ sub get_past_workshops {
             
             my $search_filter = {
                 'me.date'   => { '<' => DateTime->today->ymd },
-                'me.status' => 'published',
+                'me.status' => { '!=' => 'draft' },
             };
             
             if ($site_id) {
@@ -237,9 +230,34 @@ sub get_past_workshops {
     };
     if ($@) {
         $error = "Error fetching past workshops: $@";
+        my $logger = Comserv::Util::Logging->instance;
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'get_past_workshops', $error);
     }
 
     return (\@workshops, $error);
+}
+
+sub _normalize_roles {
+    my ($roles) = @_;
+    return () unless defined $roles;
+
+    if (ref $roles eq 'ARRAY') {
+        return map { lc($_ // '') } @$roles;
+    }
+
+    return map { lc($_) } grep { length $_ } map { s/^\s+|\s+$//gr } split(/\s*,\s*/, $roles);
+}
+
+sub _has_workshop_leader_role {
+    my ($roles) = @_;
+    my @normalized = _normalize_roles($roles);
+    for my $role (@normalized) {
+        return 1 if $role eq 'workshop_leader'
+                 || $role eq 'workshop_leaders'
+                 || $role eq 'workshopleader'
+                 || $role eq 'workshopleaders';
+    }
+    return 0;
 }
 
 __PACKAGE__->meta->make_immutable;

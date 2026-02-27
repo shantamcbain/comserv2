@@ -135,6 +135,19 @@
     padding: 6px 8px;
     font-size: 0.9em;
 }
+.resource-list {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+.resource-list th, .resource-list td {
+    border: 1px solid var(--border-color, #dee2e6);
+    padding: 8px;
+    text-align: left;
+    vertical-align: top;
+}
+.resource-list th { background: var(--table-header-bg, #f8f9fa); }
+.hidden-view { display: none; }
 </style>
 
 <div class="app-container">
@@ -241,7 +254,117 @@
         </div>
     </details>
 
+    <!-- Sync to File Table Panel -->
+    [% IF is_admin %]
+    <details class="upload-panel" style="margin-top:10px;">
+        <summary style="cursor:pointer; font-weight:bold; font-size:1.05em;">🗂️ Add NFS Files to File Table</summary>
+        <div style="margin-top:14px;">
+        <form method="POST" action="/workshop/resource_index_nfs" style="margin-bottom:10px;">
+            <input type="hidden" name="return_to" value="/workshop/resources?sort_by=[% sort_by | html %]&sort_order=[% sort_order | html %]">
+            <button type="submit" class="btn btn-secondary">Re-index NFS to Files Table (All Files)</button>
+        </form>
+        <form method="POST" action="/file/nfs_sync">
+            <input type="hidden" name="return_to" value="/workshop/resources">
+            <div class="upload-row" style="margin-bottom:10px;">
+                <div class="form-group" style="flex:2; min-width:200px;">
+                    <label>Default Description <em>(optional)</em></label>
+                    <input type="text" name="description" placeholder="Imported from NFS">
+                </div>
+                <div class="form-group" style="min-width:110px;">
+                    <label>Site ID</label>
+                    <input type="number" name="site_id" min="0" placeholder="0">
+                </div>
+                <div class="form-group" style="min-width:110px;">
+                    <label>Reference ID</label>
+                    <input type="number" name="reference_id" min="0" placeholder="0">
+                </div>
+                <div class="form-group" style="min-width:110px;">
+                    <label>Category ID</label>
+                    <input type="number" name="category_id" min="0" placeholder="0">
+                </div>
+                <div class="form-group" style="min-width:110px;">
+                    <label>Share ID</label>
+                    <input type="number" name="share_id" min="0" placeholder="0">
+                </div>
+                <div class="form-group" style="min-width:160px;">
+                    <label>Access</label>
+                    <select name="access_level">
+                        <option value="site_only">My Site Only</option>
+                        <option value="all_leaders">All Leaders</option>
+                        [% IF is_csc %]
+                        <option value="workshop_specific">Workshop Specific</option>
+                        [% END %]
+                    </select>
+                </div>
+                <div class="form-group" style="min-width:120px;">
+                    <label>Workshop ID <em>(optional)</em></label>
+                    <input type="number" name="workshop_id" min="1" placeholder="e.g. 12">
+                </div>
+                <div class="form-group" style="min-width:140px;">
+                    <label>File Status</label>
+                    <input type="text" name="file_status" value="active">
+                </div>
+                <div class="form-group" style="min-width:140px;">
+                    <label>Source Type</label>
+                    <input type="text" name="source_type" value="nfs">
+                </div>
+                <div class="form-group" style="min-width:230px;">
+                    <label style="margin-bottom:8px;">&nbsp;</label>
+                    <label style="font-weight:normal;">
+                        <input type="checkbox" name="add_to_workshop_resource" value="1">
+                        Also add to workshop_resource table
+                    </label>
+                </div>
+            </div>
+
+            <div style="max-height:260px; overflow:auto; border:1px solid var(--border-color, #dee2e6); border-radius:6px; padding:8px;">
+                [% SET has_nfs_files = 0 %]
+                [% FOREACH r IN resources %]
+                    [% NEXT IF r.external_url %]
+                    [% NEXT IF r.file_in_table %]
+                    [% SET has_nfs_files = 1 %]
+                    <label style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:6px 4px; border-bottom:1px solid #f0f0f0;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" name="selected_paths" value="[% r.file_path | html %]">
+                            <span>[% r.file_path | html %]</span>
+                        </span>
+                        <span class="badge-access badge-site">Not in files table</span>
+                    </label>
+                [% END %]
+                [% UNLESS has_nfs_files %]
+                    <div style="padding:10px; color:var(--text-muted-color);">No missing NFS files found. File table is up to date.</div>
+                [% END %]
+            </div>
+
+            <div style="margin-top:10px;">
+                <button type="submit" class="btn btn-primary">Add Selected Files</button>
+            </div>
+        </form>
+        </div>
+    </details>
+    [% END %]
+
     <!-- File Type Filter -->
+    <div style="margin-bottom: 10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <form method="GET" action="/workshop/resources" style="display:flex; gap:8px; align-items:center;">
+            <strong>Sort:</strong>
+            <select name="sort_by">
+                <option value="directory" [% IF sort_by == 'directory' %]selected[% END %]>Directory</option>
+                <option value="name" [% IF sort_by == 'name' %]selected[% END %]>Name</option>
+                <option value="size" [% IF sort_by == 'size' %]selected[% END %]>Size</option>
+                <option value="ext" [% IF sort_by == 'ext' %]selected[% END %]>Extension</option>
+                <option value="status" [% IF sort_by == 'status' %]selected[% END %]>In-Table Status</option>
+            </select>
+            <select name="sort_order">
+                <option value="asc" [% IF sort_order == 'asc' %]selected[% END %]>Ascending</option>
+                <option value="desc" [% IF sort_order == 'desc' %]selected[% END %]>Descending</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-secondary">Apply Sort</button>
+        </form>
+        <button class="btn btn-sm btn-secondary" id="view-list-btn">List View</button>
+        <button class="btn btn-sm btn-secondary" id="view-grid-btn">Icon View</button>
+    </div>
+
     <div style="margin-bottom: 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <strong>Filter:</strong>
         <button class="btn btn-sm filter-btn active" data-filter="all">All</button>
@@ -258,7 +381,7 @@
 
     [% IF resources.size > 0 %]
 
-    <div class="resource-grid" id="resource-grid">
+    <div class="resource-grid hidden-view" id="resource-grid">
         [% FOREACH r IN resources %]
         [% SET ext = r.file_ext | lower %]
         [% SET is_image  = (ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'gif' || ext == 'svg') %]
@@ -300,6 +423,9 @@
                 </div>
                 [% END %]
                 <div class="file-meta">By [% uploader_name | html %]</div>
+                [% IF r.file_in_table %]
+                <div class="file-meta" style="margin-top:4px;color:#155724;">In files table (ID [% r.file_table_id %])</div>
+                [% END %]
                 [% IF r.access_level == 'all_leaders' %]
                     <span class="badge-access badge-all">All Leaders</span>
                 [% ELSIF r.access_level == 'site_only' %]
@@ -344,6 +470,46 @@
         </div>
         [% END %]
     </div>
+
+    <table class="resource-list" id="resource-list">
+        <thead>
+            <tr>
+                <th>Directory</th>
+                <th>File</th>
+                <th>Ext</th>
+                <th>Size</th>
+                <th>In Files Table</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH r IN resources %]
+            [% NEXT IF r.external_url %]
+            [% SET size_raw = r.file_size ? r.file_size / 1024 : 0; SET size_kb = size_raw.int %]
+            [% SET size_mb_raw = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb_raw.int _ ' MB' : size_kb > 0 ? size_kb _ ' KB' : '' %]
+            <tr class="resource-card" data-ftype="other" data-name="[% r.file_name | lower | html %]">
+                <td>[% r.file_path | html %]</td>
+                <td>[% r.file_name | html %]</td>
+                <td>[% r.file_ext | upper %]</td>
+                <td>[% size_label | html %]</td>
+                <td>
+                    [% IF r.file_in_table %]
+                        <span class="badge-access badge-all">Yes (ID [% r.file_table_id %])</span>
+                    [% ELSE %]
+                        <span class="badge-access badge-site">No</span>
+                    [% END %]
+                </td>
+                <td>
+                    [% IF r.id %]
+                    <a href="/workshop/resource_download/[% r.id %]" class="btn btn-sm">⬇️</a>
+                    [% ELSE %]
+                    <a href="/workshop/resource_fs_download?path=[% r.file_path | uri %]" class="btn btn-sm">⬇️</a>
+                    [% END %]
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
 
     [% ELSE %]
     <div class="empty-state" style="text-align:center; padding:40px; color:var(--text-muted-color);">
@@ -450,4 +616,24 @@ function closeResourceModal() {
 document.getElementById('resource-modal').addEventListener('click', function(e) {
     if (e.target === this) closeResourceModal();
 });
+
+(function() {
+    var listBtn = document.getElementById('view-list-btn');
+    var gridBtn = document.getElementById('view-grid-btn');
+    var grid = document.getElementById('resource-grid');
+    var list = document.getElementById('resource-list');
+    if (!listBtn || !gridBtn || !grid || !list) { return; }
+
+    function showList() {
+        list.classList.remove('hidden-view');
+        grid.classList.add('hidden-view');
+    }
+    function showGrid() {
+        grid.classList.remove('hidden-view');
+        list.classList.add('hidden-view');
+    }
+    listBtn.addEventListener('click', showList);
+    gridBtn.addEventListener('click', showGrid);
+    showList();
+})();
 </script>
