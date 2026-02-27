@@ -92,8 +92,8 @@ __PACKAGE__->add_columns(
     },
     is_duplicate => {
         data_type     => 'tinyint',
-        default_value => 0,
         is_nullable   => 1,
+        default_value => 0,
     },
     duplicate_of => {
         data_type   => 'integer',
@@ -103,7 +103,7 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(
     'workshop' => 'Comserv::Model::Schema::Ency::Result::WorkShop',
-    'id'
+    'workshop_id'
 );
 __PACKAGE__->belongs_to(
     'name' => 'Comserv::Model::Schema::Ency::Result::Site',
