@@ -1,0 +1,164 @@
+[% META 
+   title = "Create User (Admin)"
+   description = "Admin interface for creating new user accounts with invitation workflow"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.03"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/admin_create_user.tt,v 0.03 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Create User (Admin)</h1>
+        <h2 class="page-subtitle">Create a new user account with invitation</h2>
+        <p class="page-subtitle" style="font-size: var(--font-size-small); margin-top: 4px;">
+            <a href="/Documentation/AdminAddUserGuide" target="_blank" style="color: var(--link-color);">&#9432; Admin User Management Guide</a>
+        </p>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+            
+            <div class="form-container">
+                <form method="POST" action="[% c.uri_for('/user/admin_create_user') %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+
+                    <div class="form-section">
+                        <h3>User Information</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="first_name">First Name *</label>
+                                <input type="text" id="first_name" name="first_name" 
+                                       value="[% c.req.params.first_name | html %]" class="form-input" required>
+                            </div>
+                            <div class="form-field">
+                                <label for="last_name">Last Name *</label>
+                                <input type="text" id="last_name" name="last_name" 
+                                       value="[% c.req.params.last_name | html %]" class="form-input" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" name="email" 
+                                       value="[% c.req.params.email | html %]" class="form-input" required>
+                            </div>
+                            <div class="form-field">
+                                <label for="username">Username <small>(optional — user can set during setup)</small></label>
+                                <input type="text" id="username" name="username" 
+                                       value="[% c.req.params.username | html %]" class="form-input">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Site Access *</h3>
+                        <p>Select one or more sites this user will have access to.</p>
+                        
+                        <div class="form-field">
+                            <div class="check-pill-group">
+                                [% FOREACH site IN sites %]
+                                <label class="check-pill">
+                                    <input type="checkbox" name="sitenames" value="[% site.name | html %]">
+                                    [% site.name | html %]
+                                </label>
+                                [% END %]
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>Roles *</h3>
+                        <p>Select one or more roles to assign to the user.</p>
+                        
+                        <div class="form-field">
+                            [% IF available_roles.default_roles.size > 0 %]
+                            <div class="check-pill-group">
+                                [% FOREACH role IN available_roles.default_roles %]
+                                <label class="check-pill">
+                                    <input type="checkbox" name="roles" value="[% role | html %]">
+                                    [% role | ucfirst | html %]
+                                </label>
+                                [% END %]
+                            </div>
+                            [% END %]
+
+                            [% IF available_roles.site_roles.size > 0 %]
+                            <div style="margin-top: 8px;">
+                                <small><strong>Site-Specific Roles:</strong></small>
+                                <div class="check-pill-group">
+                                    [% FOREACH sr IN available_roles.site_roles %]
+                                    <label class="check-pill">
+                                        <input type="checkbox" name="roles" value="[% sr.name | html %]">
+                                        [% sr.name | html %][% IF is_csc_admin %] <small>([% sr.sitename | html %])</small>[% END %]
+                                    </label>
+                                    [% END %]
+                                </div>
+                            </div>
+                            [% END %]
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Create User</button>
+                        <a href="[% c.uri_for('/admin/users') %]" class="btn btn-secondary">Cancel</a>
+                    </div>
+                    
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
+
+<style>
+.check-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+}
+.check-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border: 1px solid #bbb;
+    border-radius: 20px;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.check-pill:hover {
+    background: #e9ecef;
+    border-color: #888;
+}
+.check-pill input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+.check-pill input[type="checkbox"]:checked + * {
+    font-weight: bold;
+}
+.check-pill:has(input:checked) {
+    background: #d0e8ff;
+    border-color: #0066cc;
+}
+</style>

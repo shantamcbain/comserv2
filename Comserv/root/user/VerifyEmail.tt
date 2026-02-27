@@ -1,0 +1,72 @@
+[% META
+   title = "Verify Email"
+   description = "Email verification step for account registration"
+   roles = ""
+   TemplateType = "Application"
+   category = "User"
+   page_version = "0.02"
+   last_updated = "2026-02-23"
+%]
+[% PageVersion = 'user/VerifyEmail.tt,v 0.02 2026/02/23 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Create Account - Step 2 of 3</h1>
+        <h2 class="page-subtitle">Email Verification</h2>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+                <div class="error">[% error_msg %]</div>
+            [% END %]
+
+            [% SET code_display = c.session.verification_code_display %]
+            [% SET email_sent = c.session.email_sent %]
+
+            [% IF email_sent %]
+            <div class="alert-info">
+                <p><strong>A verification code has been sent to your email address.</strong></p>
+                <p>Please check your inbox and enter the 6-digit code below.</p>
+                <p><em>If you don't see the email, check your spam/junk folder.</em></p>
+            </div>
+            [% ELSE %]
+            <div class="alert-warning">
+                <p><strong>Email delivery is not configured on this server.</strong></p>
+                <p>Your verification code is shown below for account setup:</p>
+                [% IF code_display %]
+                <p class="verification-code-display"><strong>[% code_display | html %]</strong></p>
+                [% END %]
+            </div>
+            [% END %]
+
+            <div class="form-container">
+                <form method="post" action="[% c.uri_for('/user/verify_email') %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+                    <div class="form-section">
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="code">Verification Code (6 digits)</label>
+                                <input type="text" id="code" name="code" class="form-input" maxlength="6" pattern="\d{6}" placeholder="000000" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Verify</button>
+                        <a href="[% c.uri_for('/user/register') %]" class="btn btn-secondary">Start Over</a>
+                    </div>
+                </form>
+            </div>
+            
+        </div>
+        
+    </div>
+    
+</div>
