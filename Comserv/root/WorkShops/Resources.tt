@@ -524,17 +524,24 @@ document.addEventListener('click', function(e) {
 
 <!-- View/Info Modal -->
 <div id="resource-modal">
-    <div id="resource-modal-inner" style="max-width:860px;">
+    <div id="resource-modal-inner" style="max-width:900px;">
         <button id="resource-modal-close" onclick="closeResourceModal()" title="Close">&times;</button>
-        <h2 id="modal-title" style="margin-top:0; padding-right:30px; word-break:break-word;"></h2>
-        <img id="modal-image" src="" alt="" style="display:none;">
-        <iframe id="modal-frame" src="" style="display:none;width:100%;height:70vh;border:none;border-radius:4px;"></iframe>
-        <audio id="modal-audio" src="" controls style="display:none;width:100%;margin-top:12px;"></audio>
-        <table id="modal-table" style="display:none;"></table>
-        <div id="modal-loading" style="text-align:center; padding:20px;">Loading…</div>
-        <div style="margin-top:16px;">
-            <a id="modal-download" href="#" class="btn btn-primary">⬇️ Download</a>
-            <button onclick="closeResourceModal()" class="btn btn-secondary" style="margin-left:8px;">✕ Close</button>
+        <h2 id="modal-title" style="margin-top:0; padding-right:30px; word-break:break-word; font-size:1em;"></h2>
+        <div id="modal-body">
+            <img id="modal-image" src="" alt="" style="display:none; max-width:100%; border-radius:4px; margin-top:8px;">
+            <iframe id="modal-frame" src="" style="display:none; width:100%; height:72vh; border:none; border-radius:4px; margin-top:8px;"></iframe>
+            <video id="modal-video" src="" controls style="display:none; width:100%; max-height:72vh; border-radius:4px; margin-top:8px;" preload="metadata"></video>
+            <audio id="modal-audio" src="" controls style="display:none; width:100%; margin-top:16px;"></audio>
+            <pre id="modal-text" style="display:none; max-height:60vh; overflow:auto; background:var(--table-header-bg,#f8f9fa); border:1px solid var(--border-color,#dee2e6); border-radius:4px; padding:12px; font-size:0.82em; white-space:pre-wrap; word-break:break-all; margin-top:8px;"></pre>
+            <table id="modal-table" style="display:none; margin-top:12px;"></table>
+            <div id="modal-loading" style="text-align:center; padding:30px; color:var(--text-muted-color);">Loading…</div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <a id="modal-download" href="#" class="btn btn-primary">⬇️ Download / Open Locally</a>
+            <span id="modal-open-hint" style="font-size:0.8em; color:var(--text-muted-color); display:none;">
+                This file type cannot be previewed in the browser. Use the button above to download and open in the appropriate application (e.g. PowerPoint, Word, LibreOffice).
+            </span>
+            <button onclick="closeResourceModal()" class="btn btn-secondary" style="margin-left:auto;">✕ Close</button>
         </div>
     </div>
 </div>
@@ -640,58 +647,118 @@ document.addEventListener('click', function(e) {
     }
 })();
 
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 /* ---- Shared modal helpers ---- */
 function _openModal(title, srcUrl, ftype, dlHref, infoUrl) {
-    var modal = document.getElementById('resource-modal');
-    var tTitle= document.getElementById('modal-title');
-    var img   = document.getElementById('modal-image');
-    var frame = document.getElementById('modal-frame');
-    var tbl   = document.getElementById('modal-table');
-    var load  = document.getElementById('modal-loading');
-    var dl    = document.getElementById('modal-download');
-    var audio = document.getElementById('modal-audio');
+    var modal  = document.getElementById('resource-modal');
+    var tTitle = document.getElementById('modal-title');
+    var img    = document.getElementById('modal-image');
+    var frame  = document.getElementById('modal-frame');
+    var video  = document.getElementById('modal-video');
+    var audio  = document.getElementById('modal-audio');
+    var pre    = document.getElementById('modal-text');
+    var tbl    = document.getElementById('modal-table');
+    var load   = document.getElementById('modal-loading');
+    var dl     = document.getElementById('modal-download');
+    var hint   = document.getElementById('modal-open-hint');
 
+    /* Reset all */
     tTitle.textContent = title;
-    img.style.display   = 'none'; img.src = '';
+    img.style.display   = 'none'; img.src   = '';
     frame.style.display = 'none'; frame.src = '';
-    tbl.style.display   = 'none'; tbl.innerHTML = '';
-    audio.style.display = 'none'; audio.src = '';
+    video.style.display = 'none'; video.src = ''; video.pause && video.pause();
+    audio.style.display = 'none'; audio.src = ''; audio.pause && audio.pause();
+    pre.style.display   = 'none'; pre.textContent = '';
+    tbl.style.display   = 'none'; tbl.innerHTML   = '';
+    hint.style.display  = 'none';
     load.style.display  = 'block'; load.textContent = 'Loading…';
     dl.href = dlHref || '#';
     modal.classList.add('open');
 
     if (ftype === 'image') {
-        img.src = srcUrl + '?t=' + Date.now();
         img.onload  = function() { load.style.display = 'none'; img.style.display = 'block'; };
-        img.onerror = function() { load.textContent = 'Cannot preview image (file may be large or unsupported).'; };
+        img.onerror = function() { load.textContent = 'Cannot preview image (may be large or unsupported format).'; };
+        img.src = srcUrl + '?t=' + Date.now();
     } else if (ftype === 'pdf') {
         frame.src = srcUrl;
         frame.style.display = 'block';
+        load.style.display  = 'none';
+    } else if (ftype === 'video') {
+        video.src = srcUrl;
+        video.style.display = 'block';
         load.style.display  = 'none';
     } else if (ftype === 'audio') {
         audio.src = srcUrl;
         audio.style.display = 'block';
         load.style.display  = 'none';
-    } else {
-        fetch(infoUrl)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                load.style.display = 'none';
-                var rows = [
-                    ['File Name', data.file_name || title],
-                    ['Type', data.file_type || data.file_ext || ftype],
-                    ['Size', data.file_size_kb !== undefined ? data.file_size_kb + ' KB' : '—'],
-                    ['Description', data.description || '—'],
-                    ['Site', data.sitename || '—'],
-                    ['Access', data.access_level || '—'],
-                    ['Uploaded By', data.uploaded_by || '—'],
-                ];
-                tbl.innerHTML = rows.map(function(r) {
-                    return '<tr><td>' + r[0] + '</td><td>' + escH(String(r[1] || '')) + '</td></tr>';
-                }).join('');
-                tbl.style.display = 'table';
+    } else if (ftype === 'text') {
+        fetch(srcUrl)
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
             })
-            .catch(function() { load.textContent = 'Could not load file info.'; });
+            .then(function(text) {
+                load.style.display = 'none';
+                pre.textContent    = text.substring(0, 200000);
+                pre.style.display  = 'block';
+            })
+            .catch(function(e) { load.textContent = 'Could not load text: ' + e; });
+    } else if (ftype === 'office') {
+        load.style.display = 'none';
+        hint.style.display = 'block';
+        /* Show metadata from info endpoint */
+        if (infoUrl) {
+            fetch(infoUrl)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var rows = [
+                        ['File Name', data.file_name || title],
+                        ['Type', data.file_type || data.file_ext || ftype],
+                        ['Size', data.file_size_kb !== undefined ? data.file_size_kb + ' KB' : '—'],
+                        ['Description', data.description || '—'],
+                        ['Site', data.sitename || '—'],
+                    ];
+                    tbl.innerHTML = rows.map(function(r) {
+                        return '<tr><td>' + escH(r[0]) + '</td><td>' + escH(String(r[1] || '')) + '</td></tr>';
+                    }).join('');
+                    tbl.style.display = 'table';
+                })
+                .catch(function() {});
+        }
+    } else {
+        /* Unknown — fetch info endpoint for metadata */
+        if (infoUrl) {
+            fetch(infoUrl)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    load.style.display = 'none';
+                    var resolvedType = data.preview || 'none';
+                    if (resolvedType === 'image') {
+                        img.onload  = function() { img.style.display = 'block'; };
+                        img.src = srcUrl + '?t=' + Date.now();
+                        return;
+                    }
+                    if (resolvedType === 'pdf') { frame.src = srcUrl; frame.style.display = 'block'; return; }
+                    if (resolvedType === 'video') { video.src = srcUrl; video.style.display = 'block'; return; }
+                    if (resolvedType === 'audio') { audio.src = srcUrl; audio.style.display = 'block'; return; }
+                    var rows = [
+                        ['File Name', data.file_name || title],
+                        ['Type', data.file_type || data.file_ext || '—'],
+                        ['Size', data.file_size_kb !== undefined ? data.file_size_kb + ' KB' : '—'],
+                        ['Description', data.description || '—'],
+                        ['Site', data.sitename || '—'],
+                    ];
+                    tbl.innerHTML = rows.map(function(r) {
+                        return '<tr><td>' + escH(r[0]) + '</td><td>' + escH(String(r[1] || '')) + '</td></tr>';
+                    }).join('');
+                    tbl.style.display = 'table';
+                    if (resolvedType === 'none') hint.style.display = 'block';
+                })
+                .catch(function() { load.textContent = 'Could not load file info.'; });
+        } else {
+            load.textContent = 'No preview available.';
+        }
     }
 }
 
@@ -702,31 +769,26 @@ function openResourceModal(id, name, ftype) {
         '/workshop/resource_view/' + id,
         ftype,
         '/workshop/resource_download/' + id,
-        '/workshop/resource_view/' + id
+        '/workshop/resource_view/' + id + '?info=1'
     );
 }
 
 /* Open files table record modal */
 function openFileModal(id, name, ftype) {
     var viewUrl = '/workshop/file_view/' + id;
-    _openModal(
-        name,
-        viewUrl,
-        ftype,
-        viewUrl,
-        viewUrl + '?info=1'
-    );
+    _openModal(name, viewUrl, ftype, viewUrl, viewUrl + '?info=1');
 }
 
 function closeResourceModal() {
     var modal = document.getElementById('resource-modal');
     modal.classList.remove('open');
+    var v = document.getElementById('modal-video');
+    var a = document.getElementById('modal-audio');
+    if (v) { v.pause(); v.src = ''; }
+    if (a) { a.pause(); a.src = ''; }
     document.getElementById('modal-image').src = '';
     document.getElementById('modal-frame').src = '';
-    document.getElementById('modal-audio').src = '';
 }
-
-function escH(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 document.getElementById('resource-modal').addEventListener('click', function(e) {
     if (e.target === this) closeResourceModal();
