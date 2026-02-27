@@ -165,9 +165,14 @@
     [% END %]
 
     [% IF is_admin %]
-    <div class="alert alert-info" style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:0.9em;">
-        <strong>Admin view:</strong> Browsing full NFS storage at <code>[% scan_root | html %]</code>.
-        Workshop leaders see the <code>apis</code> subdirectory only.
+    <div class="alert alert-info" style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:0.9em;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span><strong>Admin view:</strong> Browsing NFS at <code>[% scan_root | html %]</code>. Workshop leaders see the <code>apis</code> subdirectory only.</span>
+        [% IF is_csc %]
+        <form method="POST" action="/workshop/resource_scan_nfs" style="display:inline;"
+              onsubmit="return confirm('Scan the full NFS and add all files to the Files database? This may take several minutes on a large drive.');">
+            <button type="submit" class="btn btn-sm" style="background:#17a2b8;color:#fff;border:none;">🔍 Scan NFS → Files DB</button>
+        </form>
+        [% END %]
     </div>
     [% END %]
 
@@ -269,8 +274,10 @@
         [% SET is_link   = r.external_url ? 1 : 0 %]
         [% SET ftype_class = is_link ? 'link' : is_image ? 'image' : is_office ? 'office' : is_pdf ? 'pdf' : is_video ? 'video' : is_audio ? 'audio' : 'other' %]
         [% SET icon = is_link ? '🔗' : is_image ? '🖼️' : is_office ? '📊' : is_pdf ? '📄' : is_video ? '🎬' : is_audio ? '🎵' : '📦' %]
-        [% SET size_raw = r.file_size ? r.file_size / 1024 : 0; SET size_kb = size_raw.int %]
-        [% SET size_mb_raw = size_kb / 1024; SET size_label = size_kb > 1024 ? size_mb_raw.int _ ' MB' : size_kb > 0 ? size_kb _ ' KB' : '' %]
+        [% SET size_raw = (r.file_size AND r.file_size > 0) ? r.file_size / 1024 : 0 %]
+        [% SET size_kb  = size_raw ? size_raw.int : 0 %]
+        [% SET size_mb  = size_kb  ? (size_kb / 1024).int : 0 %]
+        [% SET size_label = size_kb > 1024 ? size_mb _ ' MB' : size_kb > 0 ? size_kb _ ' KB' : '' %]
         [% SET uploader_name = r.uploaded_by ? r.uploaded_by : 'Unknown' %]
         [% SET thumb_click = r.id ? "openResourceModal(" _ r.id _ ", '" _ r.file_name _ "', '" _ ftype_class _ "')" : '' %]
 

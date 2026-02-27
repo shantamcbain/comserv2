@@ -2078,6 +2078,118 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     $c->response->redirect($c->uri_for('/workshop/resources'));
 }
 
+sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($admin_type eq 'csc' || $admin_type eq 'special') {
+        $c->flash->{error_msg} = 'Only CSC admins can run the NFS scan.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root();
+    unless (-d $nfs_root) {
+        $c->flash->{error_msg} = "NFS root not available: $nfs_root";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema   = $c->model('DBEncy');
+    my $files_rs = $schema->resultset('File');
+    my $user_id  = $c->session->{user_id};
+    my $sitename = $c->session->{SiteName} // '';
+
+    # Build lookup of existing nfs_path records to detect duplicates
+    my %existing;
+    eval {
+        my @rows = $files_rs->search(
+            { nfs_path => { '!=' => undef } },
+            { columns => ['id', 'nfs_path', 'file_name', 'file_size'] }
+        )->all;
+        for my $r (@rows) {
+            $existing{ $r->nfs_path } = $r;
+        }
+    };
+
+    my ($inserted, $skipped, $duplicates, $errors) = (0, 0, 0, 0);
+
+    my $scan;
+    $scan = sub {
+        my ($dir) = @_;
+        return unless opendir(my $dh, $dir);
+        while (my $entry = readdir($dh)) {
+            next if $entry =~ /^\./;
+            my $full = "$dir/$entry";
+            if (-d $full) {
+                $scan->($full);
+            } elsif (-f $full) {
+                my ($ext) = ($entry =~ /\.([^.]+)$/);
+                $ext = lc($ext // '');
+                my $size = -s $full;
+                my $mime = $MIME_MAP{$ext} // 'application/octet-stream';
+
+                # Check if already in files table by nfs_path
+                if ($existing{$full}) {
+                    $skipped++;
+                    next;
+                }
+
+                # Check for duplicate by file_name + file_size (different path)
+                my $dup_check;
+                eval {
+                    $dup_check = $files_rs->search(
+                        { file_name => $entry, file_size => $size, nfs_path => { '!=' => $full } },
+                        { rows => 1 }
+                    )->first;
+                };
+
+                eval {
+                    $files_rs->create({
+                        file_name    => $entry,
+                        nfs_path     => $full,
+                        file_path    => $full,
+                        file_type    => $mime,
+                        file_format  => $ext,
+                        file_size    => $size,
+                        source_type  => 'nfs',
+                        sitename     => $sitename,
+                        access_level => 'site_only',
+                        user_id      => $user_id,
+                        is_duplicate => ($dup_check ? 1 : 0),
+                        duplicate_of => ($dup_check ? $dup_check->id : undef),
+                        upload_date  => \'NOW()',
+                    });
+                    $dup_check ? $duplicates++ : $inserted++;
+                };
+                if ($@) {
+                    $c->log->error("resource_scan_nfs insert error for $full: $@");
+                    $errors++;
+                }
+            }
+        }
+        closedir($dh);
+    };
+
+    eval { $scan->($nfs_root) };
+    $c->log->error("NFS scan failed: $@") if $@;
+
+    $c->flash->{success_msg} = "NFS scan complete: $inserted new files added, $skipped already in DB, $duplicates flagged as duplicates, $errors errors.";
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
 sub content :Local :Args(1) {
     my ($self, $c, $id) = @_;
     
