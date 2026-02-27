@@ -1358,9 +1358,7 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # Database Schema Comparison functionality (with alias)
 sub compare_schema :Path('/admin/compare_schema') :Args(0) {
     my ($self, $c) = @_;
-    # Redirect to the main schema_compare action
-    $c->response->redirect($c->uri_for('/admin/schema_compare'));
-    return;
+    $c->forward('schema_compare');
 }
 
 # Database Schema Comparison functionality

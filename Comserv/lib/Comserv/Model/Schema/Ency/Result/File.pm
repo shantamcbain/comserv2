@@ -63,13 +63,47 @@ __PACKAGE__->add_columns(
     user_id => {
         data_type => 'integer',
     },
+    nfs_path => {
+        data_type   => 'varchar',
+        size        => 1000,
+        is_nullable => 1,
+    },
+    external_url => {
+        data_type   => 'varchar',
+        size        => 1000,
+        is_nullable => 1,
+    },
+    access_level => {
+        data_type     => 'varchar',
+        size          => 50,
+        is_nullable   => 1,
+        default_value => 'site_only',
+    },
+    source_type => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 1,
+        default_value => 'nfs',
+    },
+    sitename => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    is_duplicate => {
+        data_type     => 'tinyint',
+        is_nullable   => 1,
+        default_value => 0,
+    },
+    duplicate_of => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
 );
-# TODO: run compare_schema to add these columns to the DB, then uncomment:
-# nfs_path, external_url, access_level, source_type, sitename, is_duplicate, duplicate_of
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(
     'workshop' => 'Comserv::Model::Schema::Ency::Result::WorkShop',
-    'id'
+    'workshop_id'
 );
 __PACKAGE__->belongs_to(
     'name' => 'Comserv::Model::Schema::Ency::Result::Site',
