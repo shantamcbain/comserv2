@@ -4,11 +4,11 @@
    roles = "admin,user"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.05"
-   last_updated = "2026-02-19"
+   page_version = "0.06"
+   last_updated = "2026-02-27"
 %]
 
-[% PageVersion = 'WorkShops/Details.tt,v 0.05 2026/02/19 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/Details.tt,v 0.06 2026/02/27 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
  [% PageVersion %]
 [% END %]
@@ -201,22 +201,28 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>File Name</th>
-                                <th>File Type</th>
-                                <th>File Size</th>
-                                <th>Uploaded</th>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Size</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             [% FOREACH file IN workshop_files %]
+                            [% SET fsize_kb = file.file_size > 0 ? (file.file_size / 1024).int : 0 %]
+                            [% SET fsize_label = fsize_kb > 1024 ? (fsize_kb / 1024).int _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
                             <tr>
-                                <td>[% file.file_name | html %]</td>
-                                <td>[% file.file_type | html %]</td>
-                                <td>[% file.file_size | html %] bytes</td>
-                                <td>[% file.upload_date || 'N/A' | html %]</td>
+                                <td><strong>[% file.file_name | html %]</strong></td>
+                                <td><code>[% file.file_type | upper | html %]</code></td>
+                                <td>[% fsize_label %]</td>
                                 <td class="action-cell">
-                                    <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">Download</a>
+                                    [% IF file.external_url %]
+                                        <a href="[% file.external_url | html %]" target="_blank" class="btn btn-sm btn-primary">🔗 Open Link</a>
+                                    [% ELSIF file.source == 'workshop_resource' %]
+                                        <a href="/workshop/resource_download/[% file.id %]" class="btn btn-sm btn-primary">⬇️ Download</a>
+                                    [% ELSE %]
+                                        <a href="/workshop/download/[% file.id %]" class="btn btn-sm btn-primary">⬇️ Download</a>
+                                    [% END %]
                                 </td>
                             </tr>
                             [% END %]

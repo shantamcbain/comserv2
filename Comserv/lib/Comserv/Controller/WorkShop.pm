@@ -433,11 +433,47 @@ sub details :Path('/workshop/details') :Args(0) {
         $is_workshop_leader = $self->_is_workshop_leader($c, $workshop);
     }
 
-    # Get workshop files
-    my @workshop_files = $schema->resultset('File')->search(
-        { workshop_id => $id },
-        { order_by => { -desc => 'upload_date' } }
-    )->all;
+    # Get workshop files — combine files table (workshop_id) + workshop_resource table
+    my @workshop_files;
+    eval {
+        my @direct = $schema->resultset('File')->search(
+            { 'me.workshop_id' => $id },
+            {
+                columns  => [qw(id file_name file_type file_size upload_date nfs_path file_path external_url)],
+                order_by => { -desc => 'me.upload_date' },
+            }
+        )->all;
+        for my $f (@direct) {
+            push @workshop_files, {
+                id          => $f->id,
+                file_name   => $f->file_name  // '',
+                file_type   => $f->file_type  // '',
+                file_size   => $f->file_size  // 0,
+                upload_date => $f->upload_date // '',
+                source      => 'files',
+            };
+        }
+    };
+    $c->log->error("details: file query error: $@") if $@;
+
+    eval {
+        my @resources = $schema->resultset('WorkshopResource')->search(
+            { 'me.workshop_id' => $id },
+            { order_by => { -desc => 'me.created_at' } }
+        )->all;
+        for my $r (@resources) {
+            push @workshop_files, {
+                id          => $r->id,
+                file_name   => $r->file_name  // '',
+                file_type   => $r->file_ext   // $r->file_type // '',
+                file_size   => $r->file_size  // 0,
+                upload_date => $r->created_at // '',
+                source      => 'workshop_resource',
+                external_url => $r->external_url // '',
+            };
+        }
+    };
+    $c->log->error("details: resource query error: $@") if $@;
 
     # Get workshop content
     my @workshop_content = $schema->resultset('WorkshopContent')->search(
