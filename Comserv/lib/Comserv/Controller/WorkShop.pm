@@ -3,212 +3,288 @@ use Moose;
 use namespace::autoclean;
 use Data::FormValidator;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # In Workshop Controller
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
+    my $logger = Comserv::Util::Logging->instance;
 
-    my ($workshops, $error);
-    ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
-    
-    # Apply client-side filters based on query parameters
-    my $site_filter = $c->request->params->{site_filter} || '';
-    my $status_filter = $c->request->params->{status_filter} || '';
-    
-    if ($site_filter || $status_filter) {
-        my @filtered_workshops;
+    eval {
+        my ($workshops, $error);
+        ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+        $workshops ||= [];
+        if (ref($workshops) && ref($workshops) ne 'ARRAY') {
+            if (eval { $workshops->can('all') }) {
+                my @tmp = eval { $workshops->all };
+                $workshops = \@tmp if !$@;
+            } else {
+                $workshops = [];
+            }
+        }
+        
+        # Apply client-side filters based on query parameters
+        my $site_filter = $c->request->params->{site_filter} || '';
+        my $status_filter = $c->request->params->{status_filter} || '';
+        
+        if ($site_filter || $status_filter) {
+            my @filtered_workshops;
+            for my $workshop (@$workshops) {
+                my $include = 1;
+                
+                # Apply site filter
+                if ($site_filter eq 'public') {
+                    $include = 0 unless $workshop->share eq 'public';
+                } elsif ($site_filter eq 'my_site') {
+                    my $sitename = $c->session->{SiteName};
+                    $include = 0 unless $workshop->sitename eq $sitename;
+                }
+                
+                # Apply status filter
+                if ($status_filter && $include) {
+                    $include = 0 unless $workshop->status eq $status_filter;
+                }
+                
+                push @filtered_workshops, $workshop if $include;
+            }
+            $workshops = \@filtered_workshops;
+        }
+
+        my @workshops_hash;
         for my $workshop (@$workshops) {
-            my $include = 1;
+            my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+
+            my %workshop_hash = $workshop->get_columns;
+            $workshop_hash{file} = \@file;
             
-            # Apply site filter
-            if ($site_filter eq 'public') {
-                $include = 0 unless $workshop->share eq 'public';
-            } elsif ($site_filter eq 'my_site') {
-                my $sitename = $c->session->{SiteName};
-                $include = 0 unless $workshop->sitename eq $sitename;
+            if ($workshop->creator) {
+                $workshop_hash{creator} = {
+                    id => $workshop->creator->id,
+                    username => $workshop->creator->username,
+                    first_name => $workshop->creator->first_name,
+                    last_name => $workshop->creator->last_name,
+                };
             }
-            
-            # Apply status filter
-            if ($status_filter && $include) {
-                $include = 0 unless $workshop->status eq $status_filter;
-            }
-            
-            push @filtered_workshops, $workshop if $include;
+
+            push @workshops_hash, \%workshop_hash;
         }
-        $workshops = \@filtered_workshops;
-    }
 
-    my @workshops_hash;
-    for my $workshop (@$workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
+        my ($past_workshops, $past_error);
+        ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
+        $past_workshops ||= [];
+        if (ref($past_workshops) && ref($past_workshops) ne 'ARRAY') {
+            if (eval { $past_workshops->can('all') }) {
+                my @ptmp = eval { $past_workshops->all };
+                $past_workshops = \@ptmp if !$@;
+            } else {
+                $past_workshops = [];
+            }
+        }
         
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
+        # Apply filters to past workshops too
+        if ($site_filter || $status_filter) {
+            my @filtered_past;
+            for my $workshop (@$past_workshops) {
+                my $include = 1;
+                
+                if ($site_filter eq 'public') {
+                    $include = 0 unless $workshop->share eq 'public';
+                } elsif ($site_filter eq 'my_site') {
+                    my $sitename = $c->session->{SiteName};
+                    $include = 0 unless ($workshop->sitename // '') eq ($sitename // '');
+                }
+                
+                if ($status_filter && $include) {
+                    $include = 0 unless ($workshop->status // '') eq $status_filter;
+                }
+                
+                push @filtered_past, $workshop if $include;
+            }
+            $past_workshops = \@filtered_past;
         }
 
-        push @workshops_hash, \%workshop_hash;
-    }
+        # Fallback visibility rules: ensure guests and admins see past workshops
+        if (!@$past_workshops) {
+            my $schema = $c->model('DBEncy');
+            my $admin_auth = Comserv::Util::AdminAuth->new();
+            my $is_admin_fallback = eval { my $t = $admin_auth->get_admin_type($c); $t && $t ne 'none' } // 0;
+            my $today = eval { DateTime->today->ymd } || '';
+            my @date_clause = $today ? ( { date => { '<', $today } } ) : ();
+            my $past_clause = { -or => [ { status => { -in => ['completed','cancelled'] } }, @date_clause ] };
+            my $cond = $is_admin_fallback
+                ? $past_clause
+                : { share => 'public', %$past_clause };
+            eval {
+                my @rows = $schema->resultset('WorkShop')->search(
+                    $cond,
+                    { order_by => { -desc => 'date' }, prefetch => 'creator' }
+                )->all;
+                $past_workshops = \@rows;
+            };
+            if ($@) {
+                $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'index', "Fallback past_workshops query failed: $@");
+            }
+        }
 
-    my ($past_workshops, $past_error);
-    ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
-    
-    # Apply filters to past workshops too
-    if ($site_filter || $status_filter) {
-        my @filtered_past;
+        my @past_workshops_hash;
         for my $workshop (@$past_workshops) {
-            my $include = 1;
-            
-            if ($site_filter eq 'public') {
-                $include = 0 unless $workshop->share eq 'public';
-            } elsif ($site_filter eq 'my_site') {
-                my $sitename = $c->session->{SiteName};
-                $include = 0 unless $workshop->sitename eq $sitename;
-            }
-            
-            if ($status_filter && $include) {
-                $include = 0 unless $workshop->status eq $status_filter;
-            }
-            
-            push @filtered_past, $workshop if $include;
-        }
-        $past_workshops = \@filtered_past;
-    }
+            my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
 
-    my @past_workshops_hash;
-    for my $workshop (@$past_workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+            my %workshop_hash = $workshop->get_columns;
+            $workshop_hash{file} = \@file;
+            
+            if ($workshop->creator) {
+                $workshop_hash{creator} = {
+                    id => $workshop->creator->id,
+                    username => $workshop->creator->username,
+                    first_name => $workshop->creator->first_name,
+                    last_name => $workshop->creator->last_name,
+                };
+            }
 
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
-        
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
+            push @past_workshops_hash, \%workshop_hash;
         }
 
-        push @past_workshops_hash, \%workshop_hash;
-    }
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        my $admin_type = $admin_auth->get_admin_type($c);
+        my $is_admin = ($admin_type && $admin_type ne 'none') ? 1 : 0;
+        my $can_access_dashboard = $self->_can_access_workshop_dashboard($c);
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
-
-    $c->stash(
-        workshops => \@workshops_hash,
-        past_workshops => \@past_workshops_hash,
-        error => $error,
-        past_error => $past_error,
-        sitename => $c->session->{SiteName},
-        is_admin => $is_admin,
-        template => 'WorkShops/Workshops.tt',
-    );
+        $c->stash(
+            workshops => \@workshops_hash,
+            past_workshops => \@past_workshops_hash,
+            error => $error,
+            past_error => $past_error,
+            sitename => $c->session->{SiteName},
+            is_admin => $is_admin,
+            can_access_dashboard => $can_access_dashboard,
+            template => 'WorkShops/Workshops.tt',
+        );
+    };
     if ($@) {
-    $c->stash(error => "Error fetching active workshops: $@");
-}
+        my $err = $@;
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'index', "Workshop index failed: $err");
+        $c->stash(
+            workshops      => [],
+            past_workshops => [],
+            error          => "Unable to load workshops at this time.",
+            past_error     => '',
+            sitename       => $c->session->{SiteName},
+            is_admin       => 0,
+            can_access_dashboard => 0,
+            template       => 'WorkShops/Workshops.tt',
+        );
+    }
 }
 sub dashboard :Local {
     my ( $self, $c ) = @_;
+    my $logger = Comserv::Util::Logging->instance;
 
-    # Check if user has admin access OR workshop_leader role
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_dashboard');
-    
-    my $roles = $c->session->{roles} || [];
-    my $has_workshop_leader_role = 0;
-    if (ref $roles eq 'ARRAY') {
-        $has_workshop_leader_role = grep { $_ eq 'workshop_leader' } @$roles;
-    }
-    
-    unless ($has_admin || $has_workshop_leader_role) {
-        $c->flash->{error_msg} = "Access denied. Admin or workshop leader access required.";
-        $c->response->redirect($c->uri_for($self->action_for('index')));
-        return;
-    }
-
-    my $user_id = $c->session->{user_id};
-    my $sitename = $c->session->{SiteName};
-    my $schema = $c->model('DBEncy');
-
-    my $admin_type = $admin_auth->get_admin_type($c);
-    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
-
-    $c->log->debug("Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
-
-    my $search_filter;
-
-    if ($is_csc_admin) {
-        $search_filter = {};
-        $c->log->debug("Dashboard: CSC admin - showing ALL workshops");
-    } else {
-        $search_filter = {
-            -or => [
-                { created_by => $user_id },
-            ]
-        };
-        if ($sitename) {
-            push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+    eval {
+        # Check if user has admin access OR workshop leader role (supports role aliases)
+        unless ($self->_can_access_workshop_dashboard($c)) {
+            $c->flash->{error_msg} = "Access denied. Admin or workshop leader access required.";
+            $c->response->redirect($c->uri_for($self->action_for('index')));
+            return;
         }
-        $c->log->debug("Dashboard: Regular admin filter applied");
-    }
 
-    my @my_workshops = $schema->resultset('WorkShop')->search(
-        $search_filter,
-        { 
-            order_by => { -desc => 'created_at' },
-            prefetch => 'creator'
+        my $user_id = $c->session->{user_id};
+        my $sitename = $c->session->{SiteName};
+        my $schema = $c->model('DBEncy');
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+
+        my $admin_type = $admin_auth->get_admin_type($c);
+        my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+        $c->log->debug("Dashboard: user_id=$user_id, sitename=$sitename, admin_type=$admin_type, is_csc_admin=$is_csc_admin");
+
+        my $search_filter;
+        my $dashboard_scope = $c->req->params->{scope} || 'all';
+        $dashboard_scope = 'all' unless $dashboard_scope eq 'mine';
+
+        if ($is_csc_admin && $dashboard_scope eq 'all') {
+            $search_filter = {};
+            $c->log->debug("Dashboard: CSC admin - showing ALL workshops");
+        } else {
+            $search_filter = {
+                -or => [
+                    { created_by => $user_id },
+                ]
+            };
+            if ($sitename) {
+                push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+            }
+            $c->log->debug("Dashboard: Regular admin filter applied");
         }
-    )->all;
 
-    $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
-
-    my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
-        {
-            user_id => $user_id,
-            role => 'workshop_leader'
-        }
-    )->get_column('workshop_id')->all;
-
-    if (@workshop_leader_ids) {
-        my @leader_workshops = $schema->resultset('WorkShop')->search(
-            {
-                id => { -in => \@workshop_leader_ids },
-                created_by => { '!=' => $user_id }
-            },
-            { prefetch => 'creator' }
+        my @my_workshops = $schema->resultset('WorkShop')->search(
+            $search_filter,
+            { 
+                order_by => { -desc => 'created_at' },
+                prefetch => 'creator'
+            }
         )->all;
-        push @my_workshops, @leader_workshops;
+
+        $c->log->debug("Dashboard: Found " . scalar(@my_workshops) . " workshops from main search");
+
+        my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
+            {
+                user_id => $user_id,
+                role => 'workshop_leader'
+            }
+        )->get_column('workshop_id')->all;
+
+        if (@workshop_leader_ids) {
+            my @leader_workshops = $schema->resultset('WorkShop')->search(
+                {
+                    id => { -in => \@workshop_leader_ids },
+                    created_by => { '!=' => $user_id }
+                },
+                { prefetch => 'creator' }
+            )->all;
+            push @my_workshops, @leader_workshops;
+        }
+
+        my @workshops_with_stats;
+        for my $workshop (@my_workshops) {
+            my ($participant_count, $email_count, $file_count) = (0, 0, 0);
+            eval {
+                $participant_count = $workshop->participants->search({ status => 'registered' })->count;
+                $email_count = $workshop->emails->count;
+                $file_count = $workshop->files->count;
+            };
+            if ($@) {
+                $logger->log_with_details(
+                    $c, 'error', __FILE__, __LINE__, 'dashboard',
+                    "Workshop stats fetch failed for workshop_id=" . ($workshop->id // 'unknown') . ": $@"
+                );
+            }
+
+            push @workshops_with_stats, {
+                workshop => $workshop,
+                participant_count => $participant_count,
+                email_count => $email_count,
+                file_count => $file_count,
+            };
+        }
+
+        $c->stash(
+            workshops => \@workshops_with_stats,
+            dashboard_scope => $dashboard_scope,
+            is_csc_admin => $is_csc_admin,
+            template => 'WorkShops/Dashboard.tt',
+        );
+    };
+    if ($@) {
+        my $err = $@;
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'dashboard', "Workshop dashboard failed: $err");
+        $c->stash(
+            workshops => [],
+            template  => 'WorkShops/Dashboard.tt',
+        );
+        $c->flash->{error_msg} = 'Dashboard temporarily unavailable. Your session is still active.';
     }
-
-    my @workshops_with_stats;
-    for my $workshop (@my_workshops) {
-        my $participant_count = $workshop->participants->search({ status => 'registered' })->count;
-        my $email_count = $workshop->emails->count;
-        my $file_count = $workshop->files->count;
-
-        push @workshops_with_stats, {
-            workshop => $workshop,
-            participant_count => $participant_count,
-            email_count => $email_count,
-            file_count => $file_count,
-        };
-    }
-
-    $c->stash(
-        workshops => \@workshops_with_stats,
-        template => 'WorkShops/Dashboard.tt',
-    );
 }
 
 sub add :Local {
@@ -420,6 +496,8 @@ sub details :Path('/workshop/details') :Args(0) {
     # Check if user is registered for this workshop (including past attendees)
     my $is_user_registered = 0;
     my $is_workshop_leader = 0;
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin = $admin_auth->check_admin_access($c, 'workshop_details');
     if ($c->user_exists) {
         my $user_id = $c->session->{user_id};
         my $participant = $schema->resultset('Participant')->search({
@@ -451,6 +529,7 @@ sub details :Path('/workshop/details') :Args(0) {
         formatted_date => $formatted_date,
         is_user_registered => $is_user_registered,
         is_workshop_leader => $is_workshop_leader,
+        is_admin => $is_admin,
         workshop_files => \@workshop_files,
         workshop_content => \@workshop_content,
         template => 'WorkShops/Details.tt',
@@ -1465,8 +1544,46 @@ sub _can_access_resources {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     return 1 if $admin_type && $admin_type ne 'none';
-    my $roles = $c->session->{roles} || [];
-    return 1 if ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+    my $roles = $c->session->{roles};
+    return 1 if $self->_has_workshop_leader_role($roles);
+    return 0;
+}
+
+sub _session_roles_list {
+    my ($self, $roles) = @_;
+    $roles = [] unless defined $roles;
+
+    return @$roles if ref $roles eq 'ARRAY';
+    return grep { length $_ } map { s/^\s+|\s+$//gr } split(/\s*,\s*/, $roles);
+}
+
+sub _has_workshop_leader_role {
+    my ($self, $roles) = @_;
+    my @roles = map { lc($_) } $self->_session_roles_list($roles);
+    for my $role (@roles) {
+        return 1 if $role eq 'workshop_leader'
+                 || $role eq 'workshop_leaders'
+                 || $role eq 'workshopleader'
+                 || $role eq 'workshopleaders';
+    }
+    return 0;
+}
+
+sub _has_admin_role {
+    my ($self, $roles) = @_;
+    my @roles = map { lc($_) } $self->_session_roles_list($roles);
+    return scalar grep { $_ eq 'admin' } @roles;
+}
+
+sub _can_access_workshop_dashboard {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles};
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $has_admin_access = ($admin_type && $admin_type ne 'none') ? 1 : 0;
+    $has_admin_access ||= $self->_has_admin_role($roles);
+    return 1 if $has_admin_access;
+    return 1 if $self->_has_workshop_leader_role($roles);
     return 0;
 }
 
@@ -1488,6 +1605,111 @@ my %MIME_MAP = (
     zip  => 'application/zip',
     txt  => 'text/plain',
 );
+
+sub resource_index_nfs :Path('/workshop/resource_index_nfs') :Args(0) {
+    my ($self, $c) = @_;
+
+    # Authorization: admin-only to avoid heavy scans by regular users
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($admin_type && $admin_type ne 'none') {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required to re-index NFS.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $logger   = Comserv::Util::Logging->instance;
+    my $nfs_root = $self->_nfs_root();
+    unless (-d $nfs_root) {
+        $c->flash->{error_msg} = "NFS root not available at $nfs_root";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+
+    my ($inserted, $updated, $skipped, $errors) = (0, 0, 0, 0);
+    my $scan;
+    $scan = sub {
+        my ($dir, $rel_prefix) = @_;
+        return unless opendir(my $dh, $dir);
+        while (my $entry = readdir($dh)) {
+            next if $entry =~ /^\./;
+            my $full = "$dir/$entry";
+            my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
+            if (-d $full) {
+                $scan->($full, $rel);
+                next;
+            }
+            next unless -f $full;
+
+            my $file_name = $entry;
+            my ($ext) = ($file_name =~ /\.([^.]+)$/);
+            $ext = lc($ext // '');
+            my $file_size = -s $full;
+
+            # Determine a consistent relative key (store relative to nfs_root)
+            my $rel_key = $rel;
+            $rel_key =~ s{^/+}{};
+
+            eval {
+                # Prefer matching by nfs_path if available, else by file_path
+                my $row = $schema->resultset('File')->search({ nfs_path => $rel_key })->first;
+                $row ||= $schema->resultset('File')->search({ file_path => $rel_key })->first;
+
+                my %changes = (
+                    file_name => $file_name,
+                    file_type => ($ext ? (exists $MIME_MAP{$ext} ? $MIME_MAP{$ext} : 'application/octet-stream') : ''),
+                    file_size => $file_size,
+                    nfs_path  => $rel_key,
+                    file_path => $rel_key,
+                    file_format => $ext,
+                );
+
+                if ($row) {
+                    # Update if any significant field changed
+                    my $needs_update = 0;
+                    for my $k (qw/file_name file_type file_size nfs_path file_path file_format/) {
+                        my $newv = $changes{$k};
+                        my $oldv = eval { $row->get_column($k) };
+                        $needs_update ||= ((defined $newv ? $newv : '') ne (defined $oldv ? $oldv : ''));
+                    }
+                    if ($needs_update) {
+                        $row->update(\%changes);
+                        $updated++;
+                    } else {
+                        $skipped++;
+                    }
+                } else {
+                    $schema->resultset('File')->create({
+                        %changes,
+                        upload_date => DateTime->now,
+                        user_id     => $c->session->{user_id},
+                    });
+                    $inserted++;
+                }
+            };
+            if ($@) {
+                $errors++;
+                $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'resource_index_nfs', "Failed to upsert '$rel_key': $@");
+            }
+        }
+        closedir($dh);
+    };
+
+    eval { $scan->($nfs_root, '') };
+    if ($@) {
+        $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'resource_index_nfs', "Scan error at '$nfs_root': $@");
+        $c->flash->{error_msg} = 'Indexing failed: ' . $@;
+    } else {
+        my $msg = "NFS indexing complete. Inserted: $inserted, Updated: $updated, Skipped: $skipped, Errors: $errors";
+        $c->flash->{success_msg} = $msg;
+        $logger->log_with_details($c, 'info', __FILE__, __LINE__, 'resource_index_nfs', $msg);
+    }
+
+    my $return_to = $c->req->param('return_to') || '/workshop/resources';
+    $c->response->redirect($c->uri_for($return_to));
+}
 
 sub resources :Path('/workshop/resources') :Args(0) {
     my ($self, $c) = @_;
@@ -1511,6 +1733,10 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
     my $is_admin   = $admin_type && $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
+    my $sort_by    = $c->req->params->{sort_by}  || 'directory';
+    my $sort_order = lc($c->req->params->{sort_order} || 'asc');
+    $sort_by = 'directory' unless $sort_by =~ /^(directory|name|size|ext|status)$/;
+    $sort_order = 'asc' unless $sort_order eq 'desc';
 
     # Admin sees full NFS drive; workshop leaders scoped to apis subdir only
     my $scan_root  = $nfs_root;
@@ -1521,6 +1747,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
 
     # Build a lookup of DB records keyed by file_path for metadata enrichment
     my %db_by_path;
+    my %file_table_by_path;
     my $db_error;
     eval {
         my $schema = $c->model('DBEncy');
@@ -1546,6 +1773,28 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $db_error = $@;
         $c->log->error("Resource library DB error: $db_error");
     }
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @file_rows = $schema->resultset('File')->search(
+            {
+                -or => [
+                    { nfs_path => { '!=' => undef } },
+                    { file_path => { '!=' => undef } },
+                ]
+            }
+        )->all;
+
+        for my $row (@file_rows) {
+            my $raw = $row->nfs_path // $row->file_path // '';
+            next unless length $raw;
+            $raw =~ s{\\}{/}g;
+            $raw =~ s{^\Q$nfs_root\E/?}{};
+            $raw =~ s{^/+}{};
+            next unless length $raw;
+            $file_table_by_path{$raw} ||= $row;
+        }
+    };
+    $c->log->error("Resource file-table lookup error: $@") if $@;
 
     # Scan filesystem directly so existing files always appear
     my @resources;
@@ -1568,6 +1817,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
                         $ext = lc($ext // '');
                         my $size = -s $full;
                         my $db_row = $db_by_path{$rel};
+                        my $file_row = $file_table_by_path{$rel};
                         push @fs_files, {
                             id          => $db_row ? $db_row->id : undef,
                             file_name   => $entry,
@@ -1580,6 +1830,8 @@ sub resources :Path('/workshop/resources') :Args(0) {
                             sitename    => $db_row ? ($db_row->sitename // '') : '',
                             uploaded_by => '',
                             in_db       => $db_row ? 1 : 0,
+                            file_in_table => $file_row ? 1 : 0,
+                            file_table_id => $file_row ? $file_row->id : undef,
                             full_path   => $full,
                         };
                     }
@@ -1591,11 +1843,11 @@ sub resources :Path('/workshop/resources') :Args(0) {
         if ($@) {
             $c->log->error("NFS scan error: $@");
         }
-        # Sort newest first by filesystem mtime fallback, then name
-        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @fs_files;
+        @resources = @fs_files;
     } else {
         # NFS not mounted — fall back to DB records only
         for my $row (values %db_by_path) {
+            my $file_row = $file_table_by_path{$row->file_path // ''};
             push @resources, {
                 id          => $row->id,
                 file_name   => $row->file_name,
@@ -1608,10 +1860,12 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 sitename    => $row->sitename // '',
                 uploaded_by => '',
                 in_db       => 1,
+                file_in_table => $file_row ? 1 : 0,
+                file_table_id => $file_row ? $file_row->id : undef,
                 full_path   => "$nfs_root/" . $row->file_path,
             };
         }
-        @resources = sort { lc($a->{file_name}) cmp lc($b->{file_name}) } @resources;
+        @resources = @resources;
     }
 
     # Always append external URL records from DB (they have no NFS path to scan)
@@ -1646,6 +1900,8 @@ sub resources :Path('/workshop/resources') :Args(0) {
                     sitename     => $row->sitename // '',
                     uploaded_by  => '',
                     in_db        => 1,
+                    file_in_table => 0,
+                    file_table_id => undef,
                     external_url => $row->external_url,
                 };
             }
@@ -1653,10 +1909,37 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $c->log->error("External URL fetch error: $@") if $@;
     }
 
+    my $sort_key = sub {
+        my ($row) = @_;
+        return '' unless $row;
+        if ($sort_by eq 'name') {
+            return lc($row->{file_name} // '');
+        } elsif ($sort_by eq 'size') {
+            return ($row->{file_size} // 0) + 0;
+        } elsif ($sort_by eq 'ext') {
+            return lc($row->{file_ext} // '');
+        } elsif ($sort_by eq 'status') {
+            return $row->{file_in_table} ? 1 : 0;
+        }
+        my $path = $row->{file_path} // '';
+        $path =~ s{/[^/]+$}{};
+        return lc($path);
+    };
+
+    @resources = sort {
+        my $av = $sort_key->($a);
+        my $bv = $sort_key->($b);
+        my $cmp = ($sort_by eq 'size' || $sort_by eq 'status') ? ($av <=> $bv) : ($av cmp $bv);
+        $cmp = (lc($a->{file_name} // '') cmp lc($b->{file_name} // '')) if $cmp == 0;
+        $sort_order eq 'desc' ? -$cmp : $cmp;
+    } @resources;
+
     $c->stash(
         resources     => \@resources,
         is_csc        => $is_csc,
         is_admin      => $is_admin,
+        sort_by       => $sort_by,
+        sort_order    => $sort_order,
         sitename      => $sitename,
         nfs_root      => $nfs_root,
         scan_root     => $scan_root,

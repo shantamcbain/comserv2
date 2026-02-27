@@ -81,7 +81,11 @@ requires 'Digest::SHA';
 # Email handling
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
+requires 'Email::MIME';
 requires 'Email::Sender::Simple';
+requires 'Email::Sender::Transport::SMTP';
+requires 'Catalyst::View::Email';
+requires 'Catalyst::View::Email::Template';
 
 # Utility modules
 requires 'URI::Escape';

@@ -2,6 +2,7 @@
 use Moose;
 use namespace::autoclean;
 use File::Find;
+use File::Basename qw(basename dirname);
 use Time::Piece;
 use URI::Escape;
 BEGIN { extends 'Catalyst::Controller'; }
@@ -213,6 +214,336 @@ $c->stash->{sites} = $sites;
     } else {
         $c->response->body('Failed to upload file.');
     }
+}
+
+sub _nfs_root_for_sync {
+    my ($self) = @_;
+    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+    return $configured if -d $configured;
+
+    for my $fallback (
+        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
+        '/opt/comserv/workshop_resources',
+        ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
+    ) {
+        return $fallback if -d $fallback;
+    }
+
+    return $configured;
+}
+
+my %SYNC_MIME_MAP = (
+    pdf  => 'application/pdf',
+    ppt  => 'application/vnd.ms-powerpoint',
+    pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    doc  => 'application/msword',
+    docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls  => 'application/vnd.ms-excel',
+    xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    jpg  => 'image/jpeg',
+    jpeg => 'image/jpeg',
+    png  => 'image/png',
+    gif  => 'image/gif',
+    svg  => 'image/svg+xml',
+    mp4  => 'video/mp4',
+    mp3  => 'audio/mpeg',
+    zip  => 'application/zip',
+    txt  => 'text/plain',
+);
+
+sub _top_level_dir {
+    my ($rel) = @_;
+    return '' unless defined $rel && length $rel;
+    my ($top) = split('/', $rel, 2);
+    return $top // '';
+}
+
+sub _infer_sitename_for_rel {
+    my ($self, $schema, $rel) = @_;
+    my $top = _top_level_dir($rel);
+    return 'BMaster' if lc($top) eq 'apis';
+    return '3d' if lc($top) eq '3d';
+    return 'CSC' unless $top;
+
+    my $site = $schema->resultset('Site')->search(
+        { name => { -in => [ $top, uc($top), lc($top) ] } }
+    )->first;
+    return $site ? ($site->name // 'CSC') : 'CSC';
+}
+
+sub _gather_nfs_files {
+    my ($self, $nfs_root) = @_;
+    my @paths;
+    my $scan;
+    $scan = sub {
+        my ($dir, $prefix) = @_;
+        return unless opendir(my $dh, $dir);
+        while (my $entry = readdir($dh)) {
+            next if $entry =~ /^\./;
+            my $full = "$dir/$entry";
+            my $rel = $prefix ? "$prefix/$entry" : $entry;
+            if (-d $full) {
+                $scan->($full, $rel);
+            } elsif (-f $full) {
+                push @paths, $rel;
+            }
+        }
+        closedir($dh);
+    };
+    $scan->($nfs_root, '');
+    return @paths;
+}
+
+sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my @selected_paths = $c->req->param('selected_paths');
+    my $add_to_workshop_resource = $c->req->param('add_to_workshop_resource') ? 1 : 0;
+    my $access_level = $c->req->param('access_level') || 'site_only';
+    my $description  = $c->req->param('description') // '';
+    my $workshop_id  = $c->req->param('workshop_id');
+    my $site_id_form = $c->req->param('site_id');
+    my $reference_id = $c->req->param('reference_id');
+    my $category_id  = $c->req->param('category_id');
+    my $share_id     = $c->req->param('share_id');
+    my $file_status  = $c->req->param('file_status') || 'active';
+    my $source_type  = $c->req->param('source_type') || 'nfs';
+    my $return_to    = $c->req->param('return_to') || '/workshop/resources';
+    $return_to = '/workshop/resources' unless $return_to =~ m{^/};
+
+    unless (@selected_paths) {
+        $c->flash->{error_msg} = 'Select at least one file to add.';
+        $c->response->redirect($c->uri_for($return_to));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    unless (-d $nfs_root) {
+        $c->flash->{error_msg} = "Storage directory not available ($nfs_root).";
+        $c->response->redirect($c->uri_for($return_to));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $file_rs   = $schema->resultset('File');
+    my $res_rs    = $schema->resultset('WorkshopResource');
+    my $user_id   = $c->session->{user_id};
+    my $default_sitename  = $c->session->{SiteName} // 'CSC';
+    my $site_id   = defined $site_id_form && $site_id_form ne '' ? $site_id_form : ($c->session->{site_id} // 0);
+
+    my ($added_files, $existing_files, $added_resources, $failed) = (0, 0, 0, 0);
+
+    for my $input_rel (@selected_paths) {
+        my $rel = $input_rel // '';
+        $rel =~ s{\\}{/}g;
+        $rel =~ s{^/+}{};
+        if (!$rel || $rel =~ m{(?:^|/)\.\.(?:/|$)}) {
+            $failed++;
+            next;
+        }
+
+        my $full_path = "$nfs_root/$rel";
+        unless (-f $full_path) {
+            $failed++;
+            next;
+        }
+
+        my ($name) = ($rel =~ m{([^/]+)$});
+        $name ||= basename($full_path);
+        my ($ext) = ($name =~ /\.([^.]+)$/);
+        $ext = lc($ext // '');
+        my $file_size = -s $full_path;
+        my $upload_date = localtime->strftime('%Y-%m-%d %H:%M:%S');
+        my $mime_type = $SYNC_MIME_MAP{$ext} || 'application/octet-stream';
+        my $desc = length $description ? $description : "Imported from NFS: $rel";
+
+        my $resolved_sitename = $self->_infer_sitename_for_rel($schema, $rel) || $default_sitename;
+        my $file_row = $file_rs->search(
+            {
+                -or => [
+                    { nfs_path => $rel },
+                    { file_path => $full_path },
+                ]
+            }
+        )->first;
+
+        if ($file_row) {
+            $existing_files++;
+        } else {
+            eval {
+                $file_row = $file_rs->create({
+                    workshop_id  => ($workshop_id || undef),
+                    file_name    => $name,
+                    file_type    => $ext ? ".$ext" : 'unknown',
+                    file_data    => '',
+                    site_id      => $site_id,
+                    reference_id => (defined $reference_id && $reference_id ne '' ? $reference_id : 0),
+                    category_id  => (defined $category_id && $category_id ne '' ? $category_id : 0),
+                    share_id     => (defined $share_id && $share_id ne '' ? $share_id : 0),
+                    description  => $desc,
+                    upload_date  => $upload_date,
+                    file_size    => $file_size,
+                    file_path    => $full_path,
+                    file_url     => '',
+                    file_status  => $file_status,
+                    file_format  => $mime_type,
+                    user_id      => $user_id,
+                    nfs_path     => $rel,
+                    external_url => '',
+                    access_level => $access_level,
+                    source_type  => $source_type,
+                    sitename     => $resolved_sitename,
+                    is_duplicate => 0,
+                    duplicate_of => undef,
+                });
+            };
+            if ($@ || !$file_row) {
+                $c->log->error("nfs_sync file create failed for '$rel': " . ($@ || 'unknown error'));
+                $failed++;
+                next;
+            }
+            $added_files++;
+        }
+
+        if ($add_to_workshop_resource) {
+            my $resource_row = $res_rs->search({ file_path => $rel })->first;
+            unless ($resource_row) {
+                eval {
+                    $res_rs->create({
+                        file_name    => $name,
+                        file_path    => $rel,
+                        file_type    => $mime_type,
+                        file_ext     => $ext,
+                        file_size    => $file_size,
+                        description  => $desc,
+                        uploaded_by  => $user_id,
+                        sitename     => $resolved_sitename,
+                        access_level => $access_level,
+                        file_id      => $file_row ? $file_row->id : undef,
+                        workshop_id  => ($workshop_id || undef),
+                    });
+                };
+                if ($@) {
+                    $c->log->error("nfs_sync workshop_resource create failed for '$rel': $@");
+                    $failed++;
+                    next;
+                }
+                $added_resources++;
+            }
+        }
+    }
+
+    $c->flash->{success_msg} = "Files added: $added_files. Already in files table: $existing_files. Workshop resources added: $added_resources. Failures: $failed.";
+    $c->response->redirect($c->uri_for($return_to));
+}
+
+sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $return_to = $c->req->param('return_to') || '/workshop/resources';
+    $return_to = '/workshop/resources' unless $return_to =~ m{^/};
+    my $nfs_root = $self->_nfs_root_for_sync();
+
+    unless (-d $nfs_root) {
+        $c->flash->{error_msg} = "Storage directory not available ($nfs_root).";
+        $c->response->redirect($c->uri_for($return_to));
+        return;
+    }
+
+    my $schema    = $c->model('DBEncy');
+    my $file_rs   = $schema->resultset('File');
+    my $user_id   = $c->session->{user_id};
+    my $site_id   = $c->session->{site_id} // 0;
+
+    my @selected_paths = $self->_gather_nfs_files($nfs_root);
+    my ($added_files, $existing_files, $failed) = (0, 0, 0);
+
+    for my $rel (@selected_paths) {
+        $rel =~ s{\\}{/}g;
+        $rel =~ s{^/+}{};
+        next unless $rel;
+        my $full_path = "$nfs_root/$rel";
+        next unless -f $full_path;
+
+        my ($name) = ($rel =~ m{([^/]+)$});
+        $name ||= basename($full_path);
+        my ($ext) = ($name =~ /\.([^.]+)$/);
+        $ext = lc($ext // '');
+        my $file_size = -s $full_path;
+        my $upload_date = localtime->strftime('%Y-%m-%d %H:%M:%S');
+        my $mime_type = $SYNC_MIME_MAP{$ext} || 'application/octet-stream';
+        my $resolved_sitename = $self->_infer_sitename_for_rel($schema, $rel);
+
+        my $exists = $file_rs->search({
+            -or => [
+                { nfs_path => $rel },
+                { file_path => $full_path },
+            ]
+        })->first;
+
+        if ($exists) {
+            $existing_files++;
+            next;
+        }
+
+        eval {
+            $file_rs->create({
+                workshop_id  => undef,
+                file_name    => $name,
+                file_type    => $ext ? ".$ext" : 'unknown',
+                file_data    => '',
+                site_id      => $site_id,
+                reference_id => 0,
+                category_id  => 0,
+                share_id     => 0,
+                description  => "Imported from NFS refresh: $rel",
+                upload_date  => $upload_date,
+                file_size    => $file_size,
+                file_path    => $full_path,
+                file_url     => '',
+                file_status  => 'active',
+                file_format  => $mime_type,
+                user_id      => $user_id,
+                nfs_path     => $rel,
+                external_url => '',
+                access_level => 'site_only',
+                source_type  => 'nfs',
+                sitename     => $resolved_sitename,
+                is_duplicate => 0,
+                duplicate_of => undef,
+            });
+        };
+        if ($@) {
+            $failed++;
+            $c->log->error("nfs_sync_all failed for '$rel': $@");
+        } else {
+            $added_files++;
+        }
+    }
+
+    $c->flash->{success_msg} = "NFS refresh complete. Added: $added_files, existing: $existing_files, failed: $failed.";
+    $c->response->redirect($c->uri_for($return_to));
 }
 
 __PACKAGE__->meta->make_immutable;

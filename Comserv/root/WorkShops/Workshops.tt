@@ -1,7 +1,7 @@
 [% META 
    title = "Workshops"
    description = "Workshop listing and management page"
-   roles = "admin,user"
+   roles = "public"
    TemplateType = "Application"
    category = "WorkShops"
    page_version = "0.06"
@@ -33,7 +33,7 @@
             
             <div class="form-actions">
                 <a href="/workshop/add" class="btn btn-primary">Add Workshop</a>
-                [% IF is_admin %]
+                [% IF can_access_dashboard %]
                 <a href="/workshop/dashboard" class="btn btn-secondary">My Dashboard</a>
                 [% END %]
             </div>
@@ -98,7 +98,7 @@
                                 <th>End Time</th>
                                 <th>Location</th>
                                 <th>Title</th>
-                                [% IF is_admin %]
+                                [% IF can_access_dashboard %]
                                 <th>Leader</th>
                                 [% END %]
                                 <th>Participants</th>
@@ -116,7 +116,7 @@
                                 <td>[% workshop.end_time %]</td>
                                 <td>[% workshop.location %]</td>
                                 <td>[% workshop.title %]</td>
-                                [% IF is_admin %]
+                                [% IF can_access_dashboard %]
                                 <td>
                                     [% IF workshop.creator && workshop.created_by %]
                                         <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
@@ -187,10 +187,12 @@
                                         </form>
                                         [% END %]
                                     [% END %]
-                                    [% IF c.session.roles.grep('admin').size %]
+                                    [% IF can_access_dashboard %]
                                     <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
                                         <button type="submit" class="btn btn-sm btn-edit">Edit</button>
                                     </form>
+                                    [% END %]
+                                    [% IF is_admin %]
                                     <form action="/workshop/delete" method="POST" style="display:inline;">
                                         <input type="hidden" name="id" value="[% workshop.id %]">
                                         <button type="submit" class="btn btn-sm btn-delete">Delete</button>
@@ -228,7 +230,7 @@
                                     <th>End Time</th>
                                     <th>Location</th>
                                     <th>Title</th>
-                                    [% IF is_admin %]
+                                    [% IF can_access_dashboard %]
                                     <th>Leader</th>
                                     [% END %]
                                     <th>Participants</th>
@@ -246,7 +248,7 @@
                                     <td>[% workshop.end_time %]</td>
                                     <td>[% workshop.location %]</td>
                                     <td>[% workshop.title %]</td>
-                                    [% IF is_admin %]
+                                    [% IF can_access_dashboard %]
                                     <td>
                                         [% IF workshop.creator && workshop.created_by %]
                                             <a href="/user/edit_user/[% workshop.created_by %]">[% workshop.creator.first_name %] [% workshop.creator.last_name %]</a>
@@ -297,7 +299,7 @@
                                             <input type="hidden" name="id" value="[% workshop.id %]">
                                             <button type="submit" class="btn btn-sm">Details</button>
                                         </form>
-                                        [% IF c.session.roles.grep('admin').size %]
+                                        [% IF can_access_dashboard %]
                                         <form method="GET" action="/workshop/edit/[% workshop.id %]" style="display:inline;">
                                             <button type="submit" class="btn btn-sm btn-edit">Edit</button>
                                         </form>

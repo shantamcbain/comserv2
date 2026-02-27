@@ -35,6 +35,10 @@
                 <a href="/workshop" class="btn btn-secondary">Back to Workshops</a>
                 <a href="/workshop/add" class="btn btn-primary">Create New Workshop</a>
                 <a href="/workshop/resources" class="btn btn-secondary">📁 Resource Library</a>
+                [% IF is_csc_admin %]
+                <a href="/workshop/dashboard?scope=all" class="btn [% dashboard_scope != 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: All Workshops</a>
+                <a href="/workshop/dashboard?scope=mine" class="btn [% dashboard_scope == 'mine' ? 'btn-primary' : 'btn-secondary' %]">CSC: Just Mine</a>
+                [% END %]
             </div>
             
             <div class="data-container">
