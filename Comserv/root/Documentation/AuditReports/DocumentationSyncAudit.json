@@ -1,0 +1,75 @@
+{
+   "audit_timestamp" : "2026-01-15T15:42:30Z",
+   "summary" : {
+      "ready_to_sync" : 1,
+      "docs_missing" : 3,
+      "total_code_changes" : 9,
+      "naming_mismatches_found" : "0",
+      "docs_needing_update" : 6
+   },
+   "files_changed" : 9,
+   "naming_mismatches" : null,
+   "git_range" : "HEAD~1..HEAD",
+   "documentation_files_needing_update" : [
+      {
+         "code_file" : "lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/models/ApiToken.tt",
+         "exists" : null,
+         "last_updated" : "Unknown",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/models/ApiToken.tt",
+         "version" : "0.01"
+      },
+      {
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "code_file" : "lib/Comserv/Controller/Api.pm",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Api.tt",
+         "version" : "0.01",
+         "last_updated" : "Unknown",
+         "exists" : null,
+         "documentation_file" : "/Documentation/controllers/Api.tt"
+      },
+      {
+         "version" : "0.01",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/utils/ApiTokenValidator.tt",
+         "last_updated" : "Unknown",
+         "exists" : null,
+         "documentation_file" : "/Documentation/utils/ApiTokenValidator.tt",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "action" : "CREATE - New documentation file needed (controller recently added). START PAGE VERSION AT 0.01",
+         "code_file" : "lib/Comserv/Util/ApiTokenValidator.pm"
+      },
+      {
+         "documentation_file" : "/Documentation/controllers/Root.tt",
+         "exists" : 1,
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Root.tt",
+         "version" : "0.03",
+         "last_updated" : "Sat Jan 11 2026",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "code_file" : "lib/Comserv/Controller/Root.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)"
+      },
+      {
+         "code_file" : "lib/Comserv/Controller/Admin/SchemaComparison.pm",
+         "action" : "UPDATE - Bump version from 0.03 to 0.04, add Recent Changes section",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "exists" : 1,
+         "documentation_file" : "/Documentation/controllers/SchemaComparison.tt",
+         "last_updated" : "Sat Jan 11 2026",
+         "version" : "0.03",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/SchemaComparison.tt"
+      },
+      {
+         "action" : "UPDATE - Bump version from 0.01 to 0.02, add Recent Changes section",
+         "code_file" : "lib/Comserv/Controller/Todo.pm",
+         "reason" : "Code changed in git diff (HEAD~1..HEAD)",
+         "documentation_file" : "/Documentation/controllers/Todo.tt",
+         "exists" : 1,
+         "version" : "0.01",
+         "full_path" : "/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/controllers/Todo.tt",
+         "last_updated" : "Unknown"
+      }
+   ]
+}

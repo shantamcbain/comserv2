@@ -9,6 +9,7 @@ use URI;
 use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::CSRF;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -185,6 +186,8 @@ sub get_server_ip :Private {
 # Auto method to set up common stash variables for all requests
 sub auto :Private {
     my ($self, $c) = @_;
+
+    Comserv::Util::CSRF::ensure_token($c);
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {

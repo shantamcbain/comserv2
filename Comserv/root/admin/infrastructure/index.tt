@@ -133,6 +133,40 @@
     cursor: not-allowed;
 }
 
+.container-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.container-card {
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+    background: #fafafa;
+}
+
+.container-card.up { border-left: 4px solid #4caf50; }
+.container-card.exit { border-left: 4px solid #f44336; }
+.container-card.restarting { border-left: 4px solid #ff9800; }
+
+.container-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.container-name { font-weight: bold; }
+.container-state { font-size: 0.8em; text-transform: uppercase; }
+
+.container-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.btn-xs { padding: 4px 8px; font-size: 0.8em; }
 .add-cluster-section {
     background: #f5f5f5;
     border: 1px solid #ddd;
@@ -279,6 +313,17 @@
     [% IF success_msg %]
     <div class="success-banner">
         <strong>✓ Success:</strong> [% success_msg %]
+    </div>
+    [% END %]
+    
+    [% # Show Docker management only in development environment %]
+    [% IF env == 'development' || !env %]
+    <div class="add-cluster-section">
+        <h2>Docker Container Management (Development Only)</h2>
+        <div id="docker-container-list" class="container-grid">
+            <p>Loading containers...</p>
+        </div>
+        <button class="btn btn-secondary" onclick="refreshContainers()">Refresh Containers</button>
     </div>
     [% END %]
     
@@ -476,8 +521,81 @@ function openKubectlConsole(clusterName) {
     });
 }
 
+function refreshContainers() {
+    const listDiv = document.getElementById('docker-container-list');
+    listDiv.innerHTML = '<p>Loading containers...</p>';
+    
+    fetch('/admin/docker/list')
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            if (result.containers.length === 0) {
+                listDiv.innerHTML = '<p>No containers found.</p>';
+                return;
+            }
+            
+            listDiv.innerHTML = '';
+            result.containers.forEach(container => {
+                const card = document.createElement('div');
+                card.className = `container-card ${container.state}`;
+                card.innerHTML = `
+                    <div class="container-header">
+                        <div class="container-name">${container.service}</div>
+                        <div class="container-state">${container.state}</div>
+                    </div>
+                    <div style="font-size: 0.85em; color: #666;">
+                        Image: ${container.image}<br>
+                        Status: ${container.status}
+                    </div>
+                    <div class="container-actions">
+                        <button class="btn btn-xs btn-primary" onclick="dockerAction('restart', '${container.service}')">Restart</button>
+                        <button class="btn btn-xs btn-success" onclick="dockerAction('start', '${container.service}')">Start</button>
+                        <button class="btn btn-xs btn-danger" onclick="dockerAction('stop', '${container.service}')">Stop</button>
+                        <button class="btn btn-xs btn-danger" onclick="dockerAction('down', '${container.service}')">Down</button>
+                        <button class="btn btn-xs btn-secondary" onclick="dockerAction('up', '${container.service}')">Up -d</button>
+                        <button class="btn btn-xs btn-secondary" onclick="dockerLogs('${container.service}')">Logs</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        } else {
+            listDiv.innerHTML = `<p style="color: #f44336;">Error: ${result.error || 'Failed to list containers'}</p>`;
+        }
+    })
+    .catch(error => {
+        listDiv.innerHTML = `<p style="color: #f44336;">Request failed: ${error}</p>`;
+    });
+}
+
+function dockerAction(action, service) {
+    if (!confirm(`Are you sure you want to ${action} ${service}?`)) return;
+    
+    fetch(`/admin/docker/${action}/${service}`, { method: 'POST' })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(`${service} ${action}ed successfully!`);
+            refreshContainers();
+        } else {
+            alert(`Error: ${result.stderr || 'Action failed'}`);
+        }
+    })
+    .catch(error => alert('Request failed: ' + error));
+}
+
+function dockerLogs(service) {
+    fetch(`/admin/docker/logs/${service}`)
+    .then(response => response.json())
+    .then(result => {
+        const logs = result.output || result.error || 'No logs found';
+        alert(`Logs for ${service}:\n\n${logs.substring(logs.length - 2000)}`);
+    })
+    .catch(error => alert('Request failed: ' + error));
+}
+
 // Auto-check cluster status on page load
 document.addEventListener('DOMContentLoaded', function() {
+    refreshContainers();
     document.querySelectorAll('[data-cluster]').forEach(function(card) {
         const clusterName = card.dataset.cluster;
         updateClusterStatus(clusterName);

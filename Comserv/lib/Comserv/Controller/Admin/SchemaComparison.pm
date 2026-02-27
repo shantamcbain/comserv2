@@ -987,12 +987,18 @@ sub get_result_field_info {
         die "Field '$field_name' not found in Result source '$source_name'";
     }
     
+    # Dereference scalar references for JSON serialization
+    my $default_value = $info->{default_value};
+    if (defined $default_value && ref($default_value) eq 'SCALAR') {
+        $default_value = $$default_value;
+    }
+    
     return {
         data_type => $info->{data_type},
         size => $info->{size},
         is_nullable => $info->{is_nullable} ? 1 : 0,
         is_auto_increment => $info->{is_auto_increment} ? 1 : 0,
-        default_value => $info->{default_value},
+        default_value => $default_value,
         enum_list => ($info->{extra} && $info->{extra}->{list}) ? $info->{extra}->{list} : undef
     };
 }
@@ -1100,7 +1106,17 @@ sub update_table_field_from_result {
     my $nullable = $result_field_info->{is_nullable} ? "NULL" : "NOT NULL";
     my $default = "";
     if (defined $result_field_info->{default_value}) {
-        $default = "DEFAULT '$result_field_info->{default_value}'";
+        my $def_val = $result_field_info->{default_value};
+        # If it's a scalar reference (like \'CURRENT_TIMESTAMP'), dereference it
+        if (ref($def_val) eq 'SCALAR') {
+            $def_val = $$def_val;
+        }
+        # Check if this is a SQL literal (CURRENT_TIMESTAMP, NOW(), etc) - these don't need quotes
+        if ($def_val =~ /^(CURRENT_TIMESTAMP|NOW\(\)|CURRENT_DATE|CURRENT_TIME|NULL)$/i) {
+            $default = "DEFAULT $def_val";
+        } else {
+            $default = "DEFAULT '$def_val'";
+        }
     }
     
     my $extra = "";
@@ -1611,9 +1627,12 @@ sub get_table_result_comparison_v2 {
             }
         }
         
+        # Clean scalar references from result field for JSON serialization
+        my $cleaned_result_field = $result_field ? $self->clean_scalar_refs($result_field) : undef;
+        
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
-            result => $result_field,
+            result => $cleaned_result_field,
             differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
         };
     }
@@ -1844,17 +1863,58 @@ sub get_result_file_schema {
 sub parse_result_file_columns {
     my ($self, $text) = @_;
     my $columns = {};
-    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
+    while ($text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,\s*$|\s*\))/g) {
         my ($name, $def) = ($1, $2);
         my $info = {};
         while ($def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
             my $attr = $1;
             my $val = $2 // $3 // $4 // $5;
-            $info->{$attr} = $val;
+            # If the value was captured from \'...' syntax, mark it as a scalar ref
+            if (defined $4) {
+                # This was \'SOMETHING', which is a scalar reference in Perl
+                # Store the actual string value
+                $info->{$attr} = $val;
+            } else {
+                $info->{$attr} = $val;
+            }
         }
         $columns->{$name} = $info;
     }
     return $columns;
+}
+
+=head2 clean_scalar_refs
+
+Recursively clean scalar references from data structures for JSON serialization
+
+=cut
+
+sub clean_scalar_refs {
+    my ($self, $data) = @_;
+    
+    return undef unless defined $data;
+    
+    # If it's a scalar reference, dereference it
+    if (ref($data) eq 'SCALAR') {
+        return $$data;
+    }
+    
+    # If it's a hash, recursively clean all values
+    if (ref($data) eq 'HASH') {
+        my $cleaned = {};
+        foreach my $key (keys %$data) {
+            $cleaned->{$key} = $self->clean_scalar_refs($data->{$key});
+        }
+        return $cleaned;
+    }
+    
+    # If it's an array, recursively clean all elements
+    if (ref($data) eq 'ARRAY') {
+        return [ map { $self->clean_scalar_refs($_) } @$data ];
+    }
+    
+    # Otherwise return as-is
+    return $data;
 }
 
 sub get_result_file_path {
