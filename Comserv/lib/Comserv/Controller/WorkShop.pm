@@ -2455,6 +2455,67 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     $c->response->redirect($c->uri_for('/workshop/resource_sync'));
 }
 
+sub file_view :Path('/workshop/file_view') :Args(1) {
+    my ($self, $c, $file_id) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(403);
+        $c->response->body('Not authenticated');
+        return;
+    }
+
+    my $file = eval { $c->model('DBEncy')->resultset('File')->find($file_id) };
+    unless ($file) {
+        $c->response->status(404);
+        $c->response->body('File not found');
+        return;
+    }
+
+    my $want_info = $c->req->param('info');
+
+    if ($want_info) {
+        my $kb = int(($file->file_size || 0) / 1024);
+        (my $safe_name = $file->file_name // '') =~ s/"/\\"/g;
+        (my $safe_desc = $file->description // '') =~ s/"/\\"/g;
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body('{"file_name":"' . $safe_name . '","file_type":"' . ($file->file_type // '') . '","file_ext":"' . ($file->file_format // '') . '","file_size_kb":' . $kb . ',"description":"' . $safe_desc . '","sitename":"' . ($file->sitename // '') . '"}');
+        return;
+    }
+
+    my $mime     = $file->file_type // 'application/octet-stream';
+    my $is_image = $mime =~ m{^image/};
+    my $is_pdf   = $mime eq 'application/pdf';
+    my $inline   = $is_image || $is_pdf;
+
+    if ($file->file_data) {
+        $c->response->content_type($mime);
+        $c->response->header('Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . ($file->file_name // 'file') . '"');
+        $c->response->body($file->file_data);
+        return;
+    }
+
+    my $path = $file->nfs_path || $file->file_path || '';
+    unless ($path && -f $path) {
+        $c->response->status(404);
+        $c->response->body('File not found on storage');
+        return;
+    }
+
+    eval {
+        open my $fh, '<:raw', $path or die "Cannot open: $!";
+        my $data = do { local $/; <$fh> };
+        close $fh;
+        $c->response->content_type($mime);
+        $c->response->header('Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . ($file->file_name // 'file') . '"');
+        $c->response->body($data);
+    };
+    if ($@) {
+        $c->log->error("file_view read error: $@");
+        $c->response->status(500);
+        $c->response->body('Could not read file');
+    }
+}
+
 sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
     my ($self, $c) = @_;
 
