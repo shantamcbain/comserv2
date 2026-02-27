@@ -1487,6 +1487,14 @@ my %MIME_MAP = (
     mp3  => 'audio/mpeg',
     zip  => 'application/zip',
     txt  => 'text/plain',
+    csv  => 'text/csv',
+    md   => 'text/plain',
+    log  => 'text/plain',
+    webm => 'video/webm',
+    ogv  => 'video/ogg',
+    oga  => 'audio/ogg',
+    flac => 'audio/flac',
+    m4a  => 'audio/mp4',
 );
 
 sub resources :Path('/workshop/resources') :Args(0) {
@@ -1955,55 +1963,76 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
         return $json_error->(404, $@ ? "DB error: $@" : 'Not found');
     }
 
-    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
-    my $is_image  = ($resource->file_type // '') =~ m{^image/};
+    my $full_path  = $self->_nfs_root() . '/' . ($resource->file_path // '');
+    my $mime       = $resource->file_type // '';
+    my $is_image   = $mime =~ m{^image/};
+    my $is_pdf     = $mime eq 'application/pdf';
+    my $is_video   = $mime =~ m{^video/};
+    my $is_audio   = $mime =~ m{^audio/};
+    my $is_text    = $mime =~ m{^text/};
+    my $want_info  = $c->req->param('info');
+    my $can_inline = $is_image || $is_pdf || $is_video || $is_audio || $is_text;
 
-    if ($is_image && -f $full_path) {
+    if (!$want_info && $can_inline && -f $full_path) {
+        my $inline = $is_image || $is_pdf || $is_video || $is_audio || $is_text;
         eval {
             open my $fh, '<:raw', $full_path or die "Cannot open: $!";
             my $data = do { local $/; <$fh> };
             close $fh;
-            $c->response->content_type($resource->file_type);
+            $c->response->content_type($mime);
+            $c->response->header('Content-Disposition' =>
+                ($inline ? 'inline' : 'attachment') . '; filename="' . ($resource->file_name // 'file') . '"');
             $c->response->body($data);
         };
         if ($@) {
-            $c->log->error("resource_view image error: $@");
-            return $json_error->(500, "Cannot read image: $@");
+            $c->log->error("resource_view serve error: $@");
+            return $json_error->(500, "Cannot read file: $@");
         }
-    } else {
-        eval {
-            my $size_kb = int(($resource->file_size || 0) / 1024);
-            my $uploader = $resource->uploader;
-            my $uploader_name = $uploader
-                ? (join(' ', grep { $_ } ($uploader->first_name, $uploader->last_name)) || $uploader->username)
-                : 'Unknown';
-            my %safe = (
-                file_name    => $resource->file_name    // '',
-                file_type    => $resource->file_type    // '',
-                file_ext     => $resource->file_ext     // '',
-                file_size_kb => $size_kb,
-                description  => $resource->description  // '',
-                sitename     => $resource->sitename     // '',
-                access_level => $resource->access_level // '',
-                uploaded_by  => $uploader_name,
-            );
-            for (values %safe) { s/"/\\"/g; s/\n/ /g }
-            $c->response->content_type('application/json; charset=utf-8');
-            $c->response->body(
-                '{"file_name":"'    . $safe{file_name}    . '",' .
-                '"file_type":"'     . $safe{file_type}    . '",' .
-                '"file_ext":"'      . $safe{file_ext}     . '",' .
-                '"file_size_kb":'   . $safe{file_size_kb} . ','  .
-                '"description":"'   . $safe{description}  . '",' .
-                '"sitename":"'      . $safe{sitename}     . '",' .
-                '"access_level":"'  . $safe{access_level} . '",' .
-                '"uploaded_by":"'   . $safe{uploaded_by}  . '"}'
-            );
-        };
-        if ($@) {
-            $c->log->error("resource_view metadata error: $@");
-            return $json_error->(500, "Error building metadata: $@");
+        return;
+    }
+
+    eval {
+        my $size_kb = int(($resource->file_size || 0) / 1024);
+        my $uploader = eval { $resource->uploader };
+        my $uploader_name = $uploader
+            ? (join(' ', grep { $_ } ($uploader->first_name // '', $uploader->last_name // '')) || $uploader->username // 'Unknown')
+            : 'Unknown';
+        my $preview = $is_image ? 'image'
+                    : $is_pdf   ? 'pdf'
+                    : $is_video ? 'video'
+                    : $is_audio ? 'audio'
+                    : $is_text  ? 'text'
+                    : 'none';
+        my %safe = (
+            file_name    => $resource->file_name    // '',
+            file_type    => $mime,
+            file_ext     => $resource->file_ext     // '',
+            file_size_kb => $size_kb,
+            description  => $resource->description  // '',
+            sitename     => $resource->sitename     // '',
+            access_level => $resource->access_level // '',
+            uploaded_by  => $uploader_name,
+            preview      => $preview,
+        );
+        for (grep { $_ ne 'file_size_kb' && $_ ne 'preview' } keys %safe) {
+            $safe{$_} =~ s/"/\\"/g; $safe{$_} =~ s/\n/ /g;
         }
+        $c->response->content_type('application/json; charset=utf-8');
+        $c->response->body(
+            '{"file_name":"'    . $safe{file_name}    . '",' .
+            '"file_type":"'     . $safe{file_type}    . '",' .
+            '"file_ext":"'      . $safe{file_ext}     . '",' .
+            '"file_size_kb":'   . $safe{file_size_kb} . ','  .
+            '"description":"'   . $safe{description}  . '",' .
+            '"sitename":"'      . $safe{sitename}     . '",' .
+            '"access_level":"'  . $safe{access_level} . '",' .
+            '"uploaded_by":"'   . $safe{uploaded_by}  . '",' .
+            '"preview":"'       . $safe{preview}      . '"}'
+        );
+    };
+    if ($@) {
+        $c->log->error("resource_view metadata error: $@");
+        return $json_error->(500, "Error building metadata: $@");
     }
 }
 
@@ -2474,18 +2503,28 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
     my $want_info = $c->req->param('info');
 
     if ($want_info) {
-        my $kb = int(($file->file_size || 0) / 1024);
-        (my $safe_name = $file->file_name // '') =~ s/"/\\"/g;
+        my $mime_i = $file->file_type // '';
+        my $kb     = int(($file->file_size || 0) / 1024);
+        my $preview = $mime_i =~ m{^image/}  ? 'image'
+                    : $mime_i eq 'application/pdf' ? 'pdf'
+                    : $mime_i =~ m{^video/}  ? 'video'
+                    : $mime_i =~ m{^audio/}  ? 'audio'
+                    : $mime_i =~ m{^text/}   ? 'text'
+                    : 'none';
+        (my $safe_name = $file->file_name   // '') =~ s/"/\\"/g;
         (my $safe_desc = $file->description // '') =~ s/"/\\"/g;
+        (my $safe_mime = $mime_i)                  =~ s/"/\\"/g;
         $c->response->content_type('application/json; charset=utf-8');
-        $c->response->body('{"file_name":"' . $safe_name . '","file_type":"' . ($file->file_type // '') . '","file_ext":"' . ($file->file_format // '') . '","file_size_kb":' . $kb . ',"description":"' . $safe_desc . '","sitename":"' . ($file->sitename // '') . '"}');
+        $c->response->body('{"file_name":"' . $safe_name . '","file_type":"' . $safe_mime . '","file_ext":"' . ($file->file_format // '') . '","file_size_kb":' . $kb . ',"description":"' . $safe_desc . '","sitename":"' . ($file->sitename // '') . '","preview":"' . $preview . '"}');
         return;
     }
 
     my $mime     = $file->file_type // 'application/octet-stream';
     my $is_image = $mime =~ m{^image/};
     my $is_pdf   = $mime eq 'application/pdf';
-    my $inline   = $is_image || $is_pdf;
+    my $is_text  = $mime =~ m{^text/};
+    my $is_av    = $mime =~ m{^(audio|video)/};
+    my $inline   = $is_image || $is_pdf || $is_text || $is_av;
 
     if ($file->file_data) {
         $c->response->content_type($mime);
