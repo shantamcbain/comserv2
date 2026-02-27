@@ -41,7 +41,7 @@
             </div>
             
             <div class="form-actions">
-                <a href="/workshop/add_participant?workshop_id=[% workshop.id %]" class="btn btn-primary">Manually Add Participant</a>
+                <a href="/workshop/add_participant/[% workshop.id %]" class="btn btn-primary">Manually Add Participant</a>
                 [% IF registered.size > 0 || waitlist.size > 0 %]
                 <a href="#" onclick="window.print(); return false;" class="btn btn-secondary">Print List</a>
                 [% END %]
@@ -82,9 +82,7 @@
                                     <span class="badge badge-success">Registered</span>
                                 </td>
                                 <td class="action-cell">
-                                    <form action="/workshop/remove_participant" method="POST" style="display:inline;">
-                                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
-                                        <input type="hidden" name="participant_id" value="[% participant.id %]">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
                                         <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
                                     </form>
                                 </td>
@@ -135,9 +133,7 @@
                                     <span class="badge badge-warning">Waitlist</span>
                                 </td>
                                 <td class="action-cell">
-                                    <form action="/workshop/remove_participant" method="POST" style="display:inline;">
-                                        <input type="hidden" name="workshop_id" value="[% workshop.id %]">
-                                        <input type="hidden" name="participant_id" value="[% participant.id %]">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
                                         <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
                                     </form>
                                 </td>
