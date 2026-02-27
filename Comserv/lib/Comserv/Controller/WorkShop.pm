@@ -1530,7 +1530,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
         }
         my @db_rows = $schema->resultset('WorkshopResource')->search(
             $filter,
-            { order_by => { -desc => 'created_at' }, prefetch => 'uploader' }
+            { order_by => { -desc => 'me.created_at' }, prefetch => 'uploader' }
         )->all;
         for my $row (@db_rows) {
             push @resources, {
@@ -2078,8 +2078,28 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
 
     my $schema   = $c->model('DBEncy');
     my $files_rs = $schema->resultset('File');
-    my $user_id  = $c->session->{user_id};
-    my $sitename = $c->session->{SiteName} // '';
+    my $user_id   = $c->session->{user_id};
+    my $sitename  = $c->session->{SiteName} // '';
+
+    # Allow admin to select which subdirectory to scan; default to apis/
+    my $sub_dir   = $c->req->param('scan_dir') // 'apis';
+    my $max_files = int($c->req->param('max_files') // 2000);
+    $max_files    = 10000 if $max_files > 10000;
+    $max_files    = 100   if $max_files < 100;
+
+    my $scan_root;
+    if ($sub_dir eq 'full') {
+        $scan_root = $nfs_root;
+    } else {
+        my $sub = "$nfs_root/$sub_dir";
+        $scan_root = -d $sub ? $sub : $nfs_root;
+    }
+
+    unless (-d $scan_root) {
+        $c->flash->{error_msg} = "Scan directory not available: $scan_root";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
 
     # Build lookup of existing nfs_path records to detect duplicates
     my %existing;
@@ -2093,30 +2113,36 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
         }
     };
 
-    my ($inserted, $skipped, $duplicates, $errors) = (0, 0, 0, 0);
+    my ($inserted, $skipped, $duplicates, $errors, $total_seen) = (0, 0, 0, 0, 0);
+    my $limit_hit = 0;
 
     my $scan;
     $scan = sub {
         my ($dir) = @_;
+        return if $limit_hit;
         return unless opendir(my $dh, $dir);
         while (my $entry = readdir($dh)) {
+            last if $limit_hit;
             next if $entry =~ /^\./;
             my $full = "$dir/$entry";
             if (-d $full) {
                 $scan->($full);
             } elsif (-f $full) {
+                $total_seen++;
+                if ($total_seen > $max_files) {
+                    $limit_hit = 1;
+                    last;
+                }
                 my ($ext) = ($entry =~ /\.([^.]+)$/);
                 $ext = lc($ext // '');
                 my $size = -s $full;
                 my $mime = $MIME_MAP{$ext} // 'application/octet-stream';
 
-                # Check if already in files table by nfs_path
                 if ($existing{$full}) {
                     $skipped++;
                     next;
                 }
 
-                # Check for duplicate by file_name + file_size (different path)
                 my $dup_check;
                 eval {
                     $dup_check = $files_rs->search(
@@ -2152,10 +2178,12 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
         closedir($dh);
     };
 
-    eval { $scan->($nfs_root) };
+    eval { $scan->($scan_root) };
     $c->log->error("NFS scan failed: $@") if $@;
 
-    $c->flash->{success_msg} = "NFS scan complete: $inserted new files added, $skipped already in DB, $duplicates flagged as duplicates, $errors errors.";
+    my $msg = "NFS scan of '$scan_root': $inserted new, $skipped already in DB, $duplicates duplicates, $errors errors.";
+    $msg   .= " (Limit of $max_files files reached — run again to continue.)" if $limit_hit;
+    $c->flash->{success_msg} = $msg;
     $c->response->redirect($c->uri_for('/workshop/resources'));
 }
 
