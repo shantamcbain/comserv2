@@ -16,9 +16,14 @@ sub get_active_workshops {
         my $admin_type = $admin_auth->get_admin_type($c);
         my $is_admin   = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
 
-        my $filter = { 'me.date' => { '>=' => DateTime->today->ymd } };
+        my $filter = {
+            -or => [
+                { 'me.date' => { '>=' => DateTime->today->ymd } },
+                { 'me.date' => undef },
+            ]
+        };
 
-        # Admins see all non-draft active workshops; everyone else sees only published
+        # Admins see all non-draft upcoming workshops; everyone else sees only published
         $filter->{'me.status'} = $is_admin ? { '!=' => 'draft' } : 'published';
 
         @workshops = $rs->search(
@@ -44,17 +49,10 @@ sub get_past_workshops {
     my @workshops;
     my $error;
     eval {
-        my $admin_auth = Comserv::Util::AdminAuth->new();
-        my $admin_type = $admin_auth->get_admin_type($c);
-        my $is_admin   = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
-
-        my $filter = { 'me.date' => { '<' => DateTime->today->ymd } };
-
-        # Admins see all non-draft past workshops; everyone else sees only published
-        $filter->{'me.status'} = $is_admin ? { '!=' => 'draft' } : 'published';
-
+        # Past workshops are always visible to everyone — they already happened.
+        # Status filtering is only relevant for upcoming workshops.
         @workshops = $rs->search(
-            $filter,
+            { 'me.date' => { '<' => DateTime->today->ymd } },
             { order_by => { -desc => 'me.date' }, prefetch => 'creator' }
         );
     };
