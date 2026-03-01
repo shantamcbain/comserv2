@@ -1,6 +1,8 @@
 package Comserv::Model::File;
 use Moose;
 use namespace::autoclean;
+use POSIX qw(strftime);
+use File::Path qw(make_path);
 
 extends 'Catalyst::Model';
 
@@ -30,11 +32,31 @@ sub get_files_info {
     closedir $dir;
 
     unless ($show_hidden) {
-        @entries = grep { !/^\./ } @entries;  # Exclude hidden files and directories
+        @entries = grep { !/^\./ } @entries;
     }
 
-    my @directories = grep {-d "$dir_path/$_" && ! /^\.{1,2}$/} @entries;
-    my @files = grep {-f "$dir_path/$_"} @entries;
+    my (@directories, @files);
+    for my $entry (@entries) {
+        next if $entry =~ /^\.{1,2}$/;
+        my $full = "$dir_path/$entry";
+        my @st   = stat($full);
+        my $mtime = $st[9] // 0;
+        my $size  = $st[7] // 0;
+        if (-d $full) {
+            push @directories, { name => $entry, mtime => $mtime };
+        } elsif (-f $full) {
+            my ($ext) = ($entry =~ /\.([^.]+)$/);
+            push @files, {
+                name  => $entry,
+                size  => $size,
+                mtime => $mtime,
+                ext   => lc($ext // ''),
+            };
+        }
+    }
+
+    @directories = sort { $a->{name} cmp $b->{name} } @directories;
+    @files       = sort { $a->{name} cmp $b->{name} } @files;
 
     return (\@directories, \@files);
 }
@@ -52,12 +74,11 @@ sub get_top_files {
     # Get a DBIx::Class::ResultSet object for the 'File' table
     my $rs = $schema->resultset('File');
 
-    # Fetch the top 10 file for the given site, ordered by some criteria
     my @file = $rs->search(
         { sitename => $SiteName },
-        { order_by => { -desc => ['some_criteria'] }, rows => 10 }
+        { order_by => { -desc => ['upload_date'] }, rows => 10 }
     );
-some_criteria
+
     $c->log->debug('Visited the file page');
     $c->log->debug("Number of file fetched: " . scalar(@file));
 
@@ -169,6 +190,286 @@ sub handle_upload {
 
     return $result ? "File uploaded successfully." : "Failed to upload file.";
 }
+sub get_files_filtered {
+    my ($self, $c, %filters) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+
+    my %where;
+    $where{sitename} = $sitename unless $is_csc;
+    $where{file_status}  = $filters{file_status}  if defined $filters{file_status}  && $filters{file_status}  ne '';
+    $where{file_type}    = $filters{file_type}    if defined $filters{file_type}    && $filters{file_type}    ne '';
+    $where{is_duplicate} = $filters{is_duplicate} if defined $filters{is_duplicate} && $filters{is_duplicate} ne '';
+    $where{sitename}     = $filters{sitename}     if $is_csc && defined $filters{sitename} && $filters{sitename} ne '';
+
+    my @files = $schema->resultset('File')->search(\%where, { order_by => { -desc => 'upload_date' } });
+    return \@files;
+}
+
+sub get_file_by_id {
+    my ($self, $c, $id) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+
+    my %where = (id => $id);
+    $where{sitename} = $sitename unless $is_csc;
+
+    return $schema->resultset('File')->find(\%where);
+}
+
+sub check_duplicate {
+    my ($self, $schema, $file_name, $file_size) = @_;
+    return $schema->resultset('File')->search(
+        { file_name => $file_name, file_size => $file_size, is_duplicate => 0 },
+        { rows => 1 }
+    )->first;
+}
+
+sub upload_and_record {
+    my ($self, $c, $upload, $nfs_dir_id) = @_;
+
+    my $schema = $c->model('DBEncy');
+
+    my ($nfs_path, $nfs_dir_sitename, $nfs_dir_site_id);
+    if ($nfs_dir_id =~ /^path:(.+)$/) {
+        $nfs_path = $1;
+        $nfs_dir_sitename = $c->session->{SiteName} // 'CSC';
+        $nfs_dir_site_id  = $c->session->{site_id}  // 0;
+        unless (-d $nfs_path) {
+            return (undef, "Directory '$nfs_path' does not exist on filesystem.");
+        }
+    } else {
+        my $nfs_dir;
+        eval { $nfs_dir = $schema->resultset('NfsDirectory')->find($nfs_dir_id) };
+        unless ($nfs_dir) {
+            return (undef, "NFS directory allocation #$nfs_dir_id not found.");
+        }
+        $nfs_path         = $nfs_dir->nfs_path;
+        $nfs_dir_sitename = $nfs_dir->sitename // ($c->session->{SiteName} // '');
+        $nfs_dir_site_id  = $nfs_dir->site_id  // ($c->session->{site_id}  // 0);
+        unless (-d $nfs_path) {
+            return (undef, "NFS directory '$nfs_path' does not exist on filesystem.");
+        }
+    }
+
+    my $filename  = $upload->filename;
+    $filename     =~ s{[/\\]}{}g;
+    my $file_size = $upload->size;
+    my $full_path = "$nfs_path/$filename";
+
+    unless ($upload->copy_to($full_path)) {
+        return (undef, "Failed to write file to '$full_path'.");
+    }
+
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+    my %mime_map = (
+        pdf  => 'application/pdf',
+        doc  => 'application/msword',
+        docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls  => 'application/vnd.ms-excel',
+        xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt  => 'application/vnd.ms-powerpoint',
+        pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        jpg  => 'image/jpeg',
+        jpeg => 'image/jpeg',
+        png  => 'image/png',
+        gif  => 'image/gif',
+        svg  => 'image/svg+xml',
+        mp4  => 'video/mp4',
+        mp3  => 'audio/mpeg',
+        zip  => 'application/zip',
+        txt  => 'text/plain',
+    );
+    my $mime_type   = $mime_map{$ext} || 'application/octet-stream';
+    my $upload_date = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $sitename    = $nfs_dir_sitename;
+    my $site_id     = $nfs_dir_site_id // 0;
+    my $user_id     = $c->session->{user_id} // 0;
+
+    my $existing = $self->check_duplicate($schema, $filename, $file_size);
+    my ($is_dup, $dup_of) = (0, undef);
+    if ($existing) {
+        $is_dup = 1;
+        $dup_of = $existing->id;
+    }
+
+    my $file_row;
+    eval {
+        $file_row = $schema->resultset('File')->create({
+            file_name    => $filename,
+            file_type    => $ext ? ".$ext" : 'unknown',
+            file_data    => '',
+            site_id      => $site_id,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => '',
+            upload_date  => $upload_date,
+            file_size    => $file_size,
+            file_path    => $full_path,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => $mime_type,
+            user_id      => $user_id,
+            nfs_path     => "$nfs_path/$filename",
+            external_url => '',
+            access_level => 'site_only',
+            source_type  => 'upload',
+            sitename     => $sitename,
+            is_duplicate => $is_dup,
+            duplicate_of => $dup_of,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        unlink $full_path;
+        return (undef, "Database record creation failed: $err");
+    }
+
+    return ($file_row, undef);
+}
+
+sub _file_fs_info {
+    my ($file) = @_;
+    my $path = '';
+    $path = $file->file_path if defined $file->file_path && length($file->file_path // '');
+    $path = $file->nfs_path  if !length($path) && defined $file->nfs_path && length($file->nfs_path // '');
+    return {
+        fs_path   => $path,
+        fs_exists => (length($path) && -f $path) ? 1 : 0,
+        fs_size   => (length($path) && -f $path) ? (-s $path) : undef,
+    };
+}
+
+sub get_duplicates {
+    my ($self, $c, %filters) = @_;
+    my $schema    = $c->model('DBEncy');
+    my $s_name    = $c->session->{SiteName} // '';
+    my $roles     = $c->session->{roles} || [];
+    my $is_admin  = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc    = $is_admin && lc($s_name) eq 'csc';
+
+    my %where = (is_duplicate => 1);
+    unless ($is_csc) {
+        $where{sitename} = $s_name;
+    }
+    $where{sitename}  = $filters{sitename}  if $is_csc && defined $filters{sitename}  && $filters{sitename}  ne '';
+    $where{file_type} = $filters{file_type} if defined $filters{file_type} && $filters{file_type} ne '';
+
+    my $sort_col = $filters{sort_by} || 'upload_date';
+    $sort_col = 'upload_date' unless $sort_col =~ /^(upload_date|file_name|file_size|sitename)$/;
+    my $sort_dir = $filters{sort_dir} || 'desc';
+    $sort_dir = $sort_dir eq 'asc' ? '-asc' : '-desc';
+
+    my @duplicates = $schema->resultset('File')->search(
+        \%where,
+        { order_by => { $sort_dir => $sort_col } }
+    )->all;
+
+    my @pairs;
+    for my $dup (@duplicates) {
+        my $original;
+        if ($dup->duplicate_of) {
+            $original = $schema->resultset('File')->find($dup->duplicate_of);
+        }
+        push @pairs, {
+            duplicate      => $dup,
+            original       => $original,
+            dup_fs         => _file_fs_info($dup),
+            orig_fs        => $original ? _file_fs_info($original) : { fs_path => '', fs_exists => 0, fs_size => undef },
+            same_path      => ($original && ($dup->file_path // '') eq ($original->file_path // '') && length($dup->file_path // '')) ? 1 : 0,
+            same_nfs       => ($original && ($dup->nfs_path  // '') eq ($original->nfs_path  // '') && length($dup->nfs_path  // '')) ? 1 : 0,
+        };
+    }
+
+    return \@pairs;
+}
+
+sub get_nfs_allocations {
+    my ($self, $c, $sitename) = @_;
+    my $schema = $c->model('DBEncy');
+    my %where = ();
+    $where{sitename} = $sitename if defined $sitename && $sitename ne '';
+    my @allocs = $schema->resultset('NfsDirectory')->search(
+        \%where,
+        { order_by => ['sitename', 'nfs_path'] }
+    )->all;
+    return \@allocs;
+}
+
+sub create_nfs_allocation {
+    my ($self, $c, %params) = @_;
+    my $schema = $c->model('DBEncy');
+    my $row;
+    eval {
+        $row = $schema->resultset('NfsDirectory')->create({
+            sitename    => $params{sitename},
+            site_id     => $params{site_id} || undef,
+            nfs_path    => $params{nfs_path},
+            description => $params{description} // '',
+            created_by  => $params{created_by} || undef,
+            is_active   => 1,
+        });
+    };
+    my $err = "$@" if $@;
+    return ($row, $err);
+}
+
+sub rename_file {
+    my ($self, $c, $id, $new_name) = @_;
+
+    my $file = $self->get_file_by_id($c, $id);
+    return "File #$id not found or access denied." unless $file;
+
+    my $old_name  = $file->file_name;
+    my $old_path  = $file->file_path // '';
+    my $nfs_path  = $file->nfs_path  // '';
+
+    my $new_path = $old_path;
+    if (length $old_path) {
+        require File::Basename;
+        my $dir = File::Basename::dirname($old_path);
+        $new_path = "$dir/$new_name";
+    }
+
+    my $new_nfs = $nfs_path;
+    if (length $nfs_path) {
+        require File::Basename;
+        my $nfs_dir = File::Basename::dirname($nfs_path);
+        $new_nfs = ($nfs_dir eq '.') ? $new_name : "$nfs_dir/$new_name";
+    }
+
+    if (length $old_path && -e $old_path) {
+        unless (rename $old_path, $new_path) {
+            return "Filesystem rename failed: $!";
+        }
+    }
+
+    eval {
+        $file->update({
+            file_name => $new_name,
+            file_path => $new_path,
+            nfs_path  => $new_nfs,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        if (length $old_path && -e $new_path) {
+            rename $new_path, $old_path;
+        }
+        return "Database update failed: $err";
+    }
+
+    return '';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

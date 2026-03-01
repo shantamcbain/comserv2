@@ -1,3 +1,5 @@
+[% PageVersion = 'Navigation/TopDropListWorkshop.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+
 [% PageVersion = 'Navigation/TopDropListMainWorkshop.tt,v 0.01 2026/02/27 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
@@ -6,8 +8,11 @@
 [% END %]
 
 <li class="horizontal-dropdown">
+    <a href="/workshop" class="dropbtn"><i class="icon-workshop"></i>Workshops</a>
     <a href="/workshop" class="dropbtn"><i class="icon-main"></i>WorkShops</a>
     <div class="dropdown-content">
+        <a href="/workshop" class="menu-item"><i class="icon-home"></i>Workshops Home</a>
+        <a href="/workshop/list" class="menu-item"><i class="icon-list"></i>All Workshops</a>
         <!-- Core Navigation -->
         <a href="/workshop" onclick="activateSite('Home')"><i class="icon-home"></i>Workshop Home</a>
         <a href="[% c.session.return_url %]"><i class="icon-back"></i>Go Back</a>
@@ -17,9 +22,11 @@
 
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
+        <a href="/workshop/dashboard" class="menu-item"><i class="icon-dashboard"></i>My Dashboard</a>
         <a href="/navigation/add_link"><i class="icon-add"></i>Add Link</a>
         [% END %]
 
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
         <div class="dropdown-divider"></div>
 
         <!-- Mail Services -->
@@ -43,8 +50,13 @@
 
         <!-- Shared Folders -->
         <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
             <span class="submenu-header"><i class="icon-folder"></i>Shared Folders</span>
             <div class="submenu">
+                <a href="/workshop/add" class="submenu-link"><i class="icon-add"></i>Add Workshop</a>
+                <a href="/workshop/resources" class="submenu-link"><i class="icon-resources"></i>Resources</a>
+                <a href="/file/list" class="submenu-link"><i class="icon-files"></i>File Management</a>
+                <a href="/file/duplicates" class="submenu-link"><i class="icon-duplicate"></i>Duplicate Files</a>
                 <a href="/Shares"><i class="icon-cloud"></i>File Shares</a>
                 <a href="/media"><i class="icon-image"></i>Media Server</a>
                 <a href="/" onclick="activateSite('BMaster')"><i class="icon-drive"></i>BMaster</a>
