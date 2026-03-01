@@ -209,6 +209,98 @@ sub check_duplicate {
     )->first;
 }
 
+sub upload_and_record {
+    my ($self, $c, $upload, $nfs_dir_id) = @_;
+
+    my $schema = $c->model('DBEncy');
+    my $nfs_dir = $schema->resultset('NfsDirectory')->find($nfs_dir_id);
+    unless ($nfs_dir) {
+        return (undef, "NFS directory allocation #$nfs_dir_id not found.");
+    }
+
+    my $nfs_path = $nfs_dir->nfs_path;
+    unless (-d $nfs_path) {
+        return (undef, "NFS directory '$nfs_path' does not exist on filesystem.");
+    }
+
+    my $filename  = $upload->filename;
+    $filename     =~ s{[/\\]}{}g;
+    my $file_size = $upload->size;
+    my $full_path = "$nfs_path/$filename";
+
+    unless ($upload->copy_to($full_path)) {
+        return (undef, "Failed to write file to '$full_path'.");
+    }
+
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+    my %mime_map = (
+        pdf  => 'application/pdf',
+        doc  => 'application/msword',
+        docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls  => 'application/vnd.ms-excel',
+        xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt  => 'application/vnd.ms-powerpoint',
+        pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        jpg  => 'image/jpeg',
+        jpeg => 'image/jpeg',
+        png  => 'image/png',
+        gif  => 'image/gif',
+        svg  => 'image/svg+xml',
+        mp4  => 'video/mp4',
+        mp3  => 'audio/mpeg',
+        zip  => 'application/zip',
+        txt  => 'text/plain',
+    );
+    my $mime_type   = $mime_map{$ext} || 'application/octet-stream';
+    my $upload_date = localtime->strftime('%Y-%m-%d %H:%M:%S');
+    my $sitename    = $nfs_dir->sitename;
+    my $site_id     = $nfs_dir->site_id // 0;
+    my $user_id     = $c->session->{user_id} // 0;
+
+    my $existing = $self->check_duplicate($schema, $filename, $file_size);
+    my ($is_dup, $dup_of) = (0, undef);
+    if ($existing) {
+        $is_dup = 1;
+        $dup_of = $existing->id;
+    }
+
+    my $file_row;
+    eval {
+        $file_row = $schema->resultset('File')->create({
+            file_name    => $filename,
+            file_type    => $ext ? ".$ext" : 'unknown',
+            file_data    => '',
+            site_id      => $site_id,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => '',
+            upload_date  => $upload_date,
+            file_size    => $file_size,
+            file_path    => $full_path,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => $mime_type,
+            user_id      => $user_id,
+            nfs_path     => "$nfs_path/$filename",
+            external_url => '',
+            access_level => 'site_only',
+            source_type  => 'upload',
+            sitename     => $sitename,
+            is_duplicate => $is_dup,
+            duplicate_of => $dup_of,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        unlink $full_path;
+        return (undef, "Database record creation failed: $err");
+    }
+
+    return ($file_row, undef);
+}
+
 sub rename_file {
     my ($self, $c, $id, $new_name) = @_;
 
