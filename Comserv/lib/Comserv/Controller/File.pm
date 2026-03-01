@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use File::Find;
 use File::Basename qw(basename dirname);
+use File::Path qw(make_path);
 use Time::Piece;
 use URI::Escape;
 use Comserv::Util::Logging;
@@ -1713,6 +1714,79 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     }
 
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+}
+
+sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->body('{"error":"Access denied"}');
+        return;
+    }
+
+    my $target_dir = $c->req->param('target_dir') // '';
+    my $rel_path   = $c->req->param('rel_path')   // '';
+    my $upload     = $c->req->upload('file');
+
+    $target_dir =~ s{\.\.}{}g;
+    $rel_path   =~ s{\.\.}{}g;
+    $rel_path   =~ s{^/+}{};
+
+    my $allowed = 0;
+    if ($is_csc) {
+        $allowed = (-d $target_dir) ? 1 : 0;
+    } else {
+        my $schema = $c->model('DBEncy');
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
+            for my $a (@allocs) {
+                if (CORE::index($target_dir, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+    }
+
+    unless ($allowed && $upload) {
+        $c->response->body('{"error":"Access denied or no file provided"}');
+        return;
+    }
+
+    require File::Basename;
+    my $dest_path;
+    if (length $rel_path) {
+        my $sub_dir  = File::Basename::dirname($rel_path);
+        my $full_sub = "$target_dir/$sub_dir";
+        $full_sub    =~ s{/\./}{/}g;
+        unless (-d $full_sub) {
+            eval { make_path($full_sub) };
+            if ($@) {
+                my $e = "$@"; $e =~ s/"/\\"/g;
+                $c->response->body("{\"error\":\"Cannot create directory: $e\"}");
+                return;
+            }
+        }
+        my $bn = File::Basename::basename($rel_path);
+        $bn    =~ s{[/\\]}{}g;
+        $dest_path = "$full_sub/$bn";
+    } else {
+        my $fn = $upload->filename;
+        $fn    =~ s{[/\\]}{}g;
+        $dest_path = "$target_dir/$fn";
+    }
+
+    unless ($upload->copy_to($dest_path)) {
+        $c->response->body('{"error":"Failed to write file to disk"}');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_upload_tree',
+        "Uploaded file to $dest_path rel=$rel_path");
+
+    my $escaped = $dest_path;
+    $escaped =~ s/"/\\"/g;
+    $c->response->body("{\"ok\":1,\"path\":\"$escaped\"}");
 }
 
 __PACKAGE__->meta->make_immutable;
