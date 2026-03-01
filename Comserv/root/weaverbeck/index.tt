@@ -11,6 +11,7 @@
     <hr class="my-4">
     <p>Explore our site to learn more about our services and how we can help you achieve your goals.</p>
     <a class="btn btn-primary btn-lg" href="[% c.uri_for('/weaverbeck/about') %]" role="button">Learn More</a>
+    <a class="btn btn-outline-primary btn-lg" href="[% c.uri_for('/workshop') %]" role="button">Workshops</a>
   </div>
   
   <div class="row mt-5">

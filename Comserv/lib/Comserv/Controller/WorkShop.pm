@@ -105,6 +105,10 @@ sub index :Path :Args(0) {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
 
+    my $roles = $c->session->{roles} || [];
+    my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+    my $can_access_dashboard = $is_admin || $has_workshop_leader_role ? 1 : 0;
+
     $c->stash(
         workshops => \@workshops_hash,
         past_workshops => \@past_workshops_hash,
@@ -112,6 +116,7 @@ sub index :Path :Args(0) {
         past_error => $past_error,
         sitename => $c->session->{SiteName},
         is_admin => $is_admin,
+        can_access_dashboard => $can_access_dashboard,
         template => 'WorkShops/Workshops.tt',
     );
     if ($@) {
@@ -140,7 +145,6 @@ sub dashboard :Local {
     my $user_id = $c->session->{user_id};
     my $sitename = $c->session->{SiteName};
     my $schema = $c->model('DBEncy');
-
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
 
@@ -481,12 +485,15 @@ sub details :Path('/workshop/details') :Args(0) {
         { order_by => { -asc => 'sort_order' } }
     )->all;
 
-    # Pass the workshop to the view
+    my $admin_auth_d = Comserv::Util::AdminAuth->new();
+    my $is_admin_d = $admin_auth_d->check_admin_access($c, 'workshop_details');
+
     $c->stash(
         workshop => $workshop,
         formatted_date => $formatted_date,
         is_user_registered => $is_user_registered,
         is_workshop_leader => $is_workshop_leader,
+        is_admin => $is_admin_d,
         workshop_files => \@workshop_files,
         workshop_content => \@workshop_content,
         template => 'WorkShops/Details.tt',
@@ -1401,7 +1408,7 @@ sub download :Local :Args(1) {
     my $user_id = $c->session->{user_id};
     unless ($user_id) {
         $c->flash->{error_msg} = 'Please log in to download workshop files.';
-        $c->response->redirect($c->uri_for('/login'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1472,7 +1479,7 @@ sub download :Local :Args(1) {
 }
 
 sub _nfs_root {
-    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
     return $configured if -d $configured;
 
     # Fallback for dev environments where NFS is not mounted:
@@ -1493,6 +1500,25 @@ sub _nfs_root {
     }
 
     return $configured;  # Return configured path even if not mounted
+}
+
+sub _site_scoped_nfs_root {
+    my ($self, $c) = @_;
+    my $root = $self->_nfs_root();
+    return $root unless $c;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    return $root if $admin_type eq 'csc' || $admin_type eq 'special';
+
+    my $sitename = $c->session->{SiteName} // '';
+    if (lc($sitename) eq 'bmaster' && -d "$root/apis") {
+        return "$root/apis";
+    }
+    if ($sitename && -d "$root/$sitename") {
+        return "$root/$sitename";
+    }
+    return $root;
 }
 
 sub _can_manage_resource {
@@ -1545,12 +1571,69 @@ my %MIME_MAP = (
     m4a  => 'audio/mp4',
 );
 
+sub _normalized_mime {
+    my ($self, $mime, $ext) = @_;
+    $mime = lc($mime // '');
+    return $mime if $mime =~ m{^[a-z0-9.+-]+/[a-z0-9.+-]+$};
+
+    $ext = lc($ext // '');
+    $ext =~ s/^\.//;
+    return $MIME_MAP{$ext} // 'application/octet-stream';
+}
+
+sub _resolve_storage_path {
+    my ($self, $c, $stored_path) = @_;
+    return '' unless defined $stored_path;
+
+    my $path = $stored_path;
+    $path =~ s{\\}{/}g;
+    $path =~ s{^\s+|\s+$}{}g;
+    return '' unless length $path;
+
+    my $global_root = $self->_nfs_root();
+    my $scoped_root = $self->_site_scoped_nfs_root($c);
+
+    if ($path =~ m{^/}) {
+        return $path if -f $path;
+
+        my @roots = grep { defined $_ && length $_ } ($scoped_root, $global_root);
+        my @host_prefixes = grep { defined $_ && length $_ } (
+            $ENV{WORKSHOP_HOST_NFS_PATH},
+            '/home/shanta/nfs',
+            '/data/nfs',
+        );
+
+        for my $prefix (@host_prefixes) {
+            my $p = $prefix;
+            $p =~ s{/*$}{};
+            next unless $path eq $p || CORE::index($path, "$p/") == 0;
+            my $suffix = substr($path, length($p));
+            $suffix =~ s{^/}{};
+            for my $root (@roots) {
+                my $candidate = "$root/$suffix";
+                return $candidate if -f $candidate;
+            }
+        }
+        return '';
+    }
+
+    return '' if $path =~ m{(?:^|/)\.\.(?:/|$)};
+
+    my $scoped_candidate = "$scoped_root/$path";
+    return $scoped_candidate if -f $scoped_candidate;
+
+    my $global_candidate = "$global_root/$path";
+    return $global_candidate if -f $global_candidate;
+
+    return '';
+}
+
 sub resources :Path('/workshop/resources') :Args(0) {
     my ($self, $c) = @_;
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to access the resource library.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1570,6 +1653,14 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $nfs_available = -d $nfs_root;
 
     my $schema = $c->model('DBEncy');
+    my $res_filter = lc($c->req->param('res_filter') // 'all');
+    my $res_search = lc($c->req->param('res_search') // '');
+    my $lib_filter = lc($c->req->param('lib_filter') // 'all');
+    my $open_panel = lc($c->req->param('open_panel') // '');
+    my $show_archived = $c->req->param('show_archived') ? 1 : 0;
+    my %allowed_filter = map { $_ => 1 } qw(all image office pdf video audio text other link backup);
+    $res_filter = 'all' unless $allowed_filter{$res_filter};
+    $lib_filter = 'all' unless $allowed_filter{$lib_filter};
 
     # --- Workshop resources (attached to workshops) ---
     my @resources;
@@ -1587,15 +1678,21 @@ sub resources :Path('/workshop/resources') :Args(0) {
         }
         my @db_rows = $schema->resultset('WorkshopResource')->search(
             $filter,
-            { order_by => { -desc => 'me.created_at' }, prefetch => 'uploader' }
+            { order_by => { -asc => 'me.file_name' }, prefetch => 'uploader' }
         )->all;
         for my $row (@db_rows) {
+            my $ext = lc($row->file_ext // '');
+            if (!$ext) {
+                my $nameish = $row->file_name // $row->file_path // '';
+                ($ext) = ($nameish =~ /\.([^.\/\\]+)$/);
+                $ext = lc($ext // '');
+            }
             push @resources, {
                 id           => $row->id,
                 file_id      => $row->file_id,
                 file_name    => $row->file_name,
                 file_path    => $row->file_path // '',
-                file_ext     => $row->file_ext // '',
+                file_ext     => $ext,
                 file_size    => $row->file_size // 0,
                 file_type    => $row->file_type // '',
                 description  => $row->description // '',
@@ -1614,12 +1711,56 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $db_error = $@;
         $c->log->error("Resource library DB error: $db_error");
     }
+    my $matches_filter = sub {
+        my ($row, $filter_name, $search_text) = @_;
+        $filter_name ||= 'all';
+        $search_text ||= '';
+
+        my $ext = lc($row->{file_ext} // '');
+        my $blob = lc(join(' ',
+            $row->{file_name} // '',
+            $row->{description} // '',
+            $row->{file_path} // '',
+            $row->{nfs_path} // '',
+            $row->{sitename} // '',
+        ));
+        return 0 if $search_text ne '' && CORE::index($blob, $search_text) < 0;
+
+        my $is_link  = ($row->{external_url} // '') ne '' ? 1 : 0;
+        my $is_image = $ext =~ /^(?:jpg|jpeg|png|gif|svg|webp)$/ ? 1 : 0;
+        my $is_office = $ext =~ /^(?:ppt|pptx|doc|docx|xls|xlsx|odt|odp|ods)$/ ? 1 : 0;
+        my $is_pdf   = $ext eq 'pdf' ? 1 : 0;
+        my $is_video = $ext =~ /^(?:mp4|mov|avi|webm)$/ ? 1 : 0;
+        my $is_audio = $ext =~ /^(?:mp3|wav|ogg|flac|m4a)$/ ? 1 : 0;
+        my $is_text  = $ext =~ /^(?:txt|csv|md|log|json|xml|yaml|yml)$/ ? 1 : 0;
+        my $is_backup = CORE::index($blob, 'backup') >= 0 ? 1 : 0;
+        my $is_other = (!$is_link && !$is_image && !$is_office && !$is_pdf && !$is_video && !$is_audio && !$is_text) ? 1 : 0;
+
+        return 1 if $filter_name eq 'all';
+        return $is_link if $filter_name eq 'link';
+        return $is_image if $filter_name eq 'image';
+        return $is_office if $filter_name eq 'office';
+        return $is_pdf if $filter_name eq 'pdf';
+        return $is_video if $filter_name eq 'video';
+        return $is_audio if $filter_name eq 'audio';
+        return $is_text if $filter_name eq 'text';
+        return $is_backup if $filter_name eq 'backup';
+        return $is_other if $filter_name eq 'other';
+        return 1;
+    };
+    if ($res_filter ne 'all' || $res_search ne '') {
+        @resources = grep { $matches_filter->($_, $res_filter, $res_search) } @resources;
+    }
 
     # --- File library (files table) with pagination + search ---
     my $lib_search = $c->req->param('lib_search') // '';
     my $lib_page   = int($c->req->param('lib_page') // 1);
     $lib_page = 1 if $lib_page < 1;
     my $lib_per_page = 40;
+    if ($lib_filter ne 'all') {
+        $lib_page = 1;
+        $lib_per_page = 5000;
+    }
 
     my @file_library;
     my ($file_count, $file_pages, $lib_error) = (0, 0, undef);
@@ -1634,19 +1775,28 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 ]
             };
         }
+        my @and_terms;
+        unless ($show_archived) {
+            push @and_terms, { -or => [ { 'me.file_status' => { '!=' => 'archived' } }, { 'me.file_status' => undef } ] };
+        }
         if ($lib_search) {
             my $like = "%$lib_search%";
-            $file_filter = {
-                %$file_filter,
-                -and => [
-                    -or => [
-                        { 'me.file_name'   => { like => $like } },
-                        { 'me.description' => { like => $like } },
-                        { 'me.file_format' => { like => $like } },
-                        { 'me.nfs_path'    => { like => $like } },
-                    ]
+            push @and_terms, {
+                -or => [
+                    { 'me.file_name'   => { like => $like } },
+                    { 'me.description' => { like => $like } },
+                    { 'me.file_format' => { like => $like } },
+                    { 'me.nfs_path'    => { like => $like } },
                 ]
             };
+        }
+        if (@and_terms) {
+            my @existing = ();
+            if (exists $file_filter->{-and}) {
+                my $existing = $file_filter->{-and};
+                @existing = ref($existing) eq 'ARRAY' ? @$existing : ($existing);
+            }
+            $file_filter = { %$file_filter, -and => [ @existing, @and_terms ] };
         }
         my $files_rs = $schema->resultset('File');
         $file_count  = $files_rs->search($file_filter)->count;
@@ -1656,16 +1806,21 @@ sub resources :Path('/workshop/resources') :Args(0) {
         my @rows = $files_rs->search(
             $file_filter,
             {
-                order_by => { -desc => 'me.upload_date' },
+                order_by => { -asc => 'me.file_name' },
                 rows     => $lib_per_page,
                 offset   => ($lib_page - 1) * $lib_per_page,
                 columns  => [qw(id file_name file_format file_size nfs_path file_path external_url
-                                access_level sitename description file_type upload_date file_status)],
+                                access_level sitename description file_type upload_date file_status workshop_id user_id)],
             }
         )->all;
 
         for my $f (@rows) {
             my $ext  = lc($f->file_format // '');
+            if (!$ext) {
+                my $nameish = $f->file_name // $f->nfs_path // $f->file_path // '';
+                ($ext) = ($nameish =~ /\.([^.\/\\]+)$/);
+                $ext = lc($ext // '');
+            }
             my $size = $f->file_size // 0;
             push @file_library, {
                 id           => $f->id,
@@ -1678,6 +1833,10 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 access_level => $f->access_level // 'site_only',
                 sitename     => $f->sitename // '',
                 description  => $f->description // '',
+                file_status  => $f->file_status // 'active',
+                workshop_id  => $f->workshop_id,
+                duplicate_count => 0,
+                duplicate_path_count => 0,
             };
         }
     };
@@ -1685,6 +1844,38 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $lib_error = $@;
         $c->log->error("File library DB error: $lib_error");
     }
+    if ($lib_filter ne 'all') {
+        @file_library = grep { $matches_filter->($_, $lib_filter, '') } @file_library;
+        $file_count = scalar @file_library;
+        $file_pages = int(($file_count + $lib_per_page - 1) / $lib_per_page) || 1;
+    }
+
+    my (%res_name_counts, %file_name_counts, %file_path_counts);
+    for my $r (@resources) {
+        my $k = lc($r->{file_name} // '');
+        next unless $k ne '';
+        $res_name_counts{$k}++;
+    }
+    for my $f (@file_library) {
+        my $nk = lc($f->{file_name} // '');
+        $file_name_counts{$nk}++ if $nk ne '';
+        my $pk = lc($f->{nfs_path} // '');
+        $file_path_counts{$pk}++ if $pk ne '';
+    }
+    for my $r (@resources) {
+        my $k = lc($r->{file_name} // '');
+        my $count = $k ne '' ? ($res_name_counts{$k} // 0) : 0;
+        $r->{duplicate_count} = $count;
+    }
+    for my $f (@file_library) {
+        my $nk = lc($f->{file_name} // '');
+        my $pk = lc($f->{nfs_path} // '');
+        $f->{duplicate_count} = $nk ne '' ? ($file_name_counts{$nk} // 0) : 0;
+        $f->{duplicate_path_count} = $pk ne '' ? ($file_path_counts{$pk} // 0) : 0;
+    }
+
+    my $open_resources = ($open_panel eq 'resources' || $res_filter ne 'all' || $res_search ne '') ? 1 : 0;
+    my $open_library   = ($open_panel eq 'files' || $lib_filter ne 'all' || $lib_search ne '') ? 1 : 0;
 
     # --- Workshops list for "Attach to Workshop" dropdown ---
     my @workshops;
@@ -1703,6 +1894,12 @@ sub resources :Path('/workshop/resources') :Args(0) {
         lib_page      => $lib_page,
         lib_per_page  => $lib_per_page,
         lib_search    => $lib_search,
+        lib_filter    => $lib_filter,
+        res_filter    => $res_filter,
+        res_search    => $res_search,
+        open_resources => $open_resources,
+        open_library   => $open_library,
+        show_archived  => $show_archived,
         lib_error     => $lib_error,
         workshops     => \@workshops,
         is_csc        => $is_csc,
@@ -1736,7 +1933,7 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         return;
     }
 
-    my $nfs_root = $self->_nfs_root();
+    my $nfs_root = $self->_site_scoped_nfs_root($c);
     unless (-d $nfs_root) {
         $c->stash(json => { error => 'NFS not available', nfs_available => 0, files => [] });
         $c->forward('View::JSON');
@@ -1744,11 +1941,17 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
     }
 
     my @files;
+    my $max_files = int($c->req->param('max_files') // 3000);
+    $max_files = 100 if $max_files < 100;
+    $max_files = 20000 if $max_files > 20000;
+    my $limit_hit = 0;
     my $scan;
     $scan = sub {
         my ($dir, $rel_prefix) = @_;
+        return if $limit_hit;
         return unless opendir(my $dh, $dir);
         while (my $entry = readdir($dh)) {
+            last if $limit_hit;
             next if $entry =~ /^\./;
             my $full = "$dir/$entry";
             my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
@@ -1763,6 +1966,10 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
                     file_ext  => $ext,
                     file_size => (-s $full) + 0,
                 };
+                if (@files >= $max_files) {
+                    $limit_hit = 1;
+                    last;
+                }
             }
         }
         closedir($dh);
@@ -1777,6 +1984,8 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         nfs_available => 1,
         nfs_root      => $nfs_root,
         count         => scalar(@files),
+        max_files     => $max_files,
+        truncated     => $limit_hit ? 1 : 0,
         error         => $@ ? "$@" : undef,
     });
     $c->forward('View::JSON');
@@ -1787,7 +1996,7 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to upload files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1882,7 +2091,7 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1948,7 +2157,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     my $user_id = $c->session->{user_id};
     unless ($user_id) {
         $c->flash->{error_msg} = 'Please log in to download workshop files.';
-        $c->response->redirect($c->uri_for('/login'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2000,9 +2209,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     }
 
     # Serve the file
-    my $full_path = ($resource->file_path // '') =~ m{^/}
-        ? $resource->file_path
-        : $self->_nfs_root() . '/' . ($resource->file_path // '');
+    my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
 
     if ($resource->external_url) {
         $c->response->redirect($resource->external_url);
@@ -2028,7 +2235,8 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
         return;
     }
 
-    my $content_type = $resource->file_type || 'application/octet-stream';
+    my ($ext) = (($resource->file_name // '') =~ /\.([^.]+)$/);
+    my $content_type = $self->_normalized_mime($resource->file_type, $ext);
     $c->response->content_type($content_type);
     $c->response->header('Content-Disposition' => 'attachment; filename="' . ($resource->file_name // 'file') . '"');
     $c->response->body($data);
@@ -2055,8 +2263,9 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
         return $json_error->(404, $@ ? "DB error: $@" : 'Not found');
     }
 
-    my $full_path  = $self->_nfs_root() . '/' . ($resource->file_path // '');
-    my $mime       = $resource->file_type // '';
+    my $full_path  = $self->_resolve_storage_path($c, $resource->file_path // '');
+    my ($ext) = (($resource->file_name // '') =~ /\.([^.]+)$/);
+    my $mime       = $self->_normalized_mime($resource->file_type, $ext);
     my $is_image   = $mime =~ m{^image/};
     my $is_pdf     = $mime eq 'application/pdf';
     my $is_video   = $mime =~ m{^video/};
@@ -2133,7 +2342,7 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to delete files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2151,7 +2360,7 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
         return;
     }
 
-    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
     if (-f $full_path) {
         unlink($full_path) or $c->log->warn("Could not delete NFS file '$full_path': $!");
     }
@@ -2173,7 +2382,7 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to download files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2183,20 +2392,17 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
         return;
     }
 
-    my $rel_path = $c->req->param('path') // '';
-    $rel_path =~ s{\.\.}{}g;  # strip path traversal
-    $rel_path =~ s{^/+}{};
-
-    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    my $stored_path = $c->req->param('path') // '';
+    my $full_path = $self->_resolve_storage_path($c, $stored_path);
     unless (-f $full_path) {
         $c->flash->{error_msg} = 'File not found on storage.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
 
-    my ($filename) = ($rel_path =~ m{([^/]+)$});
+    my ($filename) = ($full_path =~ m{([^/]+)$});
     my ($ext) = ($filename =~ /\.([^.]+)$/);
-    my $content_type = $MIME_MAP{ lc($ext // '') } // 'application/octet-stream';
+    my $content_type = $self->_normalized_mime('', $ext);
 
     my $data;
     eval {
@@ -2221,7 +2427,7 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2395,7 +2601,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     my $sitename  = $c->session->{SiteName} // '';
 
     # Parameters — accept from both the old inline form and the new Sync.tt form
-    my $sub_dir      = $c->req->param('scan_dir')      // 'apis';
+    my $sub_dir      = $c->req->param('scan_dir')      // 'full';
     my $max_files    = int($c->req->param('max_files') // 2000);
     my $target_table = $c->req->param('target_table')  // 'files';
     my $ext_filter   = $c->req->param('ext_filter')    // '';
@@ -2495,6 +2701,16 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                     $cat_desc = $dir_part // '';
                 }
 
+                # If sitename is not provided, infer it from top-level NFS directory.
+                # This supports a root layout where each directory name matches SiteName.
+                my $sitename_for_file = $form_sitename;
+                if (!defined $sitename_for_file || $sitename_for_file eq '') {
+                    my $relative = $full;
+                    $relative =~ s{^\Q$nfs_root\E/?}{};
+                    my ($top) = split('/', $relative, 2);
+                    $sitename_for_file = $top || $sitename || 'CSC';
+                }
+
                 if ($target_table eq 'files' || $target_table eq 'both') {
                     if ($existing_files{$full}) {
                         $skipped++;
@@ -2516,7 +2732,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                                 file_format  => $ext,
                                 file_size    => $size,
                                 source_type  => 'nfs',
-                                sitename     => $form_sitename,
+                                sitename     => $sitename_for_file,
                                 access_level => $access_level,
                                 user_id      => $user_id,
                                 workshop_id  => $workshop_id,
@@ -2547,7 +2763,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                             file_ext     => $ext,
                             file_type    => $mime,
                             file_size    => $size,
-                            sitename     => $form_sitename,
+                            sitename     => $sitename_for_file,
                             access_level => $access_level,
                             uploaded_by  => $user_id,
                             workshop_id  => $workshop_id,
@@ -2611,7 +2827,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         return;
     }
 
-    my $mime     = $file->file_type // 'application/octet-stream';
+    my $mime     = $self->_normalized_mime($file->file_type, $file->file_format);
     my $is_image = $mime =~ m{^image/};
     my $is_pdf   = $mime eq 'application/pdf';
     my $is_text  = $mime =~ m{^text/};
@@ -2625,7 +2841,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         return;
     }
 
-    my $path = $file->nfs_path || $file->file_path || '';
+    my $path = $self->_resolve_storage_path($c, ($file->nfs_path || $file->file_path || ''));
     unless ($path && -f $path) {
         $c->response->status(404);
         $c->response->body('File not found on storage');
@@ -2725,6 +2941,144 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
     } else {
         my $ws_label = ($workshop_id && $workshop_id =~ /^\d+$/) ? " to workshop #$workshop_id" : '';
         $c->flash->{success_msg} = "File '" . $file->file_name . "' attached$ws_label successfully.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
+sub file_update :Path('/workshop/file_update') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $file_id = $c->req->param('file_id');
+    unless ($file_id && $file_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid file ID.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $file = eval { $schema->resultset('File')->find($file_id) };
+    unless ($file) {
+        $c->flash->{error_msg} = 'File record not found.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $is_site_admin = ($admin_type eq 'standard' && ($c->session->{SiteName} // '') eq ($file->sitename // ''));
+    my $is_owner = (($file->user_id // 0) == ($c->session->{user_id} // -1));
+    unless ($is_csc_admin || $is_site_admin || $is_owner) {
+        $c->flash->{error_msg} = 'Access denied for editing this file.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $new_name = $c->req->param('file_name');
+    $new_name = $file->file_name unless defined $new_name;
+    $new_name =~ s/^\s+|\s+$//g;
+    $new_name =~ s{[/\\]}{}g;
+    $new_name = $file->file_name unless length $new_name;
+
+    my $description = $c->req->param('description');
+    $description = '' unless defined $description;
+    $description =~ s/^\s+|\s+$//g;
+
+    my $access_level = $c->req->param('access_level') // ($file->access_level // 'site_only');
+    my %allowed_access = map { $_ => 1 } qw(site_only all_leaders workshop_specific);
+    $access_level = 'site_only' unless $allowed_access{$access_level};
+
+    my $sitename = $c->req->param('sitename');
+    $sitename = $file->sitename unless defined $sitename;
+    $sitename =~ s/^\s+|\s+$//g;
+    $sitename = $file->sitename unless length $sitename;
+    $sitename = $file->sitename unless $is_csc_admin || $is_site_admin;
+
+    my $file_status = $c->req->param('file_status') // ($file->file_status // 'active');
+    my %allowed_status = map { $_ => 1 } qw(active pending archived);
+    $file_status = 'active' unless $allowed_status{$file_status};
+
+    my $workshop_action = $c->req->param('workshop_action') // 'keep';
+    $workshop_action = 'keep' unless $workshop_action =~ /^(keep|attach|detach)$/;
+    my $workshop_id = $c->req->param('workshop_id');
+    $workshop_id = undef unless defined $workshop_id && $workshop_id =~ /^\d+$/;
+
+    my $ok = eval {
+        $file->update({
+            file_name    => $new_name,
+            description  => $description,
+            access_level => $access_level,
+            sitename     => $sitename,
+            file_status  => $file_status,
+        });
+
+        my $wr_rs = $schema->resultset('WorkshopResource');
+        my $ext = lc($file->file_format // ($new_name =~ /\.([^.]+)$/ ? $1 : ''));
+        my $mime = $self->_normalized_mime($file->file_type, $ext);
+
+        # Keep workshop_resource metadata aligned with edited file record.
+        $wr_rs->search({ file_id => $file_id })->update({
+            file_name    => $new_name,
+            sitename     => $sitename,
+            access_level => $access_level,
+            description  => $description,
+            file_ext     => $ext,
+            file_type    => $mime,
+        });
+
+        if ($workshop_action eq 'detach') {
+            my $filter = { file_id => $file_id };
+            $filter->{workshop_id} = $workshop_id if defined $workshop_id;
+            $wr_rs->search($filter)->delete;
+        } elsif ($workshop_action eq 'attach' && defined $workshop_id) {
+            my $existing = $wr_rs->search(
+                { file_id => $file_id, workshop_id => $workshop_id },
+                { rows => 1 }
+            )->first;
+            unless ($existing) {
+                $wr_rs->create({
+                    file_name    => $new_name,
+                    file_path    => $file->nfs_path // $file->file_path // '',
+                    file_ext     => $ext,
+                    file_type    => $mime,
+                    file_size    => $file->file_size,
+                    sitename     => $sitename,
+                    access_level => $access_level,
+                    uploaded_by  => $c->session->{user_id},
+                    workshop_id  => $workshop_id,
+                    description  => $description,
+                    file_id      => $file_id,
+                });
+            }
+            $file->update({ workshop_id => $workshop_id }) unless ($file->workshop_id // '') eq "$workshop_id";
+        }
+        1;
+    };
+
+    if (!$ok || $@) {
+        my $err = $@ || 'unknown error';
+        $c->log->error("file_update failed for file_id=$file_id: $err");
+        $c->flash->{error_msg} = 'Failed to update file record.';
+    } else {
+        $c->flash->{success_msg} = "Updated file '$new_name'.";
     }
 
     $c->response->redirect($c->uri_for('/workshop/resources'));
