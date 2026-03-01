@@ -233,14 +233,27 @@ sub upload_and_record {
     my ($self, $c, $upload, $nfs_dir_id) = @_;
 
     my $schema = $c->model('DBEncy');
-    my $nfs_dir = $schema->resultset('NfsDirectory')->find($nfs_dir_id);
-    unless ($nfs_dir) {
-        return (undef, "NFS directory allocation #$nfs_dir_id not found.");
-    }
 
-    my $nfs_path = $nfs_dir->nfs_path;
-    unless (-d $nfs_path) {
-        return (undef, "NFS directory '$nfs_path' does not exist on filesystem.");
+    my ($nfs_path, $nfs_dir_sitename, $nfs_dir_site_id);
+    if ($nfs_dir_id =~ /^path:(.+)$/) {
+        $nfs_path = $1;
+        $nfs_dir_sitename = $c->session->{SiteName} // 'CSC';
+        $nfs_dir_site_id  = $c->session->{site_id}  // 0;
+        unless (-d $nfs_path) {
+            return (undef, "Directory '$nfs_path' does not exist on filesystem.");
+        }
+    } else {
+        my $nfs_dir;
+        eval { $nfs_dir = $schema->resultset('NfsDirectory')->find($nfs_dir_id) };
+        unless ($nfs_dir) {
+            return (undef, "NFS directory allocation #$nfs_dir_id not found.");
+        }
+        $nfs_path         = $nfs_dir->nfs_path;
+        $nfs_dir_sitename = $nfs_dir->sitename // ($c->session->{SiteName} // '');
+        $nfs_dir_site_id  = $nfs_dir->site_id  // ($c->session->{site_id}  // 0);
+        unless (-d $nfs_path) {
+            return (undef, "NFS directory '$nfs_path' does not exist on filesystem.");
+        }
     }
 
     my $filename  = $upload->filename;
@@ -274,8 +287,8 @@ sub upload_and_record {
     );
     my $mime_type   = $mime_map{$ext} || 'application/octet-stream';
     my $upload_date = localtime->strftime('%Y-%m-%d %H:%M:%S');
-    my $sitename    = $nfs_dir->sitename;
-    my $site_id     = $nfs_dir->site_id // 0;
+    my $sitename    = $nfs_dir_sitename;
+    my $site_id     = $nfs_dir_site_id // 0;
     my $user_id     = $c->session->{user_id} // 0;
 
     my $existing = $self->check_duplicate($schema, $filename, $file_size);

@@ -19,13 +19,16 @@
   </div>
 
   [% IF error_msg %]
-  <div class="error">[% error_msg | html %]</div>
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
   [% END %]
   [% IF c.flash.error_msg %]
-  <div class="error">[% c.flash.error_msg | html %]</div>
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
   [% END %]
   [% IF c.flash.success_msg %]
-  <div class="success">[% c.flash.success_msg | html %]</div>
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.info_msg %]
+  <div style="background:#e3f2fd;border:1px solid #64b5f6;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#0d47a1"><strong>Info:</strong> [% c.flash.info_msg | html %]</div>
   [% END %]
 
   <div class="content-container">

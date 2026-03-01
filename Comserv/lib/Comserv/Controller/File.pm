@@ -506,12 +506,14 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $nfs_dir_id = $c->req->param('nfs_dir_id') // '';
+        my $dir_path   = $c->req->param('dir_path')   // '';
         my $upload     = $c->req->upload('file');
 
         unless ($upload) {
             $c->stash(
                 allocated_dirs => $allocated_dirs,
                 is_csc         => $is_csc,
+                dir_path       => $dir_path,
                 error_msg      => 'No file selected for upload.',
                 template       => 'file/FileUpload.tt',
             );
@@ -519,15 +521,20 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
             return;
         }
 
-        unless ($nfs_dir_id =~ /^\d+$/) {
-            $c->stash(
-                allocated_dirs => $allocated_dirs,
-                is_csc         => $is_csc,
-                error_msg      => 'Please select a valid target directory.',
-                template       => 'file/FileUpload.tt',
-            );
-            $c->forward($c->view('TT'));
-            return;
+        if ($nfs_dir_id !~ /^\d+$/) {
+            if ($is_csc && length($dir_path) && -d $dir_path) {
+                $nfs_dir_id = 'path:' . $dir_path;
+            } else {
+                $c->stash(
+                    allocated_dirs => $allocated_dirs,
+                    is_csc         => $is_csc,
+                    dir_path       => $dir_path,
+                    error_msg      => 'Please select a valid target directory.',
+                    template       => 'file/FileUpload.tt',
+                );
+                $c->forward($c->view('TT'));
+                return;
+            }
         }
 
         unless ($is_csc) {
@@ -538,6 +545,7 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
                 $c->stash(
                     allocated_dirs => $allocated_dirs,
                     is_csc         => $is_csc,
+                    dir_path       => $dir_path,
                     error_msg      => 'Access denied to that directory.',
                     template       => 'file/FileUpload.tt',
                 );
@@ -572,6 +580,7 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
     $c->stash(
         allocated_dirs => $allocated_dirs,
         is_csc         => $is_csc,
+        dir_path       => ($c->req->param('dir_path') // ''),
         template       => 'file/FileUpload.tt',
     );
     $c->forward($c->view('TT'));
@@ -1635,8 +1644,11 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     })->first;
 
     if ($existing) {
-        $c->flash->{error_msg} = "File already exists in database (ID #" . $existing->id . ").";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_import_file',
+            "File already in DB id=" . $existing->id . " path=$file_path — redirecting to edit");
+        $c->flash->{info_msg} = "This file is already in the database (ID #" . $existing->id . "). "
+            . "You can update its attributes or see duplicate info below.";
+        $c->response->redirect($c->uri_for('/file/edit', $existing->id));
         return;
     }
 
