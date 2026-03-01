@@ -615,51 +615,81 @@
 
 [%# ── Move modal ─────────────────────────────────────────────────── %]
 <div class="fb-modal-overlay" id="fb-mv-overlay" onclick="fbCancelMove()"></div>
-<div class="fb-modal" id="fb-mv-modal" style="max-width:520px">
+<div class="fb-modal" id="fb-mv-modal" style="max-width:560px">
   <div class="fb-modal-header">
-    <h3>Move File</h3>
+    <h3>Move</h3>
     <button class="fb-modal-close" onclick="fbCancelMove()">&times;</button>
   </div>
-  <div class="fb-modal-body" style="padding:16px 20px;display:block">
-    <p style="font-weight:bold;margin-bottom:6px;word-break:break-all" id="fb-mv-filename"></p>
-    <p style="font-size:.82rem;color:#555;margin-bottom:14px">
-      Current location: <code id="fb-mv-current" style="font-size:.78rem"></code>
+  <div class="fb-modal-body" style="padding:14px 18px;display:block">
+    <p style="font-weight:bold;margin-bottom:2px;word-break:break-all" id="fb-mv-filename"></p>
+    <p style="font-size:.78rem;color:#777;margin-bottom:10px">
+      From: <code id="fb-mv-current" style="font-size:.75rem"></code>
     </p>
+
     <form id="fb-mv-form" method="post" action="[% c.uri_for('/file/fs_move') %]">
       <input type="hidden" id="fb-mv-old-path" name="old_path" value="">
       <input type="hidden" id="fb-mv-dir"      name="dir"      value="">
-      <div class="form-field" style="margin-bottom:10px">
-        <label for="fb-mv-dest" style="font-weight:600;display:block;margin-bottom:4px">
-          Destination directory:
+      <input type="hidden" id="fb-mv-dest"      name="dest_dir" value="">
+
+      [%# ── Directory picker ─── %]
+      <div style="margin-bottom:8px">
+        <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:4px">Select destination:</label>
+
+        [% IF allocated_dirs.size %]
+        <div style="margin-bottom:6px">
+          <select class="form-input" style="font-size:.82rem"
+                  onchange="if(this.value)fbMvNavTo(this.value)">
+            <option value="">— jump to allocated directory —</option>
+            [% FOREACH alloc IN allocated_dirs %]
+            <option value="[% alloc.nfs_path | html %]">
+              [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
+            </option>
+            [% END %]
+          </select>
+        </div>
+        [% END %]
+
+        <div style="border:1px solid #ccc;border-radius:4px;overflow:hidden">
+          <div id="fb-mv-picker-path"
+               style="background:#f5f5f5;padding:5px 8px;font-family:monospace;font-size:.78rem;
+                      border-bottom:1px solid #ccc;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-secondary" id="fb-mv-up-btn"
+                    onclick="fbMvGoUp()" title="Go up one level">&#8593; Up</button>
+            <span id="fb-mv-picker-path-text" style="flex:1;word-break:break-all"></span>
+          </div>
+          <div id="fb-mv-dir-list"
+               style="max-height:200px;overflow-y:auto;padding:4px 0;background:#fff;min-height:60px">
+            <p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">Loading…</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#e8f4ff;border:1px solid #90caf9;border-radius:4px;padding:7px 10px;font-size:.82rem;margin-bottom:6px">
+        <strong>Move to:</strong>
+        <span id="fb-mv-selected-label" style="font-family:monospace;margin-left:6px;color:#1565c0;word-break:break-all">
+          (navigate above to select)
+        </span>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <label style="font-size:.78rem;color:#666;display:block;margin-bottom:2px">
+          Or type path directly:
         </label>
-        <input type="text" id="fb-mv-dest" name="dest_dir" class="form-input"
+        <input type="text" id="fb-mv-manual" class="form-input"
                placeholder="/path/to/destination"
-               style="font-family:monospace;font-size:.85rem"
+               style="font-family:monospace;font-size:.82rem"
+               oninput="fbMvSetDest(this.value)"
                autocomplete="off">
       </div>
-      [% IF allocated_dirs.size %]
-      <div style="margin-bottom:10px">
-        <label style="font-size:.8rem;color:#555;display:block;margin-bottom:4px">Quick-select allocated directory:</label>
-        <select class="form-input" style="font-size:.82rem" onchange="if(this.value)document.getElementById('fb-mv-dest').value=this.value">
-          <option value="">— pick a directory —</option>
-          [% FOREACH alloc IN allocated_dirs %]
-          <option value="[% alloc.nfs_path | html %]">
-            [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
-          </option>
-          [% END %]
-        </select>
-      </div>
-      [% END %]
-      <p style="font-size:.78rem;color:#888">
-        The file will be physically moved on the NFS filesystem.
-        If it has a database record the stored path will be updated automatically.
-        The browser will navigate to the destination directory after the move.
+
+      <p style="font-size:.75rem;color:#888;margin:0">
+        File is physically moved on the NFS filesystem. Any database record path is updated automatically.
+        Browser navigates to the destination after the move.
       </p>
     </form>
   </div>
   <div class="fb-modal-footer">
-    <button type="button" class="btn btn-primary"
-            onclick="fbSubmitMove()">Move File</button>
+    <button type="button" class="btn btn-primary" onclick="fbSubmitMove()">Move Here</button>
     <button type="button" class="btn btn-secondary" onclick="fbCancelMove()">Cancel</button>
   </div>
 </div>
@@ -800,15 +830,21 @@ function fbCancelDbImport() {
     document.getElementById('fb-db-modal').classList.remove('open');
 }
 
+var _fbMvListDirsUrl = '[% c.uri_for('/file/fs_list_dirs') %]';
+var _fbMvCurrentPicker = '';
+var _fbMvParentPicker  = '';
+
 function fbOpenMove(filePath, fileName, dir) {
     document.getElementById('fb-mv-old-path').value = filePath;
     document.getElementById('fb-mv-dir').value      = dir;
+    document.getElementById('fb-mv-dest').value     = '';
     document.getElementById('fb-mv-filename').textContent = fileName;
     document.getElementById('fb-mv-current').textContent  = filePath;
-    document.getElementById('fb-mv-dest').value = dir;
+    document.getElementById('fb-mv-selected-label').textContent = '(navigate below to select)';
+    document.getElementById('fb-mv-manual').value   = '';
     document.getElementById('fb-mv-overlay').style.display = 'block';
     document.getElementById('fb-mv-modal').classList.add('open');
-    document.getElementById('fb-mv-dest').focus();
+    fbMvNavTo(dir);
 }
 
 function fbCancelMove() {
@@ -816,10 +852,62 @@ function fbCancelMove() {
     document.getElementById('fb-mv-modal').classList.remove('open');
 }
 
+function fbMvSetDest(path) {
+    path = path.trim();
+    document.getElementById('fb-mv-dest').value = path;
+    document.getElementById('fb-mv-selected-label').textContent = path || '(none)';
+}
+
+function fbMvNavTo(path) {
+    var list = document.getElementById('fb-mv-dir-list');
+    list.innerHTML = '<p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">Loading\u2026</p>';
+    fetch(_fbMvListDirsUrl + '?path=' + encodeURIComponent(path))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                list.innerHTML = '<p style="color:#c00;font-size:.8rem;padding:8px 12px;margin:0">' + data.error + '</p>';
+                return;
+            }
+            _fbMvCurrentPicker = data.path;
+            _fbMvParentPicker  = data.parent;
+            document.getElementById('fb-mv-picker-path-text').textContent = data.path;
+            document.getElementById('fb-mv-up-btn').disabled = !data.can_go_up;
+
+            fbMvSetDest(data.path);
+            document.getElementById('fb-mv-manual').value = data.path;
+
+            if (!data.dirs || data.dirs.length === 0) {
+                list.innerHTML = '<p style="color:#aaa;font-size:.8rem;padding:8px 12px;margin:0">No subdirectories here.</p>';
+                return;
+            }
+            var html = '';
+            data.dirs.forEach(function(d) {
+                var fullPath = data.path.replace(/\/+$/, '') + '/' + d;
+                html += '<div onclick="fbMvNavTo(\'' + fullPath.replace(/'/g, "\\'") + '\')"'
+                      + ' style="padding:5px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid #f0f0f0;'
+                      + 'display:flex;align-items:center;gap:6px" '
+                      + ' onmouseover="this.style.background=\'#f0f5ff\'" '
+                      + ' onmouseout="this.style.background=\'\'">'
+                      + '<span style="color:#d4881a;font-size:.7rem;font-weight:bold;background:#f5f5f5;'
+                      + 'border-radius:2px;padding:1px 4px">DIR</span>'
+                      + '<span>' + d.replace(/</g,'&lt;') + '</span>'
+                      + '<span style="margin-left:auto;font-size:.72rem;color:#aaa">&#9654;</span>'
+                      + '</div>';
+            });
+            list.innerHTML = html;
+        })
+        .catch(function(e) {
+            list.innerHTML = '<p style="color:#c00;font-size:.8rem;padding:8px 12px;margin:0">Error loading directories.</p>';
+        });
+}
+
+function fbMvGoUp() {
+    if (_fbMvParentPicker) fbMvNavTo(_fbMvParentPicker);
+}
+
 function fbSubmitMove() {
     var dest = document.getElementById('fb-mv-dest').value.trim();
-    var src  = document.getElementById('fb-mv-old-path').value;
-    if (!dest) { alert('Please enter a destination directory.'); return; }
+    if (!dest) { alert('Please select or type a destination directory.'); return; }
     var name = document.getElementById('fb-mv-filename').textContent;
     if (!confirm('Move "' + name + '" to:\n' + dest + '\n\nProceed?')) return;
     document.getElementById('fb-mv-form').submit();
