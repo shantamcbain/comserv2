@@ -45,14 +45,21 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
     my $schema   = $c->model('DBEncy');
 
     my $allocated_dirs = [];
-    if ($is_csc) {
-        my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 })->all;
-        $allocated_dirs = \@allocs;
-    } else {
-        my @allocs = $schema->resultset('NfsDirectory')->search(
-            { sitename => $sitename, is_active => 1 }
-        )->all;
-        $allocated_dirs = \@allocs;
+    eval {
+        if ($is_csc) {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 })->all;
+            $allocated_dirs = \@allocs;
+        } else {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            $allocated_dirs = \@allocs;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_browser',
+            "nfs_directory table not available: $@");
+        $c->stash(error_msg => 'NFS directory table not yet created. Visit /admin/compare_schema to create it.');
     }
 
     my $dir_path = $c->req->param('dir_path');
@@ -297,16 +304,22 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
 
     my $schema = $c->model('DBEncy');
 
-    my $allocated_dirs;
-    if ($is_csc) {
-        my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 }, { order_by => 'sitename' })->all;
-        $allocated_dirs = \@allocs;
-    } else {
-        my @allocs = $schema->resultset('NfsDirectory')->search(
-            { sitename => $sitename, is_active => 1 },
-            { order_by => 'nfs_path' }
-        )->all;
-        $allocated_dirs = \@allocs;
+    my $allocated_dirs = [];
+    eval {
+        if ($is_csc) {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 }, { order_by => 'sitename' })->all;
+            $allocated_dirs = \@allocs;
+        } else {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 },
+                { order_by => 'nfs_path' }
+            )->all;
+            $allocated_dirs = \@allocs;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'upload_file',
+            "nfs_directory table not available: $@");
     }
 
     if ($c->req->method eq 'POST') {
@@ -978,8 +991,29 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
         return;
     }
 
-    my $sitename_filter = $c->req->param('sitename_filter') // '';
-    my $duplicate_pairs = $c->model('File')->get_duplicates($c, $sitename_filter);
+    my %filters = (
+        sitename  => scalar($c->req->param('sitename_filter'))  // '',
+        file_type => scalar($c->req->param('type_filter'))      // '',
+        sort_by   => scalar($c->req->param('sort_by'))          // 'upload_date',
+        sort_dir  => scalar($c->req->param('sort_dir'))         // 'desc',
+    );
+
+    my $duplicate_pairs = $c->model('File')->get_duplicates($c, %filters);
+
+    my $sites = [];
+    if ($is_csc) {
+        eval {
+            my @site_list = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name', columns => ['name'] }
+            )->all;
+            $sites = \@site_list;
+        };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'duplicates',
+                "Could not fetch site list: $err");
+        }
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'duplicates',
         "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] }));
@@ -987,7 +1021,8 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
     $c->stash(
         duplicate_pairs => $duplicate_pairs,
         is_csc          => $is_csc,
-        sitename_filter => $sitename_filter,
+        sites           => $sites,
+        filters         => \%filters,
         template        => 'file/Duplicates.tt',
     );
     $c->forward($c->view('TT'));
