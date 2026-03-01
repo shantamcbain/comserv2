@@ -1,0 +1,169 @@
+[% META
+   title = "Admin File Browser"
+   description = "Browse NFS directory structure and files as admin"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/AdminBrowser.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>Admin File Browser</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div class="error">[% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div class="error">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div class="success">[% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <form method="get" action="[% c.uri_for('/file/admin_browser') %]" class="app-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="dir_path">Directory:</label>
+              <input type="text" id="dir_path" name="dir_path"
+                     value="[% current_directory | html %]" class="form-input" style="width:400px">
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="show_hidden" value="1"
+                [% 'checked' IF show_hidden %]> Show Hidden</label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Browse</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      [% IF is_csc AND allocated_dirs.size %]
+      <div class="content-section">
+        <h3>Allocated NFS Directories</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>SiteName</th>
+                <th>NFS Path</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH alloc IN allocated_dirs %]
+              <tr>
+                <td>[% alloc.sitename | html %]</td>
+                <td>[% alloc.nfs_path | html %]</td>
+                <td>[% alloc.description | html %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
+                     class="btn btn-sm btn-edit">Browse</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% ELSIF NOT is_csc AND allocated_dirs.size %]
+      <div class="content-section">
+        <h3>Your Allocated Directories</h3>
+        <ul>
+          [% FOREACH alloc IN allocated_dirs %]
+          <li>
+            <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]">
+              [% alloc.nfs_path | html %]
+            </a>
+            [% IF alloc.description %]— [% alloc.description | html %][% END %]
+          </li>
+          [% END %]
+        </ul>
+      </div>
+      [% END %]
+
+      <div class="content-section">
+        <h3>Current Directory: [% current_directory | html %]</h3>
+
+        [% IF directories.size OR files.size %]
+
+        [% IF directories.size %]
+        <h4>Subdirectories</h4>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr><th>Name</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              [% FOREACH dir IN directories %]
+              <tr>
+                <td>[% dir | html %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => current_directory _ '/' _ dir }) %]"
+                     class="btn btn-sm btn-edit">Open</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% END %]
+
+        [% IF files.size %]
+        <h4>Files</h4>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH file IN files %]
+              <tr>
+                <td>[% file | html %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/file/list', { sitename_filter => '', type_filter => '' }) %]"
+                     class="btn btn-sm btn-edit">View in DB</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No files in this directory.</p>
+        [% END %]
+
+        [% ELSE %]
+        <p class="empty-state">Directory is empty or does not exist.</p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">File List (DB)</a>
+          [% IF is_csc %]
+          <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary">NFS Allocations</a>
+          [% END %]
+          <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">Duplicate Files</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
