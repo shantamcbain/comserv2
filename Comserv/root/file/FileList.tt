@@ -30,6 +30,15 @@
                 font-size:.7rem; font-weight:bold; color:#fff; }
 .fl-badge-dup { background:#c0720a; }
 .fl-badge-ok  { background:#78909c; }
+.btn { display:inline-block; padding:5px 10px; border:none; border-radius:4px;
+       cursor:pointer; font-size:.85rem; text-decoration:none; line-height:1.4;
+       vertical-align:middle; font-weight:500; }
+.btn:hover { opacity:.88; text-decoration:none; }
+.btn-sm        { padding:2px 8px; font-size:.75rem; }
+.btn-primary   { background:#007bff; color:#fff !important; }
+.btn-secondary { background:#6c757d; color:#fff !important; }
+.btn-edit      { background:#fd7e14; color:#fff !important; }
+.btn-delete    { background:#dc3545; color:#fff !important; }
 </style>
 
 [% MACRO fmt_size(b) BLOCK %]
