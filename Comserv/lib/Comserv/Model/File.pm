@@ -52,12 +52,11 @@ sub get_top_files {
     # Get a DBIx::Class::ResultSet object for the 'File' table
     my $rs = $schema->resultset('File');
 
-    # Fetch the top 10 file for the given site, ordered by some criteria
     my @file = $rs->search(
         { sitename => $SiteName },
-        { order_by => { -desc => ['some_criteria'] }, rows => 10 }
+        { order_by => { -desc => ['upload_date'] }, rows => 10 }
     );
-some_criteria
+
     $c->log->debug('Visited the file page');
     $c->log->debug("Number of file fetched: " . scalar(@file));
 
@@ -169,6 +168,47 @@ sub handle_upload {
 
     return $result ? "File uploaded successfully." : "Failed to upload file.";
 }
+sub get_files_filtered {
+    my ($self, $c, %filters) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+
+    my %where;
+    $where{sitename} = $sitename unless $is_csc;
+    $where{file_status}  = $filters{file_status}  if defined $filters{file_status}  && $filters{file_status}  ne '';
+    $where{file_type}    = $filters{file_type}    if defined $filters{file_type}    && $filters{file_type}    ne '';
+    $where{is_duplicate} = $filters{is_duplicate} if defined $filters{is_duplicate} && $filters{is_duplicate} ne '';
+    $where{sitename}     = $filters{sitename}     if $is_csc && defined $filters{sitename} && $filters{sitename} ne '';
+
+    my @files = $schema->resultset('File')->search(\%where, { order_by => { -desc => 'upload_date' } });
+    return \@files;
+}
+
+sub get_file_by_id {
+    my ($self, $c, $id) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+
+    my %where = (id => $id);
+    $where{sitename} = $sitename unless $is_csc;
+
+    return $schema->resultset('File')->find(\%where);
+}
+
+sub check_duplicate {
+    my ($self, $schema, $file_name, $file_size) = @_;
+    return $schema->resultset('File')->search(
+        { file_name => $file_name, file_size => $file_size, is_duplicate => 0 },
+        { rows => 1 }
+    )->first;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

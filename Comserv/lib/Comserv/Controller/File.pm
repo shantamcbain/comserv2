@@ -21,8 +21,6 @@ sub index :PathPart('file') :Chained('/') :Args(0) {
     # Check if the directory exists
     if (-d $dir_path) {
         my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path, $show_hidden);
-# Print the file names
-print "Files: " . join(", ", @$files) . "\n";       # Debugging: print out the file names
         $c->log->debug("Files: " . join(", ", @$files));
 
         my @sorted_directories = sort @$directories;
@@ -133,29 +131,20 @@ sub search_and_insert :Local {
 
         # If the file does not exist in the database, insert it
         if (!$existing_file) {
-            # Insert the data into the file table
             my $file = $rs->create({
                 file_name => $name,
                 file_size => $size,
                 upload_date => $creation_date,
                 file_path => $file_path,
                 file_format => $file_format,
-                # Other fields...
             });
-            warn "Inserting file: $name, $size, $creation_date, $file_path, $file_format\n"; # Print the file being inserted
-        sleep(5);
-            # Check if the insert operation was successful
+            warn "Inserting file: $name, $size, $creation_date, $file_path, $file_format\n";
             if (!$file) {
                 warn "Failed to insert file: $name\n";
-                sleep(5);
             }
         } else {
             warn "Skipping duplicate file: $name\n";
-            sleep(5);
         }
-
-        # Add a delay
-        sleep(5);
     }
 
     $c->response->body('Files of type ' . $file_type . ' have been inserted into the file table.');
@@ -214,6 +203,16 @@ $c->stash->{sites} = $sites;
     } else {
         $c->response->body('Failed to upload file.');
     }
+}
+
+sub _resolve_roles {
+    my ($self, $c) = @_;
+    my $sitename = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    $roles = [split /\s*,\s*/, $roles] unless ref $roles;
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+    return ($is_admin, $is_csc, $sitename);
 }
 
 sub _nfs_root_for_sync {
