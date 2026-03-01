@@ -1,0 +1,155 @@
+[% META
+   title = "File List"
+   description = "Browse and manage all files tracked in the database"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/FileList.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>File List</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div class="error">[% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div class="error">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div class="success">[% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h3>Filter Files</h3>
+        <form method="get" action="[% c.uri_for('/file/list') %]" class="app-form">
+          <div class="form-section">
+            <div class="form-row">
+
+              [% IF is_csc %]
+              <div class="form-field">
+                <label for="sitename_filter">SiteName:</label>
+                <select id="sitename_filter" name="sitename_filter" class="form-input">
+                  <option value="">— All —</option>
+                  [% FOREACH site IN sites %]
+                  <option value="[% site.name | html %]"
+                    [% 'selected' IF filter_params.sitename == site.name %]>
+                    [% site.name | html %]
+                  </option>
+                  [% END %]
+                </select>
+              </div>
+              [% END %]
+
+              <div class="form-field">
+                <label for="status_filter">Status:</label>
+                <select id="status_filter" name="status_filter" class="form-input">
+                  <option value="">— All —</option>
+                  <option value="active"   [% 'selected' IF filter_params.file_status == 'active'   %]>Active</option>
+                  <option value="inactive" [% 'selected' IF filter_params.file_status == 'inactive' %]>Inactive</option>
+                  <option value="archived" [% 'selected' IF filter_params.file_status == 'archived' %]>Archived</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="type_filter">File Type:</label>
+                <input type="text" id="type_filter" name="type_filter"
+                       value="[% filter_params.file_type | html %]"
+                       placeholder="e.g. .pdf" class="form-input">
+              </div>
+
+              <div class="form-field">
+                <label for="duplicate_filter">Duplicates:</label>
+                <select id="duplicate_filter" name="duplicate_filter" class="form-input">
+                  <option value="">— All —</option>
+                  <option value="1" [% 'selected' IF filter_params.is_duplicate == '1' %]>Duplicates Only</option>
+                  <option value="0" [% 'selected' IF filter_params.is_duplicate == '0' %]>Originals Only</option>
+                </select>
+              </div>
+
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Apply Filters</button>
+              <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Clear</a>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="content-section">
+        [% IF files.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>File Name</th>
+                [% IF is_csc %]<th>SiteName</th>[% END %]
+                <th>Type</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Duplicate</th>
+                <th>Upload Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH file IN files %]
+              <tr>
+                <td>[% file.id | html %]</td>
+                <td>[% file.file_name | html %]</td>
+                [% IF is_csc %]<td>[% file.sitename | html %]</td>[% END %]
+                <td>[% file.file_type | html %]</td>
+                <td>[% file.file_size | html %]</td>
+                <td>[% file.file_status | html %]</td>
+                <td>
+                  [% IF file.is_duplicate %]
+                  <span class="badge-duplicate">Duplicate</span>
+                  [% ELSE %]
+                  &mdash;
+                  [% END %]
+                </td>
+                <td>[% file.upload_date | html %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/file/view', file.id) %]" class="btn btn-sm btn-edit">View</a>
+                  <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-sm btn-edit">Edit</a>
+                  <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm">Download</a>
+                  [% IF file.is_duplicate %]
+                  <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-sm btn-delete">Resolve</a>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No files found matching the selected filters.</p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/admin_browser') %]" class="btn btn-secondary">Admin Browser</a>
+          <a href="[% c.uri_for('/file/upload_file') %]" class="btn btn-primary">Upload File</a>
+          [% IF is_csc %]
+          <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary">NFS Allocations</a>
+          [% END %]
+          <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">Duplicate Files</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
