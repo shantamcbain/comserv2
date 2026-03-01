@@ -1,0 +1,143 @@
+[% META
+   title = "File Management - Implementation Plan"
+   description = "Phase-by-phase implementation plan for the File Management System"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'admin/Planning.tt,v 0.01 2026/02/28 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>File Management System &mdash; Implementation Plan</h1>
+    </div>
+
+    [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="content-section">
+                <p>This page tracks the rollout of the File Management System across all delivery phases.
+                   Links become active as each phase is deployed. CSC Admin manages NFS allocations;
+                   SiteName Admins see only their scoped directories and files.</p>
+            </div>
+
+            <!-- Phase 0 -->
+            <div class="content-section">
+                <h2>Phase 0 &mdash; Navigation &amp; Admin Dashboard Integration
+                    <span class="phase-status phase-done">&#10003; Done</span>
+                </h2>
+                <ul>
+                    <li>File Management dropdown added to admin top menu</li>
+                    <li>File Management section added to <a href="/admin">/admin</a> dashboard</li>
+                    <li>This Planning page created at <code>/admin/planning</code></li>
+                </ul>
+            </div>
+
+            <!-- Phase 1 -->
+            <div class="content-section">
+                <h2>Phase 1 &mdash; Fixes &amp; Foundation
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                <ul>
+                    <li>Fix <code>get_top_files</code> syntax error in <code>Model/File.pm</code></li>
+                    <li>Remove debug <code>sleep()</code> / <code>print</code> calls from <code>Controller/File.pm</code></li>
+                    <li>Create <code>NfsDirectory</code> Result class and <code>nfs_directory</code> table</li>
+                    <li>Add <code>_resolve_roles</code> helper to controller</li>
+                    <li>Add <code>get_files_filtered</code>, <code>get_file_by_id</code>, <code>check_duplicate</code> to model</li>
+                </ul>
+            </div>
+
+            <!-- Phase 2 -->
+            <div class="content-section">
+                <h2>Phase 2 &mdash; Admin File Browser &amp; List
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                <ul>
+                    <li><a href="/file/admin_browser">Admin Browser</a> &mdash; directory tree scoped by role</li>
+                    <li><a href="/file/list">File List</a> &mdash; filterable table of all tracked files</li>
+                </ul>
+            </div>
+
+            <!-- Phase 3 -->
+            <div class="content-section">
+                <h2>Phase 3 &mdash; View, Edit &amp; Rename
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                <ul>
+                    <li>File detail view (<code>/file/view/:id</code>)</li>
+                    <li>Metadata edit form (<code>/file/edit/:id</code>) &mdash; description, status, access level</li>
+                    <li>File rename &mdash; updates DB and NFS filesystem atomically</li>
+                </ul>
+            </div>
+
+            <!-- Phase 4 -->
+            <div class="content-section">
+                <h2>Phase 4 &mdash; Upload &amp; Download
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                <ul>
+                    <li><a href="/file/upload_file">Upload File</a> &mdash; writes to NFS, duplicate-checks, creates DB record</li>
+                    <li>File download (<code>/file/download/:id</code>) &mdash; streams file with correct Content-Type</li>
+                </ul>
+            </div>
+
+            <!-- Phase 5 -->
+            <div class="content-section">
+                <h2>Phase 5 &mdash; NFS Allocation Management (CSC Admin)
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                [% IF c.session.SiteName == 'CSC' %]
+                <ul>
+                    <li><a href="/file/nfs_allocations">NFS Allocations</a> &mdash; create and manage per-SiteName directory grants</li>
+                    <li>Admin Browser scoped to allocated dirs for SiteName admins</li>
+                </ul>
+                [% ELSE %]
+                <p class="empty-state">NFS Allocation management is available to CSC Admin only.</p>
+                [% END %]
+            </div>
+
+            <!-- Phase 6 -->
+            <div class="content-section">
+                <h2>Phase 6 &mdash; Duplicate File Management
+                    <span class="phase-status phase-pending">Pending</span>
+                </h2>
+                <ul>
+                    <li><a href="/file/duplicates">Duplicate Files</a> &mdash; view and resolve duplicate records</li>
+                    <li>Duplicate detection wired into upload and NFS sync</li>
+                </ul>
+            </div>
+
+            <div class="content-section">
+                <div class="form-actions">
+                    <a href="/admin" class="btn btn-primary">Back to Admin Dashboard</a>
+                    <a href="/file/list" class="btn btn-secondary">File List</a>
+                    <a href="/file/admin_browser" class="btn btn-secondary">Admin Browser</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.phase-status {
+    display: inline-block;
+    font-size: 0.75em;
+    font-weight: normal;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+.phase-done    { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.phase-pending { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+</style>

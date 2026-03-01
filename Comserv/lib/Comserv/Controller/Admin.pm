@@ -941,6 +941,22 @@ sub settings :Path('/admin/settings') :Args(0) {
         "Completed settings action");
 }
 
+sub planning :Path('/admin/planning') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Planning page requested by user=" . ($c->session->{user_id} // 'anon'));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'planning')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    $c->stash(template => 'admin/Planning.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Rendering admin/Planning.tt");
+    $c->forward($c->view('TT'));
+}
+
 # Admin system information
 sub system_info :Path('/admin/system_info') :Args(0) {
     my ($self, $c) = @_;
