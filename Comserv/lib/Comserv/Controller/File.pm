@@ -1061,23 +1061,47 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         return;
     }
 
-    if ($action eq 'keep') {
+    if ($action eq 'swap') {
+        my $orig_id = $file->duplicate_of;
+        unless ($orig_id) {
+            $c->flash->{error_msg} = "File #$id has no original linked — cannot swap.";
+            $c->response->redirect($c->uri_for('/file/duplicates'));
+            return;
+        }
+        my $original = $c->model('DBEncy')->resultset('File')->find($orig_id);
+        unless ($original) {
+            $c->flash->{error_msg} = "Original file #$orig_id not found — cannot swap.";
+            $c->response->redirect($c->uri_for('/file/duplicates'));
+            return;
+        }
         eval {
             $file->update({ is_duplicate => 0, duplicate_of => undef });
+            $original->update({ is_duplicate => 1, duplicate_of => $file->id });
         };
         my $err = "$@" if $@;
         if ($err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "Failed to promote file id=$id to non-duplicate: $err");
-            $self->send_error_notification($c, 'Duplicate Resolve Error', "File id=$id keep failed: $err")
-                if $self->can('send_error_notification');
-            $c->flash->{error_msg} = "Failed to resolve duplicate: $err";
+                "Swap failed dup=$id orig=$orig_id: $err");
+            $c->flash->{error_msg} = "Swap failed: $err";
         } else {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "File id=$id promoted to original (is_duplicate cleared)");
-            $c->flash->{success_msg} = "File '" . $file->file_name . "' is now kept as an original.";
+                "Swapped: file id=$id is now original, file id=$orig_id is now duplicate");
+            $c->flash->{success_msg} = "Swapped: '" . $file->file_name . "' (#$id) is now the original; #$orig_id is now the duplicate.";
         }
-    } elsif ($action eq 'delete') {
+    } elsif ($action eq 'delete_db') {
+        my $file_name = $file->file_name;
+        eval { $file->delete };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
+                "DB-only delete failed id=$id: $err");
+            $c->flash->{error_msg} = "Failed to delete DB record: $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                "Duplicate DB record id=$id deleted (file left on disk)");
+            $c->flash->{success_msg} = "DB record for '$file_name' removed. File left on disk.";
+        }
+    } elsif ($action eq 'delete_both') {
         my $nfs_path  = $file->nfs_path  // '';
         my $file_path = $file->file_path // '';
         my $file_name = $file->file_name;
@@ -1086,12 +1110,15 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
                     : length($nfs_path)  && -f $nfs_path  ? $nfs_path
                     : '';
 
+        my $disk_deleted = 0;
         if (length $fs_path) {
             eval { unlink $fs_path or die "unlink failed: $!" };
             my $unlink_err = "$@" if $@;
             if ($unlink_err) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'resolve_duplicate',
-                    "Could not delete file id=$id from filesystem path=$fs_path: $unlink_err");
+                    "Filesystem delete failed id=$id path=$fs_path: $unlink_err");
+            } else {
+                $disk_deleted = 1;
             }
         }
 
@@ -1099,17 +1126,16 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         my $err = "$@" if $@;
         if ($err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "Failed to delete duplicate file id=$id from DB: $err");
-            $self->send_error_notification($c, 'Duplicate Delete Error', "File id=$id delete failed: $err")
-                if $self->can('send_error_notification');
-            $c->flash->{error_msg} = "Failed to delete duplicate: $err";
+                "DB delete failed id=$id: $err");
+            $c->flash->{error_msg} = "DB delete failed: $err";
         } else {
+            my $disk_msg = $disk_deleted ? ' File deleted from disk.' : length($fs_path) ? ' (disk delete failed — check logs).' : ' No file found on disk.';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Duplicate file id=$id name=$file_name deleted from DB and filesystem");
-            $c->flash->{success_msg} = "Duplicate file '$file_name' deleted.";
+                "Duplicate id=$id name=$file_name deleted from DB.$disk_msg");
+            $c->flash->{success_msg} = "Deleted '$file_name' from database.$disk_msg";
         }
     } else {
-        $c->flash->{error_msg} = "Unknown action '$action'. Use 'keep' or 'delete'.";
+        $c->flash->{error_msg} = "Unknown action '$action'.";
     }
 
     $c->response->redirect($c->uri_for('/file/duplicates'));
