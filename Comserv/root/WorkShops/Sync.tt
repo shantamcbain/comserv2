@@ -90,16 +90,16 @@
                 <div class="form-field">
                     <label for="scan_dir">Subdirectory to scan</label>
                     <select name="scan_dir" id="scan_dir">
-                        <option value="full">-- Full NFS drive (slow) --</option>
+                        <option value="full" selected>-- Full NFS drive (recommended for SiteName root directories) --</option>
                         [% IF nfs_available %]
                             [% FOREACH d IN subdirs %]
-                            <option value="[% d | html %]"[% IF d == 'apis' %] selected[% END %]>[% d | html %][% IF d == 'apis' %] (recommended — workshop files)[% END %]</option>
+                            <option value="[% d | html %]">[% d | html %]</option>
                             [% END %]
                         [% ELSE %]
-                            <option value="apis" selected>apis/ (workshop files)</option>
+                            <option value="full" selected>Full NFS drive</option>
                         [% END %]
                     </select>
-                    <span class="hint">Choose <em>apis/</em> for workshop resources. Use <em>Full NFS drive</em> for a global inventory scan.</span>
+                    <span class="hint">Use <em>Full NFS drive</em> to scan SiteName directories at the NFS root, or select one directory for a targeted scan.</span>
                 </div>
                 <div class="form-field">
                     <label for="max_files">Max files per run</label>
@@ -171,7 +171,7 @@
                         <option value="[% s | html %]">[% s | html %]</option>
                         [% END %]
                     </select>
-                    <span class="hint">Defaults to your current site if left blank.</span>
+                    <span class="hint">Leave blank to infer SiteName from each file's top-level NFS directory. Set a value only to force all imported files to one site.</span>
                 </div>
                 <div class="form-field">
                     <label for="file_status">File status</label>

@@ -218,7 +218,7 @@ $c->stash->{sites} = $sites;
 
 sub _nfs_root_for_sync {
     my ($self) = @_;
-    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
+    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
     return $configured if -d $configured;
 
     for my $fallback (
@@ -261,8 +261,6 @@ sub _top_level_dir {
 sub _infer_sitename_for_rel {
     my ($self, $schema, $rel) = @_;
     my $top = _top_level_dir($rel);
-    return 'BMaster' if lc($top) eq 'apis';
-    return '3d' if lc($top) eq '3d';
     return 'CSC' unless $top;
 
     my $site = $schema->resultset('Site')->search(
