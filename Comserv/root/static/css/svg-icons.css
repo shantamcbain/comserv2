@@ -766,3 +766,108 @@
   background-color: currentColor;
   background-image: none;
 }
+
+.icon-file-pdf, .fas.fa-file-pdf {
+  -webkit-mask-image: url('/static/images/icons/file-pdf.svg');
+  mask-image: url('/static/images/icons/file-pdf.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-word, .fas.fa-file-word {
+  -webkit-mask-image: url('/static/images/icons/file-word.svg');
+  mask-image: url('/static/images/icons/file-word.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-excel, .fas.fa-file-excel {
+  -webkit-mask-image: url('/static/images/icons/file-excel.svg');
+  mask-image: url('/static/images/icons/file-excel.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-ppt, .fas.fa-file-powerpoint {
+  -webkit-mask-image: url('/static/images/icons/file-ppt.svg');
+  mask-image: url('/static/images/icons/file-ppt.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-video, .fas.fa-file-video {
+  -webkit-mask-image: url('/static/images/icons/file-video.svg');
+  mask-image: url('/static/images/icons/file-video.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-audio, .fas.fa-file-audio {
+  -webkit-mask-image: url('/static/images/icons/file-audio.svg');
+  mask-image: url('/static/images/icons/file-audio.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-archive, .fas.fa-file-archive {
+  -webkit-mask-image: url('/static/images/icons/file-archive.svg');
+  mask-image: url('/static/images/icons/file-archive.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-code, .fas.fa-file-code {
+  -webkit-mask-image: url('/static/images/icons/file-code.svg');
+  mask-image: url('/static/images/icons/file-code.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-file-text, .fas.fa-file-alt {
+  -webkit-mask-image: url('/static/images/icons/file-text.svg');
+  mask-image: url('/static/images/icons/file-text.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-download, .fas.fa-download {
+  -webkit-mask-image: url('/static/images/icons/download.svg');
+  mask-image: url('/static/images/icons/download.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-trash, .fas.fa-trash, .fas.fa-trash-alt {
+  -webkit-mask-image: url('/static/images/icons/trash.svg');
+  mask-image: url('/static/images/icons/trash.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-eye, .fas.fa-eye {
+  -webkit-mask-image: url('/static/images/icons/eye.svg');
+  mask-image: url('/static/images/icons/eye.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+.icon-db-add {
+  -webkit-mask-image: url('/static/images/icons/db-add.svg');
+  mask-image: url('/static/images/icons/db-add.svg');
+  background-color: currentColor;
+  background-image: none;
+}
+
+/* File type color classes — used in file browser to color-code icons */
+.ft-folder  { color: #d4881a; }
+.ft-pdf     { color: #c62828; }
+.ft-word    { color: #1565c0; }
+.ft-excel   { color: #2e7d32; }
+.ft-ppt     { color: #e65100; }
+.ft-image   { color: #6a1b9a; }
+.ft-video   { color: #b71c1c; }
+.ft-audio   { color: #00695c; }
+.ft-archive { color: #f57f17; }
+.ft-code    { color: #0277bd; }
+.ft-text    { color: #546e7a; }
+.ft-generic { color: #455a64; }

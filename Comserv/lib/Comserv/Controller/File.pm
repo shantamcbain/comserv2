@@ -1451,6 +1451,250 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
     $c->response->redirect($c->uri_for('/file/nfs_allocations'));
 }
 
+sub fs_preview :Path('/file/fs_preview') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $path = $c->req->param('path') // '';
+    $path =~ s{\.\.}{}g;
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $allowed  = 0;
+    if ($is_csc) {
+        $allowed = (-f $path) ? 1 : 0;
+    } else {
+        my $schema = $c->model('DBEncy');
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+    }
+
+    unless ($allowed && -f $path) {
+        $c->response->status(404);
+        $c->response->content_type('text/plain');
+        $c->response->body('File not found or access denied.');
+        return;
+    }
+
+    require File::Basename;
+    my $filename = File::Basename::basename($path);
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    my $lext = lc($ext // '');
+
+    my %inline_types = (
+        pdf  => 'application/pdf',
+        jpg  => 'image/jpeg', jpeg => 'image/jpeg',
+        png  => 'image/png', gif => 'image/gif', svg => 'image/svg+xml', webp => 'image/webp',
+        mp4  => 'video/mp4', webm => 'video/webm',
+        mp3  => 'audio/mpeg', ogg => 'audio/ogg',
+        txt  => 'text/plain', md => 'text/plain', rst => 'text/plain',
+        html => 'text/html', htm => 'text/html',
+        pl   => 'text/plain', py => 'text/plain', js => 'text/plain',
+        pm   => 'text/plain', sh => 'text/plain', css => 'text/plain',
+    );
+
+    my $mime = $inline_types{$lext} // $SYNC_MIME_MAP{$lext} // 'application/octet-stream';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_preview',
+        "Preview: path=$path mime=$mime");
+
+    open(my $fh, '<:raw', $path) or do {
+        $c->response->status(500);
+        $c->response->content_type('text/plain');
+        $c->response->body("Cannot read file: $!");
+        return;
+    };
+    $c->response->content_type($mime);
+    $c->response->header('Content-Disposition' => "inline; filename=\"$filename\"");
+    $c->response->header('Content-Length' => -s $path);
+    local $/ = undef;
+    $c->response->body(<$fh>);
+    close $fh;
+}
+
+sub fs_delete :Path('/file/fs_delete') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $path     = $c->req->param('path')     // '';
+    my $dir      = $c->req->param('dir')      // '';
+    my $also_db  = $c->req->param('also_db')  // 0;
+
+    $path =~ s{\.\.}{}g;
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $allowed  = 0;
+    if ($is_csc) {
+        $allowed = 1 if -e $path;
+    } else {
+        my $schema = $c->model('DBEncy');
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+    }
+
+    unless ($allowed && -e $path) {
+        $c->flash->{error_msg} = 'File not found or access denied.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    if (-d $path) {
+        my @children = glob("$path/*");
+        if (@children) {
+            $c->flash->{error_msg} = "Cannot delete '$path': directory is not empty.";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+        unless (rmdir $path) {
+            $c->flash->{error_msg} = "Failed to delete directory: $!";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_delete',
+            "Deleted directory: $path");
+        $c->flash->{success_msg} = "Directory deleted.";
+    } else {
+        unless (unlink $path) {
+            $c->flash->{error_msg} = "Failed to delete file: $!";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_delete',
+            "Deleted file: $path also_db=$also_db");
+
+        if ($also_db) {
+            eval {
+                my $schema = $c->model('DBEncy');
+                my $rec = $schema->resultset('File')->search({
+                    -or => [{ file_path => $path }, { nfs_path => $path }]
+                })->first;
+                $rec->delete if $rec;
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_delete',
+                    "DB record delete failed for $path: $@");
+            }
+        }
+        $c->flash->{success_msg} = "File deleted" . ($also_db ? " (and removed from database)." : " from disk.");
+    }
+
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+}
+
+sub db_import_file :Path('/file/db_import_file') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $file_path = $c->req->param('file_path') // '';
+    my $dir       = $c->req->param('dir')        // '';
+
+    $file_path =~ s{\.\.}{}g;
+
+    unless (-f $file_path) {
+        $c->flash->{error_msg} = "File not found on disk: $file_path";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $file_rs = $schema->resultset('File');
+
+    my $existing = $file_rs->search({
+        -or => [{ file_path => $file_path }, { nfs_path => $file_path }]
+    })->first;
+
+    if ($existing) {
+        $c->flash->{error_msg} = "File already exists in database (ID #" . $existing->id . ").";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    require File::Basename;
+    my $name    = File::Basename::basename($file_path);
+    my ($ext)   = ($name =~ /\.([^.]+)$/);
+    $ext        = lc($ext // '');
+    my $size    = -s $file_path;
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $rel      = $file_path;
+    $rel =~ s{^\Q$nfs_root\E/?}{};
+
+    my $mime        = $SYNC_MIME_MAP{$ext} || 'application/octet-stream';
+    my $upload_date = Time::Piece->new->strftime('%Y-%m-%d %H:%M:%S');
+    my $user_id     = $c->session->{user_id} // 0;
+    my $site_id     = $c->session->{site_id}  // 0;
+    my $res_sitename = $is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename;
+
+    my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size);
+    my ($is_dup, $dup_of) = (0, undef);
+    if ($dup_check) { $is_dup = 1; $dup_of = $dup_check->id; }
+
+    my $new_rec;
+    eval {
+        $new_rec = $file_rs->create({
+            file_name    => $name,
+            file_type    => $ext ? ".$ext" : 'unknown',
+            file_data    => '',
+            site_id      => $site_id,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => "Imported from filesystem: $file_path",
+            upload_date  => $upload_date,
+            file_size    => $size,
+            file_path    => $file_path,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => $mime,
+            user_id      => $user_id,
+            nfs_path     => $rel,
+            external_url => '',
+            access_level => 'site_only',
+            source_type  => 'nfs',
+            sitename     => $res_sitename,
+            is_duplicate => $is_dup,
+            duplicate_of => $dup_of,
+            workshop_id  => undef,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'db_import_file',
+            "DB create failed for $file_path: $err");
+        $c->flash->{error_msg} = "Failed to add to database: $err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'db_import_file',
+            "Added $file_path to DB as id=" . $new_rec->id . " is_dup=$is_dup");
+        my $msg = "Added '$name' to database (ID #" . $new_rec->id . ").";
+        $msg .= " Marked as duplicate of #$dup_of." if $is_dup;
+        $c->flash->{success_msg} = $msg;
+    }
+
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
