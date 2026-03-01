@@ -255,6 +255,110 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
+sub fs_move :Path('/file/fs_move') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $old_path = $c->req->param('old_path') // '';
+    my $dest_dir = $c->req->param('dest_dir') // '';
+    my $dir      = $c->req->param('dir')      // '';
+
+    $old_path =~ s{\.\.}{}g;
+    $dest_dir =~ s{\.\.}{}g;
+    $old_path =~ s/\s+$//;
+    $dest_dir =~ s/\s+$//;
+    $dest_dir =~ s{/+$}{};
+
+    unless (length $old_path && length $dest_dir) {
+        $c->flash->{error_msg} = 'Source path and destination directory are required.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    unless (-e $old_path) {
+        $c->flash->{error_msg} = 'Source file not found.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                my $apath = $a->nfs_path;
+                if (CORE::index($old_path, $apath) == 0 &&
+                    CORE::index($dest_dir, $apath) == 0) {
+                    $allowed = 1; last;
+                }
+            }
+        };
+        unless ($allowed) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
+                "Scope violation: '$sitename' tried to move '$old_path' -> '$dest_dir'");
+            $c->flash->{error_msg} = 'Access denied: destination is outside your allocated directories.';
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+    }
+
+    unless (-d $dest_dir) {
+        eval { make_path($dest_dir) };
+        if ($@ || !-d $dest_dir) {
+            $c->flash->{error_msg} = "Destination directory could not be created: $@";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+    }
+
+    require File::Basename;
+    my $filename = File::Basename::basename($old_path);
+    my $new_path = "$dest_dir/$filename";
+
+    if (-e $new_path) {
+        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'.";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    require File::Copy;
+    unless (File::Copy::move($old_path, $new_path)) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
+            "Move failed: $old_path -> $new_path: $!");
+        $c->flash->{error_msg} = "Move failed: $!";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $rec = $schema->resultset('File')->search(
+            [ { file_path => $old_path }, { nfs_path => $old_path } ]
+        )->first;
+        if ($rec) {
+            $rec->update({ file_path => $new_path, nfs_path => $new_path });
+        }
+    };
+    my $db_err = "$@" if $@;
+    if ($db_err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
+            "DB path update failed after move: $db_err");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_move',
+        "Moved '$old_path' -> '$new_path' user=" . ($c->session->{user_id} // 'anon'));
+    $c->flash->{success_msg} = "Moved '$filename' to '$dest_dir'.";
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dest_dir }));
+}
+
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
     my ($self, $c) = @_;
     my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
