@@ -107,12 +107,17 @@
 
         <!-- File Management -->
         <div class="submenu-item">
-            <span class="submenu-header"><a href="/file"><i class="icon-file"></i>File Management</a></span>
+            <span class="submenu-header"><a href="/file/admin_browser"><i class="icon-file"></i>File Management</a></span>
             <div class="submenu">
-                <a href="/file"><i class="icon-file"></i>File Dashboard</a>
+                <a href="/file/admin_browser"><i class="icon-file"></i>Admin Browser</a>
+                <a href="/file/list"><i class="icon-list"></i>File List</a>
                 <a href="/file/upload_file"><i class="icon-upload"></i>Upload a File</a>
-                <a href="/file/files"><i class="icon-file"></i>Files in Database</a>
-                
+                <a href="/file/duplicates"><i class="icon-copy"></i>Duplicate Files</a>
+                [% IF c.session.SiteName == 'CSC' %]
+                <a href="/file/nfs_allocations"><i class="icon-folder"></i>NFS Allocations</a>
+                [% END %]
+                <a href="/admin/planning"><i class="icon-plan"></i>Implementation Plan</a>
+
                 <!-- File Search Section -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Search by File Type</span>
