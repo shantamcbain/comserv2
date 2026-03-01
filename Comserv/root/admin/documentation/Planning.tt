@@ -189,6 +189,12 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-9" class="jump-link">AutomatedSync</a>
                     </div>
                     <div class="jump-line">
+                        <strong><a href="#group-file-mgmt" class="jump-link">📁 File Management System</a></strong>:
+                        <a href="#group-file-mgmt" class="jump-link">Overview</a> |
+                        Phase: <a href="#group-file-mgmt" class="jump-link">0✓</a>
+                        1 2 3 4 5 6 (Pending)
+                    </div>
+                    <div class="jump-line">
                         <strong><a href="#group-workshops" class="jump-link">🎓 WorkShops System</a></strong>:
                         <a href="#anchor-workshops-project" class="jump-link">WorkShopsProject</a>
                     </div>
@@ -237,6 +243,7 @@ last_updated = '2026/02/08'
                 <li><strong>WorkShops:</strong> <a href="[% base_url %]4004/workshop" target="_blank">workshops-7d21</a> <em>(port 4004)</em> - Workshop Advertising System with Multi-Site Support</li>
                 <li><strong>Users:</strong> <a href="[% base_url %]4005/user/dashboard" target="_blank">users-e5b8</a> <em>(port 4005)</em> - User & Admin Management System with Email Verification and Role Management</li>
                 <li><strong>ProjectConfig:</strong> <a href="[% base_url %]3000/Documentation/DailyPlan" target="_blank">set-up-project-config-d327</a> <em>(ports 3000, 5000)</em> - Zenflow Project Configuration & Docker Container Testing</li>
+                <li><strong>FileManagement:</strong> <a href="/admin/planning#group-file-mgmt">new-task-bb05</a> - NFS-backed File Management System with multi-tier access control, duplicate detection, and workshop file sharing across SiteNames</li>
             </ul>
             
             <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
@@ -2068,6 +2075,122 @@ last_updated = '2026/02/08'
                     </ul>
                 </div>
             </details>
+            </div>
+        </details>
+
+        <!-- Group: File Management System -->
+        <details id="group-file-mgmt" class="priority-group-container" open>
+            <summary class="group-header">📁 File Management System</summary>
+            <div class="priority-content">
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">HIGH</span></p>
+            <p><strong>Zenflow Task:</strong> <code>new-task-bb05</code> | <strong>Branch:</strong> <code>new-task-bb05</code></p>
+
+            <p><strong>Objective:</strong> Production-ready NFS-backed file management system with multi-tier access control, duplicate detection, file renaming, and workshop file sharing across SiteNames.</p>
+
+            <h4>📋 Overview</h4>
+            <ul>
+                <li>CSC Admin manages NFS directory allocations per SiteName (<code>nfs_directory</code> table)</li>
+                <li>SiteName Admins browse and manage files scoped to their allocated directories</li>
+                <li>All files tracked in the <code>files</code> DB table (already exists)</li>
+                <li>Duplicate detection by file name + size on upload and NFS sync</li>
+                <li>Atomic file rename: filesystem + DB updated together, DB rolled back on FS failure</li>
+                <li>Workshop file sharing across SiteNames via <code>WorkshopResource.access_level</code></li>
+                <li>Server-room services (Proxmox etc.) tracked read-only via NFS sync</li>
+            </ul>
+
+            <h4>🗺️ Delivery Phases</h4>
+
+            <details class="priority-container" open>
+                <summary><strong>Phase 0 — Navigation &amp; Admin Dashboard</strong> <span class="status-completed">COMPLETE</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File Management dropdown expanded in admin top menu (<code>admintopmenu.tt</code>)</li>
+                        <li>File Management section added to <a href="/admin">/admin</a> dashboard</li>
+                        <li>This Planning entry added to <code>admin/documentation/Planning.tt</code></li>
+                        <li><code>/admin/planning</code> route added to <code>Controller/Admin.pm</code></li>
+                    </ul>
+                    <p><strong>New nav links:</strong>
+                        <a href="/file/admin_browser">Admin Browser</a> |
+                        <a href="/file/list">File List</a> |
+                        <a href="/file/duplicates">Duplicates</a> |
+                        <a href="/file/nfs_allocations">NFS Allocations (CSC)</a>
+                    </p>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 1 — Fixes &amp; Foundation</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>Fix bare <code>some_criteria</code> syntax error in <code>Model/File.pm</code> <code>get_top_files</code></li>
+                        <li>Remove debug <code>sleep()</code> / <code>print</code> calls from <code>Controller/File.pm</code></li>
+                        <li>Create <code>nfs_directory</code> table + <code>Result/NfsDirectory.pm</code></li>
+                        <li>Add <code>_resolve_roles</code> helper to controller</li>
+                        <li>Add <code>get_files_filtered</code>, <code>get_file_by_id</code>, <code>check_duplicate</code> to model</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 2 — Admin Browser &amp; File List</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/admin_browser">Admin Browser</a> — NFS directory tree scoped by role + <code>AdminBrowser.tt</code></li>
+                        <li><a href="/file/list">File List</a> — filterable DB file table + <code>FileList.tt</code></li>
+                        <li>Update <code>index</code> action redirect</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 3 — View, Edit &amp; Rename</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li>File detail view <code>/file/view/:id</code> + <code>FileView.tt</code></li>
+                        <li>Metadata edit <code>/file/edit/:id</code> (description, status, access_level) + <code>FileEdit.tt</code></li>
+                        <li>Atomic rename: <code>rename()</code> on NFS + DB update, rollback on FS failure</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 4 — Upload &amp; Download</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/upload_file">Upload</a> — writes to NFS dir, duplicate-checks, creates <code>files</code> record</li>
+                        <li>Download <code>/file/download/:id</code> — streams file with correct Content-Type header</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 5 — NFS Allocation Management (CSC Admin)</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/nfs_allocations">NFS Allocations</a> — create/edit/deactivate per-SiteName NFS paths</li>
+                        <li>Admin Browser scoped to allocated dirs for SiteName admins</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="priority-container">
+                <summary><strong>Phase 6 — Duplicate Management</strong> <span class="status-pending">PENDING</span></summary>
+                <div class="priority-content">
+                    <ul>
+                        <li><a href="/file/duplicates">Duplicate Files</a> — view pairs, resolve (keep/delete/unmark)</li>
+                        <li>Duplicate check wired into upload and NFS sync</li>
+                    </ul>
+                </div>
+            </details>
+
+            <h4>📚 Reference</h4>
+            <ul>
+                <li>Spec: <code>.zenflow/tasks/new-task-bb05/spec.md</code></li>
+                <li>PRD: <code>.zenflow/tasks/new-task-bb05/requirements.md</code></li>
+                <li>Key files: <code>Controller/File.pm</code>, <code>Model/File.pm</code>, <code>Result/File.pm</code></li>
+            </ul>
+
             </div>
         </details>
 
