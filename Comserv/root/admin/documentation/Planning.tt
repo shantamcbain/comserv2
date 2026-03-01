@@ -2125,7 +2125,7 @@ last_updated = '2026/02/08'
                     <ul>
                         <li>Fix bare <code>some_criteria</code> syntax error in <code>Model/File.pm</code> <code>get_top_files</code></li>
                         <li>Remove debug <code>sleep()</code> / <code>print</code> calls from <code>Controller/File.pm</code></li>
-                        <li>Create <code>nfs_directory</code> table + <code>Result/NfsDirectory.pm</code></li>
+                        <li>Create <code>Result/NfsDirectory.pm</code> (DBIx::Class Result class only — table created by DBA, no .sql files)</li>
                         <li>Add <code>_resolve_roles</code> helper to controller</li>
                         <li>Add <code>get_files_filtered</code>, <code>get_file_by_id</code>, <code>check_duplicate</code> to model</li>
                     </ul>
