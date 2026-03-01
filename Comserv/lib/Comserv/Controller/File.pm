@@ -786,6 +786,13 @@ sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
         if ($file_row) {
             $existing_files++;
         } else {
+            my $existing_dup = $c->model('File')->check_duplicate($schema, $name, $file_size);
+            my ($is_dup, $dup_of) = (0, undef);
+            if ($existing_dup) {
+                $is_dup = 1;
+                $dup_of = $existing_dup->id;
+            }
+
             eval {
                 $file_row = $file_rs->create({
                     workshop_id  => ($workshop_id || undef),
@@ -809,8 +816,8 @@ sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
                     access_level => $access_level,
                     source_type  => $source_type,
                     sitename     => $resolved_sitename,
-                    is_duplicate => 0,
-                    duplicate_of => undef,
+                    is_duplicate => $is_dup,
+                    duplicate_of => $dup_of,
                 });
             };
             if ($@ || !$file_row) {
@@ -912,6 +919,13 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
             next;
         }
 
+        my $existing_dup_all = $c->model('File')->check_duplicate($schema, $name, $file_size);
+        my ($is_dup_all, $dup_of_all) = (0, undef);
+        if ($existing_dup_all) {
+            $is_dup_all = 1;
+            $dup_of_all = $existing_dup_all->id;
+        }
+
         eval {
             $file_rs->create({
                 workshop_id  => undef,
@@ -935,8 +949,8 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
                 access_level => 'site_only',
                 source_type  => 'nfs',
                 sitename     => $resolved_sitename,
-                is_duplicate => 0,
-                duplicate_of => undef,
+                is_duplicate => $is_dup_all,
+                duplicate_of => $dup_of_all,
             });
         };
         if ($@) {
@@ -949,6 +963,121 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
 
     $c->flash->{success_msg} = "NFS refresh complete. Added: $added_files, existing: $existing_files, failed: $failed.";
     $c->response->redirect($c->uri_for($return_to));
+}
+
+sub duplicates :Path('/file/duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'duplicates',
+        "Duplicates page accessed by user=" . ($c->session->{user_id} // 'anon') . " sitename=$sitename is_csc=$is_csc");
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $sitename_filter = $c->req->param('sitename_filter') // '';
+    my $duplicate_pairs = $c->model('File')->get_duplicates($c, $sitename_filter);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'duplicates',
+        "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] }));
+
+    $c->stash(
+        duplicate_pairs => $duplicate_pairs,
+        is_csc          => $is_csc,
+        sitename_filter => $sitename_filter,
+        template        => 'file/Duplicates.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+        "Resolve duplicate POST id=$id user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    my $action = $c->req->param('action') // '';
+
+    my $file = $c->model('File')->get_file_by_id($c, $id);
+    unless ($file) {
+        $c->flash->{error_msg} = "File #$id not found or access denied.";
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    unless ($file->is_duplicate) {
+        $c->flash->{error_msg} = "File #$id is not marked as a duplicate.";
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    if ($action eq 'keep') {
+        eval {
+            $file->update({ is_duplicate => 0, duplicate_of => undef });
+        };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
+                "Failed to promote file id=$id to non-duplicate: $err");
+            $self->send_error_notification($c, 'Duplicate Resolve Error', "File id=$id keep failed: $err")
+                if $self->can('send_error_notification');
+            $c->flash->{error_msg} = "Failed to resolve duplicate: $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                "File id=$id promoted to original (is_duplicate cleared)");
+            $c->flash->{success_msg} = "File '" . $file->file_name . "' is now kept as an original.";
+        }
+    } elsif ($action eq 'delete') {
+        my $nfs_path  = $file->nfs_path  // '';
+        my $file_path = $file->file_path // '';
+        my $file_name = $file->file_name;
+
+        my $fs_path = length($file_path) && -f $file_path ? $file_path
+                    : length($nfs_path)  && -f $nfs_path  ? $nfs_path
+                    : '';
+
+        if (length $fs_path) {
+            eval { unlink $fs_path or die "unlink failed: $!" };
+            my $unlink_err = "$@" if $@;
+            if ($unlink_err) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'resolve_duplicate',
+                    "Could not delete file id=$id from filesystem path=$fs_path: $unlink_err");
+            }
+        }
+
+        eval { $file->delete };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
+                "Failed to delete duplicate file id=$id from DB: $err");
+            $self->send_error_notification($c, 'Duplicate Delete Error', "File id=$id delete failed: $err")
+                if $self->can('send_error_notification');
+            $c->flash->{error_msg} = "Failed to delete duplicate: $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                "Duplicate file id=$id name=$file_name deleted from DB and filesystem");
+            $c->flash->{success_msg} = "Duplicate file '$file_name' deleted.";
+        }
+    } else {
+        $c->flash->{error_msg} = "Unknown action '$action'. Use 'keep' or 'delete'.";
+    }
+
+    $c->response->redirect($c->uri_for('/file/duplicates'));
 }
 
 sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {

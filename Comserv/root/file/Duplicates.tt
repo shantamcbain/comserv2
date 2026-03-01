@@ -1,0 +1,138 @@
+[% META
+   title = "Duplicate Files"
+   description = "View and resolve duplicate files in the file management system"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/Duplicates.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>Duplicate Files</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div class="error">[% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div class="error">[% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div class="success">[% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF is_csc %]
+      <div class="content-section">
+        <h3>Filter by SiteName</h3>
+        <form method="get" action="[% c.uri_for('/file/duplicates') %]" class="app-form">
+          <div class="form-section">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="sitename_filter">SiteName:</label>
+                <input type="text" id="sitename_filter" name="sitename_filter"
+                       value="[% sitename_filter | html %]"
+                       placeholder="Leave blank for all" class="form-input">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Filter</button>
+              <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">Clear</a>
+            </div>
+          </div>
+        </form>
+      </div>
+      [% END %]
+
+      <div class="content-section">
+        [% IF duplicate_pairs.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Duplicate File</th>
+                [% IF is_csc %]<th>SiteName</th>[% END %]
+                <th>Size</th>
+                <th>Uploaded</th>
+                <th>Original File</th>
+                <th>Original ID</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH pair IN duplicate_pairs %]
+              <tr>
+                <td>
+                  <a href="[% c.uri_for('/file/view', pair.duplicate.id) %]">
+                    [% pair.duplicate.file_name | html %]
+                  </a>
+                  <br><small>#[% pair.duplicate.id | html %]</small>
+                </td>
+                [% IF is_csc %]
+                <td>[% pair.duplicate.sitename | html %]</td>
+                [% END %]
+                <td>[% pair.duplicate.file_size | html %]</td>
+                <td>[% pair.duplicate.upload_date | html %]</td>
+                <td>
+                  [% IF pair.original %]
+                  <a href="[% c.uri_for('/file/view', pair.original.id) %]">
+                    [% pair.original.file_name | html %]
+                  </a>
+                  [% ELSE %]
+                  <em>Original not found</em>
+                  [% END %]
+                </td>
+                <td>
+                  [% IF pair.original %]
+                  #[% pair.original.id | html %]
+                  [% ELSE %]
+                  &mdash;
+                  [% END %]
+                </td>
+                <td class="action-cell">
+                  <form method="post" action="[% c.uri_for('/file/resolve_duplicate', pair.duplicate.id) %]"
+                        style="display:inline">
+                    <input type="hidden" name="action" value="keep">
+                    <button type="submit" class="btn btn-sm btn-edit"
+                            onclick="return confirm('Promote this file as an original (remove duplicate flag)?')">
+                      Keep
+                    </button>
+                  </form>
+                  <form method="post" action="[% c.uri_for('/file/resolve_duplicate', pair.duplicate.id) %]"
+                        style="display:inline">
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn btn-sm btn-delete"
+                            onclick="return confirm('Delete this duplicate file permanently? This cannot be undone.')">
+                      Delete
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No duplicate files found.</p>
+        [% END %]
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Back to File List</a>
+          <a href="[% c.uri_for('/file/admin_browser') %]" class="btn btn-secondary">Admin Browser</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
