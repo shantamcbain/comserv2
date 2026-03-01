@@ -95,9 +95,21 @@
     <h1><i class="fi fi-folder"></i> File Browser</h1>
   </div>
 
-  [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
-  [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
-  [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20">
+    <strong>Done:</strong> [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
 
   [%# ── Quick action bar ─────────────────────────────────────── %]
   <div class="content-section">
@@ -185,18 +197,34 @@
           </form>
         </div>
 
-        [%# Breadcrumb ───────────────────────────────────────── %]
+        [%# Breadcrumb — CSC admin sees full path; others only see below nav_root %]
         <div class="fb-breadcrumb">
           [% IF parent_dir %]
           <a href="[% c.uri_for('/file/admin_browser', { dir_path => parent_dir }) %]">&#8593; Up</a>
           <span class="sep">/</span>
           [% END %]
-          [% SET crumb_path = '' %]
-          [% FOREACH part IN current_directory.split('/') %]
-            [% IF part %]
-              [% SET crumb_path = crumb_path _ '/' _ part %]
-              <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
-              <span class="sep">/</span>
+          [% IF is_csc %]
+            [% SET crumb_path = '' %]
+            [% FOREACH part IN current_directory.split('/') %]
+              [% IF part %]
+                [% SET crumb_path = crumb_path _ '/' _ part %]
+                <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
+                <span class="sep">/</span>
+              [% END %]
+            [% END %]
+          [% ELSE %]
+            [%# Show only path segments at/below nav_root %]
+            [% SET nav_root_shown = 0 %]
+            [% SET crumb_path = '' %]
+            [% FOREACH part IN current_directory.split('/') %]
+              [% IF part %]
+                [% SET crumb_path = crumb_path _ '/' _ part %]
+                [% IF crumb_path == nav_root || nav_root_shown %]
+                  [% SET nav_root_shown = 1 %]
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
+                  <span class="sep">/</span>
+                [% END %]
+              [% END %]
             [% END %]
           [% END %]
         </div>
@@ -322,11 +350,9 @@
                     <button type="button" class="btn btn-sm btn-edit"
                             onclick="fbRenameShow('[% fid %]','[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
                             title="Rename">Rename</button>
-                    <form method="post" action="[% c.uri_for('/file/db_import_file') %]" style="display:inline">
-                      <input type="hidden" name="file_path" value="[% full_path | html %]">
-                      <input type="hidden" name="dir"       value="[% current_directory | html %]">
-                      <button type="submit" class="btn btn-sm" title="Add to database for other users">+DB</button>
-                    </form>
+                    <button type="button" class="btn btn-sm"
+                            onclick="fbOpenDbImport('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
+                            title="Add to database so other users can find and use this file">+DB</button>
                     <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
                           onsubmit="return fbConfirmDelete('[% fname_esc %]',this)">
                       <input type="hidden" name="path"    value="[% full_path | html %]">
@@ -427,6 +453,44 @@
       <i class="fas fa-download"></i> Download
     </a>
     <button type="button" class="btn btn-secondary" onclick="fbClosePreview()">Close</button>
+  </div>
+</div>
+
+[%# ── DB Import modal ───────────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-db-overlay" onclick="fbCancelDbImport()"></div>
+<div class="fb-modal" id="fb-db-modal" style="max-width:480px">
+  <div class="fb-modal-header">
+    <h3>Add File to Database</h3>
+    <button class="fb-modal-close" onclick="fbCancelDbImport()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:16px 20px;display:block">
+    <p style="font-weight:bold;margin-bottom:12px;word-break:break-all" id="fb-db-import-name"></p>
+    <p style="font-size:.85rem;margin-bottom:14px;color:#555">
+      Adding to the database makes this file discoverable by other users of the application.
+      Choose who should be able to see it:
+    </p>
+    <form id="fb-db-import-form" method="post" action="[% c.uri_for('/file/db_import_file') %]">
+      <input type="hidden" id="fb-db-path" name="file_path" value="">
+      <input type="hidden" id="fb-db-dir"  name="dir"       value="">
+      <div class="form-field" style="margin-bottom:12px">
+        <label for="fb-db-access" style="font-weight:600;display:block;margin-bottom:4px">Visibility:</label>
+        <select id="fb-db-access" name="access_level" class="form-input">
+          <option value="site_only">SiteName users only (default)</option>
+          <option value="public">Public — visible to all sites</option>
+          <option value="private">Private — owner only</option>
+        </select>
+      </div>
+      <p style="font-size:.78rem;color:#888">
+        The file stays on the NFS server. This only creates a database record so users can
+        search, download and reference it through the application.
+      </p>
+    </form>
+  </div>
+  <div class="fb-modal-footer">
+    <button type="button" class="btn btn-primary" onclick="document.getElementById('fb-db-import-form').submit()">
+      Add to Database
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelDbImport()">Cancel</button>
   </div>
 </div>
 
@@ -550,6 +614,20 @@ function fbConfirmDelete(name, form) {
 function fbCancelDelete() {
     document.getElementById('fb-del-overlay').style.display = 'none';
     document.getElementById('fb-del-modal').classList.remove('open');
+}
+
+function fbOpenDbImport(filePath, fileName, dir) {
+    document.getElementById('fb-db-path').value = filePath;
+    document.getElementById('fb-db-dir').value  = dir;
+    document.getElementById('fb-db-import-name').textContent = fileName;
+    document.getElementById('fb-db-access').value = 'site_only';
+    document.getElementById('fb-db-overlay').style.display = 'block';
+    document.getElementById('fb-db-modal').classList.add('open');
+}
+
+function fbCancelDbImport() {
+    document.getElementById('fb-db-overlay').style.display = 'none';
+    document.getElementById('fb-db-modal').classList.remove('open');
 }
 
 function fbShowLocalList(input) {
