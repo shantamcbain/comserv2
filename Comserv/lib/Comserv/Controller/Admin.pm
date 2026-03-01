@@ -951,9 +951,9 @@ sub planning :Path('/admin/planning') :Args(0) {
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
-    $c->stash(template => 'admin/Planning.tt');
+    $c->stash(template => 'admin/documentation/Planning.tt');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
-        "Rendering admin/Planning.tt");
+        "Rendering admin/documentation/Planning.tt");
     $c->forward($c->view('TT'));
 }
 
