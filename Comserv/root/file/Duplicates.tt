@@ -240,17 +240,24 @@
             [% END %]
 
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
-              <input type="hidden" name="action" value="keep">
+              <input type="hidden" name="action" value="swap">
               <button type="submit" class="btn btn-sm btn-edit"
-                      onclick="return confirm('Promote duplicate #[% dup.id %] as an original (remove duplicate flag)?')">
-                Promote to Original
+                      onclick="return confirm('Make #[% dup.id %] the original and mark #[% orig ? orig.id : '?' %] as the duplicate instead?')">
+                Make This the Original
               </button>
             </form>
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
-              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="action" value="delete_db">
+              <button type="submit" class="btn btn-sm"
+                      onclick="return confirm('Remove duplicate #[% dup.id %] from the database only? The file on disk will NOT be deleted.')">
+                Delete (DB only)
+              </button>
+            </form>
+            <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+              <input type="hidden" name="action" value="delete_both">
               <button type="submit" class="btn btn-sm btn-delete"
-                      onclick="return confirm('Delete duplicate #[% dup.id %] ([% dup.file_name | html %])? This cannot be undone.')">
-                Delete Duplicate
+                      onclick="return confirm('Delete duplicate #[% dup.id %] from the database AND from disk? This cannot be undone.')">
+                Delete (DB + Disk)
               </button>
             </form>
 
