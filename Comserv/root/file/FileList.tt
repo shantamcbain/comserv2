@@ -1,0 +1,194 @@
+[% META
+   title = "File List"
+   description = "Browse and manage all files tracked in the database"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.02"
+   last_updated = "2026-02-28"
+%]
+[% PageVersion = 'file/FileList.tt,v 0.02 2026/02/28 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<style>
+/* ── Responsive file list ─────────────────────────────────────── */
+.fl-wrap      { overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; }
+.fl-table     { width:100%; border-collapse:collapse; font-size:.875rem; min-width:480px; }
+.fl-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
+                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
+.fl-table tbody tr:nth-child(even) { background:#fafafa; }
+.fl-table tbody tr:hover { background:#f0f5ff; }
+.fl-table td  { padding:5px 10px; vertical-align:middle; border-bottom:1px solid #f0f0f0; }
+.fl-name      { max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl-name a    { color:#1565c0; text-decoration:none; }
+.fl-name a:hover { text-decoration:underline; }
+.fl-num       { text-align:right; white-space:nowrap; color:#555; font-size:.8rem; }
+.fl-date      { white-space:nowrap; color:#666; font-size:.8rem; }
+.fl-badge     { display:inline-block; padding:1px 6px; border-radius:3px;
+                font-size:.7rem; font-weight:bold; color:#fff; }
+.fl-badge-dup { background:#c0720a; }
+.fl-badge-ok  { background:#78909c; }
+.btn { display:inline-block; padding:5px 10px; border:none; border-radius:4px;
+       cursor:pointer; font-size:.85rem; text-decoration:none; line-height:1.4;
+       vertical-align:middle; font-weight:500; }
+.btn:hover { opacity:.88; text-decoration:none; }
+.btn-sm        { padding:2px 8px; font-size:.75rem; }
+.btn-primary   { background:#007bff; color:#fff !important; }
+.btn-secondary { background:#6c757d; color:#fff !important; }
+.btn-edit      { background:#fd7e14; color:#fff !important; }
+.btn-delete    { background:#dc3545; color:#fff !important; }
+</style>
+
+[% MACRO fmt_size(b) BLOCK %]
+[% IF    b >= 1073741824 %][% b / 1073741824 | format('%.1f') %]&nbsp;GB
+[% ELSIF b >= 1048576    %][% b / 1048576    | format('%.1f') %]&nbsp;MB
+[% ELSIF b >= 1024       %][% b / 1024       | format('%.1f') %]&nbsp;KB
+[% ELSIF b               %][% b %]&nbsp;B
+[% ELSE %]—[% END %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>File List
+      [% IF files.size %]<small style="font-size:.6em;font-weight:normal;margin-left:8px;color:#777">([% files.size %] files)</small>[% END %]
+    </h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <details [% IF filter_params.sitename || filter_params.file_status || filter_params.file_type || filter_params.is_duplicate %]open[% END %]>
+          <summary class="btn btn-secondary">&#9660; Filters</summary>
+          <form method="get" action="[% c.uri_for('/file/list') %]" class="app-form">
+            <div class="form-row">
+
+              [% IF is_csc %]
+              <div class="form-field">
+                <label for="sitename_filter">Site:</label>
+                <select id="sitename_filter" name="sitename_filter" class="form-input">
+                  <option value="">— All —</option>
+                  [% FOREACH site IN sites %]
+                  <option value="[% site.name | html %]"
+                    [% 'selected' IF filter_params.sitename == site.name %]>
+                    [% site.name | html %]
+                  </option>
+                  [% END %]
+                </select>
+              </div>
+              [% END %]
+
+              <div class="form-field">
+                <label for="status_filter">Status:</label>
+                <select id="status_filter" name="status_filter" class="form-input">
+                  <option value="">— All —</option>
+                  <option value="active"   [% 'selected' IF filter_params.file_status == 'active'   %]>Active</option>
+                  <option value="inactive" [% 'selected' IF filter_params.file_status == 'inactive' %]>Inactive</option>
+                  <option value="archived" [% 'selected' IF filter_params.file_status == 'archived' %]>Archived</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="type_filter">Type:</label>
+                <input type="text" id="type_filter" name="type_filter"
+                       value="[% filter_params.file_type | html %]"
+                       placeholder=".pdf" class="form-input">
+              </div>
+
+              <div class="form-field">
+                <label for="duplicate_filter">Dups:</label>
+                <select id="duplicate_filter" name="duplicate_filter" class="form-input">
+                  <option value="">— All —</option>
+                  <option value="1" [% 'selected' IF filter_params.is_duplicate == '1' %]>Duplicates</option>
+                  <option value="0" [% 'selected' IF filter_params.is_duplicate == '0' %]>Originals</option>
+                </select>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">Clear</a>
+              </div>
+
+            </div>
+          </form>
+        </details>
+      </div>
+
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/file/admin_browser') %]" class="btn btn-secondary"><i class="fas fa-folder-open"></i> Browser</a>
+          <a href="[% c.uri_for('/file/upload_file') %]" class="btn btn-primary"><i class="fas fa-upload"></i> Upload</a>
+          <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary"><i class="fas fa-copy"></i> Duplicates</a>
+          [% IF is_csc %]
+          <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary"><i class="fas fa-network-wired"></i> NFS</a>
+          [% END %]
+        </div>
+      </div>
+
+      <div class="content-section">
+        [% IF files.size %]
+        <div class="fl-wrap">
+          <table class="fl-table">
+            <thead>
+              <tr>
+                <th style="min-width:140px">Name</th>
+                [% IF is_csc %]<th>Site</th>[% END %]
+                <th>Type</th>
+                <th class="fl-num">Size</th>
+                <th>Status</th>
+                <th>Dup</th>
+                <th class="fl-date">Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH file IN files %]
+              <tr>
+                <td class="fl-name" title="[% file.file_name | html %]">
+                  <a href="[% c.uri_for('/file/view', file.id) %]">[% file.file_name | html %]</a>
+                </td>
+                [% IF is_csc %]<td style="white-space:nowrap;font-size:.8rem">[% file.sitename | html %]</td>[% END %]
+                <td style="white-space:nowrap;font-size:.8rem">[% file.file_type | html %]</td>
+                <td class="fl-num">[% fmt_size(file.file_size) %]</td>
+                <td style="font-size:.8rem">[% file.file_status | html %]</td>
+                <td>
+                  [% IF file.is_duplicate %]
+                  <a href="[% c.uri_for('/file/duplicates') %]"
+                     class="fl-badge fl-badge-dup" title="View duplicate details">Dup</a>
+                  [% ELSE %]
+                  <span class="fl-badge fl-badge-ok">OK</span>
+                  [% END %]
+                </td>
+                <td class="fl-date">
+                  [% file.upload_date.replace(' .*', '') | html %]
+                </td>
+                <td style="white-space:nowrap">
+                  <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-sm btn-edit">Edit</a>
+                  <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm" title="Download">&#8595;</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No files found matching the selected filters.</p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>
