@@ -297,7 +297,7 @@
                   <div class="fb-row-actions">
                     <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
                        class="btn btn-sm btn-edit" title="Open">Open</a>
-                    <button type="button" class="btn btn-sm"
+                    <button type="button" class="btn btn-sm btn-edit"
                             onclick="fbRenameShow('[% rid %]','[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
                             title="Rename">Rename</button>
                     <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
@@ -366,19 +366,19 @@
                 <td>
                   <div class="fb-row-actions">
                     [% IF can_preview %]
-                    <button type="button" class="btn btn-sm"
+                    <button type="button" class="btn btn-sm btn-primary"
                             onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]')"
                             title="Preview / View">View</button>
                     [% END %]
                     <a href="[% c.uri_for('/file/fs_download', { path => full_path }) %]"
-                       class="btn btn-sm" title="Download">&#8595; DL</a>
+                       class="btn btn-sm btn-secondary" title="Download">&#8595; DL</a>
                     <button type="button" class="btn btn-sm btn-edit"
                             onclick="fbRenameShow('[% fid %]','[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
                             title="Rename">Rename</button>
-                    <button type="button" class="btn btn-sm"
+                    <button type="button" class="btn btn-sm btn-secondary"
                             onclick="fbOpenMove('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
                             title="Move file to another directory">Move</button>
-                    <button type="button" class="btn btn-sm"
+                    <button type="button" class="btn btn-sm btn-secondary"
                             onclick="fbOpenDbImport('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
                             title="Add to database so other users can find and use this file">+DB</button>
                     <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
