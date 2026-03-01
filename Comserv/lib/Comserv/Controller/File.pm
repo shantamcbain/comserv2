@@ -282,42 +282,104 @@ sub extract_file_data {
 
     return ($name, $size, $creation_date, $file_path);
 }
-sub upload_file :Local {
+sub upload_file :Path('/file/upload_file') :Args(0) {
     my ($self, $c) = @_;
-# Get all sites
-my $sites = $c->model('Site')->get_all_sites();
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
 
-# Pass the sites to the template
-$c->stash->{sites} = $sites;
-    # Get the upload from the request
-    my $upload = $c->request->upload('file');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upload_file',
+        "Upload file accessed method=" . $c->req->method . " user=" . ($c->session->{user_id} // 'anon') . " sitename=$sitename");
 
-    # If no file has been uploaded, display the file_upload.tt template
-    if (!defined $upload) {
-        $c->stash(template => 'file/file_upload.tt');
-        $c->forward('View::TT');
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
         return;
     }
 
-    # Determine the directory to store the file in based on the user's permissions
-    my $directory;
-    my $root_controller = $c->controller('Root');
-    if ($root_controller->user_exists($c) && $root_controller->check_user_roles($c, 'admin')) {
-        # If the user is an admin, they can upload to any directory
-        $directory = $c->request->param('directory');
+    my $schema = $c->model('DBEncy');
+
+    my $allocated_dirs;
+    if ($is_csc) {
+        my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 }, { order_by => 'sitename' })->all;
+        $allocated_dirs = \@allocs;
     } else {
-        # Otherwise, restrict the directory to a specific location
-        $directory = '/path/to/restricted/directory';
+        my @allocs = $schema->resultset('NfsDirectory')->search(
+            { sitename => $sitename, is_active => 1 },
+            { order_by => 'nfs_path' }
+        )->all;
+        $allocated_dirs = \@allocs;
     }
 
-    # Use the model to handle the file upload
-    my $result = $c->model('File')->handle_upload($upload, $directory);
+    if ($c->req->method eq 'POST') {
+        my $nfs_dir_id = $c->req->param('nfs_dir_id') // '';
+        my $upload     = $c->req->upload('file');
 
-    if ($result) {
-        $c->response->body('File uploaded successfully.');
-    } else {
-        $c->response->body('Failed to upload file.');
+        unless ($upload) {
+            $c->stash(
+                allocated_dirs => $allocated_dirs,
+                is_csc         => $is_csc,
+                error_msg      => 'No file selected for upload.',
+                template       => 'file/FileUpload.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        unless ($nfs_dir_id =~ /^\d+$/) {
+            $c->stash(
+                allocated_dirs => $allocated_dirs,
+                is_csc         => $is_csc,
+                error_msg      => 'Please select a valid target directory.',
+                template       => 'file/FileUpload.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        unless ($is_csc) {
+            my $allowed = grep { $_->id == $nfs_dir_id } @$allocated_dirs;
+            unless ($allowed) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'upload_file',
+                    "SiteName admin '$sitename' attempted upload to unallocated dir id=$nfs_dir_id");
+                $c->stash(
+                    allocated_dirs => $allocated_dirs,
+                    is_csc         => $is_csc,
+                    error_msg      => 'Access denied to that directory.',
+                    template       => 'file/FileUpload.tt',
+                );
+                $c->forward($c->view('TT'));
+                return;
+            }
+        }
+
+        my ($file_row, $upload_err) = $c->model('File')->upload_and_record($c, $upload, $nfs_dir_id);
+
+        if ($upload_err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'upload_file',
+                "Upload failed nfs_dir_id=$nfs_dir_id filename=" . $upload->filename . ": $upload_err");
+            $c->stash(
+                allocated_dirs => $allocated_dirs,
+                is_csc         => $is_csc,
+                error_msg      => "Upload failed: $upload_err",
+                template       => 'file/FileUpload.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        my $dup_msg = $file_row->is_duplicate ? ' (detected as duplicate)' : '';
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upload_file',
+            "File uploaded id=" . $file_row->id . " name=" . $file_row->file_name . $dup_msg);
+        $c->flash->{success_msg} = "File '" . $file_row->file_name . "' uploaded successfully.$dup_msg";
+        $c->response->redirect($c->uri_for('/file/list'));
+        return;
     }
+
+    $c->stash(
+        allocated_dirs => $allocated_dirs,
+        is_csc         => $is_csc,
+        template       => 'file/FileUpload.tt',
+    );
+    $c->forward($c->view('TT'));
 }
 
 sub view :Path('/file/view') :Args(1) {
@@ -484,6 +546,69 @@ sub rename :Path('/file/rename') :Args(1) {
     }
 
     $c->response->redirect($c->uri_for('/file/list'));
+}
+
+sub download :Path('/file/download') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
+        "File download requested id=$id user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to download files.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $file = $c->model('File')->get_file_by_id($c, $id);
+    unless ($file) {
+        $c->flash->{error_msg} = "File #$id not found or access denied.";
+        $c->response->redirect($c->uri_for('/file/list'));
+        return;
+    }
+
+    my $full_path = $file->file_path // '';
+    if (!length($full_path) || !-f $full_path) {
+        my $nfs_rel = $file->nfs_path // '';
+        if (length $nfs_rel) {
+            my $nfs_root = $self->_nfs_root_for_sync();
+            $full_path = (-f $nfs_rel) ? $nfs_rel : "$nfs_root/$nfs_rel";
+        }
+    }
+
+    unless (length($full_path) && -f $full_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'download',
+            "File id=$id not found on filesystem: path=" . ($file->file_path // 'undef'));
+        $c->flash->{error_msg} = 'File not found on the filesystem.';
+        $c->response->redirect($c->uri_for('/file/view', $id));
+        return;
+    }
+
+    my $filename = $file->file_name // basename($full_path);
+    my $mime     = $file->file_format || 'application/octet-stream';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
+        "Streaming file id=$id name=$filename path=$full_path");
+
+    open(my $fh, '<:raw', $full_path)
+        or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'download',
+                "Cannot open file id=$id path=$full_path: $!");
+            $c->flash->{error_msg} = "Cannot read file: $!";
+            $c->response->redirect($c->uri_for('/file/view', $id));
+            return;
+        };
+
+    $c->response->content_type($mime);
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Length' => -s $full_path);
+
+    local $/ = undef;
+    my $content = <$fh>;
+    close $fh;
+
+    $c->response->body($content);
 }
 
 sub _resolve_roles {
