@@ -119,8 +119,8 @@
       <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">
         <i class="fas fa-database"></i> DB File List
       </a>
-      <a href="[% c.uri_for('/file/upload_file') %]" class="btn btn-primary">
-        <i class="fas fa-upload"></i> Upload to DB
+      <a href="[% c.uri_for('/file/upload_file', { dir_path => current_directory }) %]" class="btn btn-primary">
+        &#8679; Upload to DB
       </a>
       <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">
         <i class="fas fa-copy"></i> Duplicates
@@ -385,45 +385,72 @@
   [%# ── Local Drive Import (admin only, collapsible) ─────────── %]
   [% IF is_admin %]
   <div class="content-section">
-    <details>
-      <summary class="btn btn-secondary">
-        <i class="fas fa-laptop"></i> Import files from your computer
+    <details id="local-upload-section">
+      <summary style="cursor:pointer;padding:6px 0;font-weight:600">
+        &#128190; Import files from your computer
       </summary>
-      <div class="form-section">
-        <p style="margin:8px 0;font-size:.875rem">Select files from <strong>your local computer</strong> and upload them
-           to the selected NFS directory. These files are sent from your browser to the server.</p>
+      <div class="form-section" style="margin-top:10px">
+        <p style="margin:0 0 10px;font-size:.875rem">Files are uploaded from your <strong>local computer</strong> to the server's NFS storage.</p>
+
+        [%# ── Target directory ─── %]
         [% IF allocated_dirs.size %]
         <div class="form-row">
           <div class="form-field">
             <label for="local_target_dir">Upload to:</label>
-            <select id="local_target_dir" class="form-input">
+            <select id="local_target_dir" class="form-input" onchange="fbSyncTarget()">
               [% FOREACH alloc IN allocated_dirs %]
-              <option value="[% alloc.id | html %]">
+              <option value="nfsid:[% alloc.id | html %]" data-path="[% alloc.nfs_path | html %]">
                 [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
               </option>
               [% END %]
             </select>
           </div>
+        </div>
+        [% ELSIF is_csc %]
+        <div class="form-row">
           <div class="form-field">
-            <label for="local_files"><i class="fas fa-folder-open"></i> Select files:</label>
-            <input type="file" id="local_files" multiple class="form-input"
-                   onchange="fbShowLocalList(this)">
+            <label for="local_target_path">Server directory path:</label>
+            <input type="text" id="local_target_path" class="form-input"
+                   value="[% current_directory | html %]"
+                   placeholder="e.g. /home/user/nfs/sitename"
+                   style="font-family:monospace" onchange="fbSyncTarget()">
           </div>
         </div>
-        <div id="local-file-preview"></div>
-        <form id="local-upload-form" method="post"
-              action="[% c.uri_for('/file/upload_file') %]"
-              enctype="multipart/form-data">
-          <input type="hidden" id="local-nfs-dir-id" name="nfs_dir_id" value="">
-          <div class="form-actions">
-            <button type="button" class="btn btn-primary" id="local-upload-btn"
-                    style="display:none" onclick="fbDoLocalUpload()">
-              <i class="fas fa-cloud-upload-alt"></i> Upload Selected Files to Server
-            </button>
-          </div>
-        </form>
         [% ELSE %]
         <p class="empty-state">No NFS directories allocated. Ask CSC admin to create an allocation.</p>
+        [% END %]
+
+        [%# ── Mode tabs + file picker ─── %]
+        [% IF allocated_dirs.size || is_csc %]
+        <div class="form-row" style="gap:8px;align-items:center;margin-top:6px">
+          <button type="button" class="btn btn-sm btn-secondary" id="mode-files-btn"
+                  onclick="fbSetMode('files')" style="font-weight:bold">&#128196; Files</button>
+          <button type="button" class="btn btn-sm btn-secondary" id="mode-dir-btn"
+                  onclick="fbSetMode('dir')">&#128193; Folder</button>
+          <span style="font-size:.8rem;color:#666" id="mode-hint">Select individual files</span>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <input type="file" id="local_files_input" multiple class="form-input"
+                 onchange="fbShowLocalList(this)" style="flex:1">
+        </div>
+
+        <div id="local-file-list" style="margin:8px 0"></div>
+
+        <div id="local-upload-progress" style="display:none;margin:8px 0">
+          <div style="background:#eee;border-radius:4px;height:18px;overflow:hidden;margin-bottom:4px">
+            <div id="local-prog-bar" style="background:#1565c0;height:100%;width:0;transition:width .3s"></div>
+          </div>
+          <span id="local-prog-text" style="font-size:.8rem;color:#555"></span>
+        </div>
+
+        <div id="local-upload-errors" style="display:none;margin-top:6px"></div>
+
+        <div class="form-actions" style="margin-top:8px">
+          <button type="button" class="btn btn-primary" id="local-upload-btn"
+                  style="display:none" onclick="fbStartUpload()">
+            &#8679; Upload to Server
+          </button>
+        </div>
         [% END %]
       </div>
     </details>
@@ -534,9 +561,9 @@ function fbPreview(encodedPath, name, ext) {
         img.alt = name;
         body.appendChild(img);
     } else if (pdfs.indexOf(ext) >= 0) {
-        var iframe = document.createElement('iframe');
-        iframe.src = previewUrl;
-        body.appendChild(iframe);
+        window.open(previewUrl, '_blank', 'noopener');
+        fbClosePreview();
+        return;
     } else if (videos.indexOf(ext) >= 0) {
         var vid = document.createElement('video');
         vid.controls = true;
@@ -622,31 +649,106 @@ function fbCancelDbImport() {
     document.getElementById('fb-db-modal').classList.remove('open');
 }
 
-function fbShowLocalList(input) {
-    var files   = Array.from(input.files);
-    var preview = document.getElementById('local-file-preview');
-    var btn     = document.getElementById('local-upload-btn');
-    if (!files.length) { preview.innerHTML = ''; btn.style.display = 'none'; return; }
-    var rows = files.map(function(f) {
-        return '<tr><td>' + f.name + '</td><td>' + (f.size/1024).toFixed(1) + ' KB</td></tr>';
-    }).join('');
-    preview.innerHTML = '<table class="data-table" style="margin:8px 0"><thead><tr><th>Name</th><th>Size</th></tr></thead><tbody>' + rows + '</tbody></table>';
-    btn.style.display = 'inline-block';
-    document.getElementById('local-nfs-dir-id').value =
-        document.getElementById('local_target_dir').value;
+var _fbMode = 'files';
+var _fbUploadUrl = '[% c.uri_for('/file/fs_upload_tree') %]';
+
+function fbGetTargetDir() {
+    var sel = document.getElementById('local_target_dir');
+    if (sel) {
+        var opt = sel.options[sel.selectedIndex];
+        return opt ? (opt.getAttribute('data-path') || '') : '';
+    }
+    var inp = document.getElementById('local_target_path');
+    return inp ? inp.value.trim() : '';
 }
 
-function fbDoLocalUpload() {
-    var input  = document.getElementById('local_files');
-    var form   = document.getElementById('local-upload-form');
-    var nfsId  = document.getElementById('local_target_dir').value;
-    document.getElementById('local-nfs-dir-id').value = nfsId;
-    var dt = new DataTransfer();
-    Array.from(input.files).forEach(function(f) { dt.items.add(f); });
-    var fi = document.createElement('input');
-    fi.type = 'file'; fi.name = 'file'; fi.multiple = true;
-    fi.files = dt.files;
-    form.appendChild(fi);
-    form.submit();
+function fbSyncTarget() {}
+
+function fbSetMode(mode) {
+    _fbMode = mode;
+    var inp = document.getElementById('local_files_input');
+    var hint = document.getElementById('mode-hint');
+    var fb = document.getElementById('mode-files-btn');
+    var db = document.getElementById('mode-dir-btn');
+    if (mode === 'dir') {
+        inp.setAttribute('webkitdirectory', '');
+        inp.setAttribute('multiple', '');
+        inp.removeAttribute('accept');
+        hint.textContent = 'Select a folder — all files inside will be uploaded';
+        fb.style.fontWeight = ''; db.style.fontWeight = 'bold';
+    } else {
+        inp.removeAttribute('webkitdirectory');
+        inp.setAttribute('multiple', '');
+        hint.textContent = 'Select individual files';
+        fb.style.fontWeight = 'bold'; db.style.fontWeight = '';
+    }
+    inp.value = '';
+    document.getElementById('local-file-list').innerHTML = '';
+    document.getElementById('local-upload-btn').style.display = 'none';
+}
+
+function fbShowLocalList(input) {
+    var files = Array.from(input.files);
+    var list  = document.getElementById('local-file-list');
+    var btn   = document.getElementById('local-upload-btn');
+    if (!files.length) { list.innerHTML = ''; btn.style.display = 'none'; return; }
+    var rows = files.map(function(f) {
+        var rel = f.webkitRelativePath || f.name;
+        return '<tr><td style="font-size:.8rem">' + rel + '</td><td style="font-size:.8rem;white-space:nowrap">' + (f.size/1024).toFixed(1) + ' KB</td></tr>';
+    }).join('');
+    list.innerHTML = '<table class="data-table" style="font-size:.8rem"><thead><tr><th>File</th><th>Size</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    btn.style.display = 'inline-block';
+}
+
+function fbStartUpload() {
+    var input  = document.getElementById('local_files_input');
+    var files  = Array.from(input.files);
+    if (!files.length) { alert('No files selected.'); return; }
+    var target = fbGetTargetDir();
+    if (!target) { alert('Please specify a target directory.'); return; }
+
+    var btn     = document.getElementById('local-upload-btn');
+    var progDiv = document.getElementById('local-upload-progress');
+    var progBar = document.getElementById('local-prog-bar');
+    var progTxt = document.getElementById('local-prog-text');
+    var errDiv  = document.getElementById('local-upload-errors');
+    btn.disabled = true;
+    progDiv.style.display = 'block';
+    errDiv.style.display  = 'none';
+    errDiv.innerHTML = '';
+
+    var done = 0, errors = [];
+
+    function uploadNext(i) {
+        if (i >= files.length) {
+            progBar.style.width = '100%';
+            progTxt.textContent = done + ' file(s) uploaded.' + (errors.length ? ' ' + errors.length + ' error(s).' : '');
+            btn.disabled = false;
+            if (errors.length) {
+                errDiv.style.display = 'block';
+                errDiv.innerHTML = '<div style="color:#b71c1c;font-size:.8rem"><strong>Errors:</strong><br>' + errors.map(function(e){return e;}).join('<br>') + '</div>';
+            }
+            return;
+        }
+        var f = files[i];
+        var rel = f.webkitRelativePath || f.name;
+        var pct = Math.round(i * 100 / files.length);
+        progBar.style.width = pct + '%';
+        progTxt.textContent = 'Uploading ' + (i+1) + '/' + files.length + ': ' + rel;
+
+        var fd = new FormData();
+        fd.append('target_dir', target);
+        fd.append('rel_path',   rel);
+        fd.append('file',       f);
+
+        fetch(_fbUploadUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                if (j.ok) { done++; } else { errors.push(rel + ': ' + (j.error || 'unknown error')); }
+                uploadNext(i + 1);
+            })
+            .catch(function(e) { errors.push(rel + ': network error'); uploadNext(i + 1); });
+    }
+    uploadNext(0);
 }
 </script>
