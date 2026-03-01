@@ -320,6 +320,172 @@ $c->stash->{sites} = $sites;
     }
 }
 
+sub view :Path('/file/view') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+        "File view accessed id=$id user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $file = $c->model('File')->get_file_by_id($c, $id);
+    unless ($file) {
+        $c->flash->{error_msg} = "File record #$id not found or access denied.";
+        $c->response->redirect($c->uri_for('/file/list'));
+        return;
+    }
+
+    my $original_file;
+    if ($file->is_duplicate && $file->duplicate_of) {
+        $original_file = $c->model('File')->get_file_by_id($c, $file->duplicate_of);
+    }
+
+    $c->stash(
+        file          => $file,
+        original_file => $original_file,
+        is_csc        => $is_csc,
+        template      => 'file/FileView.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub edit :Path('/file/edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
+        "File edit accessed id=$id method=" . $c->req->method . " user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $file = $c->model('File')->get_file_by_id($c, $id);
+    unless ($file) {
+        $c->flash->{error_msg} = "File record #$id not found or access denied.";
+        $c->response->redirect($c->uri_for('/file/list'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $new_name     = $c->req->param('file_name')    // '';
+        my $description  = $c->req->param('description')  // '';
+        my $file_status  = $c->req->param('file_status')  // 'active';
+        my $access_level = $c->req->param('access_level') // 'site_only';
+
+        $new_name =~ s/^\s+|\s+$//g;
+        unless (length $new_name) {
+            $c->stash(
+                file         => $file,
+                is_csc       => $is_csc,
+                error_msg    => 'File name cannot be empty.',
+                template     => 'file/FileEdit.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        if ($new_name ne $file->file_name) {
+            my $rename_err = $c->model('File')->rename_file($c, $id, $new_name);
+            if ($rename_err) {
+                $c->stash(
+                    file         => $file,
+                    is_csc       => $is_csc,
+                    error_msg    => "Rename failed: $rename_err",
+                    template     => 'file/FileEdit.tt',
+                );
+                $c->forward($c->view('TT'));
+                return;
+            }
+            $file = $c->model('File')->get_file_by_id($c, $id);
+        }
+
+        eval {
+            $file->update({
+                description  => $description,
+                file_status  => $file_status,
+                access_level => $access_level,
+            });
+        };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
+                "File update failed id=$id: $err");
+            $self->send_error_notification($c, 'File Update Error', "File id=$id update error: $err")
+                if $self->can('send_error_notification');
+            $c->stash(
+                file         => $file,
+                is_csc       => $is_csc,
+                error_msg    => "Update failed: $err",
+                template     => 'file/FileEdit.tt',
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
+            "File updated id=$id status=$file_status access=$access_level");
+        $c->flash->{success_msg} = 'File updated successfully.';
+        $c->response->redirect($c->uri_for('/file/view', $id));
+        return;
+    }
+
+    $c->stash(
+        file     => $file,
+        is_csc   => $is_csc,
+        template => 'file/FileEdit.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub rename :Path('/file/rename') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rename',
+        "File rename POST id=$id user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/list'));
+        return;
+    }
+
+    my $new_name = $c->req->param('new_name') // '';
+    $new_name =~ s/^\s+|\s+$//g;
+
+    unless (length $new_name) {
+        $c->flash->{error_msg} = 'New file name cannot be empty.';
+        $c->response->redirect($c->uri_for('/file/view', $id));
+        return;
+    }
+
+    my $rename_err = $c->model('File')->rename_file($c, $id, $new_name);
+    if ($rename_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'rename',
+            "Rename failed id=$id new_name=$new_name: $rename_err");
+        $c->flash->{error_msg} = "Rename failed: $rename_err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rename',
+            "File renamed id=$id to $new_name");
+        $c->flash->{success_msg} = "File renamed to '$new_name'.";
+    }
+
+    $c->response->redirect($c->uri_for('/file/list'));
+}
+
 sub _resolve_roles {
     my ($self, $c) = @_;
     my $sitename = $c->session->{SiteName} // '';

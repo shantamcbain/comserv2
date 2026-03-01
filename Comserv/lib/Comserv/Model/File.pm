@@ -209,6 +209,54 @@ sub check_duplicate {
     )->first;
 }
 
+sub rename_file {
+    my ($self, $c, $id, $new_name) = @_;
+
+    my $file = $self->get_file_by_id($c, $id);
+    return "File #$id not found or access denied." unless $file;
+
+    my $old_name  = $file->file_name;
+    my $old_path  = $file->file_path // '';
+    my $nfs_path  = $file->nfs_path  // '';
+
+    my $new_path = $old_path;
+    if (length $old_path) {
+        require File::Basename;
+        my $dir = File::Basename::dirname($old_path);
+        $new_path = "$dir/$new_name";
+    }
+
+    my $new_nfs = $nfs_path;
+    if (length $nfs_path) {
+        require File::Basename;
+        my $nfs_dir = File::Basename::dirname($nfs_path);
+        $new_nfs = ($nfs_dir eq '.') ? $new_name : "$nfs_dir/$new_name";
+    }
+
+    if (length $old_path && -e $old_path) {
+        unless (rename $old_path, $new_path) {
+            return "Filesystem rename failed: $!";
+        }
+    }
+
+    eval {
+        $file->update({
+            file_name => $new_name,
+            file_path => $new_path,
+            nfs_path  => $new_nfs,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        if (length $old_path && -e $new_path) {
+            rename $new_path, $old_path;
+        }
+        return "Database update failed: $err";
+    }
+
+    return '';
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
