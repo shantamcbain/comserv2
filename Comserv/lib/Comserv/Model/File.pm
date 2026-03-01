@@ -1,6 +1,8 @@
 package Comserv::Model::File;
 use Moose;
 use namespace::autoclean;
+use POSIX qw(strftime);
+use File::Path qw(make_path);
 
 extends 'Catalyst::Model';
 
@@ -286,7 +288,7 @@ sub upload_and_record {
         txt  => 'text/plain',
     );
     my $mime_type   = $mime_map{$ext} || 'application/octet-stream';
-    my $upload_date = localtime->strftime('%Y-%m-%d %H:%M:%S');
+    my $upload_date = strftime('%Y-%m-%d %H:%M:%S', localtime);
     my $sitename    = $nfs_dir_sitename;
     my $site_id     = $nfs_dir_site_id // 0;
     my $user_id     = $c->session->{user_id} // 0;
