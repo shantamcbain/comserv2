@@ -301,25 +301,41 @@ sub upload_and_record {
     return ($file_row, undef);
 }
 
+sub _file_fs_info {
+    my ($file) = @_;
+    my $path = '';
+    $path = $file->file_path if defined $file->file_path && length($file->file_path // '');
+    $path = $file->nfs_path  if !length($path) && defined $file->nfs_path && length($file->nfs_path // '');
+    return {
+        fs_path   => $path,
+        fs_exists => (length($path) && -f $path) ? 1 : 0,
+        fs_size   => (length($path) && -f $path) ? (-s $path) : undef,
+    };
+}
+
 sub get_duplicates {
-    my ($self, $c, $sitename) = @_;
-    my $schema   = $c->model('DBEncy');
-    my $s_name   = $c->session->{SiteName} // '';
-    my $roles    = $c->session->{roles} || [];
-    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
-    my $is_csc   = $is_admin && lc($s_name) eq 'csc';
+    my ($self, $c, %filters) = @_;
+    my $schema    = $c->model('DBEncy');
+    my $s_name    = $c->session->{SiteName} // '';
+    my $roles     = $c->session->{roles} || [];
+    my $is_admin  = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc    = $is_admin && lc($s_name) eq 'csc';
 
     my %where = (is_duplicate => 1);
     unless ($is_csc) {
         $where{sitename} = $s_name;
     }
-    if (defined $sitename && $sitename ne '' && $is_csc) {
-        $where{sitename} = $sitename;
-    }
+    $where{sitename}  = $filters{sitename}  if $is_csc && defined $filters{sitename}  && $filters{sitename}  ne '';
+    $where{file_type} = $filters{file_type} if defined $filters{file_type} && $filters{file_type} ne '';
+
+    my $sort_col = $filters{sort_by} || 'upload_date';
+    $sort_col = 'upload_date' unless $sort_col =~ /^(upload_date|file_name|file_size|sitename)$/;
+    my $sort_dir = $filters{sort_dir} || 'desc';
+    $sort_dir = $sort_dir eq 'asc' ? '-asc' : '-desc';
 
     my @duplicates = $schema->resultset('File')->search(
         \%where,
-        { order_by => { -desc => 'upload_date' } }
+        { order_by => { $sort_dir => $sort_col } }
     )->all;
 
     my @pairs;
@@ -328,7 +344,14 @@ sub get_duplicates {
         if ($dup->duplicate_of) {
             $original = $schema->resultset('File')->find($dup->duplicate_of);
         }
-        push @pairs, { duplicate => $dup, original => $original };
+        push @pairs, {
+            duplicate      => $dup,
+            original       => $original,
+            dup_fs         => _file_fs_info($dup),
+            orig_fs        => $original ? _file_fs_info($original) : { fs_path => '', fs_exists => 0, fs_size => undef },
+            same_path      => ($original && ($dup->file_path // '') eq ($original->file_path // '') && length($dup->file_path // '')) ? 1 : 0,
+            same_nfs       => ($original && ($dup->nfs_path  // '') eq ($original->nfs_path  // '') && length($dup->nfs_path  // '')) ? 1 : 0,
+        };
     }
 
     return \@pairs;
