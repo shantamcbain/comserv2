@@ -951,6 +951,159 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
     $c->response->redirect($c->uri_for($return_to));
 }
 
+sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
+        "NFS allocations accessed by user=" . ($c->session->{user_id} // 'anon') . " is_csc=$is_csc");
+
+    unless ($is_csc) {
+        $c->flash->{error_msg} = 'Access denied. CSC admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $allocations = $c->model('File')->get_nfs_allocations($c);
+
+    my $sites = [];
+    eval {
+        my @site_list = $c->model('DBEncy')->resultset('Site')->search(
+            {}, { order_by => 'name' }
+        )->all;
+        $sites = \@site_list;
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'nfs_allocations',
+            "Could not fetch site list: $err");
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
+        "Rendering NFS allocations: count=" . scalar(@{ $allocations // [] }));
+
+    $c->stash(
+        allocations => $allocations,
+        sites       => $sites,
+        template    => 'file/NfsAllocations.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
+        "NFS allocation create POST by user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_csc) {
+        $c->flash->{error_msg} = 'Access denied. CSC admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $alloc_sitename = $c->req->param('sitename')    // '';
+    my $nfs_path       = $c->req->param('nfs_path')    // '';
+    my $description    = $c->req->param('description') // '';
+    my $site_id        = $c->req->param('site_id')     // '';
+
+    $alloc_sitename =~ s/^\s+|\s+$//g;
+    $nfs_path       =~ s/^\s+|\s+$//g;
+
+    unless (length $alloc_sitename) {
+        $c->flash->{error_msg} = 'SiteName is required.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    unless (length $nfs_path) {
+        $c->flash->{error_msg} = 'NFS path is required.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
+        $nfs_path = "$nfs_root/$nfs_path" unless CORE::index($nfs_path, '/') == 0;
+    }
+
+    my ($row, $create_err) = $c->model('File')->create_nfs_allocation($c,
+        sitename    => $alloc_sitename,
+        site_id     => ($site_id =~ /^\d+$/ ? $site_id : undef),
+        nfs_path    => $nfs_path,
+        description => $description,
+        created_by  => $c->session->{user_id},
+    );
+
+    if ($create_err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'nfs_allocation_create',
+            "Failed to create NFS allocation for sitename=$alloc_sitename path=$nfs_path: $create_err");
+        $c->flash->{error_msg} = "Failed to create allocation: $create_err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
+            "NFS allocation created id=" . $row->id . " sitename=$alloc_sitename path=$nfs_path");
+        $c->flash->{success_msg} = "NFS allocation created for '$alloc_sitename': $nfs_path";
+    }
+
+    $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+}
+
+sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_edit',
+        "NFS allocation edit POST id=$id by user=" . ($c->session->{user_id} // 'anon'));
+
+    unless ($is_csc) {
+        $c->flash->{error_msg} = 'Access denied. CSC admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $alloc  = $schema->resultset('NfsDirectory')->find($id);
+
+    unless ($alloc) {
+        $c->flash->{error_msg} = "NFS allocation #$id not found.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $description = $c->req->param('description') // '';
+    my $is_active   = $c->req->param('is_active') ? 1 : 0;
+
+    eval {
+        $alloc->update({
+            description => $description,
+            is_active   => $is_active,
+        });
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'nfs_allocation_edit',
+            "Failed to update NFS allocation id=$id: $err");
+        $c->flash->{error_msg} = "Failed to update allocation: $err";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_edit',
+            "NFS allocation updated id=$id is_active=$is_active");
+        $c->flash->{success_msg} = "Allocation #$id updated.";
+    }
+
+    $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
