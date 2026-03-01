@@ -123,6 +123,23 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
 
     my $disk_usage = $self->_disk_usage($dir_path);
 
+    my @sites;
+    eval {
+        my $schema = $c->model('DBEncy');
+        @sites = $schema->resultset('Site')->search(
+            {}, { order_by => 'name', columns => [qw(id name)] }
+        )->all;
+    };
+
+    my @workshops;
+    eval {
+        my $schema = $c->model('DBEncy');
+        my %ws_search = $is_csc ? () : (sitename => $sitename);
+        @workshops = $schema->resultset('WorkShop')->search(
+            \%ws_search, { order_by => 'title', columns => [qw(id title sitename)] }
+        )->all;
+    };
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
         "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@{ $directories // [] }) . " files=" . scalar(@{ $files // [] }));
 
@@ -138,6 +155,8 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
         nfs_root          => $nfs_root,
         nav_root          => $nav_root,
         disk_usage        => $disk_usage,
+        sites             => \@sites,
+        workshops         => \@workshops,
         template          => 'file/AdminBrowser.tt',
     );
     $c->forward($c->view('TT'));
@@ -1764,7 +1783,13 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     my $file_path    = $c->req->param('file_path')    // '';
     my $dir          = $c->req->param('dir')           // '';
     my $access_level = $c->req->param('access_level')  // 'site_only';
-    $access_level = 'site_only' unless $access_level =~ /^(public|site_only|private)$/;
+    my $description  = $c->req->param('description')   // '';
+    my $file_status  = $c->req->param('file_status')   // 'active';
+    my $form_sitename= $c->req->param('sitename')      // '';
+    my $workshop_id  = $c->req->param('workshop_id')   // '';
+    $workshop_id = undef unless $workshop_id =~ /^\d+$/;
+    $access_level = 'site_only' unless $access_level =~ /^(public|site_only|private|workshop)$/;
+    $file_status  = 'active'    unless $file_status  =~ /^(active|inactive|archived)$/;
 
     $file_path =~ s{\.\.}{}g;
 
@@ -1803,7 +1828,9 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     my $upload_date = Time::Piece->new->strftime('%Y-%m-%d %H:%M:%S');
     my $user_id     = $c->session->{user_id} // 0;
     my $site_id     = $c->session->{site_id}  // 0;
-    my $res_sitename = $is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename;
+    my $res_sitename = $is_csc && $form_sitename
+        ? $form_sitename
+        : ($is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename);
 
     my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size);
     my ($is_dup, $dup_of) = (0, undef);
@@ -1819,12 +1846,12 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
             reference_id => 0,
             category_id  => 0,
             share_id     => 0,
-            description  => "Imported from filesystem: $file_path",
+            description  => length($description) ? $description : "Imported from filesystem: $file_path",
             upload_date  => $upload_date,
             file_size    => $size,
             file_path    => $file_path,
             file_url     => '',
-            file_status  => 'active',
+            file_status  => $file_status,
             file_format  => $mime,
             user_id      => $user_id,
             nfs_path     => $rel,
@@ -1834,7 +1861,7 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
             sitename     => $res_sitename,
             is_duplicate => $is_dup,
             duplicate_of => $dup_of,
-            workshop_id  => undef,
+            workshop_id  => $workshop_id,
         });
     };
     my $err = "$@" if $@;
