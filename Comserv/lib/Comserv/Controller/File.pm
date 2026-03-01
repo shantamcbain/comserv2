@@ -274,6 +274,69 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
+sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($is_admin) {
+        $c->response->body('{"error":"Access denied"}');
+        return;
+    }
+
+    my $path = $c->req->param('path') // '';
+    $path =~ s{\.\.}{}g;
+    $path =~ s{/+$}{};
+
+    unless (length $path && -d $path) {
+        $c->response->body('{"error":"Invalid path"}');
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+        unless ($allowed) {
+            $c->response->body('{"error":"Access denied"}');
+            return;
+        }
+    }
+
+    opendir my $dh, $path or do {
+        $c->response->body('{"error":"Cannot read directory"}');
+        return;
+    };
+    my @dirs = sort grep { !/^\./ && -d "$path/$_" } readdir $dh;
+    closedir $dh;
+
+    require File::Basename;
+    my $parent = File::Basename::dirname($path);
+    $parent = '' if $path eq ($self->_nfs_root_for_sync()) && !$is_csc;
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $can_go_up = $is_csc ? ($path ne '/') : ($path ne $nfs_root && length $parent);
+
+    my $json_dirs = join(',', map { my $d = $_; $d =~ s/\\/\\\\/g; $d =~ s/"/\\"/g; "\"$d\"" } @dirs);
+    my $path_esc   = $path;   $path_esc   =~ s/\\/\\\\/g; $path_esc   =~ s/"/\\"/g;
+    my $parent_esc = $parent; $parent_esc =~ s/\\/\\\\/g; $parent_esc =~ s/"/\\"/g;
+
+    $c->response->body(
+        '{"path":"' . $path_esc . '",'
+      . '"parent":"' . $parent_esc . '",'
+      . '"can_go_up":' . ($can_go_up ? 'true' : 'false') . ','
+      . '"dirs":[' . $json_dirs . ']}'
+    );
+}
+
 sub fs_move :Path('/file/fs_move') :Args(0) {
     my ($self, $c) = @_;
     my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
