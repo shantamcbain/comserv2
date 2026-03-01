@@ -229,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% INCLUDE 'Navigation/admintopmenu.tt' %]
         [% END %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+        [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
         </ul>
     </nav>
 
