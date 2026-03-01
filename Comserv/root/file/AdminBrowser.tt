@@ -1,119 +1,178 @@
 [% META
    title = "Admin File Browser"
-   description = "Browse NFS directory structure and files as admin"
+   description = "Browse NFS directories and manage files as admin"
    roles = "admin"
    TemplateType = "Application"
    category = "FileManagement"
-   page_version = "0.01"
+   page_version = "0.02"
    last_updated = "2026-02-28"
 %]
-[% PageVersion = 'file/AdminBrowser.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+[% PageVersion = 'file/AdminBrowser.tt,v 0.02 2026/02/28 AI Exp AI ' %]
 [% IF debug_mode == 1 %]
   [% PageVersion %]
+[% END %]
+
+[%# ── file-type icon macro ──────────────────────────────────────── %]
+[% MACRO file_icon(ext) BLOCK %]
+  [% IF    ext == 'pdf'                          %]<i class="fas fa-file-pdf    file-icon icon-pdf"></i>
+  [% ELSIF ext == 'doc'  || ext == 'docx'        %]<i class="fas fa-file-word   file-icon icon-doc"></i>
+  [% ELSIF ext == 'xls'  || ext == 'xlsx'        %]<i class="fas fa-file-excel  file-icon icon-xls"></i>
+  [% ELSIF ext == 'ppt'  || ext == 'pptx'        %]<i class="fas fa-file-powerpoint file-icon icon-ppt"></i>
+  [% ELSIF ext == 'jpg'  || ext == 'jpeg' || ext == 'png' || ext == 'gif' || ext == 'svg' || ext == 'webp' %]<i class="fas fa-file-image  file-icon icon-img"></i>
+  [% ELSIF ext == 'mp4'  || ext == 'mov' || ext == 'avi' || ext == 'mkv' %]<i class="fas fa-file-video  file-icon icon-vid"></i>
+  [% ELSIF ext == 'mp3'  || ext == 'wav' || ext == 'ogg' || ext == 'flac' %]<i class="fas fa-file-audio  file-icon icon-aud"></i>
+  [% ELSIF ext == 'zip'  || ext == 'tar' || ext == 'gz' || ext == 'bz2' || ext == '7z' %]<i class="fas fa-file-archive file-icon icon-zip"></i>
+  [% ELSIF ext == 'txt'  || ext == 'md' || ext == 'rst' %]<i class="fas fa-file-alt     file-icon icon-txt"></i>
+  [% ELSIF ext == 'pl'   || ext == 'py' || ext == 'js' || ext == 'pm' || ext == 'sh' || ext == 'rb' %]<i class="fas fa-file-code    file-icon icon-code"></i>
+  [% ELSE %]<i class="fas fa-file            file-icon icon-generic"></i>
+  [% END %]
+[% END %]
+
+[%# ── size formatter macro ─────────────────────────────────────── %]
+[% MACRO fmt_size(bytes) BLOCK %]
+  [% IF bytes >= 1073741824 %][% FILTER format('%.1f') %][% bytes / 1073741824 %][% END %] GB
+  [% ELSIF bytes >= 1048576 %][% FILTER format('%.1f') %][% bytes / 1048576 %][% END %] MB
+  [% ELSIF bytes >= 1024 %][% FILTER format('%.1f') %][% bytes / 1024 %][% END %] KB
+  [% ELSE %][% bytes %] B
+  [% END %]
 [% END %]
 
 <div class="app-container">
 
   <div class="page-header">
-    <h1>Admin File Browser</h1>
+    <h1><i class="fas fa-folder-open"></i> File Browser</h1>
   </div>
 
-  [% IF error_msg %]
-  <div class="error">[% error_msg | html %]</div>
-  [% END %]
-  [% IF c.flash.error_msg %]
-  <div class="error">[% c.flash.error_msg | html %]</div>
-  [% END %]
-  [% IF c.flash.success_msg %]
-  <div class="success">[% c.flash.success_msg | html %]</div>
-  [% END %]
+  [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+  [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+  [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
   <div class="content-container">
     <div class="content-primary">
 
+      [%# ── Toolbar ─────────────────────────────────────────────── %]
       <div class="content-section">
         <form method="get" action="[% c.uri_for('/file/admin_browser') %]" class="app-form">
           <div class="form-row">
+
+            [% IF allocated_dirs.size %]
             <div class="form-field">
-              <label for="dir_path">Directory:</label>
-              <input type="text" id="dir_path" name="dir_path"
-                     value="[% current_directory | html %]" class="form-input" style="width:400px">
+              <label for="dir_select">Directory:</label>
+              <select id="dir_select" name="dir_path" class="form-input"
+                      onchange="this.form.submit()">
+                [% IF is_csc %]
+                <option value="[% nfs_root | html %]"
+                  [% 'selected' IF current_directory == nfs_root %]>
+                  [NFS Root] [% nfs_root | html %]
+                </option>
+                [% END %]
+                [% FOREACH alloc IN allocated_dirs %]
+                <option value="[% alloc.nfs_path | html %]"
+                  [% 'selected' IF current_directory == alloc.nfs_path %]>
+                  [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
+                  [% IF alloc.description %] — [% alloc.description | html %][% END %]
+                </option>
+                [% END %]
+              </select>
             </div>
+            [% ELSE %]
+            <div class="form-field">
+              <label for="dir_path">Path:</label>
+              <input type="text" id="dir_path" name="dir_path"
+                     value="[% current_directory | html %]" class="form-input">
+            </div>
+            [% END %]
+
             <div class="form-field">
               <label><input type="checkbox" name="show_hidden" value="1"
-                [% 'checked' IF show_hidden %]> Show Hidden</label>
+                [% 'checked' IF show_hidden %]> Hidden</label>
             </div>
             <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Browse</button>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-sync"></i> Go</button>
             </div>
           </div>
         </form>
       </div>
 
-      [% IF is_csc AND allocated_dirs.size %]
+      [%# ── Breadcrumb ──────────────────────────────────────────── %]
       <div class="content-section">
-        <h3>Allocated NFS Directories</h3>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>SiteName</th>
-                <th>NFS Path</th>
-                <th>Description</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              [% FOREACH alloc IN allocated_dirs %]
-              <tr>
-                <td>[% alloc.sitename | html %]</td>
-                <td>[% alloc.nfs_path | html %]</td>
-                <td>[% alloc.description | html %]</td>
-                <td class="action-cell">
-                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
-                     class="btn btn-sm btn-edit">Browse</a>
-                </td>
-              </tr>
+        <div class="breadcrumb-container">
+          <nav class="breadcrumb">
+            [% SET crumb_path = '' %]
+            [% FOREACH part IN current_directory.split('/') %]
+              [% IF part %]
+                [% SET crumb_path = crumb_path _ '/' _ part %]
+                <a href="[% c.uri_for('/file/admin_browser', { dir_path => crumb_path }) %]">[% part | html %]</a>
+                &rsaquo;
               [% END %]
-            </tbody>
-          </table>
+            [% END %]
+          </nav>
+          [% IF parent_dir %]
+          <a href="[% c.uri_for('/file/admin_browser', { dir_path => parent_dir }) %]"
+             class="btn btn-sm btn-secondary">
+            <i class="fas fa-level-up-alt"></i> Up
+          </a>
+          [% END %]
         </div>
       </div>
-      [% ELSIF NOT is_csc AND allocated_dirs.size %]
-      <div class="content-section">
-        <h3>Your Allocated Directories</h3>
-        <ul>
-          [% FOREACH alloc IN allocated_dirs %]
-          <li>
-            <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]">
-              [% alloc.nfs_path | html %]
-            </a>
-            [% IF alloc.description %]— [% alloc.description | html %][% END %]
-          </li>
-          [% END %]
-        </ul>
-      </div>
-      [% END %]
 
+      [%# ── New Folder + quick actions ─────────────────────────── %]
       <div class="content-section">
-        <h3>Current Directory: [% current_directory | html %]</h3>
+        <div class="form-row">
+          <form method="post" action="[% c.uri_for('/file/fs_mkdir') %]" class="app-form">
+            <input type="hidden" name="parent_dir" value="[% current_directory | html %]">
+            <div class="form-field">
+              <label for="new_dir_name"><i class="fas fa-folder-plus"></i> New Folder:</label>
+              <input type="text" id="new_dir_name" name="dir_name"
+                     placeholder="folder name" class="form-input">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+          </form>
+          <div class="form-actions">
+            <a href="[% c.uri_for('/file/upload_file') %]" class="btn btn-primary">
+              <i class="fas fa-upload"></i> Upload to DB
+            </a>
+            <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">
+              <i class="fas fa-database"></i> DB File List
+            </a>
+          </div>
+        </div>
+      </div>
+
+      [%# ── Directory listing ───────────────────────────────────── %]
+      <div class="content-section">
+        <h3><i class="fas fa-folder"></i> [% current_directory | html %]</h3>
 
         [% IF directories.size OR files.size %]
 
         [% IF directories.size %]
-        <h4>Subdirectories</h4>
         <div class="table-container">
           <table class="data-table">
             <thead>
-              <tr><th>Name</th><th>Actions</th></tr>
+              <tr>
+                <th colspan="2">Folder</th>
+                <th>Actions</th>
+              </tr>
             </thead>
             <tbody>
               [% FOREACH dir IN directories %]
+              [% SET dir_full = current_directory _ '/' _ dir.name %]
               <tr>
-                <td>[% dir | html %]</td>
+                <td><i class="fas fa-folder icon-folder"></i></td>
+                <td>
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]">
+                    [% dir.name | html %]
+                  </a>
+                </td>
                 <td class="action-cell">
-                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => current_directory _ '/' _ dir }) %]"
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
                      class="btn btn-sm btn-edit">Open</a>
+                  <button type="button" class="btn btn-sm"
+                          onclick="showRenameForm(this, '[% dir_full | html %]', '[% dir.name | html %]', '[% current_directory | html %]')">
+                    Rename
+                  </button>
                 </td>
               </tr>
               [% END %]
@@ -123,22 +182,37 @@
         [% END %]
 
         [% IF files.size %]
-        <h4>Files</h4>
         <div class="table-container">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th colspan="2">File</th>
+                <th>Size</th>
+                <th>Modified</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              [% FOREACH file IN files %]
-              <tr>
-                <td>[% file | html %]</td>
+              [% FOREACH f IN files %]
+              [% SET full_path = current_directory _ '/' _ f.name %]
+              <tr id="row-[% loop.count %]">
+                <td>[% file_icon(f.ext) %]</td>
+                <td>[% f.name | html %]</td>
+                <td>[% fmt_size(f.size) %]</td>
+                <td>[% USE date; date.format(f.mtime, '%Y-%m-%d %H:%M') %]</td>
                 <td class="action-cell">
-                  <a href="[% c.uri_for('/file/list', { sitename_filter => '', type_filter => '' }) %]"
-                     class="btn btn-sm btn-edit">View in DB</a>
+                  <a href="[% c.uri_for('/file/fs_download', { path => full_path }) %]"
+                     class="btn btn-sm" title="Download">
+                    <i class="fas fa-download"></i>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-edit"
+                          onclick="showRenameForm(this, '[% full_path | html %]', '[% f.name | html %]', '[% current_directory | html %]')">
+                    <i class="fas fa-edit"></i> Rename
+                  </button>
+                  <a href="[% c.uri_for('/file/list', { type_filter => f.ext ? '.' _ f.ext : '' }) %]"
+                     class="btn btn-sm" title="View in DB">
+                    <i class="fas fa-database"></i>
+                  </a>
                 </td>
               </tr>
               [% END %]
@@ -154,16 +228,132 @@
         [% END %]
       </div>
 
+      [%# ── Local Drive Import (SiteName admin only) ────────────── %]
+      [% IF is_admin %]
       <div class="content-section">
-        <div class="form-actions">
-          <a href="[% c.uri_for('/file/list') %]" class="btn btn-secondary">File List (DB)</a>
-          [% IF is_csc %]
-          <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary">NFS Allocations</a>
-          [% END %]
-          <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">Duplicate Files</a>
-        </div>
+        <details>
+          <summary class="btn btn-secondary">
+            <i class="fas fa-laptop"></i> Import from Local Drive
+          </summary>
+
+          <div class="form-section">
+            <p>Select files from your local computer to upload to the current NFS directory.
+               This is available to admins only.</p>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="local_target_dir">Upload to:</label>
+                [% IF allocated_dirs.size %]
+                <select id="local_target_dir" name="nfs_dir_id" class="form-input">
+                  [% FOREACH alloc IN allocated_dirs %]
+                  <option value="[% alloc.id | html %]">
+                    [% alloc.sitename | html %]: [% alloc.nfs_path | html %]
+                  </option>
+                  [% END %]
+                </select>
+                [% ELSE %]
+                <span class="empty-state">No NFS directories allocated. Contact CSC admin.</span>
+                [% END %]
+              </div>
+            </div>
+
+            [% IF allocated_dirs.size %]
+            <div class="form-row">
+              <div class="form-field">
+                <label for="local_files"><i class="fas fa-folder-open"></i> Select files:</label>
+                <input type="file" id="local_files" multiple class="form-input"
+                       onchange="showLocalFileList(this)">
+                <small>Hold Ctrl/Cmd to select multiple files.</small>
+              </div>
+            </div>
+
+            <div id="local-file-preview" class="data-container"></div>
+
+            <form id="local-upload-form" method="post"
+                  action="[% c.uri_for('/file/upload_file') %]"
+                  enctype="multipart/form-data">
+              <input type="hidden" id="upload-nfs-dir-id" name="nfs_dir_id" value="">
+              <div id="local-upload-files"></div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary" id="local-upload-btn"
+                        style="display:none" onclick="submitLocalUpload()">
+                  <i class="fas fa-cloud-upload-alt"></i> Upload Selected Files
+                </button>
+              </div>
+            </form>
+            [% END %]
+          </div>
+        </details>
       </div>
+      [% END %]
 
     </div>
   </div>
 </div>
+
+[%# ── Rename modal (hidden, shown via JS) ─────────────────────── %]
+<div id="rename-modal" class="app-container" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);z-index:1000;background:#fff;border:1px solid #ccc;padding:20px;border-radius:6px;min-width:400px">
+  <div class="page-header"><h3>Rename</h3></div>
+  <form method="post" action="[% c.uri_for('/file/fs_rename') %]" class="app-form">
+    <input type="hidden" id="rename-old-path" name="old_path" value="">
+    <input type="hidden" id="rename-dir"      name="dir"      value="">
+    <div class="form-field">
+      <label for="rename-new-name">New name:</label>
+      <input type="text" id="rename-new-name" name="new_name" class="form-input">
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Rename</button>
+      <button type="button" class="btn btn-secondary" onclick="hideRenameForm()">Cancel</button>
+    </div>
+  </form>
+</div>
+<div id="rename-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999"
+     onclick="hideRenameForm()"></div>
+
+<script>
+function showRenameForm(btn, fullPath, currentName, dir) {
+    document.getElementById('rename-old-path').value = fullPath;
+    document.getElementById('rename-dir').value      = dir;
+    document.getElementById('rename-new-name').value = currentName;
+    document.getElementById('rename-overlay').style.display = 'block';
+    document.getElementById('rename-modal').style.display   = 'block';
+    document.getElementById('rename-new-name').select();
+}
+function hideRenameForm() {
+    document.getElementById('rename-overlay').style.display = 'none';
+    document.getElementById('rename-modal').style.display   = 'none';
+}
+
+function showLocalFileList(input) {
+    var files   = Array.from(input.files);
+    var preview = document.getElementById('local-file-preview');
+    var btn     = document.getElementById('local-upload-btn');
+    if (!files.length) { preview.innerHTML = ''; btn.style.display = 'none'; return; }
+
+    var rows = files.map(function(f) {
+        var kb = (f.size / 1024).toFixed(1);
+        return '<tr><td>' + f.name + '</td><td>' + kb + ' KB</td><td>' + f.type + '</td></tr>';
+    }).join('');
+    preview.innerHTML = '<table class="data-table"><thead><tr><th>Name</th><th>Size</th><th>Type</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    btn.style.display = 'inline-block';
+
+    document.getElementById('upload-nfs-dir-id').value =
+        document.getElementById('local_target_dir').value;
+}
+
+function submitLocalUpload() {
+    var input  = document.getElementById('local_files');
+    var form   = document.getElementById('local-upload-form');
+    var nfsId  = document.getElementById('local_target_dir').value;
+    document.getElementById('upload-nfs-dir-id').value = nfsId;
+    var dt = new DataTransfer();
+    Array.from(input.files).forEach(function(f) { dt.items.add(f); });
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = 'file';
+    fileInput.multiple = true;
+    fileInput.files = dt.files;
+    form.appendChild(fileInput);
+    form.submit();
+}
+</script>
