@@ -30,11 +30,31 @@ sub get_files_info {
     closedir $dir;
 
     unless ($show_hidden) {
-        @entries = grep { !/^\./ } @entries;  # Exclude hidden files and directories
+        @entries = grep { !/^\./ } @entries;
     }
 
-    my @directories = grep {-d "$dir_path/$_" && ! /^\.{1,2}$/} @entries;
-    my @files = grep {-f "$dir_path/$_"} @entries;
+    my (@directories, @files);
+    for my $entry (@entries) {
+        next if $entry =~ /^\.{1,2}$/;
+        my $full = "$dir_path/$entry";
+        my @st   = stat($full);
+        my $mtime = $st[9] // 0;
+        my $size  = $st[7] // 0;
+        if (-d $full) {
+            push @directories, { name => $entry, mtime => $mtime };
+        } elsif (-f $full) {
+            my ($ext) = ($entry =~ /\.([^.]+)$/);
+            push @files, {
+                name  => $entry,
+                size  => $size,
+                mtime => $mtime,
+                ext   => lc($ext // ''),
+            };
+        }
+    }
+
+    @directories = sort { $a->{name} cmp $b->{name} } @directories;
+    @files       = sort { $a->{name} cmp $b->{name} } @files;
 
     return (\@directories, \@files);
 }

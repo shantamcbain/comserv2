@@ -13,6 +13,25 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->new() },
 );
 
+my %SYNC_MIME_MAP = (
+    pdf  => 'application/pdf',
+    ppt  => 'application/vnd.ms-powerpoint',
+    pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    doc  => 'application/msword',
+    docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls  => 'application/vnd.ms-excel',
+    xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    jpg  => 'image/jpeg',
+    jpeg => 'image/jpeg',
+    png  => 'image/png',
+    gif  => 'image/gif',
+    svg  => 'image/svg+xml',
+    mp4  => 'video/mp4',
+    mp3  => 'audio/mpeg',
+    zip  => 'application/zip',
+    txt  => 'text/plain',
+);
+
 sub index :PathPart('file') :Chained('/') :Args(0) {
     my ($self, $c) = @_;
     my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
@@ -93,16 +112,18 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
     my $show_hidden = $c->req->param('show_hidden') // 0;
     my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path, $show_hidden);
 
-    my @sorted_dirs  = sort @{ $directories // [] };
-    my @sorted_files = sort @{ $files // [] };
+    my @parent_parts = split '/', $dir_path;
+    pop @parent_parts;
+    my $parent_dir = @parent_parts ? join('/', @parent_parts) : '';
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
-        "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@sorted_dirs) . " files=" . scalar(@sorted_files));
+        "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@{ $directories // [] }) . " files=" . scalar(@{ $files // [] }));
 
     $c->stash(
-        directories       => \@sorted_dirs,
-        files             => \@sorted_files,
+        directories       => $directories // [],
+        files             => $files // [],
         current_directory => $dir_path,
+        parent_dir        => $parent_dir,
         is_csc            => $is_csc,
         allocated_dirs    => $allocated_dirs,
         show_hidden       => $show_hidden,
@@ -110,6 +131,161 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
         template          => 'file/AdminBrowser.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub fs_download :Path('/file/fs_download') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $path = $c->req->param('path') // '';
+    $path =~ s{\.\.}{}g;
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $allowed  = 0;
+    if ($is_csc) {
+        $allowed = (CORE::index($path, '/') == 0 || CORE::index($path, $nfs_root) == 0) ? 1 : 0;
+        $allowed = 1 if -f $path;
+    } else {
+        my $schema = $c->model('DBEncy');
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search({ sitename => $sitename, is_active => 1 })->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+    }
+
+    unless ($allowed && -f $path) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_download',
+            "Access denied or file not found: path=$path sitename=$sitename");
+        $c->flash->{error_msg} = 'File not found or access denied.';
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    require File::Basename;
+    my $filename = File::Basename::basename($path);
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    my $mime = $SYNC_MIME_MAP{lc($ext // '')} || 'application/octet-stream';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_download',
+        "Serving filesystem file path=$path");
+
+    open(my $fh, '<:raw', $path) or do {
+        $c->flash->{error_msg} = "Cannot read file: $!";
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    };
+    $c->response->content_type($mime);
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Length' => -s $path);
+    local $/ = undef;
+    $c->response->body(<$fh>);
+    close $fh;
+}
+
+sub fs_rename :Path('/file/fs_rename') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $old_path = $c->req->param('old_path') // '';
+    my $new_name = $c->req->param('new_name') // '';
+    my $dir      = $c->req->param('dir')      // '';
+
+    $old_path =~ s{\.\.}{}g;
+    $new_name =~ s{[/\\]}{}g;
+    $new_name =~ s/^\s+|\s+$//g;
+
+    unless (length $new_name) {
+        $c->flash->{error_msg} = 'New name cannot be empty.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    require File::Basename;
+    my $parent   = File::Basename::dirname($old_path);
+    my $new_path = "$parent/$new_name";
+
+    unless (-e $old_path) {
+        $c->flash->{error_msg} = 'Source file not found.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    unless (rename $old_path, $new_path) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_rename',
+            "Rename failed: $old_path -> $new_path: $!");
+        $c->flash->{error_msg} = "Rename failed: $!";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    }
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $rec = $schema->resultset('File')->search({ file_path => $old_path })->first;
+        if ($rec) {
+            $rec->update({ file_name => $new_name, file_path => $new_path, nfs_path => $new_path });
+        }
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
+        "Renamed $old_path -> $new_path");
+    $c->flash->{success_msg} = "Renamed to '$new_name'.";
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+}
+
+sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $parent_dir = $c->req->param('parent_dir') // '';
+    my $dir_name   = $c->req->param('dir_name')   // '';
+
+    $parent_dir =~ s{\.\.}{}g;
+    $dir_name   =~ s{[/\\]}{}g;
+    $dir_name   =~ s/^\s+|\s+$//g;
+
+    unless (length $dir_name) {
+        $c->flash->{error_msg} = 'Directory name cannot be empty.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $parent_dir }));
+        return;
+    }
+
+    unless (-d $parent_dir) {
+        $c->flash->{error_msg} = 'Parent directory does not exist.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $parent_dir }));
+        return;
+    }
+
+    my $new_dir = "$parent_dir/$dir_name";
+    unless (mkdir $new_dir, 0755) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_mkdir',
+            "mkdir failed: $new_dir: $!");
+        $c->flash->{error_msg} = "Could not create directory: $!";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $parent_dir }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_mkdir',
+        "Created directory $new_dir");
+    $c->flash->{success_msg} = "Directory '$dir_name' created.";
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $new_dir }));
 }
 
 sub list :Path('/file/list') :Args(0) {
@@ -649,25 +825,6 @@ sub _nfs_root_for_sync {
 
     return $configured;
 }
-
-my %SYNC_MIME_MAP = (
-    pdf  => 'application/pdf',
-    ppt  => 'application/vnd.ms-powerpoint',
-    pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    doc  => 'application/msword',
-    docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    xls  => 'application/vnd.ms-excel',
-    xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    jpg  => 'image/jpeg',
-    jpeg => 'image/jpeg',
-    png  => 'image/png',
-    gif  => 'image/gif',
-    svg  => 'image/svg+xml',
-    mp4  => 'video/mp4',
-    mp3  => 'audio/mpeg',
-    zip  => 'application/zip',
-    txt  => 'text/plain',
-);
 
 sub _top_level_dir {
     my ($rel) = @_;
