@@ -43,24 +43,26 @@
 .fb-row-actions { opacity:0; transition:opacity .15s; display:flex; gap:4px; align-items:center; flex-wrap:nowrap; }
 .fb-row-actions .btn { padding:2px 7px; font-size:0.75rem; white-space:nowrap; }
 
-/* ── File type icons ──────────────────────────────────────────── */
-.fi { display:inline-block; width:1.1em; height:1.1em; vertical-align:-0.15em; margin-right:5px;
-      -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
-      -webkit-mask-position:center; mask-position:center;
-      -webkit-mask-size:contain; mask-size:contain;
-      background-color:currentColor; }
-.fi-folder  { -webkit-mask-image:url('/static/images/icons/folder.svg');   mask-image:url('/static/images/icons/folder.svg');   color:#d4881a; }
-.fi-pdf     { -webkit-mask-image:url('/static/images/icons/file-pdf.svg'); mask-image:url('/static/images/icons/file-pdf.svg'); color:#c62828; }
-.fi-word    { -webkit-mask-image:url('/static/images/icons/file-word.svg');  mask-image:url('/static/images/icons/file-word.svg');  color:#1565c0; }
-.fi-excel   { -webkit-mask-image:url('/static/images/icons/file-excel.svg'); mask-image:url('/static/images/icons/file-excel.svg'); color:#2e7d32; }
-.fi-ppt     { -webkit-mask-image:url('/static/images/icons/file-ppt.svg');   mask-image:url('/static/images/icons/file-ppt.svg');   color:#e65100; }
-.fi-image   { -webkit-mask-image:url('/static/images/icons/image.svg');      mask-image:url('/static/images/icons/image.svg');      color:#6a1b9a; }
-.fi-video   { -webkit-mask-image:url('/static/images/icons/file-video.svg'); mask-image:url('/static/images/icons/file-video.svg'); color:#b71c1c; }
-.fi-audio   { -webkit-mask-image:url('/static/images/icons/file-audio.svg'); mask-image:url('/static/images/icons/file-audio.svg'); color:#00695c; }
-.fi-archive { -webkit-mask-image:url('/static/images/icons/file-archive.svg');mask-image:url('/static/images/icons/file-archive.svg');color:#f57f17; }
-.fi-code    { -webkit-mask-image:url('/static/images/icons/file-code.svg');  mask-image:url('/static/images/icons/file-code.svg');  color:#0277bd; }
-.fi-text    { -webkit-mask-image:url('/static/images/icons/file-text.svg');  mask-image:url('/static/images/icons/file-text.svg');  color:#546e7a; }
-.fi-generic { -webkit-mask-image:url('/static/images/icons/file.svg');       mask-image:url('/static/images/icons/file.svg');       color:#455a64; }
+/* ── File type badges ─────────────────────────────────────────── */
+.fb-ext { display:inline-block; min-width:32px; padding:1px 5px; border-radius:2px;
+          font-size:0.62rem; font-weight:bold; color:#fff !important; text-align:center;
+          vertical-align:middle; margin-right:5px; letter-spacing:.02em;
+          text-decoration:none !important; }
+.fb-ext-folder  { background:#d4881a; }
+.fb-ext-pdf     { background:#c62828; }
+.fb-ext-doc,  .fb-ext-docx  { background:#1565c0; }
+.fb-ext-xls,  .fb-ext-xlsx, .fb-ext-csv { background:#2e7d32; }
+.fb-ext-ppt,  .fb-ext-pptx  { background:#e65100; }
+.fb-ext-jpg, .fb-ext-jpeg, .fb-ext-png, .fb-ext-gif,
+.fb-ext-webp, .fb-ext-svg,  .fb-ext-bmp  { background:#6a1b9a; }
+.fb-ext-mp4, .fb-ext-avi, .fb-ext-mov, .fb-ext-mkv, .fb-ext-webm { background:#b71c1c; }
+.fb-ext-mp3, .fb-ext-wav, .fb-ext-ogg, .fb-ext-flac { background:#00695c; }
+.fb-ext-zip, .fb-ext-tar, .fb-ext-gz, .fb-ext-bz2, .fb-ext-7z, .fb-ext-rar { background:#f57f17; }
+.fb-ext-pl, .fb-ext-pm, .fb-ext-py, .fb-ext-js, .fb-ext-ts,
+.fb-ext-sh, .fb-ext-rb, .fb-ext-php, .fb-ext-java, .fb-ext-css { background:#0277bd; }
+.fb-ext-txt, .fb-ext-md, .fb-ext-rst, .fb-ext-log { background:#546e7a; }
+.fb-ext-html, .fb-ext-htm { background:#546e7a; }
+.fb-ext-other { background:#78909c; }
 
 /* Image thumbnail in listing */
 .fb-thumb { width:28px; height:28px; object-fit:cover; border-radius:2px; vertical-align:middle; }
@@ -92,7 +94,7 @@
 <div class="app-container">
 
   <div class="page-header">
-    <h1><i class="fi fi-folder"></i> File Browser</h1>
+    <h1>&#128193; File Browser</h1>
   </div>
 
   [% IF error_msg %]
@@ -137,13 +139,13 @@
 
       [%# LEFT: sidebar — allocated directories ──────────────── %]
       <div class="fb-sidebar">
-        <h4><i class="fas fa-hdd"></i> Directories</h4>
+        <h4>&#128190; Directories</h4>
         <ul class="fb-alloc-list">
           [% IF is_csc %]
           <li>
             <a href="[% c.uri_for('/file/admin_browser', { dir_path => nfs_root }) %]"
                class="[% 'active' IF current_directory == nfs_root %]">
-              <span class="fi fi-folder"></span> [NFS Root]
+              <span class="fb-ext fb-ext-folder">DIR</span> [NFS Root]
               <span class="fb-site-label">[% nfs_root | html %]</span>
             </a>
           </li>
@@ -153,7 +155,7 @@
             <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
                class="[% 'active' IF current_directory == alloc.nfs_path %]"
                title="[% alloc.nfs_path | html %]">
-              <span class="fi fi-folder"></span> [% alloc.sitename | html %]
+              <span class="fb-ext fb-ext-folder">DIR</span> [% alloc.sitename | html %]
               <span class="fb-site-label">[% alloc.nfs_path | html %]</span>
             </a>
           </li>
@@ -250,7 +252,7 @@
               [% SET dir_esc  = dir.name | html %]
               [% SET rid = 'd' _ loop.count %]
               <tr id="row-[% rid %]">
-                <td><span class="fi fi-folder"></span></td>
+                <td><span class="fb-ext fb-ext-folder">DIR</span></td>
                 <td class="fb-name">
                   <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]">
                     [% dir.name | html %]
@@ -302,29 +304,19 @@
               [% SET is_aud  = (f.ext == 'mp3' || f.ext == 'ogg' || f.ext == 'wav') %]
               [% SET can_preview = (is_img || is_text || is_pdf || is_vid || is_aud) %]
 
-              [% SET fi_class = 'fi-generic' %]
-              [% IF f.ext == 'pdf' %][% SET fi_class = 'fi-pdf' %]
-              [% ELSIF f.ext == 'doc' || f.ext == 'docx' %][% SET fi_class = 'fi-word' %]
-              [% ELSIF f.ext == 'xls' || f.ext == 'xlsx' %][% SET fi_class = 'fi-excel' %]
-              [% ELSIF f.ext == 'ppt' || f.ext == 'pptx' %][% SET fi_class = 'fi-ppt' %]
-              [% ELSIF is_img %][% SET fi_class = 'fi-image' %]
-              [% ELSIF is_vid %][% SET fi_class = 'fi-video' %]
-              [% ELSIF is_aud %][% SET fi_class = 'fi-audio' %]
-              [% ELSIF f.ext == 'zip' || f.ext == 'tar' || f.ext == 'gz' || f.ext == 'bz2' || f.ext == '7z' %][% SET fi_class = 'fi-archive' %]
-              [% ELSIF f.ext == 'pl' || f.ext == 'pm' || f.ext == 'py' || f.ext == 'js' || f.ext == 'sh' || f.ext == 'rb' %][% SET fi_class = 'fi-code' %]
-              [% ELSIF is_text %][% SET fi_class = 'fi-text' %]
-              [% END %]
+              [% SET ext_badge = f.ext ? f.ext.upper : '?' %]
+              [% SET ext_css = f.ext ? 'fb-ext-' _ f.ext : 'fb-ext-other' %]
 
               <tr id="row-[% fid %]">
-                <td>
+                <td style="white-space:nowrap">
                   [% IF is_img %]
                   <img class="fb-thumb"
                        src="[% c.uri_for('/file/fs_preview', { path => full_path }) %]"
                        alt="[% fname_esc %]"
                        onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'">
-                  <span class="fi [% fi_class %]" style="display:none"></span>
+                  <span class="fb-ext [% ext_css %]" style="display:none">[% ext_badge | html %]</span>
                   [% ELSE %]
-                  <span class="fi [% fi_class %]"></span>
+                  <span class="fb-ext [% ext_css %]">[% ext_badge | html %]</span>
                   [% END %]
                 </td>
                 <td class="fb-name">
