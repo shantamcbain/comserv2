@@ -301,6 +301,39 @@ sub upload_and_record {
     return ($file_row, undef);
 }
 
+sub get_duplicates {
+    my ($self, $c, $sitename) = @_;
+    my $schema   = $c->model('DBEncy');
+    my $s_name   = $c->session->{SiteName} // '';
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles);
+    my $is_csc   = $is_admin && lc($s_name) eq 'csc';
+
+    my %where = (is_duplicate => 1);
+    unless ($is_csc) {
+        $where{sitename} = $s_name;
+    }
+    if (defined $sitename && $sitename ne '' && $is_csc) {
+        $where{sitename} = $sitename;
+    }
+
+    my @duplicates = $schema->resultset('File')->search(
+        \%where,
+        { order_by => { -desc => 'upload_date' } }
+    )->all;
+
+    my @pairs;
+    for my $dup (@duplicates) {
+        my $original;
+        if ($dup->duplicate_of) {
+            $original = $schema->resultset('File')->find($dup->duplicate_of);
+        }
+        push @pairs, { duplicate => $dup, original => $original };
+    }
+
+    return \@pairs;
+}
+
 sub get_nfs_allocations {
     my ($self, $c, $sitename) = @_;
     my $schema = $c->model('DBEncy');
