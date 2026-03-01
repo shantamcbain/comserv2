@@ -1,0 +1,27 @@
+[% PageVersion = 'Navigation/TopDropListWorkshop.tt,v 0.01 2026/02/28 AI Exp AI ' %]
+
+<li class="horizontal-dropdown">
+    <a href="/workshop" class="dropbtn"><i class="icon-workshop"></i>Workshops</a>
+    <div class="dropdown-content">
+        <a href="/workshop" class="menu-item"><i class="icon-home"></i>Workshops Home</a>
+        <a href="/workshop/list" class="menu-item"><i class="icon-list"></i>All Workshops</a>
+
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/workshop/dashboard" class="menu-item"><i class="icon-dashboard"></i>My Dashboard</a>
+        [% END %]
+
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
+            <div class="submenu">
+                <a href="/workshop/add" class="submenu-link"><i class="icon-add"></i>Add Workshop</a>
+                <a href="/workshop/resources" class="submenu-link"><i class="icon-resources"></i>Resources</a>
+                <a href="/file/list" class="submenu-link"><i class="icon-files"></i>File Management</a>
+                <a href="/file/duplicates" class="submenu-link"><i class="icon-duplicate"></i>Duplicate Files</a>
+            </div>
+        </div>
+        [% END %]
+    </div>
+</li>
