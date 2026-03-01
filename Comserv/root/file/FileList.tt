@@ -12,17 +12,51 @@
   [% PageVersion %]
 [% END %]
 
+<style>
+/* ── Responsive file list ─────────────────────────────────────── */
+.fl-wrap      { overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; }
+.fl-table     { width:100%; border-collapse:collapse; font-size:.875rem; min-width:480px; }
+.fl-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
+                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
+.fl-table tbody tr:nth-child(even) { background:#fafafa; }
+.fl-table tbody tr:hover { background:#f0f5ff; }
+.fl-table td  { padding:5px 10px; vertical-align:middle; border-bottom:1px solid #f0f0f0; }
+.fl-name      { max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl-name a    { color:#1565c0; text-decoration:none; }
+.fl-name a:hover { text-decoration:underline; }
+.fl-num       { text-align:right; white-space:nowrap; color:#555; font-size:.8rem; }
+.fl-date      { white-space:nowrap; color:#666; font-size:.8rem; }
+.fl-badge     { display:inline-block; padding:1px 6px; border-radius:3px;
+                font-size:.7rem; font-weight:bold; color:#fff; }
+.fl-badge-dup { background:#c0720a; }
+.fl-badge-ok  { background:#78909c; }
+</style>
+
+[% MACRO fmt_size(b) BLOCK %]
+[% IF    b >= 1073741824 %][% b / 1073741824 | format('%.1f') %]&nbsp;GB
+[% ELSIF b >= 1048576    %][% b / 1048576    | format('%.1f') %]&nbsp;MB
+[% ELSIF b >= 1024       %][% b / 1024       | format('%.1f') %]&nbsp;KB
+[% ELSIF b               %][% b %]&nbsp;B
+[% ELSE %]—[% END %]
+[% END %]
+
 <div class="app-container">
 
   <div class="page-header">
     <h1>File List
-      [% IF files.size %]<small class="page-subtitle">([% files.size %] files)</small>[% END %]
+      [% IF files.size %]<small style="font-size:.6em;font-weight:normal;margin-left:8px;color:#777">([% files.size %] files)</small>[% END %]
     </h1>
   </div>
 
-  [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
-  [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
-  [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
+  [% END %]
 
   <div class="content-container">
     <div class="content-primary">
@@ -97,37 +131,44 @@
 
       <div class="content-section">
         [% IF files.size %]
-        <div class="table-container">
-          <table class="data-table">
+        <div class="fl-wrap">
+          <table class="fl-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th style="min-width:140px">Name</th>
                 [% IF is_csc %]<th>Site</th>[% END %]
                 <th>Type</th>
-                <th>Size</th>
+                <th class="fl-num">Size</th>
                 <th>Status</th>
                 <th>Dup</th>
-                <th>Date</th>
+                <th class="fl-date">Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               [% FOREACH file IN files %]
               <tr>
-                <td><a href="[% c.uri_for('/file/view', file.id) %]">[% file.file_name | html %]</a></td>
-                [% IF is_csc %]<td>[% file.sitename | html %]</td>[% END %]
-                <td>[% file.file_type | html %]</td>
-                <td>[% file.file_size | html %]</td>
-                <td>[% file.file_status | html %]</td>
+                <td class="fl-name" title="[% file.file_name | html %]">
+                  <a href="[% c.uri_for('/file/view', file.id) %]">[% file.file_name | html %]</a>
+                </td>
+                [% IF is_csc %]<td style="white-space:nowrap;font-size:.8rem">[% file.sitename | html %]</td>[% END %]
+                <td style="white-space:nowrap;font-size:.8rem">[% file.file_type | html %]</td>
+                <td class="fl-num">[% fmt_size(file.file_size) %]</td>
+                <td style="font-size:.8rem">[% file.file_status | html %]</td>
                 <td>
                   [% IF file.is_duplicate %]
-                  <a href="[% c.uri_for('/file/duplicates') %]" class="badge-duplicate">Dup</a>
-                  [% ELSE %]&mdash;[% END %]
+                  <a href="[% c.uri_for('/file/duplicates') %]"
+                     class="fl-badge fl-badge-dup" title="View duplicate details">Dup</a>
+                  [% ELSE %]
+                  <span class="fl-badge fl-badge-ok">OK</span>
+                  [% END %]
                 </td>
-                <td>[% file.upload_date | html %]</td>
-                <td class="action-cell">
+                <td class="fl-date">
+                  [% file.upload_date.replace(' .*', '') | html %]
+                </td>
+                <td style="white-space:nowrap">
                   <a href="[% c.uri_for('/file/edit', file.id) %]" class="btn btn-sm btn-edit">Edit</a>
-                  <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm">&#8595;</a>
+                  <a href="[% c.uri_for('/file/download', file.id) %]" class="btn btn-sm" title="Download">&#8595;</a>
                 </td>
               </tr>
               [% END %]

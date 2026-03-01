@@ -121,6 +121,8 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
     my $parent_dir = @parent_parts ? join('/', @parent_parts) : '';
     $parent_dir = '' if !$is_csc && $dir_path eq $nav_root;
 
+    my $disk_usage = $self->_disk_usage($dir_path);
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
         "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@{ $directories // [] }) . " files=" . scalar(@{ $files // [] }));
 
@@ -135,6 +137,7 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
         show_hidden       => $show_hidden,
         nfs_root          => $nfs_root,
         nav_root          => $nav_root,
+        disk_usage        => $disk_usage,
         template          => 'file/AdminBrowser.tt',
     );
     $c->forward($c->view('TT'));
@@ -814,6 +817,36 @@ sub download :Path('/file/download') :Args(1) {
     close $fh;
 
     $c->response->body($content);
+}
+
+sub _disk_usage {
+    my ($self, $path) = @_;
+    return {} unless defined $path && -d $path;
+    my $out = `df -P -B1 \Q$path\E 2>/dev/null`;
+    return {} unless $out;
+    my @lines = split /\n/, $out;
+    return {} unless @lines >= 2;
+    my @parts = split /\s+/, $lines[1];
+    return {} unless @parts >= 5;
+    my ($total, $used, $avail) = @parts[1, 2, 3];
+    my $pct = $total > 0 ? int($used * 100 / $total) : 0;
+    my $fmt = sub {
+        my $b = shift // 0;
+        return sprintf('%.1f GB', $b / 1_073_741_824) if $b >= 1_073_741_824;
+        return sprintf('%.1f MB', $b / 1_048_576)     if $b >= 1_048_576;
+        return sprintf('%.1f KB', $b / 1_024)         if $b >= 1_024;
+        return "$b B";
+    };
+    return {
+        total_bytes => $total,
+        used_bytes  => $used,
+        avail_bytes => $avail,
+        total_fmt   => $fmt->($total),
+        used_fmt    => $fmt->($used),
+        avail_fmt   => $fmt->($avail),
+        pct         => $pct,
+        mount       => $parts[5] // '',
+    };
 }
 
 sub _resolve_roles {
