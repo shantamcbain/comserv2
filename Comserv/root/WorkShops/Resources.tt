@@ -188,7 +188,27 @@
         </form>
     </details>
 
+    <details id="workshop-resources-panel" style="margin-top:14px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.02em;">🗃️ Workshop Resource Library
+            <span style="font-size:0.85em;font-weight:normal;color:var(--text-muted-color);">([% resources.size %] items)</span>
+        </summary>
     [% IF resources.size > 0 %]
+    <form method="GET" action="/workshop/resources" style="margin:10px 0 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'all' %] active[% END %]" name="res_filter" value="all">All</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'image' %] active[% END %]" name="res_filter" value="image">🖼️ Images</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'office' %] active[% END %]" name="res_filter" value="office">📊 Office</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'pdf' %] active[% END %]" name="res_filter" value="pdf">📄 PDF</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'video' %] active[% END %]" name="res_filter" value="video">🎬 Video</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'audio' %] active[% END %]" name="res_filter" value="audio">🎵 Audio</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'link' %] active[% END %]" name="res_filter" value="link">🔗 Links</button>
+        <button type="submit" class="btn btn-sm[% IF res_filter == 'backup' %] active[% END %]" name="res_filter" value="backup">🗄️ Backup</button>
+        <input type="hidden" name="lib_search" value="[% lib_search | html %]">
+        <input type="hidden" name="lib_filter" value="[% lib_filter | html %]">
+        <input type="text" name="res_search" value="[% res_search | html %]" placeholder="Search resource records…"
+               style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;flex:1;min-width:200px;">
+        <button type="submit" class="btn btn-sm btn-primary">Search</button>
+        [% IF res_filter != 'all' || res_search %]<a href="/workshop/resources?lib_search=[% lib_search | uri %]&lib_filter=[% lib_filter | uri %]" class="btn btn-sm">Clear</a>[% END %]
+    </form>
     <p style="color:var(--text-muted-color);font-size:0.85em;margin:0 0 8px;">[% resources.size %] resource(s) registered.</p>
     <div class="resource-grid" id="resource-grid">
         [% FOREACH r IN resources %]
@@ -207,7 +227,8 @@
         [% SET size_mb     = size_mb_raw ? size_mb_raw.int : 0 %]
         [% SET size_label  = size_kb > 1024 ? size_mb _ ' MB' : size_kb > 0 ? size_kb _ ' KB' : '' %]
 
-        <div class="resource-card" data-ftype="[% ftype_class %]" data-name="[% r.file_name | lower | html %]">
+        [% SET rsearch = (r.file_name || '') _ ' ' _ (r.description || '') _ ' ' _ (r.sitename || '') _ ' ' _ (r.file_path || '') %]
+        <div class="resource-card" data-ftype="[% ftype_class %]" data-name="[% r.file_name | lower | html %]" data-search="[% rsearch | lower | html %]">
             <div class="resource-thumb"
                 [% IF r.id %]onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" style="cursor:pointer"[% END %]>
                 [% IF is_image && r.id %]
@@ -255,6 +276,58 @@
                 [% ELSIF r.id %]
                     <a href="/workshop/resource_download/[% r.id %]" class="btn btn-sm" title="Download">⬇️ Download</a>
                     <button class="btn btn-sm" onclick="openResourceModal([% r.id %], '[% r.file_name | html %]', '[% ftype_class %]')" title="View Info">🔍</button>
+                    [% IF r.file_id %]
+                    <details style="display:inline-block;position:relative;">
+                        <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;">✏️ Edit</summary>
+                        <div style="position:absolute;right:0;top:100%;z-index:210;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                            <form method="POST" action="/workshop/file_update">
+                                <input type="hidden" name="file_id" value="[% r.file_id %]">
+                                <div style="margin-bottom:7px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Display Name</label>
+                                    <input type="text" name="file_name" value="[% r.file_name | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                </div>
+                                <div style="margin-bottom:7px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Description</label>
+                                    <input type="text" name="description" value="[% r.description | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Access</label>
+                                        <select name="access_level" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="site_only"[% IF r.access_level == 'site_only' %] selected[% END %]>Site Only</option>
+                                            <option value="all_leaders"[% IF r.access_level == 'all_leaders' %] selected[% END %]>All Leaders</option>
+                                            <option value="workshop_specific"[% IF r.access_level == 'workshop_specific' %] selected[% END %]>Workshop Specific</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Site</label>
+                                        <input type="text" name="sitename" value="[% r.sitename | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                    </div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Workshop Action</label>
+                                        <select name="workshop_action" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="keep">Keep Current</option>
+                                            <option value="attach">Attach to Workshop</option>
+                                            <option value="detach">Remove from Workshop View</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Workshop</label>
+                                        <select name="workshop_id" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="">— None —</option>
+                                            [% FOREACH w IN workshops %]
+                                            <option value="[% w.id %]"[% IF r.workshop_id && r.workshop_id == w.id %] selected[% END %]>[% w.sitename | html %] — [% w.title | html %]</option>
+                                            [% END %]
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-sm" style="background:#6c757d;color:#fff;width:100%;">💾 Save</button>
+                            </form>
+                        </div>
+                    </details>
+                    [% END %]
                     [% SET cur_uid = c.session.user_id %]
                     [% IF is_csc || r.uploaded_by == cur_uid %]
                     <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
@@ -274,15 +347,18 @@
         <p>Upload a file or add an external link using the panels above.</p>
     </div>
     [% END %]
+    </details>
 
     <!-- File Library — all files from the files table -->
-    <div style="margin-top:32px;border-top:2px solid var(--border-color,#dee2e6);padding-top:20px;">
+    <details id="file-library-panel" style="margin-top:32px;border-top:2px solid var(--border-color,#dee2e6);padding-top:14px;">
+        <summary style="cursor:pointer;font-weight:bold;font-size:1.02em;">📚 File Library
+            <span style="font-size:0.85em;font-weight:normal;color:var(--text-muted-color);">([% file_count %] files)</span>
+        </summary>
+    <div style="margin-top:12px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-            <h2 style="margin:0;">📚 File Library
-                <span style="font-size:0.7em;font-weight:normal;color:var(--text-muted-color);">[% file_count %] file(s)</span>
-            </h2>
+            <h2 style="margin:0;">📚 File Library</h2>
             <div style="display:flex;gap:6px;">
-                <a href="#add-link-panel" onclick="document.getElementById('add-link-panel').open=!document.getElementById('add-link-panel').open;return false;" class="btn btn-sm">🔗 Add External Link</a>
+                <a href="#add-link-panel" class="btn btn-sm">🔗 Add External Link</a>
                 [% IF is_csc %]<a href="/workshop/resource_sync" class="btn btn-sm" style="background:#17a2b8;color:#fff;">🔄 NFS Sync</a>[% END %]
             </div>
         </div>
@@ -325,28 +401,23 @@
         </div>
         [% END %]
 
-        <!-- Filter buttons + search -->
-        <div style="margin:12px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-            <button class="btn btn-sm lib-filter-btn active" data-filter="all">All</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="image">🖼️ Images</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="office">📊 Office</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="pdf">📄 PDF</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="video">🎬 Video</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="audio">🎵 Audio</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="other">📦 Other</button>
-            <button class="btn btn-sm lib-filter-btn" data-filter="link">🔗 Links</button>
-            &nbsp;
-            <input type="text" id="lib-search-inline" placeholder="Filter by name…"
-                   style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;flex:1;min-width:160px;">
-        </div>
-
-        <!-- Server-side search -->
         <form method="GET" action="/workshop/resources" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
-            <input type="text" name="lib_search" id="lib-search-server" value="[% lib_search | html %]"
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'all' %] active[% END %]" name="lib_filter" value="all">All</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'image' %] active[% END %]" name="lib_filter" value="image">🖼️ Images</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'office' %] active[% END %]" name="lib_filter" value="office">📊 Office</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'pdf' %] active[% END %]" name="lib_filter" value="pdf">📄 PDF</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'video' %] active[% END %]" name="lib_filter" value="video">🎬 Video</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'audio' %] active[% END %]" name="lib_filter" value="audio">🎵 Audio</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'other' %] active[% END %]" name="lib_filter" value="other">📦 Other</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'link' %] active[% END %]" name="lib_filter" value="link">🔗 Links</button>
+            <button type="submit" class="btn btn-sm[% IF lib_filter == 'backup' %] active[% END %]" name="lib_filter" value="backup">🗄️ Backup</button>
+            <input type="hidden" name="res_filter" value="[% res_filter | html %]">
+            <input type="hidden" name="res_search" value="[% res_search | html %]">
+            <input type="text" name="lib_search" value="[% lib_search | html %]"
                    placeholder="Search DB (name, path, description)…"
                    style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;flex:1;min-width:220px;">
             <button type="submit" class="btn btn-sm btn-primary">🔍 DB Search</button>
-            [% IF lib_search %]<a href="/workshop/resources" class="btn btn-sm">✕ Clear</a>[% END %]
+            [% IF lib_search || lib_filter != 'all' %]<a href="/workshop/resources?res_filter=[% res_filter | uri %]&res_search=[% res_search | uri %]" class="btn btn-sm">✕ Clear</a>[% END %]
         </form>
 
         [% IF file_library.size > 0 %]
@@ -379,7 +450,8 @@
             [% SET fsize_mb_raw = fsize_kb > 1024 ? fsize_kb / 1024 : 0 %]
             [% SET fsize_mb = fsize_mb_raw ? fsize_mb_raw.int : 0 %]
             [% SET fsize_label = fsize_kb > 1024 ? fsize_mb _ ' MB' : fsize_kb > 0 ? fsize_kb _ ' KB' : '—' %]
-            <tr class="lib-row" data-ftype="[% ftype %]" data-name="[% f.file_name | lower | html %]"
+            [% SET fsearch = (f.file_name || '') _ ' ' _ (f.description || '') _ ' ' _ (f.nfs_path || '') %]
+            <tr class="lib-row" data-ftype="[% ftype %]" data-name="[% f.file_name | lower | html %]" data-search="[% fsearch | lower | html %]"
                 style="border-bottom:1px solid var(--border-color,#dee2e6);">
                 <!-- Thumbnail / preview icon -->
                 <td style="padding:4px 8px;text-align:center;width:64px;vertical-align:middle;">
@@ -412,12 +484,9 @@
                     <button class="btn btn-sm" style="background:#007bff;color:#fff;"
                             onclick="openFileModal([% f.id %], '[% f.file_name | html %]', '[% ftype %]')"
                             title="Preview">🔍</button>
-                    <!-- Attach to Workshop -->
-                    <span style="position:relative;display:inline-block;">
-                        <button class="btn btn-sm" style="background:#28a745;color:#fff;"
-                                onclick="toggleAttachForm([% f.id %])" title="Attach to Workshop">📎</button>
-                        <div id="attach-form-[% f.id %]"
-                             style="display:none;position:absolute;right:0;top:100%;z-index:200;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                    <details style="display:inline-block;position:relative;">
+                        <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#28a745;color:#fff;" title="Attach to Workshop">📎</summary>
+                        <div style="position:absolute;right:0;top:100%;z-index:200;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/resource_attach">
                                 <input type="hidden" name="file_id" value="[% f.id %]">
                                 <div style="margin-bottom:7px;">
@@ -436,13 +505,70 @@
                                         <option value="all_leaders">All Leaders</option>
                                     </select>
                                 </div>
+                                <button type="submit" class="btn btn-sm" style="background:#28a745;color:#fff;width:100%;">📎 Attach</button>
+                            </form>
+                        </div>
+                    </details>
+                    <details style="display:inline-block;position:relative;">
+                        <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;" title="Edit File Record">✏️</summary>
+                        <div style="position:absolute;right:0;top:100%;z-index:210;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                            <form method="POST" action="/workshop/file_update">
+                                <input type="hidden" name="file_id" value="[% f.id %]">
+                                <div style="margin-bottom:7px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Display Name</label>
+                                    <input type="text" name="file_name" value="[% f.file_name | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                </div>
+                                <div style="margin-bottom:7px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Description</label>
+                                    <input type="text" name="description" value="[% f.description | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Access</label>
+                                        <select name="access_level" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="site_only"[% IF f.access_level == 'site_only' %] selected[% END %]>Site Only</option>
+                                            <option value="all_leaders"[% IF f.access_level == 'all_leaders' %] selected[% END %]>All Leaders</option>
+                                            <option value="workshop_specific"[% IF f.access_level == 'workshop_specific' %] selected[% END %]>Workshop Specific</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Status</label>
+                                        <select name="file_status" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="active"[% IF f.file_status == 'active' %] selected[% END %]>Active</option>
+                                            <option value="pending"[% IF f.file_status == 'pending' %] selected[% END %]>Pending</option>
+                                            <option value="archived"[% IF f.file_status == 'archived' %] selected[% END %]>Archived</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="margin-bottom:7px;">
+                                    <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Site</label>
+                                    <input type="text" name="sitename" value="[% f.sitename | html %]" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Workshop Action</label>
+                                        <select name="workshop_action" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="keep">Keep Current</option>
+                                            <option value="attach">Attach to Workshop</option>
+                                            <option value="detach">Remove from Workshop View</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Workshop</label>
+                                        <select name="workshop_id" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:0.82em;">
+                                            <option value="">— None —</option>
+                                            [% FOREACH w IN workshops %]
+                                            <option value="[% w.id %]"[% IF f.workshop_id && f.workshop_id == w.id %] selected[% END %]>[% w.sitename | html %] — [% w.title | html %]</option>
+                                            [% END %]
+                                        </select>
+                                    </div>
+                                </div>
                                 <div style="display:flex;gap:6px;">
-                                    <button type="submit" class="btn btn-sm" style="background:#28a745;color:#fff;flex:1;">📎 Attach</button>
-                                    <button type="button" class="btn btn-sm" onclick="toggleAttachForm([% f.id %])">✕</button>
+                                    <button type="submit" class="btn btn-sm" style="background:#6c757d;color:#fff;flex:1;">💾 Save</button>
                                 </div>
                             </form>
                         </div>
-                    </span>
+                    </details>
                 </td>
             </tr>
             [% END %]
@@ -455,29 +581,30 @@
         <div style="display:flex;gap:6px;align-items:center;margin-top:14px;flex-wrap:wrap;">
             <span style="font-size:0.85em;color:var(--text-muted-color);">Page [% lib_page %] of [% file_pages %]</span>
             [% IF lib_page > 1 %]
-            <a href="/workshop/resources?lib_page=[% lib_page - 1 %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">‹ Prev</a>
+            <a href="/workshop/resources?lib_page=[% lib_page - 1 %]&lib_search=[% lib_search | uri %]&lib_filter=[% lib_filter | uri %]&res_filter=[% res_filter | uri %]&res_search=[% res_search | uri %]" class="btn btn-sm">‹ Prev</a>
             [% END %]
             [% FOREACH p IN [1 .. file_pages] %]
                 [% IF p == lib_page %]
                 <span class="btn btn-sm" style="background:var(--primary-color,#007bff);color:#fff;">[% p %]</span>
                 [% ELSIF p == 1 || p == file_pages || (p >= lib_page - 2 && p <= lib_page + 2) %]
-                <a href="/workshop/resources?lib_page=[% p %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">[% p %]</a>
+                <a href="/workshop/resources?lib_page=[% p %]&lib_search=[% lib_search | uri %]&lib_filter=[% lib_filter | uri %]&res_filter=[% res_filter | uri %]&res_search=[% res_search | uri %]" class="btn btn-sm">[% p %]</a>
                 [% ELSIF p == lib_page - 3 || p == lib_page + 3 %]
                 <span style="padding:0 4px;">…</span>
                 [% END %]
             [% END %]
             [% IF lib_page < file_pages %]
-            <a href="/workshop/resources?lib_page=[% lib_page + 1 %]&lib_search=[% lib_search | uri %]" class="btn btn-sm">Next ›</a>
+            <a href="/workshop/resources?lib_page=[% lib_page + 1 %]&lib_search=[% lib_search | uri %]&lib_filter=[% lib_filter | uri %]&res_filter=[% res_filter | uri %]&res_search=[% res_search | uri %]" class="btn btn-sm">Next ›</a>
             [% END %]
         </div>
         [% END %]
 
         [% ELSE %]
         <p style="color:var(--text-muted-color);padding:20px 0;">
-            [% IF lib_search %]No files match "<strong>[% lib_search | html %]</strong>". <a href="/workshop/resources">Clear search</a>.[% ELSE %]No files in the library yet. Use the <a href="/workshop/resource_sync">NFS Sync Tool</a> to scan and import files.[% END %]
+            [% IF lib_search %]No files match "<strong>[% lib_search | html %]</strong>". <a href="/workshop/resources?res_filter=[% res_filter | uri %]&res_search=[% res_search | uri %]">Clear search</a>.[% ELSE %]No files in the library yet. Use the <a href="/workshop/resource_sync">NFS Sync Tool</a> to scan and import files.[% END %]
         </p>
         [% END %]
     </div>
+    </details>
 
     [% IF is_admin %]
     <!-- Admin: lazy NFS filesystem browser -->
@@ -485,12 +612,23 @@
         <summary>🗂️ Browse NFS Filesystem Raw (Admin)
             <span id="nfs-count-badge" style="font-size:0.8em;font-weight:normal;color:var(--text-muted-color);margin-left:8px;"></span>
         </summary>
+        <div style="margin:12px 16px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button type="button" class="btn btn-sm nfs-filter-btn active" data-filter="all">All</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="image">🖼️ Images</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="office">📊 Office</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="pdf">📄 PDF</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="video">🎬 Video</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="audio">🎵 Audio</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="other">📦 Other</button>
+            <button type="button" class="btn btn-sm nfs-filter-btn" data-filter="backup">🗄️ Backup</button>
+        </div>
         <input type="text" id="nfs-search" placeholder="Filter by filename…">
         <div id="nfs-table-wrap">
             <div id="nfs-status">Click to load NFS file listing…</div>
             <table id="nfs-table" style="display:none;">
                 <thead>
                     <tr>
+                        <th>Preview</th>
                         <th>Name</th>
                         <th>Ext</th>
                         <th>Size</th>
@@ -505,23 +643,6 @@
     [% END %]
 
 </div>
-<script>
-function toggleAttachForm(id) {
-    var el = document.getElementById('attach-form-' + id);
-    if (!el) return;
-    var showing = el.style.display !== 'none';
-    // Close all open attach forms first
-    document.querySelectorAll('[id^="attach-form-"]').forEach(function(f) { f.style.display = 'none'; });
-    if (!showing) el.style.display = 'block';
-}
-// Close attach forms when clicking elsewhere
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('[id^="attach-form-"]') && !e.target.closest('button[onclick^="toggleAttachForm"]')) {
-        document.querySelectorAll('[id^="attach-form-"]').forEach(function(f) { f.style.display = 'none'; });
-    }
-});
-</script>
-
 <!-- View/Info Modal -->
 <div id="resource-modal">
     <div id="resource-modal-inner" style="max-width:900px;">
@@ -552,18 +673,24 @@ document.addEventListener('click', function(e) {
     var libFilterBtns = document.querySelectorAll('.lib-filter-btn');
     var libSearchBox  = document.getElementById('lib-search-inline');
     var libFilterVal  = 'all';
+    var resFilterBtns = document.querySelectorAll('.res-filter-btn');
+    var resSearchBox  = document.getElementById('res-search-inline');
+    var resFilterVal  = 'all';
 
     function applyLibFilters() {
         var searchVal = libSearchBox ? libSearchBox.value.toLowerCase() : '';
         document.querySelectorAll('.lib-row').forEach(function(row) {
-            var typeMatch = libFilterVal === 'all' || row.dataset.ftype === libFilterVal;
-            var nameMatch = !searchVal || (row.dataset.name || '').indexOf(searchVal) >= 0;
+            var isBackup = (row.dataset.search || '').indexOf('backup') >= 0;
+            var typeMatch = libFilterVal === 'all' ||
+                (libFilterVal === 'backup' ? isBackup : row.dataset.ftype === libFilterVal);
+            var nameMatch = !searchVal || (row.dataset.search || row.dataset.name || '').indexOf(searchVal) >= 0;
             row.style.display = (typeMatch && nameMatch) ? '' : 'none';
         });
     }
 
     libFilterBtns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+            if (e) e.preventDefault();
             libFilterBtns.forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
             libFilterVal = btn.dataset.filter;
@@ -572,10 +699,44 @@ document.addEventListener('click', function(e) {
     });
     if (libSearchBox) libSearchBox.addEventListener('input', applyLibFilters);
 
+    function applyResFilters() {
+        var searchVal = resSearchBox ? resSearchBox.value.toLowerCase() : '';
+        document.querySelectorAll('.resource-card').forEach(function(card) {
+            var isBackup = (card.dataset.search || '').indexOf('backup') >= 0;
+            var typeMatch = resFilterVal === 'all' ||
+                (resFilterVal === 'backup' ? isBackup : card.dataset.ftype === resFilterVal);
+            var nameMatch = !searchVal || (card.dataset.search || card.dataset.name || '').indexOf(searchVal) >= 0;
+            card.style.display = (typeMatch && nameMatch) ? '' : 'none';
+        });
+    }
+    resFilterBtns.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            if (e) e.preventDefault();
+            resFilterBtns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            resFilterVal = btn.dataset.filter || 'all';
+            applyResFilters();
+        });
+    });
+    if (resSearchBox) resSearchBox.addEventListener('input', applyResFilters);
+
     /* ---- NFS filesystem browser (admin lazy load) ---- */
     var nfsSection = document.getElementById('nfs-browser-section');
     var nfsLoaded  = false;
     var nfsAllFiles = [];
+    var nfsFilterVal = 'all';
+
+    var nfsFilterBtns = document.querySelectorAll('.nfs-filter-btn');
+    nfsFilterBtns.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            if (e) e.preventDefault();
+            nfsFilterBtns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            nfsFilterVal = btn.dataset.filter || 'all';
+            var q = (document.getElementById('nfs-search') || {}).value || '';
+            filterNfsTable(q.toLowerCase());
+        });
+    });
 
     if (nfsSection) {
         nfsSection.addEventListener('toggle', function() {
@@ -594,12 +755,18 @@ document.addEventListener('click', function(e) {
 
     function loadNfsListing() {
         var status = document.getElementById('nfs-status');
+        var startedAt = Date.now();
         status.textContent = 'Scanning NFS filesystem… this may take a moment.';
         status.style.display = 'block';
+        var timer = setInterval(function() {
+            var sec = Math.floor((Date.now() - startedAt) / 1000);
+            status.textContent = 'Scanning NFS filesystem… ' + sec + 's elapsed.';
+        }, 1000);
 
-        fetch('/workshop/resource_fs_list')
+        fetch('/workshop/resource_fs_list?max_files=3000')
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                clearInterval(timer);
                 nfsLoaded = true;
                 if (data.error && !data.files) {
                     status.textContent = 'Error: ' + data.error;
@@ -607,12 +774,22 @@ document.addEventListener('click', function(e) {
                 }
                 nfsAllFiles = data.files || [];
                 var badge = document.getElementById('nfs-count-badge');
-                if (badge) badge.textContent = '(' + nfsAllFiles.length + ' files)';
+                if (badge) {
+                    badge.textContent = '(' + nfsAllFiles.length + ' files' +
+                        (data.truncated ? ', showing first ' + (data.max_files || nfsAllFiles.length) : '') + ')';
+                }
                 renderNfsTable(nfsAllFiles);
-                status.style.display = 'none';
+                if (data.truncated) {
+                    status.textContent = 'Loaded first ' + (data.max_files || nfsAllFiles.length) +
+                        ' files. Refine filters or use sync tool for full import.';
+                    status.style.display = 'block';
+                } else {
+                    status.style.display = 'none';
+                }
                 document.getElementById('nfs-table').style.display = 'table';
             })
             .catch(function(err) {
+                clearInterval(timer);
                 document.getElementById('nfs-status').textContent = 'Failed to load: ' + err;
             });
     }
@@ -624,12 +801,21 @@ document.addEventListener('click', function(e) {
             var kb = f.file_size > 0 ? Math.round(f.file_size / 1024) : 0;
             var sizeLabel = kb > 1024 ? Math.round(kb/1024) + ' MB' : kb > 0 ? kb + ' KB' : '—';
             var enc = encodeURIComponent(f.file_path);
-            return '<tr data-name="' + escHtml(f.file_name.toLowerCase()) + '">' +
-                '<td>' + escHtml(f.file_name) + '</td>' +
-                '<td>' + escHtml(f.file_ext.toUpperCase()) + '</td>' +
+            var ext = (f.file_ext || '').toLowerCase();
+            var ftype = classifyType(ext);
+            var icon = ftype === 'image' ? '🖼️' : ftype === 'office' ? '📊' : ftype === 'pdf' ? '📄' : ftype === 'video' ? '🎬' : ftype === 'audio' ? '🎵' : '📦';
+            var dl = '/workshop/resource_fs_download?path=' + enc;
+            var previewHtml = ftype === 'image'
+                ? '<img src="' + dl + '" alt="" loading="lazy" style="max-height:46px;max-width:56px;object-fit:cover;border-radius:3px;cursor:pointer;display:block;margin:auto;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'' + icon + '\',style:\'font-size:1.6em;cursor:pointer\'}))">'
+                : '<span style="font-size:1.6em;cursor:pointer;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + icon + '</span>';
+            var searchBlob = ((f.file_name || '') + ' ' + (f.file_path || '')).toLowerCase();
+            return '<tr data-name="' + escHtml(f.file_name.toLowerCase()) + '" data-search="' + escHtml(searchBlob) + '" data-ftype="' + ftype + '">' +
+                '<td style="text-align:center;white-space:nowrap;">' + previewHtml + '</td>' +
+                '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span></td>' +
+                '<td>' + escHtml((f.file_ext || '').toUpperCase()) + '</td>' +
                 '<td style="white-space:nowrap;">' + sizeLabel + '</td>' +
                 '<td style="font-size:0.78em;color:#666;">' + escHtml(f.file_path) + '</td>' +
-                '<td><a href="/workshop/resource_fs_download?path=' + enc + '" class="btn btn-sm">⬇️</a></td>' +
+                '<td><a href="' + dl + '" class="btn btn-sm">⬇️</a></td>' +
                 '</tr>';
         });
         tbody.innerHTML = rows.join('');
@@ -638,12 +824,29 @@ document.addEventListener('click', function(e) {
     function filterNfsTable(q) {
         var rows = document.querySelectorAll('#nfs-tbody tr');
         rows.forEach(function(row) {
-            row.style.display = (!q || (row.dataset.name || '').indexOf(q) >= 0) ? '' : 'none';
+            var isBackup = (row.dataset.search || '').indexOf('backup') >= 0;
+            var typeMatch = nfsFilterVal === 'all' ||
+                (nfsFilterVal === 'backup' ? isBackup : row.dataset.ftype === nfsFilterVal);
+            var nameMatch = !q || (row.dataset.search || row.dataset.name || '').indexOf(q) >= 0;
+            row.style.display = (typeMatch && nameMatch) ? '' : 'none';
         });
     }
 
     function escHtml(str) {
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function jsEsc(str) {
+        return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+    }
+
+    function classifyType(ext) {
+        if (['jpg','jpeg','png','gif','svg','webp'].indexOf(ext) >= 0) return 'image';
+        if (['ppt','pptx','doc','docx','xls','xlsx','odt','odp','ods'].indexOf(ext) >= 0) return 'office';
+        if (ext === 'pdf') return 'pdf';
+        if (['mp4','mov','avi','webm'].indexOf(ext) >= 0) return 'video';
+        if (['mp3','wav','ogg','flac','m4a'].indexOf(ext) >= 0) return 'audio';
+        return 'other';
     }
 })();
 
@@ -777,6 +980,21 @@ function openResourceModal(id, name, ftype) {
 function openFileModal(id, name, ftype) {
     var viewUrl = '/workshop/file_view/' + id;
     _openModal(name, viewUrl, ftype, viewUrl, viewUrl + '?info=1');
+}
+
+function openFsModal(name, ext, encodedPath) {
+    var ftype = (function(e) {
+        e = (e || '').toLowerCase();
+        if (['jpg','jpeg','png','gif','svg','webp'].indexOf(e) >= 0) return 'image';
+        if (['ppt','pptx','doc','docx','xls','xlsx','odt','odp','ods'].indexOf(e) >= 0) return 'office';
+        if (e === 'pdf') return 'pdf';
+        if (['mp4','mov','avi','webm'].indexOf(e) >= 0) return 'video';
+        if (['mp3','wav','ogg','flac','m4a'].indexOf(e) >= 0) return 'audio';
+        if (['txt','csv','md','log','json','xml','yaml','yml'].indexOf(e) >= 0) return 'text';
+        return 'other';
+    })(ext);
+    var url = '/workshop/resource_fs_download?path=' + encodedPath;
+    _openModal(name, url, ftype, url, null);
 }
 
 function closeResourceModal() {

@@ -49,10 +49,15 @@ sub get_past_workshops {
     my @workshops;
     my $error;
     eval {
-        # Past workshops are always visible to everyone — they already happened.
-        # Status filtering is only relevant for upcoming workshops.
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        my $admin_type = $admin_auth->get_admin_type($c);
+        my $is_admin   = ($admin_type eq 'csc' || $admin_type eq 'special' || $admin_type eq 'standard');
+
+        my $filter = { 'me.date' => { '<' => DateTime->today->ymd } };
+        $filter->{'me.status'} = { '!=' => 'draft' } unless $is_admin;
+
         @workshops = $rs->search(
-            { 'me.date' => { '<' => DateTime->today->ymd } },
+            $filter,
             { order_by => { -desc => 'me.date' }, prefetch => 'creator' }
         );
     };
