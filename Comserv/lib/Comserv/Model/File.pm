@@ -301,6 +301,36 @@ sub upload_and_record {
     return ($file_row, undef);
 }
 
+sub get_nfs_allocations {
+    my ($self, $c, $sitename) = @_;
+    my $schema = $c->model('DBEncy');
+    my %where = ();
+    $where{sitename} = $sitename if defined $sitename && $sitename ne '';
+    my @allocs = $schema->resultset('NfsDirectory')->search(
+        \%where,
+        { order_by => ['sitename', 'nfs_path'] }
+    )->all;
+    return \@allocs;
+}
+
+sub create_nfs_allocation {
+    my ($self, $c, %params) = @_;
+    my $schema = $c->model('DBEncy');
+    my $row;
+    eval {
+        $row = $schema->resultset('NfsDirectory')->create({
+            sitename    => $params{sitename},
+            site_id     => $params{site_id} || undef,
+            nfs_path    => $params{nfs_path},
+            description => $params{description} // '',
+            created_by  => $params{created_by} || undef,
+            is_active   => 1,
+        });
+    };
+    my $err = "$@" if $@;
+    return ($row, $err);
+}
+
 sub rename_file {
     my ($self, $c, $id, $new_name) = @_;
 
