@@ -41,13 +41,13 @@
   </div>
 
   [% IF error_msg %]
-  <div class="error">[% error_msg | html %]</div>
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% error_msg | html %]</div>
   [% END %]
   [% IF c.flash.error_msg %]
-  <div class="error">[% c.flash.error_msg | html %]</div>
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c"><strong>Error:</strong> [% c.flash.error_msg | html %]</div>
   [% END %]
   [% IF c.flash.success_msg %]
-  <div class="success">[% c.flash.success_msg | html %]</div>
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20"><strong>Done:</strong> [% c.flash.success_msg | html %]</div>
   [% END %]
 
   <div class="content-container">
@@ -242,22 +242,25 @@
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="swap">
               <button type="submit" class="btn btn-sm btn-edit"
+                      title="Swap roles: the right-hand file becomes the original, the left-hand file becomes the duplicate"
                       onclick="return confirm('Make #[% dup.id %] the original and mark #[% orig ? orig.id : '?' %] as the duplicate instead?')">
-                Make This the Original
+                &#8644; Swap: Make Duplicate the Original
               </button>
             </form>
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="delete_db">
               <button type="submit" class="btn btn-sm"
-                      onclick="return confirm('Remove duplicate #[% dup.id %] from the database only? The file on disk will NOT be deleted.')">
-                Delete (DB only)
+                      title="Remove duplicate DB record only — the actual file on disk is NOT deleted"
+                      onclick="return confirm('Remove duplicate #[% dup.id %] from the database only?\n\nThe file on disk will NOT be deleted.')">
+                Remove DB Record Only
               </button>
             </form>
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="delete_both">
               <button type="submit" class="btn btn-sm btn-delete"
-                      onclick="return confirm('Delete duplicate #[% dup.id %] from the database AND from disk? This cannot be undone.')">
-                Delete (DB + Disk)
+                      title="Delete the duplicate file from disk AND remove its database record. Cannot be undone."
+                      onclick="return confirm('Delete duplicate #[% dup.id %] from the database AND from disk?\n\nThis cannot be undone.')">
+                Delete from Disk + DB
               </button>
             </form>
 
