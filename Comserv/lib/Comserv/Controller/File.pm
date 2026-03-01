@@ -1,43 +1,158 @@
-   package Comserv::Controller::File;
+package Comserv::Controller::File;
 use Moose;
 use namespace::autoclean;
 use File::Find;
 use File::Basename qw(basename dirname);
 use Time::Piece;
 use URI::Escape;
+use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->new() },
+);
 
 sub index :PathPart('file') :Chained('/') :Args(0) {
-    my ( $self, $c ) = @_;
-    my $dir_path = $c->request->param('dir_path') // '';
-    my $show_hidden = $c->request->param('show_hidden') // 0;
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
 
-    # If the path is not absolute, prepend the home directory
-    if (substr($dir_path, 0, 1) ne '/') {
-        $dir_path = $ENV{'HOME'} . '/' . $dir_path;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "File index accessed by user=" . ($c->session->{user_id} // 'anon') . " sitename=$sitename is_admin=$is_admin");
+
+    if ($is_admin) {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
     }
 
-    # Check if the directory exists
-    if (-d $dir_path) {
-        my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path, $show_hidden);
-        $c->log->debug("Files: " . join(", ", @$files));
+    $c->response->redirect($c->uri_for('/'));
+}
 
-        my @sorted_directories = sort @$directories;
-        my @sorted_files = sort @$files;
-        $c->stash(directories => \@sorted_directories);
-        $c->stash(files => \@sorted_files);
-        $c->stash(current_directory => $dir_path);
+sub admin_browser :Path('/file/admin_browser') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
 
-        $c->stash(template => 'file/filemanagement.tt');
-        $c->stash->{last_directory} = $dir_path;
-        $c->forward('View::TT');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
+        "Admin browser accessed by user=" . ($c->session->{user_id} // 'anon') . " sitename=$sitename is_csc=$is_csc");
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    my $schema   = $c->model('DBEncy');
+
+    my $allocated_dirs = [];
+    if ($is_csc) {
+        my @allocs = $schema->resultset('NfsDirectory')->search({ is_active => 1 })->all;
+        $allocated_dirs = \@allocs;
     } else {
-        # Handle the error
-        $c->stash(error_message => "The directory $dir_path does not exist.");
-        $c->stash(template => 'error.tt');
-        $c->forward('View::TT');
+        my @allocs = $schema->resultset('NfsDirectory')->search(
+            { sitename => $sitename, is_active => 1 }
+        )->all;
+        $allocated_dirs = \@allocs;
     }
+
+    my $dir_path = $c->req->param('dir_path');
+    unless (defined $dir_path && length $dir_path) {
+        if ($is_csc) {
+            $dir_path = $nfs_root;
+        } elsif (@$allocated_dirs) {
+            $dir_path = $allocated_dirs->[0]->nfs_path;
+        } else {
+            $dir_path = $nfs_root;
+        }
+    }
+
+    unless ($is_csc) {
+        my $allowed = 0;
+        for my $alloc (@$allocated_dirs) {
+            my $apath = $alloc->nfs_path;
+            if (CORE::index($dir_path, $apath) == 0) {
+                $allowed = 1;
+                last;
+            }
+        }
+        unless ($allowed) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin_browser',
+                "SiteName admin '$sitename' attempted to access out-of-scope dir: $dir_path");
+            $c->stash(error_msg => 'Access denied to that directory.');
+            $dir_path = @$allocated_dirs ? $allocated_dirs->[0]->nfs_path : $nfs_root;
+        }
+    }
+
+    my $show_hidden = $c->req->param('show_hidden') // 0;
+    my ($directories, $files) = $c->model('File')->get_files_info($c, $dir_path, $show_hidden);
+
+    my @sorted_dirs  = sort @{ $directories // [] };
+    my @sorted_files = sort @{ $files // [] };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
+        "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@sorted_dirs) . " files=" . scalar(@sorted_files));
+
+    $c->stash(
+        directories       => \@sorted_dirs,
+        files             => \@sorted_files,
+        current_directory => $dir_path,
+        is_csc            => $is_csc,
+        allocated_dirs    => $allocated_dirs,
+        show_hidden       => $show_hidden,
+        nfs_root          => $nfs_root,
+        template          => 'file/AdminBrowser.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub list :Path('/file/list') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list',
+        "File list accessed by user=" . ($c->session->{user_id} // 'anon') . " sitename=$sitename is_csc=$is_csc");
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my %filters = (
+        sitename     => scalar($c->req->param('sitename_filter'))     // '',
+        file_status  => scalar($c->req->param('status_filter'))       // '',
+        file_type    => scalar($c->req->param('type_filter'))         // '',
+        is_duplicate => scalar($c->req->param('duplicate_filter'))    // '',
+    );
+
+    my $files = $c->model('File')->get_files_filtered($c, %filters);
+
+    my $sites = [];
+    if ($is_csc) {
+        eval {
+            my @site_list = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $sites = \@site_list;
+        };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'list',
+                "Could not fetch site list: $err");
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list',
+        "Rendering file list: count=" . scalar(@{ $files // [] }) . " is_csc=$is_csc");
+
+    $c->stash(
+        files         => $files,
+        filter_params => \%filters,
+        is_csc        => $is_csc,
+        sites         => $sites,
+        template      => 'file/FileList.tt',
+    );
+    $c->forward($c->view('TT'));
 }
 sub list_files :Local {
     my ($self, $c, $dir_path) = @_;
