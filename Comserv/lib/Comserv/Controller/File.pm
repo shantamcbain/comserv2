@@ -92,12 +92,14 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
         }
     }
 
+    my $nav_root = $nfs_root;
     unless ($is_csc) {
         my $allowed = 0;
         for my $alloc (@$allocated_dirs) {
             my $apath = $alloc->nfs_path;
             if (CORE::index($dir_path, $apath) == 0) {
-                $allowed = 1;
+                $allowed  = 1;
+                $nav_root = $apath;
                 last;
             }
         }
@@ -106,6 +108,7 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
                 "SiteName admin '$sitename' attempted to access out-of-scope dir: $dir_path");
             $c->stash(error_msg => 'Access denied to that directory.');
             $dir_path = @$allocated_dirs ? $allocated_dirs->[0]->nfs_path : $nfs_root;
+            $nav_root = $dir_path;
         }
     }
 
@@ -115,6 +118,7 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
     my @parent_parts = split '/', $dir_path;
     pop @parent_parts;
     my $parent_dir = @parent_parts ? join('/', @parent_parts) : '';
+    $parent_dir = '' if !$is_csc && $dir_path eq $nav_root;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_browser',
         "Rendering admin_browser for dir=$dir_path dirs=" . scalar(@{ $directories // [] }) . " files=" . scalar(@{ $files // [] }));
@@ -125,9 +129,11 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
         current_directory => $dir_path,
         parent_dir        => $parent_dir,
         is_csc            => $is_csc,
+        is_admin          => $is_admin,
         allocated_dirs    => $allocated_dirs,
         show_hidden       => $show_hidden,
         nfs_root          => $nfs_root,
+        nav_root          => $nav_root,
         template          => 'file/AdminBrowser.tt',
     );
     $c->forward($c->view('TT'));
@@ -1608,8 +1614,10 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
         return;
     }
 
-    my $file_path = $c->req->param('file_path') // '';
-    my $dir       = $c->req->param('dir')        // '';
+    my $file_path    = $c->req->param('file_path')    // '';
+    my $dir          = $c->req->param('dir')           // '';
+    my $access_level = $c->req->param('access_level')  // 'site_only';
+    $access_level = 'site_only' unless $access_level =~ /^(public|site_only|private)$/;
 
     $file_path =~ s{\.\.}{}g;
 
@@ -1671,7 +1679,7 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
             user_id      => $user_id,
             nfs_path     => $rel,
             external_url => '',
-            access_level => 'site_only',
+            access_level => $access_level,
             source_type  => 'nfs',
             sitename     => $res_sitename,
             is_duplicate => $is_dup,
