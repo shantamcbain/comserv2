@@ -83,18 +83,19 @@
 .fb-modal-body audio, .fb-modal-body video { max-width:80vw; }
 .fb-modal-footer  { display:flex; gap:8px; padding:8px 16px; border-top:1px solid #ddd; background:#f5f5f5; }
 
-/* ── Buttons (local definitions — no global btn classes in theme) ── */
+/* ── Buttons — force override any global theme rules ─────────────── */
 .btn {
-    display:inline-block; padding:5px 10px; border:none; border-radius:4px;
-    cursor:pointer; font-size:0.85rem; text-decoration:none; line-height:1.4;
-    vertical-align:middle; font-weight:500;
+    display:inline-block !important; padding:5px 10px !important; border:none !important;
+    border-radius:4px !important; cursor:pointer !important; font-size:0.85rem !important;
+    text-decoration:none !important; line-height:1.4 !important;
+    vertical-align:middle !important; font-weight:500 !important;
 }
-.btn:hover { opacity:.88; text-decoration:none; }
-.btn-sm   { padding:2px 8px; font-size:0.75rem; }
-.btn-primary   { background:#007bff; color:#fff !important; }
-.btn-secondary { background:#6c757d; color:#fff !important; }
-.btn-edit      { background:#fd7e14; color:#fff !important; }
-.btn-delete    { background:#dc3545; color:#fff !important; }
+.btn:hover { opacity:.85 !important; text-decoration:none !important; }
+.btn-sm        { padding:2px 8px !important; font-size:0.75rem !important; }
+.btn-primary   { background-color:#007bff !important; color:#fff !important; }
+.btn-secondary { background-color:#6c757d !important; color:#fff !important; }
+.btn-edit      { background-color:#fd7e14 !important; color:#fff !important; }
+.btn-delete    { background-color:#dc3545 !important; color:#fff !important; }
 
 /* ── Rename inline form ────────────────────────────────────────── */
 .fb-rename-row { display:none; }
@@ -296,15 +297,18 @@
                 <td>
                   <div class="fb-row-actions">
                     <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
-                       class="btn btn-sm btn-edit" title="Open">Open</a>
+                       class="btn btn-sm btn-primary" title="Open directory">Open</a>
                     <button type="button" class="btn btn-sm btn-edit"
                             onclick="fbRenameShow('[% rid %]','[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
                             title="Rename">Rename</button>
+                    <button type="button" class="btn btn-sm btn-secondary"
+                            onclick="fbOpenMove('[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
+                            title="Move directory to another location">Move</button>
                     <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
                           onsubmit="return confirm('Delete empty folder [% dir_esc %]?')">
                       <input type="hidden" name="path" value="[% dir_full | html %]">
                       <input type="hidden" name="dir"  value="[% current_directory | html %]">
-                      <button type="submit" class="btn btn-sm btn-delete" title="Delete (empty only)">Del</button>
+                      <button type="submit" class="btn btn-sm btn-delete" title="Delete (empty directories only)">Del</button>
                     </form>
                   </div>
                 </td>
@@ -513,32 +517,92 @@
 
 [%# ── DB Import modal ───────────────────────────────────────────── %]
 <div class="fb-modal-overlay" id="fb-db-overlay" onclick="fbCancelDbImport()"></div>
-<div class="fb-modal" id="fb-db-modal" style="max-width:480px">
+<div class="fb-modal" id="fb-db-modal" style="max-width:560px">
   <div class="fb-modal-header">
-    <h3>Add File to Database</h3>
+    <h3>Add / Update File in Database</h3>
     <button class="fb-modal-close" onclick="fbCancelDbImport()">&times;</button>
   </div>
-  <div class="fb-modal-body" style="padding:16px 20px;display:block">
-    <p style="font-weight:bold;margin-bottom:12px;word-break:break-all" id="fb-db-import-name"></p>
-    <p style="font-size:.85rem;margin-bottom:14px;color:#555">
-      Adding to the database makes this file discoverable by other users of the application.
-      Choose who should be able to see it:
+  <div class="fb-modal-body" style="padding:16px 20px;display:block;overflow-y:auto;max-height:75vh">
+    <p style="font-weight:bold;margin-bottom:4px;word-break:break-all" id="fb-db-import-name"></p>
+    <p style="font-size:.78rem;color:#777;margin-bottom:12px">
+      Creates a database record so users can search, download and reference this file through the application.
+      The file stays on the NFS server.
     </p>
     <form id="fb-db-import-form" method="post" action="[% c.uri_for('/file/db_import_file') %]">
       <input type="hidden" id="fb-db-path" name="file_path" value="">
       <input type="hidden" id="fb-db-dir"  name="dir"       value="">
-      <div class="form-field" style="margin-bottom:12px">
-        <label for="fb-db-access" style="font-weight:600;display:block;margin-bottom:4px">Visibility:</label>
+
+      [%# ── Description ── %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-desc" style="font-weight:600;display:block;margin-bottom:3px">Description:</label>
+        <textarea id="fb-db-desc" name="description" class="form-input" rows="2"
+                  style="width:100%;resize:vertical;font-size:.85rem"
+                  placeholder="Brief description of the file and its purpose"></textarea>
+      </div>
+
+      [%# ── Access Level ── %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-access" style="font-weight:600;display:block;margin-bottom:3px">Visibility / Access:</label>
         <select id="fb-db-access" name="access_level" class="form-input">
-          <option value="site_only">SiteName users only (default)</option>
+          <option value="site_only">Site users only (default)</option>
           <option value="public">Public — visible to all sites</option>
+          [% IF is_admin %]
           <option value="private">Private — owner only</option>
+          <option value="workshop">Workshop — via workshop attachment</option>
+          [% END %]
+        </select>
+        <p style="font-size:.75rem;color:#888;margin-top:3px">
+          Controls which users can see this file in the application.
+          Workshop leaders: choose <em>Site users only</em> or <em>Workshop</em>.
+        </p>
+      </div>
+
+      [%# ── File Status (admin only) ── %]
+      [% IF is_admin %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-status" style="font-weight:600;display:block;margin-bottom:3px">Status:</label>
+        <select id="fb-db-status" name="file_status" class="form-input">
+          <option value="active">Active — visible and downloadable</option>
+          <option value="inactive">Inactive — hidden from users</option>
+          <option value="archived">Archived — read-only reference</option>
         </select>
       </div>
-      <p style="font-size:.78rem;color:#888">
-        The file stays on the NFS server. This only creates a database record so users can
-        search, download and reference it through the application.
-      </p>
+
+      [%# ── SiteName (CSC admin only) ── %]
+      [% IF is_csc && sites.size %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-sitename" style="font-weight:600;display:block;margin-bottom:3px">Assign to Site:</label>
+        <select id="fb-db-sitename" name="sitename" class="form-input">
+          <option value="">— auto-detect from path —</option>
+          [% FOREACH site IN sites %]
+          <option value="[% site.name | html %]">[% site.name | html %]</option>
+          [% END %]
+        </select>
+      </div>
+      [% END %]
+      [% END %]
+
+      [%# ── Workshop attachment ── %]
+      [% IF workshops.size %]
+      <div style="margin-bottom:10px">
+        <label for="fb-db-workshop" style="font-weight:600;display:block;margin-bottom:3px">
+          Attach to Workshop: <span style="font-weight:normal;color:#888">(optional)</span>
+        </label>
+        <select id="fb-db-workshop" name="workshop_id" class="form-input">
+          <option value="">— none —</option>
+          [% FOREACH ws IN workshops %]
+          <option value="[% ws.id | html %]">
+            [% ws.title | html %][% IF is_csc %] ([% ws.sitename | html %])[% END %]
+          </option>
+          [% END %]
+        </select>
+        <p style="font-size:.75rem;color:#888;margin-top:3px">
+          Attaching makes this file available within that workshop session.
+          Set <em>Visibility</em> to <em>Workshop</em> to restrict access to workshop participants only.
+        </p>
+      </div>
+      [% END %]
+
     </form>
   </div>
   <div class="fb-modal-footer">
