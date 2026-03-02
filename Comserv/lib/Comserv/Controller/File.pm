@@ -315,7 +315,8 @@ sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
         $c->response->body('{"error":"Cannot read directory"}');
         return;
     };
-    my @dirs = sort grep { !/^\./ && -d "$path/$_" } readdir $dh;
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    my @dirs = sort grep { !/^\./ && $_ !~ $UUID_RE && -d "$path/$_" } readdir $dh;
     closedir $dh;
 
     require File::Basename;

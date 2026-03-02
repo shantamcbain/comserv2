@@ -31,8 +31,10 @@ sub get_files_info {
     my @entries = readdir $dir;
     closedir $dir;
 
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     unless ($show_hidden) {
-        @entries = grep { !/^\./ } @entries;
+        @entries = grep { !/^\./ && $_ !~ $UUID_RE } @entries;
     }
 
     my (@directories, @files);
