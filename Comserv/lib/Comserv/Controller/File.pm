@@ -432,10 +432,14 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         "Moved '$old_path' -> '$new_path' user=" . ($c->session->{user_id} // 'anon')
         . " db_updated=" . $sync->{updated} . " dup_flagged=" . $sync->{dup_flagged});
     my $msg = "Moved '$filename' to '$dest_dir'.";
-    $msg .= " Database record updated." if $sync->{updated};
+    if ($sync->{updated}) {
+        $msg .= " Database path updated.";
+    } else {
+        $msg .= " File is not in the database — use the +DB button to add it.";
+    }
     $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     $c->flash->{success_msg} = $msg;
-    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dest_dir }));
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
@@ -2092,6 +2096,103 @@ sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
     my $escaped = $dest_path;
     $escaped =~ s/"/\\"/g;
     $c->response->body("{\"ok\":1,\"path\":\"$escaped\"}");
+}
+
+sub fs_list_archive :Path('/file/fs_list_archive') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($is_admin) {
+        $c->response->body('{"error":"Access denied"}');
+        return;
+    }
+
+    my $path = $c->req->param('path') // '';
+    $path =~ s{\.\.}{}g;
+
+    unless (-f $path) {
+        $c->response->body('{"error":"File not found"}');
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+        unless ($allowed) {
+            $c->response->body('{"error":"Access denied"}');
+            return;
+        }
+    }
+
+    my ($ext) = ($path =~ /\.([^.]+)$/i);
+    $ext = lc($ext // '');
+
+    my @entries;
+    my $err_msg = '';
+
+    if ($ext eq 'zip') {
+        my $out = qx(unzip -l \Q$path\E 2>&1);
+        if ($? == 0) {
+            for my $line (split /\n/, $out) {
+                next unless $line =~ /^\s*(\d+)\s+[\d-]+\s+[\d:]+\s+(.+)$/;
+                my ($size, $name) = ($1, $2);
+                $name =~ s/\s+$//;
+                push @entries, { name => $name, size => $size+0 };
+            }
+        } else {
+            $err_msg = "unzip failed";
+        }
+    } elsif ($ext =~ /^(tar|tgz|tbz2|txz)$/ || $path =~ /\.(tar\.(gz|bz2|xz|zst))$/i) {
+        my $flag = ($ext eq 'tgz' || $path =~ /\.tar\.gz$/i)  ? 'z'
+                 : ($ext eq 'tbz2'|| $path =~ /\.tar\.bz2$/i) ? 'j'
+                 : ($ext eq 'txz' || $path =~ /\.tar\.xz$/i)  ? 'J'
+                 : ($path =~ /\.tar\.zst$/i)                   ? '--use-compress-program=zstd'
+                 : '';
+        my $cmd = "tar -tv${flag}f \Q$path\E 2>&1";
+        $cmd    = "tar -tv --use-compress-program=zstd -f \Q$path\E 2>&1" if $path =~ /\.tar\.zst$/i;
+        my $out = qx($cmd);
+        if ($? == 0) {
+            for my $line (split /\n/, $out) {
+                next if $line =~ m{/$};
+                next unless $line =~ /^[-drwxlst]{10}\s+\S+\/\S+\s+(\d+)\s+[\d-]+\s+[\d:]+\s+(.+)$/;
+                push @entries, { name => $2, size => $1+0 };
+            }
+        } else {
+            $err_msg = "tar failed";
+        }
+    } elsif ($ext eq 'gz' && $path !~ /\.tar\.gz$/i) {
+        my $inner = basename($path);
+        $inner =~ s/\.gz$//i;
+        push @entries, { name => $inner, size => (-s $path) // 0, note => 'single gzip file' };
+    } else {
+        $err_msg = "Unsupported archive type: $ext";
+    }
+
+    my $json_entries = join(',', map {
+        my $n = $_->{name}; $n =~ s/\\/\\\\/g; $n =~ s/"/\\"/g;
+        my $note = $_->{note} // ''; $note =~ s/"/\\"/g;
+        '{"name":"' . $n . '","size":' . ($_->{size}//0) . ',"note":"' . $note . '"}'
+    } @entries);
+
+    my $path_esc = $path; $path_esc =~ s/"/\\"/g;
+    $err_msg =~ s/"/\\"/g;
+
+    $c->response->body(
+        '{"path":"' . $path_esc . '",'
+      . '"count":' . scalar(@entries) . ','
+      . '"error":"' . $err_msg . '",'
+      . '"entries":[' . $json_entries . ']}'
+    );
 }
 
 sub dir_sync :Path('/file/dir_sync') :Args(0) {

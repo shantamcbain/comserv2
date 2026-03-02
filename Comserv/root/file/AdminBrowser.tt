@@ -308,6 +308,9 @@
                     <button type="button" class="btn btn-sm btn-secondary"
                             onclick="fbOpenMove('[% dir_full | html %]','[% dir_esc %]','[% current_directory | html %]')"
                             title="Move directory to another location">Move</button>
+                    <a href="[% c.uri_for('/file/dir_sync', { dir_path => dir_full }) %]"
+                       class="btn btn-sm btn-secondary"
+                       title="Scan this directory and bulk-import files into the database">+DB</a>
                     <form method="post" action="[% c.uri_for('/file/fs_delete') %]" style="display:inline"
                           onsubmit="return confirm('Delete empty folder [% dir_esc %]?')">
                       <input type="hidden" name="path" value="[% dir_full | html %]">
@@ -344,6 +347,7 @@
               [% SET is_vid  = (f.ext == 'mp4' || f.ext == 'webm' || f.ext == 'mov') %]
               [% SET is_aud  = (f.ext == 'mp3' || f.ext == 'ogg' || f.ext == 'wav') %]
               [% SET can_preview = (is_img || is_text || is_pdf || is_vid || is_aud) %]
+              [% SET is_archive = (f.ext == 'zip' || f.ext == 'tar' || f.ext == 'tgz' || f.ext == 'gz' || f.ext == 'tbz2' || f.ext == 'txz' || f.name.match('\.tar\.(gz|bz2|xz|zst)$')) %]
 
               [% SET ext_badge = f.ext ? f.ext.upper : '?' %]
               [% SET ext_css = f.ext ? 'fb-ext-' _ f.ext : 'fb-ext-other' %]
@@ -365,6 +369,10 @@
                   <a href="#" onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]');return false">
                     [% f.name | html %]
                   </a>
+                  [% ELSIF is_archive %]
+                  <a href="#" onclick="fbOpenArchive('[% full_path | html %]','[% fname_esc %]');return false">
+                    [% f.name | html %]
+                  </a>
                   [% ELSE %]
                   [% f.name | html %]
                   [% END %]
@@ -377,6 +385,10 @@
                     <button type="button" class="btn btn-sm btn-primary"
                             onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]')"
                             title="Preview / View">View</button>
+                    [% ELSIF is_archive %]
+                    <button type="button" class="btn btn-sm btn-primary"
+                            onclick="fbOpenArchive('[% full_path | html %]','[% fname_esc %]')"
+                            title="Browse archive contents">Contents</button>
                     [% END %]
                     <a href="[% c.uri_for('/file/fs_download', { path => full_path }) %]"
                        class="btn btn-sm btn-secondary" title="Download">&#8595; DL</a>
@@ -695,6 +707,24 @@
   <div class="fb-modal-footer">
     <button type="button" class="btn btn-primary" onclick="fbSubmitMove()">Move Here</button>
     <button type="button" class="btn btn-secondary" onclick="fbCancelMove()">Cancel</button>
+  </div>
+</div>
+
+[%# ── Archive contents modal ──────────────────────────────────────── %]
+<div class="fb-modal-overlay" id="fb-arc-overlay" onclick="fbCancelArchive()"></div>
+<div class="fb-modal" id="fb-arc-modal" style="max-width:640px">
+  <div class="fb-modal-header">
+    <h3>&#128230; Contents: <span id="fb-arc-name" style="font-weight:normal;font-size:.85rem"></span></h3>
+    <button class="fb-modal-close" onclick="fbCancelArchive()">&times;</button>
+  </div>
+  <div class="fb-modal-body" style="padding:0;display:block;max-height:70vh;overflow-y:auto">
+    <div id="fb-arc-content" style="padding:10px 14px;font-size:.82rem">
+      <p style="color:#aaa">Loading&#8230;</p>
+    </div>
+  </div>
+  <div class="fb-modal-footer">
+    <span id="fb-arc-count" style="font-size:.8rem;color:#777;flex:1"></span>
+    <button type="button" class="btn btn-secondary" onclick="fbCancelArchive()">Close</button>
   </div>
 </div>
 
@@ -1018,5 +1048,66 @@ function fbStartUpload() {
             .catch(function(e) { errors.push(rel + ': network error'); uploadNext(i + 1); });
     }
     uploadNext(0);
+}
+
+var _fbArcListUrl = '[% c.uri_for('/file/fs_list_archive') %]';
+
+function fbOpenArchive(filePath, fileName) {
+    document.getElementById('fb-arc-name').textContent = fileName;
+    document.getElementById('fb-arc-content').innerHTML = '<p style="color:#aaa">Loading\u2026</p>';
+    document.getElementById('fb-arc-count').textContent = '';
+    document.getElementById('fb-arc-overlay').style.display = 'block';
+    document.getElementById('fb-arc-modal').classList.add('open');
+
+    fetch(_fbArcListUrl + '?path=' + encodeURIComponent(filePath))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                document.getElementById('fb-arc-content').innerHTML =
+                    '<p style="color:#c00">' + data.error.replace(/</g,'&lt;') + '</p>';
+                return;
+            }
+            document.getElementById('fb-arc-count').textContent =
+                data.count + ' file' + (data.count === 1 ? '' : 's');
+
+            if (!data.entries || data.entries.length === 0) {
+                document.getElementById('fb-arc-content').innerHTML = '<p style="color:#aaa">Empty archive.</p>';
+                return;
+            }
+
+            var html = '<table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+                + '<thead><tr>'
+                + '<th style="text-align:left;padding:4px 8px;background:#f0f0f0;border-bottom:2px solid #ddd">Name</th>'
+                + '<th style="text-align:right;padding:4px 8px;background:#f0f0f0;border-bottom:2px solid #ddd;white-space:nowrap">Size</th>'
+                + '</tr></thead><tbody>';
+
+            data.entries.forEach(function(e, i) {
+                var bg = (i % 2 === 1) ? 'background:#fafafa' : '';
+                var name = e.name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                var isDir = e.name.slice(-1) === '/';
+                var icon  = isDir ? '&#128193; ' : '';
+                var sz = '';
+                if (!isDir && e.size > 0) {
+                    if      (e.size >= 1073741824) sz = (e.size/1073741824).toFixed(1) + ' GB';
+                    else if (e.size >= 1048576)    sz = (e.size/1048576).toFixed(1) + ' MB';
+                    else if (e.size >= 1024)        sz = (e.size/1024).toFixed(1) + ' KB';
+                    else                            sz = e.size + ' B';
+                }
+                html += '<tr style="' + bg + '">'
+                    + '<td style="padding:3px 8px;word-break:break-all;color:' + (isDir ? '#d4881a' : '#333') + '">' + icon + name + '</td>'
+                    + '<td style="padding:3px 8px;text-align:right;color:#666;white-space:nowrap">' + sz + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById('fb-arc-content').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('fb-arc-content').innerHTML = '<p style="color:#c00">Error loading archive.</p>';
+        });
+}
+
+function fbCancelArchive() {
+    document.getElementById('fb-arc-overlay').style.display = 'none';
+    document.getElementById('fb-arc-modal').classList.remove('open');
 }
 </script>
