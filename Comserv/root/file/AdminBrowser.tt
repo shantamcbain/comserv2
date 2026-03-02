@@ -138,6 +138,10 @@
       <a href="[% c.uri_for('/file/duplicates') %]" class="btn btn-secondary">
         <i class="fas fa-copy"></i> Duplicates
       </a>
+      <a href="[% c.uri_for('/file/dir_sync', { dir_path => current_directory }) %]" class="btn btn-secondary"
+         title="Scan this directory and bulk-import new files into the database">
+        &#8635; Sync Dir to DB
+      </a>
       [% IF is_csc %]
       <a href="[% c.uri_for('/file/nfs_allocations') %]" class="btn btn-secondary">
         <i class="fas fa-network-wired"></i> NFS Allocations

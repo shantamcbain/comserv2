@@ -1,0 +1,277 @@
+[% META
+   title = "Directory Sync to Database"
+   description = "Scan a directory and bulk-import files into the database"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-03-02"
+%]
+[% PageVersion = 'file/DirSync.tt,v 0.01 2026/03/02 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+[% MACRO fmt_size(b) BLOCK %]
+[% IF    b >= 1073741824 %][% b / 1073741824 | format('%.1f') %]&nbsp;GB
+[% ELSIF b >= 1048576    %][% b / 1048576    | format('%.1f') %]&nbsp;MB
+[% ELSIF b >= 1024       %][% b / 1024       | format('%.1f') %]&nbsp;KB
+[% ELSIF b               %][% b %]&nbsp;B
+[% ELSE %]—[% END %]
+[% END %]
+
+<style>
+.ds-table     { width:100%; border-collapse:collapse; font-size:.85rem; }
+.ds-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
+                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
+.ds-table tbody tr:nth-child(even) { background:#fafafa; }
+.ds-table tbody tr:hover { background:#f0f5ff; }
+.ds-table td  { padding:6px 10px; vertical-align:middle; border-bottom:1px solid #f0f0f0; }
+.ds-name      { max-width:260px; word-break:break-word; }
+.ds-num       { text-align:right; color:#555; font-size:.8rem; white-space:nowrap; }
+.ds-badge     { display:inline-block; padding:1px 7px; border-radius:3px;
+                font-size:.72rem; font-weight:bold; color:#fff; white-space:nowrap; }
+.ds-new       { background:#1565c0; }
+.ds-indb      { background:#2e7d32; }
+.ds-dup       { background:#c0720a; }
+.ds-proxmox   { background:#6a1b9a; }
+.ds-hidden    { background:#78909c; }
+
+.btn { display:inline-block; padding:5px 12px; border:none; border-radius:4px;
+       cursor:pointer; font-size:.85rem; text-decoration:none; line-height:1.4;
+       vertical-align:middle; font-weight:500; }
+.btn:hover { opacity:.86; text-decoration:none; }
+.btn-sm        { padding:2px 8px !important; font-size:.75rem !important; }
+.btn-primary   { background:#007bff !important; color:#fff !important; }
+.btn-secondary { background:#6c757d !important; color:#fff !important; }
+
+.ds-filter-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+                 padding:8px 0; margin-bottom:6px; }
+.ds-filter-bar label { font-size:.82rem; cursor:pointer; display:flex; gap:4px; align-items:center; }
+</style>
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>&#8635; Directory Sync to DB</h1>
+  </div>
+
+  [% IF error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20">
+    <strong>Done:</strong> [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+
+  <div class="content-section">
+    <div style="margin-bottom:10px;font-size:.88rem;color:#555">
+      <strong>Directory:</strong> <code>[% dir_path | html %]</code>
+      &nbsp;—&nbsp;
+      <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_path }) %]"
+         class="btn btn-sm btn-secondary">&#8592; Back to Browser</a>
+    </div>
+
+    [% SET total_new = 0 %]
+    [% SET total_dup = 0 %]
+    [% SET total_indb = 0 %]
+    [% SET total_prox = 0 %]
+    [% FOREACH r IN scan_results %]
+      [% IF r.status == 'new' %][% total_new = total_new + 1 %][% END %]
+      [% IF r.status == 'duplicate' %][% total_dup = total_dup + 1 %][% END %]
+      [% IF r.status == 'in_db' %][% total_indb = total_indb + 1 %][% END %]
+      [% IF r.status == 'proxmox' %][% total_prox = total_prox + 1 %][% END %]
+    [% END %]
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:.85rem">
+      <span><span class="ds-badge ds-new">[% total_new %] New</span> — not yet in database</span>
+      <span><span class="ds-badge ds-dup">[% total_dup %] Duplicate</span> — name+size matches existing DB record</span>
+      <span><span class="ds-badge ds-indb">[% total_indb %] In DB</span> — already imported</span>
+      <span><span class="ds-badge ds-proxmox">[% total_prox %] Proxmox</span> — backup/system files</span>
+    </div>
+
+    [% IF !scan_results.size %]
+    <p class="empty-state">No files found in this directory.</p>
+    [% ELSE %]
+
+    <div class="ds-filter-bar">
+      <strong style="font-size:.82rem">Show:</strong>
+      <label><input type="checkbox" checked onchange="dsFilter()"> New</label>
+      <label><input type="checkbox" checked onchange="dsFilter()"> Duplicate</label>
+      <label><input type="checkbox" onchange="dsFilter()"> In&nbsp;DB</label>
+      <label><input type="checkbox" onchange="dsFilter()"> Proxmox</label>
+      <button type="button" class="btn btn-sm btn-primary" onclick="dsSelectAll('import')">Select All New</button>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="dsSelectAll('skip')">Skip All</button>
+    </div>
+
+    <form method="post" action="[% c.uri_for('/file/dir_sync_submit') %]" id="ds-form">
+      <input type="hidden" name="dir_path" value="[% dir_path | html %]">
+
+      <div style="overflow-x:auto">
+      <table class="ds-table" id="ds-table">
+        <thead>
+          <tr>
+            <th style="width:1%"></th>
+            <th>File Name</th>
+            <th>Size</th>
+            <th>Status</th>
+            <th>Action</th>
+            <th>Access</th>
+            [% IF is_csc %]<th>Site</th>[% END %]
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH r IN scan_results %]
+          [% SET status_label = r.status == 'in_db' ? 'In DB'
+                              : r.status == 'duplicate' ? 'Duplicate'
+                              : r.status == 'proxmox' ? 'Proxmox'
+                              : 'New' %]
+          [% SET status_css   = r.status == 'in_db' ? 'ds-indb'
+                              : r.status == 'duplicate' ? 'ds-dup'
+                              : r.status == 'proxmox' ? 'ds-proxmox'
+                              : 'ds-new' %]
+          [% SET default_action = (r.status == 'new') ? 'import' : 'skip' %]
+          <tr class="ds-row ds-row-[% r.status | html %]">
+            <td style="width:1%;white-space:nowrap">
+              [% IF r.status != 'in_db' %]
+              <input type="checkbox" name="import_path" value="[% r.path | html %]"
+                     id="chk-[% loop.count %]"
+                     [% 'checked' IF r.status == 'new' %]
+                     onchange="dsChkChange(this,'[% loop.count %]')">
+              [% END %]
+            </td>
+            <td class="ds-name">
+              [% r.name | html %]
+              [% IF r.status == 'in_db' %]
+              <a href="[% c.uri_for('/file/edit', r.db_id) %]" style="font-size:.75rem;margin-left:4px">#[% r.db_id %]</a>
+              [% END %]
+              [% IF r.status == 'duplicate' && r.dup_id %]
+              <span style="font-size:.75rem;color:#777;margin-left:4px">
+                matches: <a href="[% c.uri_for('/file/edit', r.dup_id) %]">#[% r.dup_id %] [% r.dup_name | html %]</a>
+              </span>
+              [% END %]
+            </td>
+            <td class="ds-num">[% fmt_size(r.size) %]</td>
+            <td><span class="ds-badge [% status_css %]">[% status_label | html %]</span></td>
+            <td id="action-cell-[% loop.count %]" style="min-width:90px">
+              [% IF r.status != 'in_db' %]
+              <select name="action_[% r.path | html %]" id="action-[% loop.count %]"
+                      class="form-input" style="font-size:.78rem"
+                      onchange="dsActionChange(this,'[% loop.count %]')">
+                <option value="import" [% 'selected' IF default_action == 'import' %]>Import</option>
+                <option value="skip"   [% 'selected' IF default_action == 'skip'   %]>Skip</option>
+              </select>
+              [% ELSE %]
+              <span style="font-size:.78rem;color:#888">—</span>
+              [% END %]
+            </td>
+            <td id="access-cell-[% loop.count %]">
+              [% IF r.status != 'in_db' %]
+              <select name="access_[% r.path | html %]" class="form-input" style="font-size:.78rem">
+                <option value="site_only">Site Only</option>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+                <option value="workshop">Workshop</option>
+              </select>
+              [% ELSE %]
+              <span style="font-size:.78rem;color:#888">—</span>
+              [% END %]
+            </td>
+            [% IF is_csc %]
+            <td id="site-cell-[% loop.count %]">
+              [% IF r.status != 'in_db' %]
+              <select name="sitename_[% r.path | html %]" class="form-input" style="font-size:.78rem">
+                <option value="">auto</option>
+                [% FOREACH site IN sites %]
+                <option value="[% site.name | html %]">[% site.name | html %]</option>
+                [% END %]
+              </select>
+              [% ELSE %]
+              <span style="font-size:.78rem;color:#888">—</span>
+              [% END %]
+            </td>
+            [% END %]
+            <td id="desc-cell-[% loop.count %]">
+              [% IF r.status != 'in_db' %]
+              <input type="text" name="desc_[% r.path | html %]"
+                     placeholder="optional description"
+                     class="form-input" style="font-size:.78rem;width:180px">
+              [% ELSE %]
+              <span style="font-size:.78rem;color:#888">—</span>
+              [% END %]
+            </td>
+          </tr>
+          [% END %]
+        </tbody>
+      </table>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+        <button type="submit" class="btn btn-primary">&#8635; Import Selected</button>
+        <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_path }) %]"
+           class="btn btn-secondary">Cancel</a>
+        <span id="ds-count-label" style="font-size:.82rem;color:#666"></span>
+      </div>
+    </form>
+    [% END %]
+  </div>
+
+</div>
+
+<script>
+var _dsFilters = {};
+
+function dsFilter() {
+    var cbs  = document.querySelectorAll('.ds-filter-bar input[type=checkbox]');
+    var show = { new: cbs[0].checked, duplicate: cbs[1].checked, in_db: cbs[2].checked, proxmox: cbs[3].checked };
+    document.querySelectorAll('.ds-row').forEach(function(row) {
+        var cls = row.className.match(/ds-row-(\S+)/);
+        var type = cls ? cls[1] : 'new';
+        row.style.display = show[type] ? '' : 'none';
+    });
+    dsUpdateCount();
+}
+
+function dsChkChange(cb, idx) {
+    var sel = document.getElementById('action-' + idx);
+    if (sel) sel.value = cb.checked ? 'import' : 'skip';
+    dsUpdateCount();
+}
+
+function dsActionChange(sel, idx) {
+    var cb = document.getElementById('chk-' + idx);
+    if (cb) cb.checked = (sel.value === 'import');
+    dsUpdateCount();
+}
+
+function dsSelectAll(action) {
+    document.querySelectorAll('.ds-row').forEach(function(row) {
+        if (row.style.display === 'none') return;
+        var cb  = row.querySelector('input[type=checkbox]');
+        var sel = row.querySelector('select[id^="action-"]');
+        if (cb && sel) {
+            if (action === 'import') { cb.checked = true; sel.value = 'import'; }
+            else                     { cb.checked = false; sel.value = 'skip'; }
+        }
+    });
+    dsUpdateCount();
+}
+
+function dsUpdateCount() {
+    var n = document.querySelectorAll('input[name=import_path]:checked').length;
+    var lbl = document.getElementById('ds-count-label');
+    if (lbl) lbl.textContent = n + ' file' + (n === 1 ? '' : 's') + ' selected for import';
+}
+
+dsFilter();
+dsUpdateCount();
+</script>
