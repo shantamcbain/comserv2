@@ -99,6 +99,11 @@ __PACKAGE__->add_columns(
         data_type   => 'integer',
         is_nullable => 1,
     },
+    file_hash => {
+        data_type   => 'varchar',
+        size        => 64,
+        is_nullable => 1,
+    },
 );
 __PACKAGE__->set_primary_key('id');
 __PACKAGE__->belongs_to(

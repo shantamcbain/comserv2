@@ -1,6 +1,6 @@
 
 
-
+[% INCLUDE 'ENCY/ImageHelper.tt' %]
 
 
 </div>
@@ -44,7 +44,7 @@
         </td>
         <td width="50% ">
             [% IF group == "Apis_admin" %] <a href="/cgi-bin/ENCY/herbs_admin.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;&display_details_view.x&record_id=[% link.record_id %]" name="Contact" target="[% link.target %]" title="details "><font class="LeftSideBarNavStyle">Admin</font></a> [% END %]<br>
-            <img src="[% link.image %]" WIDTH="300" HEIGHT="325" /><br>
+            [% ency_img_tag(link.image, 300, 325) %]<br>
         </td>
     </tr>
 [% END %]

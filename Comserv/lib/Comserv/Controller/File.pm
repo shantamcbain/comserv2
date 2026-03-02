@@ -6,6 +6,7 @@ use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use Time::Piece;
 use URI::Escape;
+use Digest::SHA ();
 use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -260,17 +261,21 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
+    my $sync = $self->_db_sync_path($c, $old_path, $new_path);
     eval {
         my $schema = $c->model('DBEncy');
-        my $rec = $schema->resultset('File')->search({ file_path => $old_path })->first;
-        if ($rec) {
-            $rec->update({ file_name => $new_name, file_path => $new_path, nfs_path => $new_path });
-        }
+        my $rec = $schema->resultset('File')->search(
+            [ { file_path => $new_path }, { nfs_path => $new_path } ]
+        )->first;
+        $rec->update({ file_name => $new_name }) if $rec;
     };
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_rename',
-        "Renamed $old_path -> $new_path");
-    $c->flash->{success_msg} = "Renamed to '$new_name'.";
+        "Renamed $old_path -> $new_path db_updated=$sync->{updated} dup=$sync->{dup_flagged}");
+    my $msg = "Renamed to '$new_name'.";
+    $msg .= " Database record updated." if $sync->{updated};
+    $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
+    $c->flash->{success_msg} = $msg;
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
@@ -315,7 +320,8 @@ sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
         $c->response->body('{"error":"Cannot read directory"}');
         return;
     };
-    my @dirs = sort grep { !/^\./ && -d "$path/$_" } readdir $dh;
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    my @dirs = sort grep { !/^\./ && $_ !~ $UUID_RE && -d "$path/$_" } readdir $dh;
     closedir $dh;
 
     require File::Basename;
@@ -406,39 +412,58 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     my $new_path = "$dest_dir/$filename";
 
     if (-e $new_path) {
-        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'.";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
-        return;
-    }
-
-    require File::Copy;
-    unless (File::Copy::move($old_path, $new_path)) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
-            "Move failed: $old_path -> $new_path: $!");
-        $c->flash->{error_msg} = "Move failed: $!";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
-        return;
-    }
-
-    eval {
-        my $schema = $c->model('DBEncy');
-        my $rec = $schema->resultset('File')->search(
-            [ { file_path => $old_path }, { nfs_path => $old_path } ]
-        )->first;
-        if ($rec) {
-            $rec->update({ file_path => $new_path, nfs_path => $new_path });
+        if (-d $old_path && -d $new_path) {
+            $c->response->redirect($c->uri_for('/file/dir_merge', {
+                src  => $old_path,
+                dest => $new_path,
+                back => $dir,
+            }));
+            return;
         }
-    };
-    my $db_err = "$@" if $@;
-    if ($db_err) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_move',
-            "DB path update failed after move: $db_err");
+        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
     }
+
+    my $is_dir = -d $old_path;
+    my $move_ok;
+    if (rename($old_path, $new_path)) {
+        $move_ok = 1;
+    } elsif ($is_dir) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
+            "Rename failed for directory '$old_path' -> '$new_path': $!");
+        $c->flash->{error_msg} = "Cannot move directory: $! (directories can only be moved within the same filesystem)";
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+        return;
+    } else {
+        require File::Copy;
+        $move_ok = File::Copy::move($old_path, $new_path);
+        unless ($move_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
+                "Move failed: $old_path -> $new_path: $!");
+            $c->flash->{error_msg} = "Move failed: $!";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
+    }
+
+    my $sync = $is_dir ? { updated => 0, dup_flagged => 0 } : $self->_db_sync_path($c, $old_path, $new_path);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_move',
-        "Moved '$old_path' -> '$new_path' user=" . ($c->session->{user_id} // 'anon'));
-    $c->flash->{success_msg} = "Moved '$filename' to '$dest_dir'.";
-    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dest_dir }));
+        "Moved '$old_path' -> '$new_path' user=" . ($c->session->{user_id} // 'anon')
+        . " db_updated=" . $sync->{updated} . " dup_flagged=" . $sync->{dup_flagged});
+    my $type = $is_dir ? 'Directory' : 'File';
+    my $msg  = "$type '$filename' moved to '$dest_dir'.";
+    if (!$is_dir) {
+        if ($sync->{updated}) {
+            $msg .= " Database path updated.";
+        } else {
+            $msg .= " Not in database — use +DB to add it.";
+        }
+        $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
+    }
+    $c->flash->{success_msg} = $msg;
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
 
 sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
@@ -1035,6 +1060,74 @@ sub _disk_usage {
     };
 }
 
+sub _classify_file {
+    my ($self, $name) = @_;
+    return 'proxmox_backup' if $name =~ /^vzdump-.+\.(vma|vma\.gz|vma\.zst|tar|tar\.gz|tar\.zst)$/i;
+    return 'proxmox_log'    if $name =~ /^vzdump-.+\.log$/i;
+    return 'proxmox_notes'  if $name =~ /\.notes$/i;
+    return 'proxmox_chunk'  if $name =~ /^[0-9a-f]{64}\.[0-9a-f]{4}$/i;
+    return 'proxmox_index'  if $name =~ /\.(fidx|didx|blob)$/i;
+    return 'hidden'         if $name =~ /^\./;
+    return 'normal';
+}
+
+sub _db_sync_path {
+    my ($self, $c, $old_path, $new_path) = @_;
+    my $schema = $c->model('DBEncy');
+    my $summary = { updated => 0, dup_flagged => 0, error => '' };
+
+    eval {
+        my $rec = $schema->resultset('File')->search(
+            [ { file_path => $old_path }, { nfs_path => $old_path } ]
+        )->first;
+
+        if ($rec) {
+            my $nfs_root = $self->_nfs_root_for_sync();
+            my $nfs_rel  = $new_path;
+            $nfs_rel =~ s{^\Q$nfs_root\E/?}{};
+
+            my $dup = $c->model('File')->check_duplicate(
+                $schema, $rec->file_name, $rec->file_size
+            );
+            my ($is_dup, $dup_of) = (0, undef);
+            if ($dup && $dup->id != $rec->id) {
+                $is_dup = 1;
+                $dup_of = $dup->id;
+                $summary->{dup_flagged} = 1;
+            }
+
+            $rec->update({
+                file_path    => $new_path,
+                nfs_path     => $nfs_rel,
+                is_duplicate => $is_dup,
+                duplicate_of => $dup_of,
+            });
+            $summary->{updated} = 1;
+        }
+    };
+    if ($@) {
+        $summary->{error} = "$@";
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_db_sync_path',
+            "DB sync failed old=$old_path new=$new_path: $@");
+    }
+    return $summary;
+}
+
+sub _db_mark_orphan {
+    my ($self, $c, $path) = @_;
+    my $schema = $c->model('DBEncy');
+    eval {
+        my $rec = $schema->resultset('File')->search(
+            [ { file_path => $path }, { nfs_path => $path } ]
+        )->first;
+        if ($rec) {
+            $rec->update({ file_status => 'orphaned' });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_db_mark_orphan',
+                "Marked DB record id=" . $rec->id . " as orphaned (file deleted from disk)");
+        }
+    };
+}
+
 sub _resolve_roles {
     my ($self, $c) = @_;
     my $sitename = $c->session->{SiteName} // '';
@@ -1059,6 +1152,14 @@ sub _nfs_root_for_sync {
     }
 
     return $configured;
+}
+
+sub _file_sha256 {
+    my ($self, $path) = @_;
+    return undef unless -f $path && -r $path;
+    my $sha = Digest::SHA->new(256);
+    eval { $sha->addfile($path, 'b') };
+    return $@ ? undef : $sha->hexdigest;
 }
 
 sub _top_level_dir {
@@ -1381,14 +1482,24 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
         return;
     }
 
+    my $page_size = int($c->req->param('page_size') // 25);
+    $page_size = 25 unless grep { $page_size == $_ } (10, 25, 50, 100);
+    my $page      = int($c->req->param('page') // 1);
+    $page = 1 if $page < 1;
+
     my %filters = (
         sitename  => scalar($c->req->param('sitename_filter'))  // '',
         file_type => scalar($c->req->param('type_filter'))      // '',
         sort_by   => scalar($c->req->param('sort_by'))          // 'upload_date',
         sort_dir  => scalar($c->req->param('sort_dir'))         // 'desc',
+        page      => $page,
+        page_size => $page_size,
+        page_size_param => $page_size,
     );
 
-    my $duplicate_pairs = $c->model('File')->get_duplicates($c, %filters);
+    my ($duplicate_pairs, $total_count) = $c->model('File')->get_duplicates($c, %filters);
+
+    my $total_pages = int(($total_count + $page_size - 1) / $page_size) || 1;
 
     my $sites = [];
     if ($is_csc) {
@@ -1406,10 +1517,15 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'duplicates',
-        "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] }));
+        "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] })
+        . " total=$total_count page=$page/$total_pages");
 
     $c->stash(
         duplicate_pairs => $duplicate_pairs,
+        total_count     => $total_count,
+        page            => $page,
+        total_pages     => $total_pages,
+        page_size       => $page_size,
         is_csc          => $is_csc,
         sites           => $sites,
         filters         => \%filters,
@@ -1436,99 +1552,233 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         return;
     }
 
-    my $action = $c->req->param('action') // '';
+    my $action    = $c->req->param('action')   // '';
+    my $target_id = $c->req->param('target_id') // $id;
 
-    my $file = $c->model('File')->get_file_by_id($c, $id);
+    my $schema = $c->model('DBEncy');
+    my $file   = $schema->resultset('File')->find($target_id);
     unless ($file) {
-        $c->flash->{error_msg} = "File #$id not found or access denied.";
+        $c->flash->{error_msg} = "File #$target_id not found.";
         $c->response->redirect($c->uri_for('/file/duplicates'));
         return;
     }
 
-    unless ($file->is_duplicate) {
-        $c->flash->{error_msg} = "File #$id is not marked as a duplicate.";
-        $c->response->redirect($c->uri_for('/file/duplicates'));
-        return;
+    my $orig_id = $file->is_duplicate ? $file->duplicate_of
+                : $schema->resultset('File')->search(
+                      { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                  )->first ? $file->id : undef;
+
+    sub _do_delete_file {
+        my ($self, $c, $rec, $also_disk) = @_;
+        my $name = $rec->file_name;
+        if ($also_disk) {
+            my $fp = (length($rec->file_path // '') && -f $rec->file_path) ? $rec->file_path
+                   : (length($rec->nfs_path  // '') && -f $rec->nfs_path)  ? $rec->nfs_path
+                   : '';
+            if (length $fp) {
+                unlink $fp or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'resolve_duplicate', "unlink failed for $fp: $!");
+            }
+        }
+        $rec->delete;
+        return $name;
     }
 
     if ($action eq 'swap') {
-        my $orig_id = $file->duplicate_of;
-        unless ($orig_id) {
-            $c->flash->{error_msg} = "File #$id has no original linked — cannot swap.";
-            $c->response->redirect($c->uri_for('/file/duplicates'));
-            return;
+        my $partner_id = $file->is_duplicate ? $file->duplicate_of
+                       : $schema->resultset('File')->search(
+                             { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                         )->first->id;
+        my $partner = $schema->resultset('File')->find($partner_id);
+        unless ($partner) {
+            $c->flash->{error_msg} = "Partner record not found — cannot swap.";
+        } else {
+            eval {
+                my ($new_orig, $new_dup) = $file->is_duplicate
+                    ? ($file, $partner) : ($partner, $file);
+                $new_orig->update({ is_duplicate => 0, duplicate_of => undef });
+                $new_dup->update({  is_duplicate => 1, duplicate_of => $new_orig->id });
+            };
+            my $err = "$@" if $@;
+            if ($err) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
+                    "Swap failed ids=$target_id/$partner_id: $err");
+                $c->flash->{error_msg} = "Swap failed: $err";
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                    "Swapped original/duplicate roles for ids=$target_id/$partner_id");
+                $c->flash->{success_msg} = "Swapped: #$target_id is now the original; #$partner_id is now the duplicate.";
+            }
         }
-        my $original = $c->model('DBEncy')->resultset('File')->find($orig_id);
-        unless ($original) {
-            $c->flash->{error_msg} = "Original file #$orig_id not found — cannot swap.";
-            $c->response->redirect($c->uri_for('/file/duplicates'));
-            return;
-        }
+    } elsif ($action eq 'delete_db' || $action eq 'delete_both') {
+        my $also_disk = ($action eq 'delete_both');
+        my $partner_id = $file->is_duplicate ? $file->duplicate_of
+                       : do {
+                             my $r = $schema->resultset('File')->search(
+                                 { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                             )->first;
+                             $r ? $r->id : undef;
+                         };
+
         eval {
-            $file->update({ is_duplicate => 0, duplicate_of => undef });
-            $original->update({ is_duplicate => 1, duplicate_of => $file->id });
+            my $name = $self->_do_delete_file($c, $file, $also_disk);
+            if ($partner_id && !$file->is_duplicate) {
+                my $dup = $schema->resultset('File')->find($partner_id);
+                if ($dup) {
+                    $dup->update({ is_duplicate => 0, duplicate_of => undef });
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                        "Promoted dup #$partner_id to original after deleting original #$target_id");
+                }
+            }
+            $c->flash->{success_msg} = ($also_disk ? "Deleted from disk + DB" : "Removed DB record only")
+                . ": '$name' (#$target_id)."
+                . ($partner_id && !$file->is_duplicate ? " Duplicate #$partner_id promoted to original." : '');
         };
         my $err = "$@" if $@;
         if ($err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "Swap failed dup=$id orig=$orig_id: $err");
-            $c->flash->{error_msg} = "Swap failed: $err";
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Swapped: file id=$id is now original, file id=$orig_id is now duplicate");
-            $c->flash->{success_msg} = "Swapped: '" . $file->file_name . "' (#$id) is now the original; #$orig_id is now the duplicate.";
+                "Delete failed id=$target_id: $err");
+            $c->flash->{error_msg} = "Delete failed: $err";
         }
-    } elsif ($action eq 'delete_db') {
-        my $file_name = $file->file_name;
-        eval { $file->delete };
-        my $err = "$@" if $@;
-        if ($err) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "DB-only delete failed id=$id: $err");
-            $c->flash->{error_msg} = "Failed to delete DB record: $err";
+    } elsif ($action eq 'rename') {
+        my $new_name = $c->req->param('new_name') // '';
+        $new_name =~ s{/}{}g;
+        $new_name =~ s{^\s+|\s+$}{}g;
+        unless (length $new_name) {
+            $c->flash->{error_msg} = "New name cannot be empty.";
         } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Duplicate DB record id=$id deleted (file left on disk)");
-            $c->flash->{success_msg} = "DB record for '$file_name' removed. File left on disk.";
-        }
-    } elsif ($action eq 'delete_both') {
-        my $nfs_path  = $file->nfs_path  // '';
-        my $file_path = $file->file_path // '';
-        my $file_name = $file->file_name;
-
-        my $fs_path = length($file_path) && -f $file_path ? $file_path
-                    : length($nfs_path)  && -f $nfs_path  ? $nfs_path
-                    : '';
-
-        my $disk_deleted = 0;
-        if (length $fs_path) {
-            eval { unlink $fs_path or die "unlink failed: $!" };
-            my $unlink_err = "$@" if $@;
-            if ($unlink_err) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'resolve_duplicate',
-                    "Filesystem delete failed id=$id path=$fs_path: $unlink_err");
+            my $old_name = $file->file_name;
+            my $fp = (length($file->file_path // '') && -f $file->file_path) ? $file->file_path
+                   : (length($file->nfs_path  // '') && -f $file->nfs_path)  ? $file->nfs_path
+                   : '';
+            if (length $fp) {
+                my $new_fp = dirname($fp) . '/' . $new_name;
+                if (-e $new_fp) {
+                    $c->flash->{error_msg} = "A file named '$new_name' already exists in that directory.";
+                } else {
+                    eval {
+                        CORE::rename($fp, $new_fp) or die "rename failed: $!";
+                        my %upd = (file_name => $new_name);
+                        $upd{file_path} = $new_fp if length($file->file_path // '');
+                        $upd{nfs_path}  = $new_fp if length($file->nfs_path  // '');
+                        $file->update(\%upd);
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                            "Renamed #$target_id '$old_name' → '$new_name'");
+                        $c->flash->{success_msg} = "Renamed '$old_name' to '$new_name'.";
+                    };
+                    my $err = "$@" if $@;
+                    $c->flash->{error_msg} = "Rename failed: $err" if $err;
+                }
             } else {
-                $disk_deleted = 1;
+                eval {
+                    $file->update({ file_name => $new_name });
+                    $c->flash->{success_msg} = "Renamed '$old_name' to '$new_name' (DB only — no file on disk).";
+                };
+                my $err = "$@" if $@;
+                $c->flash->{error_msg} = "Rename failed: $err" if $err;
             }
-        }
-
-        eval { $file->delete };
-        my $err = "$@" if $@;
-        if ($err) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "DB delete failed id=$id: $err");
-            $c->flash->{error_msg} = "DB delete failed: $err";
-        } else {
-            my $disk_msg = $disk_deleted ? ' File deleted from disk.' : length($fs_path) ? ' (disk delete failed — check logs).' : ' No file found on disk.';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Duplicate id=$id name=$file_name deleted from DB.$disk_msg");
-            $c->flash->{success_msg} = "Deleted '$file_name' from database.$disk_msg";
         }
     } else {
         $c->flash->{error_msg} = "Unknown action '$action'.";
     }
 
-    $c->response->redirect($c->uri_for('/file/duplicates'));
+    my $back_page      = $c->req->param('back_page')      // 1;
+    my $back_page_size = $c->req->param('back_page_size') // 25;
+    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
+}
+
+sub batch_resolve_duplicates :Path('/file/batch_resolve_duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    my $action     = $c->req->param('batch_action') // '';
+    my @target_ids = $c->req->param('selected_ids');
+    @target_ids    = grep { /^\d+$/ } @target_ids;
+
+    unless (@target_ids) {
+        $c->flash->{error_msg} = 'No files selected.';
+        my $back_page      = $c->req->param('back_page')      // 1;
+        my $back_page_size = $c->req->param('back_page_size') // 25;
+        $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
+        return;
+    }
+
+    unless ($action =~ /^(delete_db|delete_both)$/) {
+        $c->flash->{error_msg} = "Unknown batch action '$action'.";
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    my $also_disk = ($action eq 'delete_both');
+    my $schema    = $c->model('DBEncy');
+    my ($deleted_count, $promoted_count, @errors) = (0, 0);
+
+    for my $tid (@target_ids) {
+        eval {
+            my $file = $schema->resultset('File')->find($tid);
+            unless ($file) {
+                push @errors, "#$tid not found";
+                return;
+            }
+
+            my $is_orig    = !$file->is_duplicate;
+            my $partner_id = $is_orig
+                ? do {
+                    my $r = $schema->resultset('File')->search(
+                        { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                    )->first;
+                    $r ? $r->id : undef;
+                  }
+                : $file->duplicate_of;
+
+            if ($also_disk) {
+                my $fp = (length($file->file_path // '') && -f $file->file_path) ? $file->file_path
+                       : (length($file->nfs_path  // '') && -f $file->nfs_path)  ? $file->nfs_path
+                       : '';
+                if (length $fp) {
+                    unlink $fp or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'batch_resolve', "unlink failed for $fp: $!");
+                }
+            }
+
+            $file->delete;
+            $deleted_count++;
+
+            if ($is_orig && $partner_id) {
+                my $dup = $schema->resultset('File')->find($partner_id);
+                if ($dup) {
+                    $dup->update({ is_duplicate => 0, duplicate_of => undef });
+                    $promoted_count++;
+                }
+            }
+        };
+        if ($@) {
+            push @errors, "#$tid: $@";
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'batch_resolve',
+        "Batch $action: deleted=$deleted_count promoted=$promoted_count errors=" . scalar(@errors));
+
+    my $msg = ($also_disk ? "Disk+DB" : "DB only") . " delete: $deleted_count file(s) removed.";
+    $msg   .= " $promoted_count duplicate(s) promoted to original." if $promoted_count;
+    $msg   .= " Errors: " . join('; ', @errors)                     if @errors;
+
+    if (@errors && !$deleted_count) {
+        $c->flash->{error_msg} = $msg;
+    } else {
+        $c->flash->{success_msg} = $msg;
+    }
+
+    my $back_page      = $c->req->param('back_page')      // 1;
+    my $back_page_size = $c->req->param('back_page_size') // 25;
+    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
 }
 
 sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
@@ -1544,7 +1794,19 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
         return;
     }
 
-    my $allocations = $c->model('File')->get_nfs_allocations($c);
+    my $allocations_rs = $c->model('File')->get_nfs_allocations($c);
+
+    my @allocations_with_status = map {
+        my $alloc = $_;
+        {
+            id          => $alloc->id,
+            sitename    => $alloc->sitename,
+            nfs_path    => $alloc->nfs_path,
+            description => $alloc->description,
+            is_active   => $alloc->is_active,
+            fs_exists   => (-d $alloc->nfs_path) ? 1 : 0,
+        }
+    } @{ $allocations_rs // [] };
 
     my $sites = [];
     eval {
@@ -1560,14 +1822,72 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
-        "Rendering NFS allocations: count=" . scalar(@{ $allocations // [] }));
+        "Rendering NFS allocations: count=" . scalar(@allocations_with_status));
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+
+    my @existing_dirs;
+    if (-d $nfs_root) {
+        opendir(my $dh, $nfs_root);
+        while (my $e = readdir($dh)) {
+            next if $e =~ /^\./;
+            my $full = "$nfs_root/$e";
+            push @existing_dirs, { name => $e, path => $full } if -d $full;
+        }
+        closedir($dh);
+        @existing_dirs = sort { $a->{name} cmp $b->{name} } @existing_dirs;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
+        "Rendering NFS allocations: count=" . scalar(@allocations_with_status));
 
     $c->stash(
-        allocations => $allocations,
-        sites       => $sites,
-        template    => 'file/NfsAllocations.tt',
+        allocations   => \@allocations_with_status,
+        sites         => $sites,
+        nfs_root      => $nfs_root,
+        existing_dirs => \@existing_dirs,
+        template      => 'file/NfsAllocations.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub nfs_allocation_mkdir :Path('/file/nfs_allocation_mkdir') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_csc && $c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $alloc;
+    eval { $alloc = $schema->resultset('NfsDirectory')->find($id) };
+    unless ($alloc) {
+        $c->flash->{error_msg} = "Allocation #$id not found.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $nfs_path = $alloc->nfs_path;
+    if (-d $nfs_path) {
+        $c->flash->{success_msg} = "Directory already exists: $nfs_path";
+    } else {
+        eval { make_path($nfs_path, { mode => 0755 }) };
+        my $err = "$@" if $@;
+        if ($err || !-d $nfs_path) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'nfs_allocation_mkdir',
+                "Failed to create $nfs_path: $err");
+            $c->flash->{error_msg} = "Could not create directory '$nfs_path': $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_mkdir',
+                "Created directory $nfs_path for allocation #$id sitename=" . $alloc->sitename);
+            $c->flash->{success_msg} = "Directory created: $nfs_path — "
+                . $alloc->sitename . " can now browse it.";
+        }
+    }
+    $c->response->redirect($c->uri_for('/file/nfs_allocations'));
 }
 
 sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
@@ -1628,7 +1948,25 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
     } else {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
             "NFS allocation created id=" . $row->id . " sitename=$alloc_sitename path=$nfs_path");
-        $c->flash->{success_msg} = "NFS allocation created for '$alloc_sitename': $nfs_path";
+
+        my $dir_msg = '';
+        unless (-d $nfs_path) {
+            eval { make_path($nfs_path, { mode => 0755 }) };
+            my $mkdir_err = "$@" if $@;
+            if ($mkdir_err || !-d $nfs_path) {
+                $dir_msg = " Warning: directory could not be created on filesystem ($mkdir_err) — create it manually on the NFS server.";
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'nfs_allocation_create',
+                    "Could not create directory $nfs_path: $mkdir_err");
+            } else {
+                $dir_msg = " Directory created on filesystem.";
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
+                    "Created directory $nfs_path on filesystem");
+            }
+        } else {
+            $dir_msg = " Directory already exists.";
+        }
+
+        $c->flash->{success_msg} = "NFS allocation created for '$alloc_sitename': $nfs_path.$dir_msg";
     }
 
     $c->response->redirect($c->uri_for('/file/nfs_allocations'));
@@ -1825,8 +2163,11 @@ sub fs_delete :Path('/file/fs_delete') :Args(0) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'fs_delete',
                     "DB record delete failed for $path: $@");
             }
+        } else {
+            $self->_db_mark_orphan($c, $path);
         }
-        $c->flash->{success_msg} = "File deleted" . ($also_db ? " (and removed from database)." : " from disk.");
+        $c->flash->{success_msg} = "File deleted from disk."
+            . ($also_db ? " Database record removed." : " Database record marked orphaned (file no longer on disk).");
     }
 
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
@@ -1893,7 +2234,8 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
         ? $form_sitename
         : ($is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename);
 
-    my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size);
+    my $file_hash = $self->_file_sha256($file_path);
+    my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size, $file_hash);
     my ($is_dup, $dup_of) = (0, undef);
     if ($dup_check) { $is_dup = 1; $dup_of = $dup_check->id; }
 
@@ -1923,6 +2265,7 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
             is_duplicate => $is_dup,
             duplicate_of => $dup_of,
             workshop_id  => $workshop_id,
+            file_hash    => $file_hash,
         });
     };
     my $err = "$@" if $@;
@@ -2012,6 +2355,591 @@ sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
     my $escaped = $dest_path;
     $escaped =~ s/"/\\"/g;
     $c->response->body("{\"ok\":1,\"path\":\"$escaped\"}");
+}
+
+sub dir_merge :Path('/file/dir_merge') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $src  = $c->req->param('src')  // '';
+    my $dest = $c->req->param('dest') // '';
+    my $back = $c->req->param('back') // '';
+
+    $src  =~ s{\.\.}{}g;  $src  =~ s{/+$}{};
+    $dest =~ s{\.\.}{}g;  $dest =~ s{/+$}{};
+
+    unless (-d $src && -d $dest) {
+        $c->flash->{error_msg} = 'Source or destination directory not found.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                my $ap = $a->nfs_path;
+                if (CORE::index($src, $ap) == 0 && CORE::index($dest, $ap) == 0) {
+                    $allowed = 1; last;
+                }
+            }
+        };
+        unless ($allowed) {
+            $c->flash->{error_msg} = 'Access denied: directory outside your allocation.';
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
+            return;
+        }
+    }
+
+    my %dest_files;
+    File::Find::find({
+        wanted => sub {
+            return unless -f $File::Find::name;
+            my $rel = $File::Find::name;
+            $rel =~ s{^\Q$dest\E/?}{};
+            $dest_files{$rel} = {
+                path => $File::Find::name,
+                size => -s $File::Find::name,
+            };
+        },
+        no_chdir => 1,
+    }, $dest);
+
+    my @entries;
+    File::Find::find({
+        wanted => sub {
+            return unless -f $File::Find::name;
+            my $src_path = $File::Find::name;
+            my $rel = $src_path;
+            $rel =~ s{^\Q$src\E/?}{};
+            my $size = -s $src_path;
+            my ($fname) = ($rel =~ m{([^/]+)$});
+            my ($ext)   = ($fname =~ /\.([^.]+)$/);
+            $ext = lc($ext // '');
+
+            my $conflict = $dest_files{$rel};
+            my ($status, $default_action);
+            if (!$conflict) {
+                $status = 'new';
+                $default_action = 'move';
+            } else {
+                my $src_hash  = $self->_file_sha256($src_path);
+                my $dest_hash = $self->_file_sha256($conflict->{path});
+                if (defined $src_hash && defined $dest_hash && $src_hash eq $dest_hash) {
+                    $status = 'identical';
+                    $default_action = 'skip';
+                } elsif ($size == $conflict->{size}) {
+                    $status = 'same_size';
+                    $default_action = 'skip';
+                } else {
+                    $status = 'conflict';
+                    $default_action = 'skip';
+                }
+            }
+
+            push @entries, {
+                rel          => $rel,
+                src_path     => $src_path,
+                dest_path    => $conflict ? $conflict->{path} : "$dest/$rel",
+                fname        => $fname,
+                ext          => $ext,
+                src_size     => $size,
+                dest_size    => $conflict ? $conflict->{size} : undef,
+                status       => $status,
+                default_action => $default_action,
+            };
+        },
+        no_chdir => 1,
+        preprocess => sub { sort @_ },
+    }, $src);
+
+    @entries = sort { $a->{rel} cmp $b->{rel} } @entries;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_merge',
+        "Dir merge review src=$src dest=$dest entries=" . scalar(@entries));
+
+    $c->stash(
+        src      => $src,
+        dest     => $dest,
+        back     => $back,
+        entries  => \@entries,
+        is_admin => $is_admin,
+        is_csc   => $is_csc,
+        template => 'file/DirMerge.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $src  = $c->req->param('src')  // '';
+    my $dest = $c->req->param('dest') // '';
+    my $back = $c->req->param('back') // '';
+    $src  =~ s{\.\.}{}g;
+    $dest =~ s{\.\.}{}g;
+
+    my @rels   = $c->req->param('rel');
+    my ($moved, $skipped, $renamed, $errors) = (0, 0, 0, 0);
+    my @messages;
+
+    for my $rel (@rels) {
+        $rel =~ s{\.\.}{}g;
+        my $action   = $c->req->param("action_$rel") // 'skip';
+        my $src_path = "$src/$rel";
+        my $dst_path = "$dest/$rel";
+
+        next unless -f $src_path;
+
+        if ($action eq 'skip') {
+            $skipped++;
+            next;
+        }
+
+        my $dst_parent = dirname($dst_path);
+        unless (-d $dst_parent) {
+            eval { make_path($dst_parent) };
+        }
+
+        if ($action eq 'move') {
+            if (-e $dst_path) {
+                unlink $dst_path or do {
+                    push @messages, "Could not overwrite '$rel': $!";
+                    $errors++; next;
+                };
+            }
+            if (rename($src_path, $dst_path)) {
+                $self->_db_sync_path($c, $src_path, $dst_path);
+                $moved++;
+            } else {
+                require File::Copy;
+                if (File::Copy::move($src_path, $dst_path)) {
+                    $self->_db_sync_path($c, $src_path, $dst_path);
+                    $moved++;
+                } else {
+                    push @messages, "Move failed for '$rel': $!";
+                    $errors++;
+                }
+            }
+        } elsif ($action eq 'rename') {
+            my ($base, $suffix) = ($rel =~ /^(.+?)(\.[^.]+)?$/);
+            $suffix //= '';
+            my $n = 1;
+            my $new_dst;
+            do {
+                $new_dst = "$dest/${base}_conflict_$n${suffix}";
+                $n++;
+            } while (-e $new_dst && $n < 100);
+            if (rename($src_path, $new_dst)) {
+                $self->_db_sync_path($c, $src_path, $new_dst);
+                $renamed++;
+                push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
+            } else {
+                require File::Copy;
+                if (File::Copy::move($src_path, $new_dst)) {
+                    $self->_db_sync_path($c, $src_path, $new_dst);
+                    $renamed++;
+                    push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
+                } else {
+                    push @messages, "Rename failed for '$rel': $!";
+                    $errors++;
+                }
+            }
+        } elsif ($action eq 'delete_src') {
+            unlink $src_path;
+            $self->_db_mark_orphan($c, $src_path);
+            $skipped++;
+        }
+    }
+
+    eval {
+        my $still_has_files = 0;
+        File::Find::find(sub { $still_has_files++ if -f $File::Find::name }, $src);
+        if (!$still_has_files) {
+            require File::Path;
+            File::Path::remove_tree($src);
+            push @messages, "Source directory '$src' removed (empty after merge).";
+        } else {
+            push @messages, "Source directory '$src' still has $still_has_files file(s) — not removed.";
+        }
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_merge_submit',
+        "Dir merge done src=$src dest=$dest moved=$moved skipped=$skipped renamed=$renamed errors=$errors");
+
+    my $msg = "Merge complete: $moved moved, $renamed renamed, $skipped skipped.";
+    $msg .= " $errors error(s)." if $errors;
+    $msg .= ' ' . join(' ', @messages) if @messages;
+    $c->flash->{success_msg} = $msg;
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dest }));
+}
+
+sub fs_list_archive :Path('/file/fs_list_archive') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($is_admin) {
+        $c->response->body('{"error":"Access denied"}');
+        return;
+    }
+
+    my $path = $c->req->param('path') // '';
+    $path =~ s{\.\.}{}g;
+
+    unless (-f $path) {
+        $c->response->body('{"error":"File not found"}');
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                if (CORE::index($path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+        unless ($allowed) {
+            $c->response->body('{"error":"Access denied"}');
+            return;
+        }
+    }
+
+    my ($ext) = ($path =~ /\.([^.]+)$/i);
+    $ext = lc($ext // '');
+
+    my @entries;
+    my $err_msg = '';
+
+    if ($ext eq 'zip') {
+        my $out = qx(unzip -l \Q$path\E 2>&1);
+        if ($? == 0) {
+            for my $line (split /\n/, $out) {
+                next unless $line =~ /^\s*(\d+)\s+[\d-]+\s+[\d:]+\s+(.+)$/;
+                my ($size, $name) = ($1, $2);
+                $name =~ s/\s+$//;
+                push @entries, { name => $name, size => $size+0 };
+            }
+        } else {
+            $err_msg = "unzip failed";
+        }
+    } elsif ($ext =~ /^(tar|tgz|tbz2|txz)$/ || $path =~ /\.(tar\.(gz|bz2|xz|zst))$/i) {
+        my $flag = ($ext eq 'tgz' || $path =~ /\.tar\.gz$/i)  ? 'z'
+                 : ($ext eq 'tbz2'|| $path =~ /\.tar\.bz2$/i) ? 'j'
+                 : ($ext eq 'txz' || $path =~ /\.tar\.xz$/i)  ? 'J'
+                 : ($path =~ /\.tar\.zst$/i)                   ? '--use-compress-program=zstd'
+                 : '';
+        my $cmd = "tar -tv${flag}f \Q$path\E 2>&1";
+        $cmd    = "tar -tv --use-compress-program=zstd -f \Q$path\E 2>&1" if $path =~ /\.tar\.zst$/i;
+        my $out = qx($cmd);
+        if ($? == 0) {
+            for my $line (split /\n/, $out) {
+                next if $line =~ m{/$};
+                next unless $line =~ /^[-drwxlst]{10}\s+\S+\/\S+\s+(\d+)\s+[\d-]+\s+[\d:]+\s+(.+)$/;
+                push @entries, { name => $2, size => $1+0 };
+            }
+        } else {
+            $err_msg = "tar failed";
+        }
+    } elsif ($ext eq 'gz' && $path !~ /\.tar\.gz$/i) {
+        my $inner = basename($path);
+        $inner =~ s/\.gz$//i;
+        push @entries, { name => $inner, size => (-s $path) // 0, note => 'single gzip file' };
+    } else {
+        $err_msg = "Unsupported archive type: $ext";
+    }
+
+    my $json_entries = join(',', map {
+        my $n = $_->{name}; $n =~ s/\\/\\\\/g; $n =~ s/"/\\"/g;
+        my $note = $_->{note} // ''; $note =~ s/"/\\"/g;
+        '{"name":"' . $n . '","size":' . ($_->{size}//0) . ',"note":"' . $note . '"}'
+    } @entries);
+
+    my $path_esc = $path; $path_esc =~ s/"/\\"/g;
+    $err_msg =~ s/"/\\"/g;
+
+    $c->response->body(
+        '{"path":"' . $path_esc . '",'
+      . '"count":' . scalar(@entries) . ','
+      . '"error":"' . $err_msg . '",'
+      . '"entries":[' . $json_entries . ']}'
+    );
+}
+
+sub dir_sync :Path('/file/dir_sync') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $dir_path = $c->req->param('dir_path') // '';
+    $dir_path =~ s{\.\.}{}g;
+    $dir_path =~ s{/+$}{};
+
+    my $nfs_root = $self->_nfs_root_for_sync();
+    unless (length $dir_path && -d $dir_path) {
+        $dir_path = $nfs_root;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                if (CORE::index($dir_path, $a->nfs_path) == 0) { $allowed = 1; last; }
+            }
+        };
+        unless ($allowed) {
+            $c->flash->{error_msg} = 'Access denied to that directory.';
+            $c->response->redirect($c->uri_for('/file/admin_browser'));
+            return;
+        }
+    }
+
+    my $recursive  = ($c->req->param('recursive') // '0') eq '1' ? 1 : 0;
+    my $max_files  = 2000;
+
+    my $schema  = $c->model('DBEncy');
+    my $file_rs = $schema->resultset('File');
+
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    my (@all_files, $truncated);
+    if ($recursive) {
+        File::Find::find({
+            wanted => sub {
+                return unless -f $File::Find::name;
+                my $fname = $_;
+                return if $fname =~ /^\./;
+                return if $fname =~ $UUID_RE;
+                if (scalar(@all_files) < $max_files) {
+                    push @all_files, $File::Find::name;
+                } else {
+                    $truncated = 1;
+                }
+            },
+            no_chdir => 1,
+            preprocess => sub {
+                sort grep { !/^\./ && $_ !~ $UUID_RE } @_;
+            },
+        }, $dir_path);
+    } else {
+        opendir(my $dh, $dir_path);
+        while (my $e = readdir($dh)) {
+            next if $e =~ /^\./;
+            next if $e =~ $UUID_RE;
+            my $full = "$dir_path/$e";
+            next unless -f $full;
+            if (scalar(@all_files) < $max_files) {
+                push @all_files, $full;
+            } else {
+                $truncated = 1;
+            }
+        }
+        closedir($dh);
+    }
+    @all_files = sort @all_files;
+
+    my @scan_results;
+    for my $full (@all_files) {
+        my $fname    = basename($full);
+        my $rel_dir  = dirname($full);
+        $rel_dir     =~ s{^\Q$dir_path\E/?}{};
+        my $display  = $rel_dir ? "$rel_dir/$fname" : $fname;
+        my $size     = -s $full // 0;
+        my ($ext)    = ($fname =~ /\.([^.]+)$/);
+        $ext         = lc($ext // '');
+        my $classify = $self->_classify_file($fname);
+
+        my $db_rec;
+        eval {
+            $db_rec = $file_rs->search(
+                [ { file_path => $full }, { nfs_path => $full } ]
+            )->first;
+        };
+
+        my ($dup_rec, $status);
+        if ($db_rec) {
+            $status = 'in_db';
+        } else {
+            eval { $dup_rec = $c->model('File')->check_duplicate($schema, $fname, $size, undef); };
+            if ($dup_rec) {
+                $status = 'duplicate';
+            } elsif ($classify ne 'normal') {
+                $status = 'proxmox';
+            } else {
+                $status = 'new';
+            }
+        }
+
+        my $rel = $full;
+        $rel =~ s{^\Q$nfs_root\E/?}{};
+
+        push @scan_results, {
+            name      => $display,
+            fname     => $fname,
+            path      => $full,
+            rel       => $rel,
+            size      => $size,
+            ext       => $ext,
+            classify  => $classify,
+            status    => $status,
+            db_id     => $db_rec  ? $db_rec->id        : undef,
+            dup_id    => $dup_rec ? $dup_rec->id        : undef,
+            dup_name  => $dup_rec ? $dup_rec->file_name : undef,
+            dup_path  => $dup_rec ? ($dup_rec->file_path // $dup_rec->nfs_path // '') : undef,
+        };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_sync',
+        "Dir sync scan dir=$dir_path recursive=$recursive files=" . scalar(@scan_results)
+        . ($truncated ? " (TRUNCATED at $max_files)" : ''));
+
+    my @sites;
+    eval { @sites = $schema->resultset('Site')->search({}, { order_by => 'name', columns => [qw(id name)] })->all; };
+
+    $c->stash(
+        scan_results    => \@scan_results,
+        dir_path        => $dir_path,
+        is_csc          => $is_csc,
+        is_admin        => $is_admin,
+        sitename        => $sitename,
+        sites           => \@sites,
+        nfs_root        => $nfs_root,
+        recursive       => $recursive,
+        truncated       => $truncated ? 1 : 0,
+        max_files       => $max_files,
+        template        => 'file/DirSync.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $dir_path = $c->req->param('dir_path') // '';
+    $dir_path =~ s{\.\.}{}g;
+
+    my @paths     = $c->req->param('import_path');
+    my $schema    = $c->model('DBEncy');
+    my $file_rs   = $schema->resultset('File');
+    my $nfs_root  = $self->_nfs_root_for_sync();
+    my $user_id   = $c->session->{user_id} // 0;
+    my $site_id   = $c->session->{site_id}  // 0;
+    my $upload_date = Time::Piece->new->strftime('%Y-%m-%d %H:%M:%S');
+
+    my ($imported, $skipped, $errors) = (0, 0, 0);
+
+    for my $path (@paths) {
+        $path =~ s{\.\.}{}g;
+        next unless -f $path;
+
+        my $action = $c->req->param("action_$path") // 'import';
+        next if $action eq 'skip';
+
+        my $existing;
+        eval { $existing = $file_rs->search([ { file_path => $path }, { nfs_path => $path } ])->first; };
+        if ($existing) { $skipped++; next; }
+
+        require File::Basename;
+        my $fname        = File::Basename::basename($path);
+        my ($ext)        = ($fname =~ /\.([^.]+)$/);
+        $ext             = lc($ext // '');
+        my $size         = -s $path // 0;
+        my $rel          = $path; $rel =~ s{^\Q$nfs_root\E/?}{};
+        my $mime         = $SYNC_MIME_MAP{$ext} || 'application/octet-stream';
+        my $access       = $c->req->param("access_$path") // 'site_only';
+        $access          = 'site_only' unless $access =~ /^(public|site_only|private|workshop)$/;
+        my $description  = $c->req->param("desc_$path") // '';
+        my $form_sn      = $c->req->param("sitename_$path") // '';
+        my $res_sitename = $is_csc && $form_sn
+            ? $form_sn
+            : ($is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename);
+
+        my $file_hash = $self->_file_sha256($path);
+        my $dup_check;
+        eval { $dup_check = $c->model('File')->check_duplicate($schema, $fname, $size, $file_hash); };
+        my ($is_dup, $dup_of) = (0, undef);
+        if ($dup_check) { $is_dup = 1; $dup_of = $dup_check->id; }
+
+        eval {
+            $file_rs->create({
+                file_name    => $fname,
+                file_type    => $ext ? ".$ext" : 'unknown',
+                file_data    => '',
+                site_id      => $site_id,
+                reference_id => 0,
+                category_id  => 0,
+                share_id     => 0,
+                description  => length($description) ? $description : "Bulk imported from $dir_path",
+                upload_date  => $upload_date,
+                file_size    => $size,
+                file_path    => $path,
+                file_url     => '',
+                file_status  => 'active',
+                file_format  => $mime,
+                user_id      => $user_id,
+                nfs_path     => $rel,
+                external_url => '',
+                access_level => $access,
+                source_type  => 'nfs',
+                sitename     => $res_sitename,
+                is_duplicate => $is_dup,
+                duplicate_of => $dup_of,
+                file_hash    => $file_hash,
+            });
+        };
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'dir_sync_submit',
+                "Import failed for $path: $err");
+            $errors++;
+        } else {
+            $imported++;
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_sync_submit',
+        "Dir sync import dir=$dir_path imported=$imported skipped=$skipped errors=$errors");
+
+    my $msg = "Directory sync complete: $imported imported, $skipped skipped.";
+    $msg .= " $errors errors — check application log." if $errors;
+    $c->flash->{success_msg} = $msg;
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir_path }));
 }
 
 __PACKAGE__->meta->make_immutable;
