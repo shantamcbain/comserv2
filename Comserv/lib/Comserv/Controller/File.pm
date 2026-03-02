@@ -417,27 +417,43 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         return;
     }
 
-    require File::Copy;
-    unless (File::Copy::move($old_path, $new_path)) {
+    my $is_dir = -d $old_path;
+    my $move_ok;
+    if (rename($old_path, $new_path)) {
+        $move_ok = 1;
+    } elsif ($is_dir) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
-            "Move failed: $old_path -> $new_path: $!");
-        $c->flash->{error_msg} = "Move failed: $!";
+            "Rename failed for directory '$old_path' -> '$new_path': $!");
+        $c->flash->{error_msg} = "Cannot move directory: $! (directories can only be moved within the same filesystem)";
         $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
         return;
+    } else {
+        require File::Copy;
+        $move_ok = File::Copy::move($old_path, $new_path);
+        unless ($move_ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'fs_move',
+                "Move failed: $old_path -> $new_path: $!");
+            $c->flash->{error_msg} = "Move failed: $!";
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
+            return;
+        }
     }
 
-    my $sync = $self->_db_sync_path($c, $old_path, $new_path);
+    my $sync = $is_dir ? { updated => 0, dup_flagged => 0 } : $self->_db_sync_path($c, $old_path, $new_path);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fs_move',
         "Moved '$old_path' -> '$new_path' user=" . ($c->session->{user_id} // 'anon')
         . " db_updated=" . $sync->{updated} . " dup_flagged=" . $sync->{dup_flagged});
-    my $msg = "Moved '$filename' to '$dest_dir'.";
-    if ($sync->{updated}) {
-        $msg .= " Database path updated.";
-    } else {
-        $msg .= " File is not in the database — use the +DB button to add it.";
+    my $type = $is_dir ? 'Directory' : 'File';
+    my $msg  = "$type '$filename' moved to '$dest_dir'.";
+    if (!$is_dir) {
+        if ($sync->{updated}) {
+            $msg .= " Database path updated.";
+        } else {
+            $msg .= " Not in database — use +DB to add it.";
+        }
+        $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     }
-    $msg .= " <strong>Duplicate detected</strong> — check the Duplicates page." if $sync->{dup_flagged};
     $c->flash->{success_msg} = $msg;
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
 }
