@@ -168,12 +168,16 @@
           </li>
           [% END %]
           [% FOREACH alloc IN allocated_dirs %]
+          [% SET dir_exists = alloc.nfs_path.defined %]
           <li>
             <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
                class="[% 'active' IF current_directory == alloc.nfs_path %]"
-               title="[% alloc.nfs_path | html %]">
+               title="[% alloc.sitename | html %]: [% alloc.nfs_path | html %]">
               <span class="fb-ext fb-ext-folder">DIR</span> [% alloc.sitename | html %]
               <span class="fb-site-label">[% alloc.nfs_path | html %]</span>
+              [% IF alloc.description %]
+              <span class="fb-site-label" style="font-style:italic">[% alloc.description | html %]</span>
+              [% END %]
             </a>
           </li>
           [% END %]
