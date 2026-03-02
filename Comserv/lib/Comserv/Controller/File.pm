@@ -6,6 +6,7 @@ use File::Basename qw(basename dirname);
 use File::Path qw(make_path);
 use Time::Piece;
 use URI::Escape;
+use Digest::SHA ();
 use Comserv::Util::Logging;
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -1125,6 +1126,14 @@ sub _nfs_root_for_sync {
     return $configured;
 }
 
+sub _file_sha256 {
+    my ($self, $path) = @_;
+    return undef unless -f $path && -r $path;
+    my $sha = Digest::SHA->new(256);
+    eval { $sha->addfile($path, 'b') };
+    return $@ ? undef : $sha->hexdigest;
+}
+
 sub _top_level_dir {
     my ($rel) = @_;
     return '' unless defined $rel && length $rel;
@@ -1962,7 +1971,8 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
         ? $form_sitename
         : ($is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename);
 
-    my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size);
+    my $file_hash = $self->_file_sha256($file_path);
+    my $dup_check = $c->model('File')->check_duplicate($schema, $name, $size, $file_hash);
     my ($is_dup, $dup_of) = (0, undef);
     if ($dup_check) { $is_dup = 1; $dup_of = $dup_check->id; }
 
@@ -1992,6 +2002,7 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
             is_duplicate => $is_dup,
             duplicate_of => $dup_of,
             workshop_id  => $workshop_id,
+            file_hash    => $file_hash,
         });
     };
     my $err = "$@" if $@;
@@ -2123,20 +2134,32 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
     my $schema  = $c->model('DBEncy');
     my $file_rs = $schema->resultset('File');
 
-    opendir my $dh, $dir_path or do {
-        $c->flash->{error_msg} = "Cannot open directory: $!";
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir_path }));
-        return;
-    };
-    my @entries = grep { !/^\./ && -f "$dir_path/$_" } readdir $dh;
-    closedir $dh;
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    my @all_files;
+    File::Find::find({
+        wanted => sub {
+            return unless -f $File::Find::name;
+            my $fname = $_;
+            return if $fname =~ /^\./;
+            return if $fname =~ $UUID_RE;
+            push @all_files, $File::Find::name;
+        },
+        no_chdir => 1,
+        preprocess => sub {
+            sort grep { !/^\./ && $_ !~ $UUID_RE } @_;
+        },
+    }, $dir_path);
 
     my @scan_results;
-    for my $fname (sort @entries) {
-        my $full = "$dir_path/$fname";
-        my $size = -s $full // 0;
-        my ($ext) = ($fname =~ /\.([^.]+)$/);
-        $ext = lc($ext // '');
+    for my $full (sort @all_files) {
+        my $fname    = basename($full);
+        my $rel_dir  = dirname($full);
+        $rel_dir     =~ s{^\Q$dir_path\E/?}{};
+        my $display  = $rel_dir ? "$rel_dir/$fname" : $fname;
+        my $size     = -s $full // 0;
+        my ($ext)    = ($fname =~ /\.([^.]+)$/);
+        $ext         = lc($ext // '');
         my $classify = $self->_classify_file($fname);
 
         my $db_rec;
@@ -2146,12 +2169,12 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
             )->first;
         };
 
-        my $dup_rec;
-        my $status;
+        my ($dup_rec, $file_hash, $status);
         if ($db_rec) {
             $status = 'in_db';
         } else {
-            eval { $dup_rec = $c->model('File')->check_duplicate($schema, $fname, $size); };
+            $file_hash = $self->_file_sha256($full);
+            eval { $dup_rec = $c->model('File')->check_duplicate($schema, $fname, $size, $file_hash); };
             if ($dup_rec) {
                 $status = 'duplicate';
             } elsif ($classify ne 'normal') {
@@ -2165,16 +2188,19 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
         $rel =~ s{^\Q$nfs_root\E/?}{};
 
         push @scan_results, {
-            name     => $fname,
-            path     => $full,
-            rel      => $rel,
-            size     => $size,
-            ext      => $ext,
-            classify => $classify,
-            status   => $status,
-            db_id    => $db_rec ? $db_rec->id : undef,
-            dup_id   => $dup_rec ? $dup_rec->id : undef,
-            dup_name => $dup_rec ? $dup_rec->file_name : undef,
+            name      => $display,
+            fname     => $fname,
+            path      => $full,
+            rel       => $rel,
+            size      => $size,
+            ext       => $ext,
+            classify  => $classify,
+            status    => $status,
+            file_hash => $file_hash,
+            db_id     => $db_rec  ? $db_rec->id      : undef,
+            dup_id    => $dup_rec ? $dup_rec->id      : undef,
+            dup_name  => $dup_rec ? $dup_rec->file_name : undef,
+            dup_path  => $dup_rec ? ($dup_rec->file_path // $dup_rec->nfs_path // '') : undef,
         };
     }
 
@@ -2245,8 +2271,9 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
             ? $form_sn
             : ($is_csc ? $self->_infer_sitename_for_rel($schema, $rel) : $sitename);
 
+        my $file_hash = $self->_file_sha256($path);
         my $dup_check;
-        eval { $dup_check = $c->model('File')->check_duplicate($schema, $fname, $size); };
+        eval { $dup_check = $c->model('File')->check_duplicate($schema, $fname, $size, $file_hash); };
         my ($is_dup, $dup_of) = (0, undef);
         if ($dup_check) { $is_dup = 1; $dup_of = $dup_check->id; }
 
@@ -2274,6 +2301,7 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
                 sitename     => $res_sitename,
                 is_duplicate => $is_dup,
                 duplicate_of => $dup_of,
+                file_hash    => $file_hash,
             });
         };
         my $err = "$@" if $@;
