@@ -119,43 +119,79 @@
 
       <div class="content-section">
         <h2>Create New Allocation</h2>
+        <p style="font-size:.85rem;color:#555;margin-bottom:10px">
+          NFS root: <code>[% nfs_root | html %]</code>
+        </p>
         <form method="post" action="[% c.uri_for('/file/nfs_allocation_create') %]" class="app-form">
           <div class="form-section">
+
+            [%# ── Row 1: SiteName + Site ID ── %]
             <div class="form-row">
               <div class="form-field">
-                <label for="sitename">SiteName <span class="required">*</span></label>
+                <label for="ac_sitename">SiteName <span class="required">*</span></label>
                 [% IF sites && sites.size > 0 %]
-                <select id="sitename" name="sitename" class="form-input">
+                <select id="ac_sitename" name="sitename" class="form-input"
+                        onchange="acSitenameChanged(this.value)">
                   <option value="">-- Select SiteName --</option>
                   [% FOR site IN sites %]
-                  <option value="[% site.name | html %]">[% site.name | html %]</option>
+                  <option value="[% site.name | html %]"
+                          data-id="[% site.id | html %]">[% site.name | html %]</option>
                   [% END %]
                 </select>
                 [% ELSE %]
-                <input type="text" id="sitename" name="sitename" class="form-input"
-                       placeholder="e.g. MyClientSite">
+                <input type="text" id="ac_sitename" name="sitename" class="form-input"
+                       placeholder="e.g. MyClientSite"
+                       oninput="acSitenameChanged(this.value)">
                 [% END %]
               </div>
               <div class="form-field">
                 <label for="site_id">Site ID (optional)</label>
                 <input type="text" id="site_id" name="site_id" class="form-input"
-                       placeholder="Numeric site ID">
+                       placeholder="Auto-filled from selection">
               </div>
             </div>
+
+            [%# ── Row 2: NFS Path — pick existing OR type new ── %]
             <div class="form-row">
-              <div class="form-field">
+              <div class="form-field" style="flex:1">
                 <label for="nfs_path">NFS Path <span class="required">*</span></label>
+
+                [% IF existing_dirs && existing_dirs.size > 0 %]
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                  <label style="font-size:.82rem;font-weight:normal;white-space:nowrap">
+                    Pick existing:
+                  </label>
+                  <select id="ac_existing_dir" class="form-input" style="max-width:340px"
+                          onchange="acPickExisting(this.value)">
+                    <option value="">-- or choose existing dir --</option>
+                    [% FOR d IN existing_dirs %]
+                    <option value="[% d.path | html %]">[% d.name | html %]</option>
+                    [% END %]
+                  </select>
+                </div>
+                [% END %]
+
                 <input type="text" id="nfs_path" name="nfs_path" class="form-input"
-                       placeholder="/data/apis/sitename or relative path" style="width:400px">
+                       placeholder="[% nfs_root | html %]/SiteName"
+                       style="width:100%;max-width:480px"
+                       oninput="acClearPicker()">
+                <div style="font-size:.78rem;color:#666;margin-top:3px">
+                  Selecting a SiteName auto-fills <code>[% nfs_root | html %]/<em>sitename</em></code>.
+                  Pick an existing directory above, or type a custom path.
+                </div>
               </div>
             </div>
+
+            [%# ── Row 3: Description ── %]
             <div class="form-row">
-              <div class="form-field">
-                <label for="description">Description</label>
-                <input type="text" id="description" name="description" class="form-input"
-                       placeholder="Optional description of this allocation" style="width:400px">
+              <div class="form-field" style="flex:1">
+                <label for="ac_description">Description</label>
+                <input type="text" id="ac_description" name="description" class="form-input"
+                       placeholder="Optional description of this allocation"
+                       style="width:100%;max-width:480px">
               </div>
             </div>
+
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Create Allocation</button>
@@ -170,12 +206,62 @@
 </div>
 
 <script>
+var _acNfsRoot = '[% nfs_root | html %]';
+
+function acSitenameChanged(val) {
+    var pathEl = document.getElementById('nfs_path');
+    if (val) {
+        pathEl.value = _acNfsRoot + '/' + val;
+    } else {
+        pathEl.value = '';
+    }
+    var pickerEl = document.getElementById('ac_existing_dir');
+    if (pickerEl) pickerEl.value = '';
+
+    var siteEl = document.getElementById('ac_sitename');
+    var siteIdEl = document.getElementById('site_id');
+    if (siteEl && siteEl.tagName === 'SELECT') {
+        var opt = siteEl.options[siteEl.selectedIndex];
+        if (opt && opt.dataset.id) {
+            siteIdEl.value = opt.dataset.id;
+        } else {
+            siteIdEl.value = '';
+        }
+    }
+}
+
+function acPickExisting(path) {
+    if (!path) return;
+    var pathEl = document.getElementById('nfs_path');
+    pathEl.value = path;
+
+    var siteEl = document.getElementById('ac_sitename');
+    if (siteEl && siteEl.tagName === 'SELECT') {
+        var dirName = path.replace(/^.*\//, '');
+        for (var i = 0; i < siteEl.options.length; i++) {
+            if (siteEl.options[i].value.toLowerCase() === dirName.toLowerCase()) {
+                siteEl.selectedIndex = i;
+                var opt = siteEl.options[i];
+                if (opt.dataset.id) {
+                    document.getElementById('site_id').value = opt.dataset.id;
+                }
+                break;
+            }
+        }
+    }
+}
+
+function acClearPicker() {
+    var pickerEl = document.getElementById('ac_existing_dir');
+    if (pickerEl) pickerEl.value = '';
+}
+
 function toggleEdit(id) {
-  var row = document.getElementById('edit_row_' + id);
-  if (row.style.display === 'none') {
-    row.style.display = '';
-  } else {
-    row.style.display = 'none';
-  }
+    var row = document.getElementById('edit_row_' + id);
+    if (row.style.display === 'none') {
+        row.style.display = '';
+    } else {
+        row.style.display = 'none';
+    }
 }
 </script>
