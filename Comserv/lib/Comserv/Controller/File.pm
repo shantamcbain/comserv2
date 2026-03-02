@@ -1677,10 +1677,29 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
         "Rendering NFS allocations: count=" . scalar(@allocations_with_status));
 
+    my $nfs_root = $self->_nfs_root_for_sync();
+
+    my @existing_dirs;
+    if (-d $nfs_root) {
+        opendir(my $dh, $nfs_root);
+        while (my $e = readdir($dh)) {
+            next if $e =~ /^\./;
+            my $full = "$nfs_root/$e";
+            push @existing_dirs, { name => $e, path => $full } if -d $full;
+        }
+        closedir($dh);
+        @existing_dirs = sort { $a->{name} cmp $b->{name} } @existing_dirs;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
+        "Rendering NFS allocations: count=" . scalar(@allocations_with_status));
+
     $c->stash(
-        allocations => \@allocations_with_status,
-        sites       => $sites,
-        template    => 'file/NfsAllocations.tt',
+        allocations   => \@allocations_with_status,
+        sites         => $sites,
+        nfs_root      => $nfs_root,
+        existing_dirs => \@existing_dirs,
+        template      => 'file/NfsAllocations.tt',
     );
     $c->forward($c->view('TT'));
 }
