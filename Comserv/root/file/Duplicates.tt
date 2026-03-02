@@ -165,7 +165,7 @@
           <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
           <span style="color:#888">|</span>
-          <span id="dup-sel-count" style="color:#555;white-space:nowrap">0 selected</span>
+          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
           <span style="color:#888">|</span>
           <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
                   onclick="dupBatchAction('delete_db')"
@@ -369,8 +369,29 @@
         </div>
         [% END %]
 
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+                    padding:8px 12px;background:#f8f0e8;border:1px solid #e0c090;border-radius:4px;
+                    margin-bottom:10px;font-size:.85rem">
+          <strong style="white-space:nowrap">Bulk select:</strong>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(true)">&#9745; Select All</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectAll(false)">&#9744; Clear</button>
+          <span style="color:#888">|</span>
+          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
+          <span style="color:#888">|</span>
+          <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
+                  onclick="dupBatchAction('delete_db')"
+                  title="Remove selected DB records only (files stay on disk)">
+            &#128465; Delete Selected (DB Only)
+          </button>
+          <button type="button" class="btn btn-sm btn-delete"
+                  onclick="dupBatchAction('delete_both')"
+                  title="Delete selected files from disk AND database">
+            &#128465; Delete Selected (Disk+DB)
+          </button>
+        </div>
+
         [% IF total_pages > 1 %]
-        <div style="display:flex;gap:5px;align-items:center;justify-content:center;padding:16px 0;flex-wrap:wrap">
+        <div style="display:flex;gap:5px;align-items:center;justify-content:center;padding:10px 0;flex-wrap:wrap">
           <a href="[% c.uri_for('/file/duplicates', pf_first) %]"
              class="btn btn-secondary" [% 'style="opacity:.4;pointer-events:none"' IF page == 1 %]>&#8676; First</a>
           <a href="[% c.uri_for('/file/duplicates', pf_prev) %]"
@@ -412,8 +433,9 @@ function dupToggleRename(id) {
 
 function dupUpdateCount() {
     var checked = document.querySelectorAll('.dup-sel-cb:checked').length;
-    var el = document.getElementById('dup-sel-count');
-    if (el) el.textContent = checked + ' selected';
+    document.querySelectorAll('.dup-sel-count-display').forEach(function(el) {
+        el.textContent = checked + ' selected';
+    });
 }
 
 function dupSelectAll(state) {
