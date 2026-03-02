@@ -31,8 +31,10 @@ sub get_files_info {
     my @entries = readdir $dir;
     closedir $dir;
 
+    my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     unless ($show_hidden) {
-        @entries = grep { !/^\./ } @entries;
+        @entries = grep { !/^\./ && $_ !~ $UUID_RE } @entries;
     }
 
     my (@directories, @files);
@@ -224,8 +226,18 @@ sub get_file_by_id {
 }
 
 sub check_duplicate {
-    my ($self, $schema, $file_name, $file_size) = @_;
-    return $schema->resultset('File')->search(
+    my ($self, $schema, $file_name, $file_size, $file_hash) = @_;
+    my $rs = $schema->resultset('File');
+
+    if (defined $file_hash && length $file_hash) {
+        my $by_hash = $rs->search(
+            { file_hash => $file_hash, is_duplicate => 0 },
+            { rows => 1 }
+        )->first;
+        return $by_hash if $by_hash;
+    }
+
+    return $rs->search(
         { file_name => $file_name, file_size => $file_size, is_duplicate => 0 },
         { rows => 1 }
     )->first;
@@ -368,10 +380,17 @@ sub get_duplicates {
     my $sort_dir = $filters{sort_dir} || 'desc';
     $sort_dir = $sort_dir eq 'asc' ? '-asc' : '-desc';
 
-    my @duplicates = $schema->resultset('File')->search(
-        \%where,
-        { order_by => { $sort_dir => $sort_col } }
-    )->all;
+    my $page      = int($filters{page}      // 1); $page = 1 if $page < 1;
+    my $page_size = int($filters{page_size} // 25);
+
+    my $rs = $schema->resultset('File')->search(\%where);
+    my $total_count = $rs->count;
+
+    my @duplicates = $rs->search(undef, {
+        order_by => { $sort_dir => $sort_col },
+        rows     => $page_size,
+        offset   => ($page - 1) * $page_size,
+    })->all;
 
     my @pairs;
     for my $dup (@duplicates) {
@@ -389,7 +408,7 @@ sub get_duplicates {
         };
     }
 
-    return \@pairs;
+    return (\@pairs, $total_count);
 }
 
 sub get_nfs_allocations {
