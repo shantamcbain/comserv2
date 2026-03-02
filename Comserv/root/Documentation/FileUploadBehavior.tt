@@ -1,0 +1,270 @@
+[% META
+   title = "File Upload Behavior — How Files Get to Disk and Database"
+   description = "Explains exactly what each upload method does to disk and the files database table"
+   roles = "admin"
+   TemplateType = "Documentation"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-03-02"
+%]
+[% PageVersion = 'Documentation/FileUploadBehavior.tt,v 0.01 2026/03/02 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>File Upload Behavior</h1>
+    <p>How files get to disk and into the database — by upload method</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <h2>Overview</h2>
+        <p>
+          The file management system has <strong>three distinct ways</strong> a file can be registered.
+          Each method has different behaviour regarding what it writes to disk and what it records in the
+          <code>files</code> database table. Understanding which method does what is critical to
+          avoiding orphaned disk files or orphaned database records.
+        </p>
+
+        <table class="data-table" style="margin-top:14px">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Writes to Disk?</th>
+              <th>Creates DB Record?</th>
+              <th>Duplicate Check?</th>
+              <th>Who can use it?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>upload_file</strong> — Upload page form</td>
+              <td>Yes — immediately</td>
+              <td>Yes — immediately after disk write</td>
+              <td>Yes (name + size)</td>
+              <td>Admin (SiteName or CSC)</td>
+            </tr>
+            <tr>
+              <td><strong>fs_upload_tree</strong> — Admin Browser "Upload" button / drag-drop</td>
+              <td>Yes — each file as it arrives</td>
+              <td><strong>No</strong></td>
+              <td>No</td>
+              <td>Admin (SiteName or CSC)</td>
+            </tr>
+            <tr>
+              <td><strong>db_import_file</strong> — "+DB" button in Admin Browser</td>
+              <td><strong>No</strong> — file must already be on disk</td>
+              <td>Yes</td>
+              <td>Yes (name + size + SHA256)</td>
+              <td>Admin (SiteName or CSC)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="content-section">
+        <h2>Method 1 — Upload Page Form (<code>/file/upload_file</code>)</h2>
+        <p>Accessed via the <em>Upload File</em> menu item. This is the traditional single-file upload.</p>
+        <h3>Step-by-step</h3>
+        <ol>
+          <li>Admin selects a file and chooses a target NFS directory from the dropdown.</li>
+          <li>
+            The server resolves the physical NFS path for that allocation record
+            (e.g. <code>/mnt/nfs/CSC</code>).
+            CSC admin can also type a raw directory path directly.
+          </li>
+          <li>The file is <strong>written to disk</strong> at <code>{nfs_path}/{filename}</code>.</li>
+          <li>
+            The <code>files</code> table is checked for an existing record with the same
+            <strong>name and size</strong>. If a match is found, <code>is_duplicate = 1</code>
+            and <code>duplicate_of</code> is set to the matching record's ID.
+          </li>
+          <li>A new row is <strong>inserted into the <code>files</code> table</strong> with
+              <code>source_type = 'upload'</code>, the detected MIME type, and
+              the full disk path in both <code>file_path</code> and <code>nfs_path</code>.
+          </li>
+          <li>
+            If the database insert <strong>fails</strong>, the file that was just written to disk is
+            <strong>deleted</strong> (rollback). An error is shown in the browser.
+          </li>
+          <li>On success the admin is redirected to the File List page.</li>
+        </ol>
+        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+          <strong>Result:</strong> File appears on disk AND in the database simultaneously.
+          You will see it in the Admin Browser and in the File List immediately.
+        </p>
+      </div>
+
+      <div class="content-section">
+        <h2>Method 2 — Admin Browser Upload / Drag-Drop (<code>/file/fs_upload_tree</code>)</h2>
+        <p>
+          Accessed via the <em>Upload</em> button in the Admin Browser, or by dragging files/folders
+          onto the browser panel. This is an AJAX endpoint — the browser sends one HTTP request per file.
+        </p>
+        <h3>Step-by-step</h3>
+        <ol>
+          <li>Admin selects files or a directory tree in the browser's file picker (or drags them in).</li>
+          <li>
+            The browser JavaScript sends each file individually to the server with its
+            <strong>relative path</strong> preserved (so subdirectories are recreated).
+          </li>
+          <li>
+            The server checks that the target directory is within the admin's allowed NFS allocation
+            (CSC admin can use any existing directory; SiteName admin is restricted to their allocation).
+          </li>
+          <li>
+            Missing subdirectories are created automatically with <code>make_path</code>.
+          </li>
+          <li>Each file is <strong>written to disk</strong>. The server returns <code>{"ok":1}</code>.</li>
+          <li>
+            <strong>No database record is created.</strong> The file exists only on disk until
+            you explicitly add it to the database.
+          </li>
+        </ol>
+        <p style="background:#fff3e0;border-left:4px solid #fb8c00;padding:8px 12px;border-radius:3px">
+          <strong>Result:</strong> Files appear in the Admin Browser directory listing immediately
+          (because the browser reads the filesystem). They do <strong>NOT</strong> appear in the
+          File List or Duplicates pages until you use the "+DB" button or the "Dir Sync" feature
+          to import them into the database.
+        </p>
+
+        <h3>Directory uploads</h3>
+        <p>
+          When a folder is selected (or dragged), the browser sends every file with its path relative
+          to the folder root. The server recreates the full subdirectory tree under the target directory.
+          All files land on disk in one operation. Again — no DB records are created during this step.
+        </p>
+      </div>
+
+      <div class="content-section">
+        <h2>Method 3 — "+DB" Button (<code>/file/db_import_file</code>)</h2>
+        <p>
+          The <strong>+DB</strong> button appears next to each file in the Admin Browser.
+          Use it to register an existing on-disk file in the database.
+        </p>
+        <h3>Step-by-step</h3>
+        <ol>
+          <li>Admin clicks <strong>+DB</strong> next to a file in the Admin Browser.</li>
+          <li>The server verifies the file actually exists on disk at that path.</li>
+          <li>
+            If the file is <strong>already in the <code>files</code> table</strong>
+            (matched by <code>file_path</code> or <code>nfs_path</code>), the admin is redirected
+            to the edit page for that record so they can update its attributes.
+            No duplicate record is created.
+          </li>
+          <li>
+            If the file is <strong>not yet in the database</strong>:
+            <ul>
+              <li>A SHA256 hash of the file's content is computed.</li>
+              <li>
+                The <code>files</code> table is checked for a matching hash (or name+size as fallback).
+                If found, <code>is_duplicate = 1</code> and <code>duplicate_of</code> is set.
+              </li>
+              <li>
+                A new DB record is created with <code>source_type = 'nfs'</code>, the SHA256 hash
+                stored in <code>file_hash</code>, and the current admin's SiteName / session data.
+              </li>
+            </ul>
+          </li>
+          <li>Admin is redirected back to the Admin Browser directory they were in.</li>
+        </ol>
+        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+          <strong>Result:</strong> File was already on disk; now it also has a database record.
+          It will appear in the File List and Duplicates pages.
+          The disk file is not touched or moved.
+        </p>
+        <p style="background:#fde8e8;border-left:4px solid #e53935;padding:8px 12px;border-radius:3px;margin-top:8px">
+          <strong>Warning:</strong> Computing the SHA256 hash reads the entire file. For very large
+          files this can take several seconds and will block the server (single-threaded dev mode)
+          during that time. On large directories use <em>Dir Sync</em> instead, which defers
+          hash computation to import time and caps the scan at 2000 files.
+        </p>
+      </div>
+
+      <div class="content-section">
+        <h2>Dir Sync — Bulk Import (<code>/file/dir_sync</code>)</h2>
+        <p>
+          The <em>Dir Sync</em> button (in the Admin Browser toolbar) is the recommended way to
+          import many files from an existing NFS directory into the database in one pass.
+        </p>
+        <ol>
+          <li>Admin clicks <strong>Dir Sync</strong> for a directory.</li>
+          <li>
+            The server scans the directory (non-recursive by default; check the box for recursive,
+            capped at 2000 files to prevent hangs).
+          </li>
+          <li>
+            Each file is classified as <em>New</em>, <em>Duplicate</em> (name+size match),
+            <em>Already in DB</em>, or <em>Proxmox/system file</em> — using fast DB queries only
+            (no SHA256 at scan time).
+          </li>
+          <li>Admin reviews the table and selects which files to import (or skip).</li>
+          <li>
+            On submit, only the files marked <em>Import</em> are processed:
+            SHA256 is computed now, a DB record is created, and the duplicate flag is set if needed.
+          </li>
+        </ol>
+        <p style="background:#e8f5e9;border-left:4px solid #43a047;padding:8px 12px;border-radius:3px">
+          <strong>Result:</strong> Selected files gain DB records; skipped files remain disk-only.
+          Nothing is moved or deleted.
+        </p>
+      </div>
+
+      <div class="content-section">
+        <h2>Summary — When Will I See the File?</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Where you look</th>
+              <th>upload_file</th>
+              <th>fs_upload_tree (Admin Browser upload)</th>
+              <th>+DB button</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Admin Browser directory listing</td>
+              <td>Yes — immediately</td>
+              <td>Yes — immediately</td>
+              <td>Was already visible</td>
+            </tr>
+            <tr>
+              <td>File List (<code>/file/list</code>)</td>
+              <td>Yes — immediately</td>
+              <td>No — must +DB or Dir Sync first</td>
+              <td>Yes — immediately</td>
+            </tr>
+            <tr>
+              <td>Duplicates page</td>
+              <td>Yes — if duplicate detected</td>
+              <td>No</td>
+              <td>Yes — if duplicate detected</td>
+            </tr>
+            <tr>
+              <td>Workshop file picker</td>
+              <td>Yes (if access_level allows)</td>
+              <td>No</td>
+              <td>Yes (if access_level allows)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="content-section">
+        <h2>Access Control Summary</h2>
+        <ul>
+          <li><strong>CSC Admin</strong> — can upload to any existing directory on the NFS, or type a raw path. No allocation needed.</li>
+          <li><strong>SiteName Admin</strong> — can only upload into directories that CSC admin has allocated to their SiteName via NFS Allocations. They cannot navigate above their allocation root.</li>
+          <li><strong>Regular users</strong> — cannot use any upload or browser functions. They interact with files only through application features (e.g. Workshop file picker).</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+</div>
