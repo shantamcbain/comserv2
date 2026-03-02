@@ -380,10 +380,17 @@ sub get_duplicates {
     my $sort_dir = $filters{sort_dir} || 'desc';
     $sort_dir = $sort_dir eq 'asc' ? '-asc' : '-desc';
 
-    my @duplicates = $schema->resultset('File')->search(
-        \%where,
-        { order_by => { $sort_dir => $sort_col } }
-    )->all;
+    my $page      = int($filters{page}      // 1); $page = 1 if $page < 1;
+    my $page_size = int($filters{page_size} // 25);
+
+    my $rs = $schema->resultset('File')->search(\%where);
+    my $total_count = $rs->count;
+
+    my @duplicates = $rs->search(undef, {
+        order_by => { $sort_dir => $sort_col },
+        rows     => $page_size,
+        offset   => ($page - 1) * $page_size,
+    })->all;
 
     my @pairs;
     for my $dup (@duplicates) {
@@ -401,7 +408,7 @@ sub get_duplicates {
         };
     }
 
-    return \@pairs;
+    return (\@pairs, $total_count);
 }
 
 sub get_nfs_allocations {

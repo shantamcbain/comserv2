@@ -110,9 +110,32 @@
 
       <div class="content-section">
         [% IF duplicate_pairs.size %]
-        <p style="margin-bottom:12px;color:#555">
-          Showing <strong>[% duplicate_pairs.size %]</strong> duplicate
-          [% duplicate_pairs.size == 1 ? 'file' : 'files' %].
+        <div style="display:flex;align-items:baseline;gap:20px;margin-bottom:12px;flex-wrap:wrap">
+          <p style="margin:0;color:#555">
+            <strong>[% total_count %]</strong> total duplicate
+            [% total_count == 1 ? 'file' : 'files' %] in database.
+            Showing page <strong>[% page %]</strong> of <strong>[% total_pages %]</strong>
+            ([% duplicate_pairs.size %] per page).
+          </p>
+          [% IF total_pages > 1 %]
+          <div style="display:flex;gap:6px;align-items:center">
+            [% IF page > 1 %]
+            <a href="[% c.uri_for('/file/duplicates', {page => page - 1,
+                sitename_filter => filters.sitename, type_filter => filters.file_type,
+                sort_by => filters.sort_by, sort_dir => filters.sort_dir}) %]"
+               class="btn btn-sm btn-secondary">&laquo; Prev</a>
+            [% END %]
+            <span style="font-size:.82rem;color:#666">Page [% page %]/[% total_pages %]</span>
+            [% IF page < total_pages %]
+            <a href="[% c.uri_for('/file/duplicates', {page => page + 1,
+                sitename_filter => filters.sitename, type_filter => filters.file_type,
+                sort_by => filters.sort_by, sort_dir => filters.sort_dir}) %]"
+               class="btn btn-sm btn-secondary">Next &raquo;</a>
+            [% END %]
+          </div>
+          [% END %]
+        </div>
+        <p style="margin-bottom:12px;font-size:.85rem;color:#666">
           Each card compares the <strong>duplicate</strong> (right) against its <strong>original</strong> (left).
           Fields highlighted in amber differ between the two.
         </p>
@@ -241,26 +264,29 @@
 
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="swap">
+              <input type="hidden" name="back_page" value="[% page %]">
               <button type="submit" class="btn btn-sm btn-edit"
                       title="Swap roles: the right-hand file becomes the original, the left-hand file becomes the duplicate"
                       onclick="return confirm('Make #[% dup.id %] the original and mark #[% orig ? orig.id : '?' %] as the duplicate instead?')">
-                &#8644; Swap: Make Duplicate the Original
+                &#8644; Swap: Make Dup the Original
               </button>
             </form>
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="delete_db">
+              <input type="hidden" name="back_page" value="[% page %]">
               <button type="submit" class="btn btn-sm"
                       title="Remove duplicate DB record only — the actual file on disk is NOT deleted"
                       onclick="return confirm('Remove duplicate #[% dup.id %] from the database only?\n\nThe file on disk will NOT be deleted.')">
-                Remove DB Record Only
+                Remove DB Only
               </button>
             </form>
             <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
               <input type="hidden" name="action" value="delete_both">
+              <input type="hidden" name="back_page" value="[% page %]">
               <button type="submit" class="btn btn-sm btn-delete"
                       title="Delete the duplicate file from disk AND remove its database record. Cannot be undone."
                       onclick="return confirm('Delete duplicate #[% dup.id %] from the database AND from disk?\n\nThis cannot be undone.')">
-                Delete from Disk + DB
+                Delete Disk + DB
               </button>
             </form>
 
@@ -272,6 +298,29 @@
             </div>
           </div>
 
+        </div>
+        [% END %]
+
+        [% IF total_pages > 1 %]
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;padding:16px 0;flex-wrap:wrap">
+          [% IF page > 1 %]
+          <a href="[% c.uri_for('/file/duplicates', {page => page - 1,
+              sitename_filter => filters.sitename, type_filter => filters.file_type,
+              sort_by => filters.sort_by, sort_dir => filters.sort_dir}) %]"
+             class="btn btn-secondary">&laquo; Previous</a>
+          [% END %]
+          [% FOREACH pg IN [1..total_pages] %]
+          <a href="[% c.uri_for('/file/duplicates', {page => pg,
+              sitename_filter => filters.sitename, type_filter => filters.file_type,
+              sort_by => filters.sort_by, sort_dir => filters.sort_dir}) %]"
+             class="btn btn-sm [% pg == page ? 'btn-primary' : 'btn-secondary' %]">[% pg %]</a>
+          [% END %]
+          [% IF page < total_pages %]
+          <a href="[% c.uri_for('/file/duplicates', {page => page + 1,
+              sitename_filter => filters.sitename, type_filter => filters.file_type,
+              sort_by => filters.sort_by, sort_dir => filters.sort_dir}) %]"
+             class="btn btn-secondary">Next &raquo;</a>
+          [% END %]
         </div>
         [% END %]
 

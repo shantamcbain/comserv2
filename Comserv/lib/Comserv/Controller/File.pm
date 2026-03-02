@@ -1484,14 +1484,22 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
         return;
     }
 
+    my $page_size = 25;
+    my $page      = int($c->req->param('page') // 1);
+    $page = 1 if $page < 1;
+
     my %filters = (
         sitename  => scalar($c->req->param('sitename_filter'))  // '',
         file_type => scalar($c->req->param('type_filter'))      // '',
         sort_by   => scalar($c->req->param('sort_by'))          // 'upload_date',
         sort_dir  => scalar($c->req->param('sort_dir'))         // 'desc',
+        page      => $page,
+        page_size => $page_size,
     );
 
-    my $duplicate_pairs = $c->model('File')->get_duplicates($c, %filters);
+    my ($duplicate_pairs, $total_count) = $c->model('File')->get_duplicates($c, %filters);
+
+    my $total_pages = int(($total_count + $page_size - 1) / $page_size) || 1;
 
     my $sites = [];
     if ($is_csc) {
@@ -1509,10 +1517,15 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'duplicates',
-        "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] }));
+        "Rendering duplicates page: pairs=" . scalar(@{ $duplicate_pairs // [] })
+        . " total=$total_count page=$page/$total_pages");
 
     $c->stash(
         duplicate_pairs => $duplicate_pairs,
+        total_count     => $total_count,
+        page            => $page,
+        total_pages     => $total_pages,
+        page_size       => $page_size,
         is_csc          => $is_csc,
         sites           => $sites,
         filters         => \%filters,
@@ -1631,7 +1644,8 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         $c->flash->{error_msg} = "Unknown action '$action'.";
     }
 
-    $c->response->redirect($c->uri_for('/file/duplicates'));
+    my $back_page = $c->req->param('back_page') // 1;
+    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page }));
 }
 
 sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
