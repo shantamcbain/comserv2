@@ -1484,7 +1484,8 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
         return;
     }
 
-    my $page_size = 25;
+    my $page_size = int($c->req->param('page_size') // 25);
+    $page_size = 25 unless grep { $page_size == $_ } (10, 25, 50, 100);
     my $page      = int($c->req->param('page') // 1);
     $page = 1 if $page < 1;
 
@@ -1495,6 +1496,7 @@ sub duplicates :Path('/file/duplicates') :Args(0) {
         sort_dir  => scalar($c->req->param('sort_dir'))         // 'desc',
         page      => $page,
         page_size => $page_size,
+        page_size_param => $page_size,
     );
 
     my ($duplicate_pairs, $total_count) = $c->model('File')->get_duplicates($c, %filters);
@@ -1682,8 +1684,103 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         $c->flash->{error_msg} = "Unknown action '$action'.";
     }
 
-    my $back_page = $c->req->param('back_page') // 1;
-    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page }));
+    my $back_page      = $c->req->param('back_page')      // 1;
+    my $back_page_size = $c->req->param('back_page_size') // 25;
+    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
+}
+
+sub batch_resolve_duplicates :Path('/file/batch_resolve_duplicates') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    my $action     = $c->req->param('batch_action') // '';
+    my @target_ids = $c->req->param('selected_ids');
+    @target_ids    = grep { /^\d+$/ } @target_ids;
+
+    unless (@target_ids) {
+        $c->flash->{error_msg} = 'No files selected.';
+        my $back_page      = $c->req->param('back_page')      // 1;
+        my $back_page_size = $c->req->param('back_page_size') // 25;
+        $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
+        return;
+    }
+
+    unless ($action =~ /^(delete_db|delete_both)$/) {
+        $c->flash->{error_msg} = "Unknown batch action '$action'.";
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    my $also_disk = ($action eq 'delete_both');
+    my $schema    = $c->model('DBEncy');
+    my ($deleted_count, $promoted_count, @errors) = (0, 0);
+
+    for my $tid (@target_ids) {
+        eval {
+            my $file = $schema->resultset('File')->find($tid);
+            unless ($file) {
+                push @errors, "#$tid not found";
+                return;
+            }
+
+            my $is_orig    = !$file->is_duplicate;
+            my $partner_id = $is_orig
+                ? do {
+                    my $r = $schema->resultset('File')->search(
+                        { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                    )->first;
+                    $r ? $r->id : undef;
+                  }
+                : $file->duplicate_of;
+
+            if ($also_disk) {
+                my $fp = (length($file->file_path // '') && -f $file->file_path) ? $file->file_path
+                       : (length($file->nfs_path  // '') && -f $file->nfs_path)  ? $file->nfs_path
+                       : '';
+                if (length $fp) {
+                    unlink $fp or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'batch_resolve', "unlink failed for $fp: $!");
+                }
+            }
+
+            $file->delete;
+            $deleted_count++;
+
+            if ($is_orig && $partner_id) {
+                my $dup = $schema->resultset('File')->find($partner_id);
+                if ($dup) {
+                    $dup->update({ is_duplicate => 0, duplicate_of => undef });
+                    $promoted_count++;
+                }
+            }
+        };
+        if ($@) {
+            push @errors, "#$tid: $@";
+        }
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'batch_resolve',
+        "Batch $action: deleted=$deleted_count promoted=$promoted_count errors=" . scalar(@errors));
+
+    my $msg = ($also_disk ? "Disk+DB" : "DB only") . " delete: $deleted_count file(s) removed.";
+    $msg   .= " $promoted_count duplicate(s) promoted to original." if $promoted_count;
+    $msg   .= " Errors: " . join('; ', @errors)                     if @errors;
+
+    if (@errors && !$deleted_count) {
+        $c->flash->{error_msg} = $msg;
+    } else {
+        $c->flash->{success_msg} = $msg;
+    }
+
+    my $back_page      = $c->req->param('back_page')      // 1;
+    my $back_page_size = $c->req->param('back_page_size') // 25;
+    $c->response->redirect($c->uri_for('/file/duplicates', { page => $back_page, page_size => $back_page_size }));
 }
 
 sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
