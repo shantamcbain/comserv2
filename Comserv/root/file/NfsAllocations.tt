@@ -42,24 +42,43 @@
                 <th>SiteName</th>
                 <th>NFS Path</th>
                 <th>Description</th>
+                <th>On Disk</th>
                 <th>Active</th>
                 <th class="action-cell">Actions</th>
               </tr>
             </thead>
             <tbody>
               [% FOR alloc IN allocations %]
+              [% SET path_ok = alloc.fs_exists %]
               <tr>
                 <td>[% alloc.id | html %]</td>
                 <td>[% alloc.sitename | html %]</td>
                 <td><code>[% alloc.nfs_path | html %]</code></td>
                 <td>[% alloc.description | html %]</td>
+                <td>
+                  [% IF alloc.fs_exists %]
+                  <span style="color:#2e7d32;font-weight:bold" title="Directory exists on filesystem">&#10003; Yes</span>
+                  [% ELSE %]
+                  <span style="color:#c62828;font-weight:bold" title="Directory does not exist on filesystem — use Create Dir">&#10007; No</span>
+                  [% END %]
+                </td>
                 <td>[% alloc.is_active ? 'Yes' : 'No' %]</td>
                 <td class="action-cell">
+                  [% IF alloc.fs_exists %]
+                  <a href="[% c.uri_for('/file/admin_browser', { dir_path => alloc.nfs_path }) %]"
+                     class="btn btn-primary btn-sm">Browse</a>
+                  [% ELSE %]
+                  <form method="post" action="[% c.uri_for('/file/nfs_allocation_mkdir', alloc.id) %]"
+                        style="display:inline"
+                        onsubmit="return confirm('Create directory [% alloc.nfs_path | html %] on the NFS filesystem?')">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Create the directory on the NFS filesystem">Create Dir</button>
+                  </form>
+                  [% END %]
                   <form method="post" action="[% c.uri_for('/file/nfs_allocation_edit', alloc.id) %]"
                         style="display:inline">
                     <input type="hidden" name="description" value="[% alloc.description | html %]" id="desc_[% alloc.id %]">
                     <input type="hidden" name="is_active" value="[% alloc.is_active ? 1 : 0 %]" id="active_[% alloc.id %]">
-                    <button type="button" class="btn btn-secondary"
+                    <button type="button" class="btn btn-secondary btn-sm"
                             onclick="toggleEdit([% alloc.id %])">Edit</button>
                   </form>
                 </td>
