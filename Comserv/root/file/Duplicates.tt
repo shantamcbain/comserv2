@@ -209,6 +209,12 @@
           [% SET card_class = (role == 'original') ? 'is-original' : 'is-duplicate' %]
           <div class="dup-card [% card_class %]">
             <h4>
+              [% IF rec %]
+              <input type="checkbox" class="dup-sel-cb" data-file-id="[% rec.id | html %]"
+                     title="Select this file for batch delete"
+                     onchange="dupUpdateCount()"
+                     style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
+              [% END %]
               [% IF role == 'original' %]
               <span class="badge badge-original">ORIGINAL</span>
               [% ELSE %]
@@ -346,13 +352,6 @@
 
           [%# ── Footer: checkbox + warnings + links ─────────────── %]
           <div class="dup-actions" style="font-size:.8rem">
-            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;font-weight:600">
-              <input type="checkbox" class="dup-sel-cb"
-                     data-dup-id="[% dup.id | html %]"
-                     [% IF orig %]data-orig-id="[% orig.id | html %]"[% END %]
-                     onchange="dupUpdateCount()">
-              Select pair
-            </label>
             [% IF pair.same_path || pair.same_nfs %]
             <span class="warning-same-path">&#9888; Both records point to same file on disk — deleting one won't remove the physical file.</span>
             [% END %]
@@ -435,12 +434,12 @@ function dupBatchAction(action) {
     var container = document.getElementById('dup-batch-ids');
     container.innerHTML = '';
     cbs.forEach(function(cb) {
-        var dupId = cb.getAttribute('data-dup-id');
-        if (dupId) {
+        var fileId = cb.getAttribute('data-file-id');
+        if (fileId) {
             var inp = document.createElement('input');
             inp.type  = 'hidden';
             inp.name  = 'selected_ids';
-            inp.value = dupId;
+            inp.value = fileId;
             container.appendChild(inp);
         }
     });
