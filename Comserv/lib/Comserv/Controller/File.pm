@@ -412,7 +412,15 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
     my $new_path = "$dest_dir/$filename";
 
     if (-e $new_path) {
-        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'.";
+        if (-d $old_path && -d $new_path) {
+            $c->response->redirect($c->uri_for('/file/dir_merge', {
+                src  => $old_path,
+                dest => $new_path,
+                back => $dir,
+            }));
+            return;
+        }
+        $c->flash->{error_msg} = "A file named '$filename' already exists in '$dest_dir'. Cannot overwrite a file with a file — rename one first.";
         $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir }));
         return;
     }
@@ -2181,6 +2189,239 @@ sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
     my $escaped = $dest_path;
     $escaped =~ s/"/\\"/g;
     $c->response->body("{\"ok\":1,\"path\":\"$escaped\"}");
+}
+
+sub dir_merge :Path('/file/dir_merge') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $src  = $c->req->param('src')  // '';
+    my $dest = $c->req->param('dest') // '';
+    my $back = $c->req->param('back') // '';
+
+    $src  =~ s{\.\.}{}g;  $src  =~ s{/+$}{};
+    $dest =~ s{\.\.}{}g;  $dest =~ s{/+$}{};
+
+    unless (-d $src && -d $dest) {
+        $c->flash->{error_msg} = 'Source or destination directory not found.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
+        return;
+    }
+
+    unless ($is_csc) {
+        my $schema  = $c->model('DBEncy');
+        my $allowed = 0;
+        eval {
+            my @allocs = $schema->resultset('NfsDirectory')->search(
+                { sitename => $sitename, is_active => 1 }
+            )->all;
+            for my $a (@allocs) {
+                my $ap = $a->nfs_path;
+                if (CORE::index($src, $ap) == 0 && CORE::index($dest, $ap) == 0) {
+                    $allowed = 1; last;
+                }
+            }
+        };
+        unless ($allowed) {
+            $c->flash->{error_msg} = 'Access denied: directory outside your allocation.';
+            $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $back }));
+            return;
+        }
+    }
+
+    my %dest_files;
+    File::Find::find({
+        wanted => sub {
+            return unless -f $File::Find::name;
+            my $rel = $File::Find::name;
+            $rel =~ s{^\Q$dest\E/?}{};
+            $dest_files{$rel} = {
+                path => $File::Find::name,
+                size => -s $File::Find::name,
+            };
+        },
+        no_chdir => 1,
+    }, $dest);
+
+    my @entries;
+    File::Find::find({
+        wanted => sub {
+            return unless -f $File::Find::name;
+            my $src_path = $File::Find::name;
+            my $rel = $src_path;
+            $rel =~ s{^\Q$src\E/?}{};
+            my $size = -s $src_path;
+            my ($fname) = ($rel =~ m{([^/]+)$});
+            my ($ext)   = ($fname =~ /\.([^.]+)$/);
+            $ext = lc($ext // '');
+
+            my $conflict = $dest_files{$rel};
+            my ($status, $default_action);
+            if (!$conflict) {
+                $status = 'new';
+                $default_action = 'move';
+            } else {
+                my $src_hash  = $self->_file_sha256($src_path);
+                my $dest_hash = $self->_file_sha256($conflict->{path});
+                if (defined $src_hash && defined $dest_hash && $src_hash eq $dest_hash) {
+                    $status = 'identical';
+                    $default_action = 'skip';
+                } elsif ($size == $conflict->{size}) {
+                    $status = 'same_size';
+                    $default_action = 'skip';
+                } else {
+                    $status = 'conflict';
+                    $default_action = 'skip';
+                }
+            }
+
+            push @entries, {
+                rel          => $rel,
+                src_path     => $src_path,
+                dest_path    => $conflict ? $conflict->{path} : "$dest/$rel",
+                fname        => $fname,
+                ext          => $ext,
+                src_size     => $size,
+                dest_size    => $conflict ? $conflict->{size} : undef,
+                status       => $status,
+                default_action => $default_action,
+            };
+        },
+        no_chdir => 1,
+        preprocess => sub { sort @_ },
+    }, $src);
+
+    @entries = sort { $a->{rel} cmp $b->{rel} } @entries;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_merge',
+        "Dir merge review src=$src dest=$dest entries=" . scalar(@entries));
+
+    $c->stash(
+        src      => $src,
+        dest     => $dest,
+        back     => $back,
+        entries  => \@entries,
+        is_admin => $is_admin,
+        is_csc   => $is_csc,
+        template => 'file/DirMerge.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_admin && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    my $src  = $c->req->param('src')  // '';
+    my $dest = $c->req->param('dest') // '';
+    my $back = $c->req->param('back') // '';
+    $src  =~ s{\.\.}{}g;
+    $dest =~ s{\.\.}{}g;
+
+    my @rels   = $c->req->param('rel');
+    my ($moved, $skipped, $renamed, $errors) = (0, 0, 0, 0);
+    my @messages;
+
+    for my $rel (@rels) {
+        $rel =~ s{\.\.}{}g;
+        my $action   = $c->req->param("action_$rel") // 'skip';
+        my $src_path = "$src/$rel";
+        my $dst_path = "$dest/$rel";
+
+        next unless -f $src_path;
+
+        if ($action eq 'skip') {
+            $skipped++;
+            next;
+        }
+
+        my $dst_parent = dirname($dst_path);
+        unless (-d $dst_parent) {
+            eval { make_path($dst_parent) };
+        }
+
+        if ($action eq 'move') {
+            if (-e $dst_path) {
+                unlink $dst_path or do {
+                    push @messages, "Could not overwrite '$rel': $!";
+                    $errors++; next;
+                };
+            }
+            if (rename($src_path, $dst_path)) {
+                $self->_db_sync_path($c, $src_path, $dst_path);
+                $moved++;
+            } else {
+                require File::Copy;
+                if (File::Copy::move($src_path, $dst_path)) {
+                    $self->_db_sync_path($c, $src_path, $dst_path);
+                    $moved++;
+                } else {
+                    push @messages, "Move failed for '$rel': $!";
+                    $errors++;
+                }
+            }
+        } elsif ($action eq 'rename') {
+            my ($base, $suffix) = ($rel =~ /^(.+?)(\.[^.]+)?$/);
+            $suffix //= '';
+            my $n = 1;
+            my $new_dst;
+            do {
+                $new_dst = "$dest/${base}_conflict_$n${suffix}";
+                $n++;
+            } while (-e $new_dst && $n < 100);
+            if (rename($src_path, $new_dst)) {
+                $self->_db_sync_path($c, $src_path, $new_dst);
+                $renamed++;
+                push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
+            } else {
+                require File::Copy;
+                if (File::Copy::move($src_path, $new_dst)) {
+                    $self->_db_sync_path($c, $src_path, $new_dst);
+                    $renamed++;
+                    push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
+                } else {
+                    push @messages, "Rename failed for '$rel': $!";
+                    $errors++;
+                }
+            }
+        } elsif ($action eq 'delete_src') {
+            unlink $src_path;
+            $self->_db_mark_orphan($c, $src_path);
+            $skipped++;
+        }
+    }
+
+    eval {
+        my $still_has_files = 0;
+        File::Find::find(sub { $still_has_files++ if -f $File::Find::name }, $src);
+        if (!$still_has_files) {
+            require File::Path;
+            File::Path::remove_tree($src);
+            push @messages, "Source directory '$src' removed (empty after merge).";
+        } else {
+            push @messages, "Source directory '$src' still has $still_has_files file(s) — not removed.";
+        }
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_merge_submit',
+        "Dir merge done src=$src dest=$dest moved=$moved skipped=$skipped renamed=$renamed errors=$errors");
+
+    my $msg = "Merge complete: $moved moved, $renamed renamed, $skipped skipped.";
+    $msg .= " $errors error(s)." if $errors;
+    $msg .= ' ' . join(' ', @messages) if @messages;
+    $c->flash->{success_msg} = $msg;
+    $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dest }));
 }
 
 sub fs_list_archive :Path('/file/fs_list_archive') :Args(0) {
