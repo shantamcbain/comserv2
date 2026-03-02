@@ -1639,7 +1639,19 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
         return;
     }
 
-    my $allocations = $c->model('File')->get_nfs_allocations($c);
+    my $allocations_rs = $c->model('File')->get_nfs_allocations($c);
+
+    my @allocations_with_status = map {
+        my $alloc = $_;
+        {
+            id          => $alloc->id,
+            sitename    => $alloc->sitename,
+            nfs_path    => $alloc->nfs_path,
+            description => $alloc->description,
+            is_active   => $alloc->is_active,
+            fs_exists   => (-d $alloc->nfs_path) ? 1 : 0,
+        }
+    } @{ $allocations_rs // [] };
 
     my $sites = [];
     eval {
@@ -1655,14 +1667,53 @@ sub nfs_allocations :Path('/file/nfs_allocations') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocations',
-        "Rendering NFS allocations: count=" . scalar(@{ $allocations // [] }));
+        "Rendering NFS allocations: count=" . scalar(@allocations_with_status));
 
     $c->stash(
-        allocations => $allocations,
+        allocations => \@allocations_with_status,
         sites       => $sites,
         template    => 'file/NfsAllocations.tt',
     );
     $c->forward($c->view('TT'));
+}
+
+sub nfs_allocation_mkdir :Path('/file/nfs_allocation_mkdir') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($is_csc && $c->req->method eq 'POST') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $alloc;
+    eval { $alloc = $schema->resultset('NfsDirectory')->find($id) };
+    unless ($alloc) {
+        $c->flash->{error_msg} = "Allocation #$id not found.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
+    my $nfs_path = $alloc->nfs_path;
+    if (-d $nfs_path) {
+        $c->flash->{success_msg} = "Directory already exists: $nfs_path";
+    } else {
+        eval { make_path($nfs_path, { mode => 0755 }) };
+        my $err = "$@" if $@;
+        if ($err || !-d $nfs_path) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'nfs_allocation_mkdir',
+                "Failed to create $nfs_path: $err");
+            $c->flash->{error_msg} = "Could not create directory '$nfs_path': $err";
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_mkdir',
+                "Created directory $nfs_path for allocation #$id sitename=" . $alloc->sitename);
+            $c->flash->{success_msg} = "Directory created: $nfs_path — "
+                . $alloc->sitename . " can now browse it.";
+        }
+    }
+    $c->response->redirect($c->uri_for('/file/nfs_allocations'));
 }
 
 sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
@@ -1723,7 +1774,25 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
     } else {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
             "NFS allocation created id=" . $row->id . " sitename=$alloc_sitename path=$nfs_path");
-        $c->flash->{success_msg} = "NFS allocation created for '$alloc_sitename': $nfs_path";
+
+        my $dir_msg = '';
+        unless (-d $nfs_path) {
+            eval { make_path($nfs_path, { mode => 0755 }) };
+            my $mkdir_err = "$@" if $@;
+            if ($mkdir_err || !-d $nfs_path) {
+                $dir_msg = " Warning: directory could not be created on filesystem ($mkdir_err) — create it manually on the NFS server.";
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'nfs_allocation_create',
+                    "Could not create directory $nfs_path: $mkdir_err");
+            } else {
+                $dir_msg = " Directory created on filesystem.";
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_create',
+                    "Created directory $nfs_path on filesystem");
+            }
+        } else {
+            $dir_msg = " Directory already exists.";
+        }
+
+        $c->flash->{success_msg} = "NFS allocation created for '$alloc_sitename': $nfs_path.$dir_msg";
     }
 
     $c->response->redirect($c->uri_for('/file/nfs_allocations'));
