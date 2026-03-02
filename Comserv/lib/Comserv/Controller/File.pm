@@ -1552,93 +1552,131 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         return;
     }
 
-    my $action = $c->req->param('action') // '';
+    my $action    = $c->req->param('action')   // '';
+    my $target_id = $c->req->param('target_id') // $id;
 
-    my $file = $c->model('File')->get_file_by_id($c, $id);
+    my $schema = $c->model('DBEncy');
+    my $file   = $schema->resultset('File')->find($target_id);
     unless ($file) {
-        $c->flash->{error_msg} = "File #$id not found or access denied.";
+        $c->flash->{error_msg} = "File #$target_id not found.";
         $c->response->redirect($c->uri_for('/file/duplicates'));
         return;
     }
 
-    unless ($file->is_duplicate) {
-        $c->flash->{error_msg} = "File #$id is not marked as a duplicate.";
-        $c->response->redirect($c->uri_for('/file/duplicates'));
-        return;
+    my $orig_id = $file->is_duplicate ? $file->duplicate_of
+                : $schema->resultset('File')->search(
+                      { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                  )->first ? $file->id : undef;
+
+    sub _do_delete_file {
+        my ($self, $c, $rec, $also_disk) = @_;
+        my $name = $rec->file_name;
+        if ($also_disk) {
+            my $fp = (length($rec->file_path // '') && -f $rec->file_path) ? $rec->file_path
+                   : (length($rec->nfs_path  // '') && -f $rec->nfs_path)  ? $rec->nfs_path
+                   : '';
+            if (length $fp) {
+                unlink $fp or $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'resolve_duplicate', "unlink failed for $fp: $!");
+            }
+        }
+        $rec->delete;
+        return $name;
     }
 
     if ($action eq 'swap') {
-        my $orig_id = $file->duplicate_of;
-        unless ($orig_id) {
-            $c->flash->{error_msg} = "File #$id has no original linked — cannot swap.";
-            $c->response->redirect($c->uri_for('/file/duplicates'));
-            return;
+        my $partner_id = $file->is_duplicate ? $file->duplicate_of
+                       : $schema->resultset('File')->search(
+                             { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                         )->first->id;
+        my $partner = $schema->resultset('File')->find($partner_id);
+        unless ($partner) {
+            $c->flash->{error_msg} = "Partner record not found — cannot swap.";
+        } else {
+            eval {
+                my ($new_orig, $new_dup) = $file->is_duplicate
+                    ? ($file, $partner) : ($partner, $file);
+                $new_orig->update({ is_duplicate => 0, duplicate_of => undef });
+                $new_dup->update({  is_duplicate => 1, duplicate_of => $new_orig->id });
+            };
+            my $err = "$@" if $@;
+            if ($err) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
+                    "Swap failed ids=$target_id/$partner_id: $err");
+                $c->flash->{error_msg} = "Swap failed: $err";
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                    "Swapped original/duplicate roles for ids=$target_id/$partner_id");
+                $c->flash->{success_msg} = "Swapped: #$target_id is now the original; #$partner_id is now the duplicate.";
+            }
         }
-        my $original = $c->model('DBEncy')->resultset('File')->find($orig_id);
-        unless ($original) {
-            $c->flash->{error_msg} = "Original file #$orig_id not found — cannot swap.";
-            $c->response->redirect($c->uri_for('/file/duplicates'));
-            return;
-        }
+    } elsif ($action eq 'delete_db' || $action eq 'delete_both') {
+        my $also_disk = ($action eq 'delete_both');
+        my $partner_id = $file->is_duplicate ? $file->duplicate_of
+                       : do {
+                             my $r = $schema->resultset('File')->search(
+                                 { duplicate_of => $file->id, is_duplicate => 1 }, { rows => 1 }
+                             )->first;
+                             $r ? $r->id : undef;
+                         };
+
         eval {
-            $file->update({ is_duplicate => 0, duplicate_of => undef });
-            $original->update({ is_duplicate => 1, duplicate_of => $file->id });
+            my $name = $self->_do_delete_file($c, $file, $also_disk);
+            if ($partner_id && !$file->is_duplicate) {
+                my $dup = $schema->resultset('File')->find($partner_id);
+                if ($dup) {
+                    $dup->update({ is_duplicate => 0, duplicate_of => undef });
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                        "Promoted dup #$partner_id to original after deleting original #$target_id");
+                }
+            }
+            $c->flash->{success_msg} = ($also_disk ? "Deleted from disk + DB" : "Removed DB record only")
+                . ": '$name' (#$target_id)."
+                . ($partner_id && !$file->is_duplicate ? " Duplicate #$partner_id promoted to original." : '');
         };
         my $err = "$@" if $@;
         if ($err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "Swap failed dup=$id orig=$orig_id: $err");
-            $c->flash->{error_msg} = "Swap failed: $err";
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Swapped: file id=$id is now original, file id=$orig_id is now duplicate");
-            $c->flash->{success_msg} = "Swapped: '" . $file->file_name . "' (#$id) is now the original; #$orig_id is now the duplicate.";
+                "Delete failed id=$target_id: $err");
+            $c->flash->{error_msg} = "Delete failed: $err";
         }
-    } elsif ($action eq 'delete_db') {
-        my $file_name = $file->file_name;
-        eval { $file->delete };
-        my $err = "$@" if $@;
-        if ($err) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "DB-only delete failed id=$id: $err");
-            $c->flash->{error_msg} = "Failed to delete DB record: $err";
+    } elsif ($action eq 'rename') {
+        my $new_name = $c->req->param('new_name') // '';
+        $new_name =~ s{/}{}g;
+        $new_name =~ s{^\s+|\s+$}{}g;
+        unless (length $new_name) {
+            $c->flash->{error_msg} = "New name cannot be empty.";
         } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Duplicate DB record id=$id deleted (file left on disk)");
-            $c->flash->{success_msg} = "DB record for '$file_name' removed. File left on disk.";
-        }
-    } elsif ($action eq 'delete_both') {
-        my $nfs_path  = $file->nfs_path  // '';
-        my $file_path = $file->file_path // '';
-        my $file_name = $file->file_name;
-
-        my $fs_path = length($file_path) && -f $file_path ? $file_path
-                    : length($nfs_path)  && -f $nfs_path  ? $nfs_path
-                    : '';
-
-        my $disk_deleted = 0;
-        if (length $fs_path) {
-            eval { unlink $fs_path or die "unlink failed: $!" };
-            my $unlink_err = "$@" if $@;
-            if ($unlink_err) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'resolve_duplicate',
-                    "Filesystem delete failed id=$id path=$fs_path: $unlink_err");
+            my $old_name = $file->file_name;
+            my $fp = (length($file->file_path // '') && -f $file->file_path) ? $file->file_path
+                   : (length($file->nfs_path  // '') && -f $file->nfs_path)  ? $file->nfs_path
+                   : '';
+            if (length $fp) {
+                my $new_fp = dirname($fp) . '/' . $new_name;
+                if (-e $new_fp) {
+                    $c->flash->{error_msg} = "A file named '$new_name' already exists in that directory.";
+                } else {
+                    eval {
+                        CORE::rename($fp, $new_fp) or die "rename failed: $!";
+                        my %upd = (file_name => $new_name);
+                        $upd{file_path} = $new_fp if length($file->file_path // '');
+                        $upd{nfs_path}  = $new_fp if length($file->nfs_path  // '');
+                        $file->update(\%upd);
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
+                            "Renamed #$target_id '$old_name' → '$new_name'");
+                        $c->flash->{success_msg} = "Renamed '$old_name' to '$new_name'.";
+                    };
+                    my $err = "$@" if $@;
+                    $c->flash->{error_msg} = "Rename failed: $err" if $err;
+                }
             } else {
-                $disk_deleted = 1;
+                eval {
+                    $file->update({ file_name => $new_name });
+                    $c->flash->{success_msg} = "Renamed '$old_name' to '$new_name' (DB only — no file on disk).";
+                };
+                my $err = "$@" if $@;
+                $c->flash->{error_msg} = "Rename failed: $err" if $err;
             }
-        }
-
-        eval { $file->delete };
-        my $err = "$@" if $@;
-        if ($err) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resolve_duplicate',
-                "DB delete failed id=$id: $err");
-            $c->flash->{error_msg} = "DB delete failed: $err";
-        } else {
-            my $disk_msg = $disk_deleted ? ' File deleted from disk.' : length($fs_path) ? ' (disk delete failed — check logs).' : ' No file found on disk.';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve_duplicate',
-                "Duplicate id=$id name=$file_name deleted from DB.$disk_msg");
-            $c->flash->{success_msg} = "Deleted '$file_name' from database.$disk_msg";
         }
     } else {
         $c->flash->{error_msg} = "Unknown action '$action'.";
