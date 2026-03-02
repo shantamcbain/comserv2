@@ -80,6 +80,29 @@
          class="btn btn-sm btn-secondary">&#8592; Back to Browser</a>
     </div>
 
+    [%# ── Scan options ─────────────────────────────────────────── %]
+    <form method="get" action="[% c.uri_for('/file/dir_sync') %]"
+          style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+                 padding:8px 12px;background:#f8f8f8;border:1px solid #ddd;border-radius:4px;font-size:.85rem">
+      <input type="hidden" name="dir_path" value="[% dir_path | html %]">
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:normal">
+        <input type="checkbox" name="recursive" value="1" [% 'checked' IF recursive %]>
+        Include subdirectories (recursive)
+      </label>
+      <span style="color:#888;font-size:.78rem">
+        Default: files in this directory only. Recursive scans all subdirectories (may be slow for large trees).
+      </span>
+      <button type="submit" class="btn btn-sm btn-primary">Re-scan</button>
+    </form>
+
+    [% IF truncated %]
+    <div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#e65100">
+      <strong>&#9888; Results capped at [% max_files %] files.</strong>
+      The directory contains more files. Use subdirectory navigation to scan in smaller batches,
+      or navigate into a subdirectory and use +DB from there.
+    </div>
+    [% END %]
+
     [% SET total_new = 0 %]
     [% SET total_dup = 0 %]
     [% SET total_indb = 0 %]
