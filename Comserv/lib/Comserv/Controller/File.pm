@@ -2577,28 +2577,52 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
         }
     }
 
+    my $recursive  = ($c->req->param('recursive') // '0') eq '1' ? 1 : 0;
+    my $max_files  = 2000;
+
     my $schema  = $c->model('DBEncy');
     my $file_rs = $schema->resultset('File');
 
     my $UUID_RE = qr/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    my @all_files;
-    File::Find::find({
-        wanted => sub {
-            return unless -f $File::Find::name;
-            my $fname = $_;
-            return if $fname =~ /^\./;
-            return if $fname =~ $UUID_RE;
-            push @all_files, $File::Find::name;
-        },
-        no_chdir => 1,
-        preprocess => sub {
-            sort grep { !/^\./ && $_ !~ $UUID_RE } @_;
-        },
-    }, $dir_path);
+    my (@all_files, $truncated);
+    if ($recursive) {
+        File::Find::find({
+            wanted => sub {
+                return unless -f $File::Find::name;
+                my $fname = $_;
+                return if $fname =~ /^\./;
+                return if $fname =~ $UUID_RE;
+                if (scalar(@all_files) < $max_files) {
+                    push @all_files, $File::Find::name;
+                } else {
+                    $truncated = 1;
+                }
+            },
+            no_chdir => 1,
+            preprocess => sub {
+                sort grep { !/^\./ && $_ !~ $UUID_RE } @_;
+            },
+        }, $dir_path);
+    } else {
+        opendir(my $dh, $dir_path);
+        while (my $e = readdir($dh)) {
+            next if $e =~ /^\./;
+            next if $e =~ $UUID_RE;
+            my $full = "$dir_path/$e";
+            next unless -f $full;
+            if (scalar(@all_files) < $max_files) {
+                push @all_files, $full;
+            } else {
+                $truncated = 1;
+            }
+        }
+        closedir($dh);
+    }
+    @all_files = sort @all_files;
 
     my @scan_results;
-    for my $full (sort @all_files) {
+    for my $full (@all_files) {
         my $fname    = basename($full);
         my $rel_dir  = dirname($full);
         $rel_dir     =~ s{^\Q$dir_path\E/?}{};
@@ -2615,12 +2639,11 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
             )->first;
         };
 
-        my ($dup_rec, $file_hash, $status);
+        my ($dup_rec, $status);
         if ($db_rec) {
             $status = 'in_db';
         } else {
-            $file_hash = $self->_file_sha256($full);
-            eval { $dup_rec = $c->model('File')->check_duplicate($schema, $fname, $size, $file_hash); };
+            eval { $dup_rec = $c->model('File')->check_duplicate($schema, $fname, $size, undef); };
             if ($dup_rec) {
                 $status = 'duplicate';
             } elsif ($classify ne 'normal') {
@@ -2642,16 +2665,16 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
             ext       => $ext,
             classify  => $classify,
             status    => $status,
-            file_hash => $file_hash,
-            db_id     => $db_rec  ? $db_rec->id      : undef,
-            dup_id    => $dup_rec ? $dup_rec->id      : undef,
+            db_id     => $db_rec  ? $db_rec->id        : undef,
+            dup_id    => $dup_rec ? $dup_rec->id        : undef,
             dup_name  => $dup_rec ? $dup_rec->file_name : undef,
             dup_path  => $dup_rec ? ($dup_rec->file_path // $dup_rec->nfs_path // '') : undef,
         };
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dir_sync',
-        "Dir sync scan dir=$dir_path files=" . scalar(@scan_results));
+        "Dir sync scan dir=$dir_path recursive=$recursive files=" . scalar(@scan_results)
+        . ($truncated ? " (TRUNCATED at $max_files)" : ''));
 
     my @sites;
     eval { @sites = $schema->resultset('Site')->search({}, { order_by => 'name', columns => [qw(id name)] })->all; };
@@ -2664,6 +2687,9 @@ sub dir_sync :Path('/file/dir_sync') :Args(0) {
         sitename        => $sitename,
         sites           => \@sites,
         nfs_root        => $nfs_root,
+        recursive       => $recursive,
+        truncated       => $truncated ? 1 : 0,
+        max_files       => $max_files,
         template        => 'file/DirSync.tt',
     );
     $c->forward($c->view('TT'));
