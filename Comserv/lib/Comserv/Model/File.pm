@@ -226,8 +226,18 @@ sub get_file_by_id {
 }
 
 sub check_duplicate {
-    my ($self, $schema, $file_name, $file_size) = @_;
-    return $schema->resultset('File')->search(
+    my ($self, $schema, $file_name, $file_size, $file_hash) = @_;
+    my $rs = $schema->resultset('File');
+
+    if (defined $file_hash && length $file_hash) {
+        my $by_hash = $rs->search(
+            { file_hash => $file_hash, is_duplicate => 0 },
+            { rows => 1 }
+        )->first;
+        return $by_hash if $by_hash;
+    }
+
+    return $rs->search(
         { file_name => $file_name, file_size => $file_size, is_duplicate => 0 },
         { rows => 1 }
     )->first;
