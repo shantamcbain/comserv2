@@ -4426,22 +4426,26 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-    
-    my $has_admin = 0;
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $has_admin = 1;
-    } elsif ($c->user_exists) {
-        my $roles = $c->session->{roles};
-        if (ref($roles) eq 'ARRAY') {
-            $has_admin = 1 if grep { lc($_) eq 'admin' } @$roles;
-        } elsif (defined $roles && $roles =~ /\badmin\b/i) {
-            $has_admin = 1;
-        }
+
+    # Port restriction: only accessible from port 3001 (host dev server)
+    my $port = $c->req->uri->port || 0;
+    if ($port == 5000) {
+        $c->response->body('');
+        $c->response->status(403);
+        return;
     }
-    unless ($has_admin) {
+    if ($port && $port != 3001) {
+        my $redirect_uri = $c->req->uri->clone;
+        $redirect_uri->port(3001);
+        $c->response->redirect($redirect_uri);
+        return;
+    }
+
+    # CSC admin only
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
-            "Access denied: User does not have admin role");
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+            "Access denied: CSC admin required");
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
         $c->response->redirect($c->uri_for('/user/login', {
             destination => $c->req->uri
         }));
@@ -4508,18 +4512,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
         "Docker volumes list API called");
 
-    my $has_admin_v = 0;
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $has_admin_v = 1;
-    } elsif ($c->user_exists) {
-        my $roles = $c->session->{roles};
-        if (ref($roles) eq 'ARRAY') {
-            $has_admin_v = 1 if grep { lc($_) eq 'admin' } @$roles;
-        } elsif (defined $roles && $roles =~ /\badmin\b/i) {
-            $has_admin_v = 1;
-        }
-    }
-    unless ($has_admin_v) {
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
         $c->response->body('{"success": false, "error": "Authentication required"}');
         $c->response->content_type('application/json');
         return;
@@ -4545,25 +4538,12 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         next unless $line =~ /^\{/;
         eval {
             my $vol = decode_json($line);
-            my $name = $vol->{Name} || '';
-            my $inspect_raw = `docker volume inspect $name 2>/dev/null`;
-            my $mountpoint = '';
-            my $driver = $vol->{Driver} || 'local';
-            my $options = {};
-            eval {
-                my $info = decode_json($inspect_raw);
-                if (ref($info) eq 'ARRAY' && @$info) {
-                    $mountpoint = $info->[0]{Mountpoint} || '';
-                    $driver     = $info->[0]{Driver}     || $driver;
-                    $options    = $info->[0]{Options}    || {};
-                }
-            };
             push @volumes, {
-                name       => $name,
-                driver     => $driver,
-                mountpoint => $mountpoint,
-                options    => $options,
-                labels     => $vol->{Labels} || '',
+                name       => $vol->{Name}       || '',
+                driver     => $vol->{Driver}     || 'local',
+                mountpoint => $vol->{Mountpoint} || '',
+                labels     => $vol->{Labels}     || '',
+                scope      => $vol->{Scope}      || 'local',
             };
         };
     }
