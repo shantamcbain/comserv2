@@ -618,23 +618,21 @@
             return;
         }
 
-        const nfsVolumeNames = ['comserv-workshop', 'comserv-logs'];
+        const nfsVolumeNames = ['comserv-workshop', 'comserv-logs', 'comserv2_comserv-workshop', 'comserv2_comserv-logs'];
 
         let html = '';
         volumes.forEach(vol => {
-            const isNfs = nfsVolumeNames.includes(vol.name) || (vol.options && vol.options.type === 'nfs');
+            const isNfs = nfsVolumeNames.some(n => vol.name.endsWith(n)) || vol.driver === 'nfs';
             const typeLabel = isNfs ? 'NFS' : (vol.driver || 'local');
             const typeColor = isNfs ? '#17a2b8' : '#6c757d';
             const typeIcon  = isNfs ? '🌐' : '💾';
 
-            let optionsHtml = '';
-            if (vol.options && typeof vol.options === 'object' && Object.keys(vol.options).length > 0) {
-                const opts = Object.entries(vol.options).map(([k, v]) => `${k}=${v}`).join(', ');
-                optionsHtml = `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Options:</strong> ${opts}</div>`;
-            }
-
             const mountDisplay = vol.mountpoint
                 ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                : '';
+
+            const labelsDisplay = vol.labels
+                ? `<div style="font-size: 11px; color: #999; margin-bottom: 4px;"><strong>Labels:</strong> ${vol.labels}</div>`
                 : '';
 
             html += `
@@ -645,10 +643,11 @@
                                 ${typeIcon}
                                 <span style="margin-left: 6px;">${vol.name}</span>
                                 <span style="margin-left: 8px; background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.75em;">${typeLabel}</span>
+                                <span style="margin-left: 6px; color: #999; font-size: 0.75em;">${vol.scope || ''}</span>
                             </h4>
                             <div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Driver:</strong> ${vol.driver || 'local'}</div>
                             ${mountDisplay}
-                            ${optionsHtml}
+                            ${labelsDisplay}
                         </div>
                     </div>
                 </div>`;
