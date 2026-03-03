@@ -509,6 +509,12 @@
             statusSection.classList.add('expanded');
             statusChevron.classList.add('expanded');
         }
+        const volumesSection = document.getElementById('volumes-status');
+        const volumesChevron = document.getElementById('chevron-volumes-status');
+        if (volumesSection && volumesChevron) {
+            volumesSection.classList.add('expanded');
+            volumesChevron.classList.add('expanded');
+        }
     });
 </script>
 
