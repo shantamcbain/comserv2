@@ -286,6 +286,7 @@
                         <i class="fas fa-info-circle"></i> Manual Deployment Commands (Copy to SSH Terminal):
                     </h5>
                     <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
+
                         <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 1: On Production - Check Disk Space</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
                             df -h /
@@ -293,87 +294,118 @@
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df')" title="Click to copy">
                             sudo docker system df
                         </div>
-                        
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df -v')" title="Click to copy">
+                            sudo docker system df -v  # Verbose: shows container sizes
+                        </div>
+
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 2: Cleanup Old Containers and Images</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps -a | grep comserv')" title="Click to copy">
                             sudo docker ps -a | grep comserv  # List all comserv containers
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm $(sudo docker ps -a -q -f name=comserv2-web-prod-old)')" title="Click to copy">
-                            sudo docker rm $(sudo docker ps -a -q -f name=comserv2-web-prod-old)  # Remove old containers
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
+                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -a --filter &quot;label!=keep&quot; -f')" title="Click to copy">
-                            sudo docker image prune -a --filter "label!=keep" -f  # Remove unused images
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
+                            sudo docker image prune -f  # Remove dangling images only (safe)
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system prune -a -f --volumes')" title="Click to copy">
-                            sudo docker system prune -a -f --volumes  # Deep cleanup
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
                         </div>
-                        
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Transfer Image via SSH Pipe (Run from Workstation)</div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 &quot;sudo docker load&quot;')" title="Click to copy">
                             docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 "sudo docker load"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ⚠ Run this from your workstation, NOT on production server
+                            ⚠ Run from WORKSTATION terminal — not on production server
                         </div>
-                        
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Backup Current Container (Creates Image Tag)</div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Backup Current Container (Creates Rollback Tag)</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)')" title="Click to copy">
                             sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)
                         </div>
-                        
+
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: Rename Old Container</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rename comserv2-web-prod comserv2-web-prod-old')" title="Click to copy">
                             sudo docker rename comserv2-web-prod comserv2-web-prod-old
                         </div>
-                        
+
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Stop Old Container</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod-old')" title="Click to copy">
                             sudo docker stop comserv2-web-prod-old
                         </div>
-                        
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7: Start New Container</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro comserv2-web-prod:latest')" title="Click to copy">
-                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro comserv2-web-prod:latest
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6b: Test NFS Reachability (Optional)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('showmount -e 192.168.1.175 2>/dev/null && echo &quot;NFS OK&quot; || echo &quot;NFS NOT REACHABLE - use local bind mount instead&quot;')" title="Click to copy">
+                            showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo "NFS OK" || echo "NFS NOT REACHABLE - use local bind mount instead"
                         </div>
-                        
+                        <div style="margin-left: 15px; margin-bottom: 5px; color: #ffaa00; font-size: 11px;">
+                            If NFS OK → use Step 7a. If NFS NOT REACHABLE → use Step 7b.
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7a: Start New Container WITH NFS Volumes</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true')" title="Click to copy">
+                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv-logs 2>/dev/null || true
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true')" title="Click to copy">
+                            sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/workshop_files comserv-workshop 2>/dev/null || true
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
+                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv-logs:/opt/comserv/root/log -v comserv-workshop:/data/nfs comserv2-web-prod:latest
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7b: Start New Container WITHOUT NFS (Local Bind Mount Fallback)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop')" title="Click to copy">
+                            mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest')" title="Click to copy">
+                            sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv2-web-prod:latest
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ --log-opt limits Docker's own log files. Logs also written to bind-mounted /home/ubuntu/comserv-logs/
+                        </div>
+
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Verify New Container is Healthy</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
                             sudo docker ps
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('curl http://localhost:5000/health')" title="Click to copy">
-                            curl http://localhost:5000/health
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker inspect --format=&quot;{{.State.Health.Status}}&quot; comserv2-web-prod')" title="Click to copy">
+                            sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod
                         </div>
-                        
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: If Successful - Remove Old Container & Final Cleanup</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old')" title="Click to copy">
-                            sudo docker rm comserv2-web-prod-old
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('curl -s -o /dev/null -w &quot;%{http_code}&quot; http://localhost:3000/')" title="Click to copy">
+                            curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: If Successful - Remove Old Container &amp; Cleanup</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
+                            sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
                             sudo docker image prune -f  # Remove dangling images
                         </div>
-                        
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep comserv2-web-prod')" title="Click to copy">
+                            sudo docker images | grep comserv2-web-prod  # List remaining images
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rmi $(sudo docker images -q --filter &quot;reference=comserv2-web-prod&quot; --filter &quot;dangling=false&quot; | tail -n +2) 2>/dev/null || true')" title="Click to copy">
+                            sudo docker rmi $(sudo docker images -q --filter "reference=comserv2-web-prod" --filter "dangling=false" | tail -n +2) 2>/dev/null || true  # Remove old backup tags (keep latest)
+                        </div>
+
                         <div style="margin: 12px 0 8px 0; color: #ff5555; font-weight: bold;">→ ROLLBACK (If New Container Fails):</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod && sudo docker rm comserv2-web-prod')" title="Click to copy">
-                            sudo docker stop comserv2-web-prod && sudo docker rm comserv2-web-prod
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker rename comserv2-web-prod-old comserv2-web-prod; sudo docker start comserv2-web-prod
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rename comserv2-web-prod-old comserv2-web-prod')" title="Click to copy">
-                            sudo docker rename comserv2-web-prod-old comserv2-web-prod
-                        </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker start comserv2-web-prod')" title="Click to copy">
-                            sudo docker start comserv2-web-prod
-                        </div>
-                        
+
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Quick Commands:</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker restart comserv2-web-prod')" title="Click to copy">
                             sudo docker restart comserv2-web-prod  # Restart without rebuild
                         </div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker logs -f comserv2-web-prod')" title="Click to copy">
-                            sudo docker logs -f comserv2-web-prod  # View logs
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker logs --tail 100 comserv2-web-prod')" title="Click to copy">
+                            sudo docker logs --tail 100 comserv2-web-prod  # Last 100 log lines
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system prune -f')" title="Click to copy">
-                            sudo docker system prune -f  # Cleanup old images/containers
+                            sudo docker system prune -f  # Cleanup dangling images/stopped containers
                         </div>
-                        
+
                         <div style="margin-top: 10px; color: #ffc107; font-size: 12px;">
                             💡 Click any command to copy it to clipboard, then paste in SSH terminal
                         </div>
