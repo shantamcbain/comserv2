@@ -4427,16 +4427,23 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
     
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Access denied: User does not have admin role");
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+    
     # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
-    
-    # Check authentication status (allow page view, but operations will require login)
-    my $authenticated = $c->user_exists ? 1 : 0;
     
     $c->stash(
         template => 'admin/docker_containers.tt',
         docker_available => $docker_available,
-        authenticated => $authenticated
+        authenticated => 1,
     );
 }
 
@@ -4481,6 +4488,65 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     }
     
     $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
+        "Docker volumes list API called");
+
+    unless ($c->user_exists && $c->check_user_roles('admin')) {
+        $c->response->body('{"success": false, "error": "Authentication required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $output = `docker volume ls --format json 2>&1`;
+    my $exit_code = $? >> 8;
+
+    if ($exit_code != 0) {
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $output" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my @volumes;
+    foreach my $line (split /\n/, $output) {
+        next unless $line =~ /^\{/;
+        eval {
+            my $vol = decode_json($line);
+            my $name = $vol->{Name} || '';
+            my $inspect_raw = `docker volume inspect $name 2>/dev/null`;
+            my $mountpoint = '';
+            my $driver = $vol->{Driver} || 'local';
+            my $options = {};
+            eval {
+                my $info = decode_json($inspect_raw);
+                if (ref($info) eq 'ARRAY' && @$info) {
+                    $mountpoint = $info->[0]{Mountpoint} || '';
+                    $driver     = $info->[0]{Driver}     || $driver;
+                    $options    = $info->[0]{Options}    || {};
+                }
+            };
+            push @volumes, {
+                name       => $name,
+                driver     => $driver,
+                mountpoint => $mountpoint,
+                options    => $options,
+                labels     => $vol->{Labels} || '',
+            };
+        };
+    }
+
+    $c->response->body(encode_json({ success => 1, volumes => \@volumes }));
     $c->response->content_type('application/json');
 }
 

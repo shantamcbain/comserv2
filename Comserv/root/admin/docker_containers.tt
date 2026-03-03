@@ -74,6 +74,29 @@
 
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('volumes-status')"
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="icon-storage" style="margin-right: 10px;"></i>
+                        Volume Status Overview
+                    </span>
+                    <button onclick="event.stopPropagation(); refreshVolumes();" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </h3>
+            </div>
+            <div id="volumes-status" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="volumes-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: #666; text-align: center;">Loading volume information...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('container-controls')" 
                  style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
                 <h3 style="margin: 0; display: flex; align-items: center;">
@@ -562,6 +585,70 @@
             .catch(error => {
                 containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
             });
+    }
+
+    function refreshVolumes() {
+        const volumesList = document.getElementById('volumes-list');
+        volumesList.innerHTML = '<p style="color: #666; text-align: center;">Loading volume information...</p>';
+
+        fetch('/admin/docker-volumes')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
+                    return;
+                }
+                displayVolumes(data.volumes);
+            })
+            .catch(error => {
+                volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading volumes: ${error.message}</p>`;
+            });
+    }
+
+    function displayVolumes(volumes) {
+        const volumesList = document.getElementById('volumes-list');
+        if (!volumes || volumes.length === 0) {
+            volumesList.innerHTML = '<p style="color: #666; text-align: center;">No volumes found</p>';
+            return;
+        }
+
+        const nfsVolumeNames = ['comserv-workshop', 'comserv-logs'];
+
+        let html = '';
+        volumes.forEach(vol => {
+            const isNfs = nfsVolumeNames.includes(vol.name) || (vol.options && vol.options.type === 'nfs');
+            const typeLabel = isNfs ? 'NFS' : (vol.driver || 'local');
+            const typeColor = isNfs ? '#17a2b8' : '#6c757d';
+            const typeIcon  = isNfs ? '🌐' : '💾';
+
+            let optionsHtml = '';
+            if (vol.options && typeof vol.options === 'object' && Object.keys(vol.options).length > 0) {
+                const opts = Object.entries(vol.options).map(([k, v]) => `${k}=${v}`).join(', ');
+                optionsHtml = `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Options:</strong> ${opts}</div>`;
+            }
+
+            const mountDisplay = vol.mountpoint
+                ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                : '';
+
+            html += `
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: #fff;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 6px 0; color: #333;">
+                                ${typeIcon}
+                                <span style="margin-left: 6px;">${vol.name}</span>
+                                <span style="margin-left: 8px; background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.75em;">${typeLabel}</span>
+                            </h4>
+                            <div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Driver:</strong> ${vol.driver || 'local'}</div>
+                            ${mountDisplay}
+                            ${optionsHtml}
+                        </div>
+                    </div>
+                </div>`;
+        });
+
+        volumesList.innerHTML = html;
     }
 
     function displayContainers(containers) {
@@ -1554,9 +1641,10 @@
         appendOutput(`Target: ${sshTarget}\n\n`);
     }
 
-    // Initialize - load containers on page load
+    // Initialize - load containers and volumes on page load
     document.addEventListener('DOMContentLoaded', function() {
         refreshContainers();
+        refreshVolumes();
         
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
