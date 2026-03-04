@@ -88,6 +88,23 @@
     opacity: 0.9;
 }
 
+#theme-manage-link {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--button-border);
+    border-radius: 3px;
+    padding: 2px 10px;
+    margin-left: 6px;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+#theme-manage-link:hover {
+    background: var(--button-hover-bg);
+    text-decoration: none;
+}
+
 .css-edit-mode * {
     outline: 2px solid rgba(52, 152, 219, 0.3) !important;
     position: relative;
@@ -138,6 +155,9 @@ header h1 {
         <button id="css-edit-toggle">
             <i class="fas fa-paint-brush"></i> Toggle CSS Edit
         </button>
+        <a href="[% c.uri_for('/admin/theme') %]" id="theme-manage-link" title="Theme Management">
+            <i class="fas fa-palette"></i> Themes
+        </a>
         [% END %]
     </div>
     [% END %]

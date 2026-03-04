@@ -180,6 +180,9 @@ sub index :Path('/admin/theme') :Args(0) {
             join(", ", @available_themes));
     }
 
+    # Get the current favicon for this site
+    my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $site_name) || '';
+
     # Pass data to template
     $c->stash->{site} = $site;
     $c->stash->{sites} = \@sites;
@@ -187,6 +190,7 @@ sub index :Path('/admin/theme') :Args(0) {
     $c->stash->{themes} = $themes;
     $c->stash->{theme_name} = $site->{theme};
     $c->stash->{is_csc} = $is_csc;
+    $c->stash->{site_favicon} = $site_favicon;
     $c->stash->{template} = 'admin/theme/index.tt';
 }
 
@@ -679,6 +683,133 @@ sub details :Path('/admin/theme/details') :Args(1) {
         variables  => $theme_data->{variables} || {},
         css_exists => $css_exists,
     );
+}
+
+# Upload / set favicon for the current site
+sub set_favicon :Path('/admin/theme/set_favicon') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->session->{SiteName} || 'bmast';
+
+    if ($c->req->method eq 'POST') {
+        my $upload = $c->req->upload('favicon_file');
+
+        if ($upload) {
+            my $favicon_dir  = $c->path_to('root', 'static', 'images', 'favicons');
+            File::Path::make_path($favicon_dir) unless -d $favicon_dir;
+
+            my $filename = lc($site_name) . '_favicon.' . ($upload->filename =~ /\.(\w+)$/ ? $1 : 'ico');
+            my $dest     = "$favicon_dir/$filename";
+
+            try {
+                $upload->copy_to($dest);
+                my $favicon_url = "/static/images/favicons/$filename";
+                $c->model('ThemeConfig')->set_site_favicon($c, $site_name, $favicon_url);
+                $c->stash->{site_favicon} = $favicon_url;
+                $c->flash->{message} = "Favicon updated successfully for $site_name.";
+            }
+            catch {
+                $c->flash->{error} = "Error saving favicon: $_";
+            };
+        } elsif (my $favicon_url = $c->req->params->{favicon_url}) {
+            $favicon_url =~ s/[<>"']//g;
+            $c->model('ThemeConfig')->set_site_favicon($c, $site_name, $favicon_url);
+            $c->flash->{message} = "Favicon URL set to $favicon_url for $site_name.";
+        } else {
+            $c->flash->{error} = "No favicon file or URL provided.";
+        }
+    }
+
+    $c->response->redirect($c->uri_for($self->action_for('index')));
+}
+
+# Import a theme from a JSON file or pasted JSON
+sub import_theme :Path('/admin/theme/import') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'import_theme',
+        "***** ENTERED ADMIN/THEME IMPORT_THEME METHOD *****");
+
+    if ($c->req->method eq 'POST') {
+        my $json_text = '';
+
+        if (my $upload = $c->req->upload('theme_file')) {
+            $json_text = $upload->slurp;
+        } elsif ($c->req->params->{theme_json}) {
+            $json_text = $c->req->params->{theme_json};
+        }
+
+        unless ($json_text) {
+            $c->flash->{error} = "No theme data provided. Upload a JSON file or paste JSON.";
+            $c->response->redirect($c->uri_for($self->action_for('index')));
+            return;
+        }
+
+        my $imported;
+        try {
+            $imported = decode_json($json_text);
+        }
+        catch {
+            $c->flash->{error} = "Invalid JSON: $_";
+            $c->response->redirect($c->uri_for($self->action_for('index')));
+            return;
+        };
+
+        # Support both a single theme object {name, variables, ...}
+        # and a full definitions export {themes: {...}}
+        my @results;
+        my $themes_to_import = {};
+
+        if (ref $imported eq 'HASH' && $imported->{themes}) {
+            $themes_to_import = $imported->{themes};
+        } elsif (ref $imported eq 'HASH' && $imported->{variables}) {
+            my $name = lc($imported->{name} || 'imported');
+            $name =~ s/[^a-z0-9_-]//g;
+            $themes_to_import->{$name} = $imported;
+        } else {
+            $c->flash->{error} = "Unrecognised theme format. Expected {themes:{...}} or {name:..., variables:{...}}.";
+            $c->response->redirect($c->uri_for($self->action_for('index')));
+            return;
+        }
+
+        my $existing = $c->model('ThemeConfig')->get_all_themes($c);
+        foreach my $tname (keys %$themes_to_import) {
+            my $tdata = $themes_to_import->{$tname};
+            if (exists $existing->{$tname}) {
+                push @results, "Skipped '$tname' — already exists (use Edit to update).";
+                next;
+            }
+            my $ok = $c->model('ThemeConfig')->create_theme($c, {
+                name         => $tname,
+                display_name => $tdata->{name}         || ucfirst($tname),
+                description  => $tdata->{description}  || "Imported theme",
+                variables    => $tdata->{variables}    || {},
+            });
+            push @results, $ok ? "Imported '$tname' successfully." : "Error importing '$tname'.";
+        }
+
+        $c->flash->{message} = join(" | ", @results);
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(template => 'admin/theme/import_theme.tt');
+}
+
+# Export a single theme as JSON (downloadable)
+sub export_theme :Path('/admin/theme/export') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
+    my $export = {
+        name        => $theme_data->{name}        || ucfirst($theme_name),
+        description => $theme_data->{description} || '',
+        variables   => $theme_data->{variables}   || {},
+    };
+
+    $c->response->content_type('application/json');
+    $c->response->header('Content-Disposition' => "attachment; filename=\"theme-$theme_name.json\"");
+    $c->response->body(encode_json($export));
 }
 
 # Add a compatibility method to handle old URLs
