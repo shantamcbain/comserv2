@@ -1,8 +1,14 @@
-[% PageVersion	= 'footer.tt,v 0.03 2024/08/31 shanta Exp shanta '	%]
-[% IF c.session.debug_mode == 1 %]
- <br>[%	PageVersion %] </br>
- <br><a href="/reset_session">Reset Session</a></br>
-[% END %]
+[% PageVersion	= 'footer.tt,v 0.04 2026/03/04 shanta Exp shanta '	%]
+<footer>
+    <div class="footer-content">
+        [% USE date %]
+        <p>&copy; [% date.format(date.now, '%Y') %] [% site_display_name || SiteDisplayName || SiteName || 'Comserv' %]. All rights reserved.</p>
+        [% IF c.session.debug_mode == 1 %]
+        <p>[% PageVersion %]</p>
+        <p><a href="/reset_session">Reset Session</a></p>
+        [% END %]
+    </div>
+</footer>
 
 <!-- Live chat implementation -->
 <script type="text/javascript" src="/static/js/local-chat.js"></script>
