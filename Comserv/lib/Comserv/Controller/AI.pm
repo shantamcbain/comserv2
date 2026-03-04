@@ -92,7 +92,30 @@ sub index :Path :Args(0) {
     
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
-    
+
+    # Check if user has external API keys configured (grok, openai, etc.)
+    my @external_models;
+    my $user_id = $c->session->{user_id};
+    if ($user_id) {
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, is_active => '1' },
+                { order_by => { -asc => 'service' } }
+            );
+            foreach my $key ($keys_rs->all) {
+                if ($key->api_key_encrypted && $key->service eq 'grok') {
+                    push @external_models, { name => 'grok-2-latest', provider => 'grok', label => 'Grok 2 Latest (xAI)' };
+                    push @external_models, { name => 'grok-beta',      provider => 'grok', label => 'Grok Beta (xAI)' };
+                    push @external_models, { name => 'grok-2-1212',   provider => 'grok', label => 'Grok 2-1212 (xAI)' };
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                'index', "Failed to fetch user API keys: $_");
+        };
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -102,11 +125,12 @@ sub index :Path :Args(0) {
         current_host => $current_host,
         current_port => $current_port,
         current_model => $current_model,
-        installed_models => $installed_models
+        installed_models => $installed_models,
+        external_models => \@external_models,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ")");
+        'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
 =head2 generate
@@ -1021,60 +1045,119 @@ sub chat :Local :Args(0) {
         'chat', "AI chat from user '$username': $prompt_preview");
     
     my $response_data;
-    
+
+    # Determine user permissions for model selection
+    my $user_roles_chat = $c->session->{roles} || [];
+    if (!ref($user_roles_chat)) {
+        $user_roles_chat = [split(/\s*,\s*/, $user_roles_chat)] if $user_roles_chat;
+    }
+    my $can_select_model_perm = 0;
+    if (ref($user_roles_chat) eq 'ARRAY') {
+        $can_select_model_perm = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_chat;
+    }
+
+    # Detect if selected model is a Grok (xAI) model
+    my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
+
     try {
-        # Get Ollama model
-        my $ollama = $c->model('Ollama');
-        unless ($ollama) {
-            die "Failed to load Ollama model";
-        }
-        
-        # Configure with user's current settings
-        my $user_roles = $c->session->{roles} || [];
-        if (!ref($user_roles)) {
-            $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
-        }
-        my $can_select_model_perm = 0;
-        if (ref($user_roles) eq 'ARRAY') {
-            $can_select_model_perm = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
-        }
-        my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model_perm);
-        
-        # Configure ollama instance with current host settings
-        $ollama->set_host($current_host);
-        $ollama->port($current_port) if $current_port;
-        $ollama->model($current_model) if $current_model;
-        
-        # Set model if specified (only for privileged users)
-        if ($model && $can_select_model_perm) {
-            $ollama->model($model);
-        }
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            'chat', "Ollama model configured (host: $current_host), calling chat API...");
-        
-        # Call the chat method in the model
-        my $response = $ollama->chat(messages => \@messages);
-        
-        unless ($response) {
-            my $error = $ollama->last_error || 'Unknown error';
-            die "Ollama chat failed: $error";
-        }
-        
-        # Extract response content
         my $ai_response = '';
-        if ($response->{message} && $response->{message}->{content}) {
-            $ai_response = $response->{message}->{content};
-        } elsif ($response->{response}) {
-            $ai_response = $response->{response};
+        my $model_used = 'unknown';
+        my $response_created_at = '';
+        my $response_total_duration = 0;
+        my $response_eval_count = 0;
+
+        if ($is_grok_model && $user_id) {
+            # Route to Grok API using user's stored API key
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Routing to Grok API for model: $model");
+
+            my $grok_api_key = '';
+            try {
+                my $schema = $c->model('DBEncy')->schema;
+                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' },
+                )->first;
+                if ($key_obj && $key_obj->api_key_encrypted) {
+                    $grok_api_key = $key_obj->get_api_key() || '';
+                }
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'chat', "Failed to fetch grok API key for user $user_id: $_");
+            };
+
+            unless ($grok_api_key) {
+                die "No Grok API key configured. Please add your xAI API key at /ai/manage_api_keys";
+            }
+
+            my $grok = $c->model('Grok');
+            unless ($grok) {
+                die "Failed to load Grok model";
+            }
+
+            $grok->api_key($grok_api_key);
+            $grok->model($model) if $model;
+
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'chat', "Calling Grok API with model: " . $grok->model);
+
+            my $response = $grok->chat(messages => \@messages);
+
+            unless ($response) {
+                my $error = $grok->last_error || 'Unknown error';
+                die "Grok chat failed: $error";
+            }
+
+            if ($response->{choices} && ref($response->{choices}) eq 'ARRAY' && @{$response->{choices}}) {
+                $ai_response = $response->{choices}[0]{message}{content} || '';
+            } elsif ($response->{response}) {
+                $ai_response = $response->{response};
+            }
+
+            $model_used = $response->{model} || $grok->model;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
+
+        } else {
+            # Default: Use Ollama
+            my $ollama = $c->model('Ollama');
+            unless ($ollama) {
+                die "Failed to load Ollama model";
+            }
+
+            my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model_perm);
+
+            $ollama->set_host($current_host);
+            $ollama->port($current_port) if $current_port;
+            $ollama->model($current_model) if $current_model;
+
+            if ($model && $can_select_model_perm) {
+                $ollama->model($model);
+            }
+
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'chat', "Ollama model configured (host: $current_host), calling chat API...");
+
+            my $response = $ollama->chat(messages => \@messages);
+
+            unless ($response) {
+                my $error = $ollama->last_error || 'Unknown error';
+                die "Ollama chat failed: $error";
+            }
+
+            if ($response->{message} && $response->{message}->{content}) {
+                $ai_response = $response->{message}->{content};
+            } elsif ($response->{response}) {
+                $ai_response = $response->{response};
+            }
+
+            $model_used = $response->{model} || $ollama->model;
+            $response_created_at = $response->{created_at} || '';
+            $response_total_duration = $response->{total_duration} || 0;
+            $response_eval_count = $response->{eval_count} || 0;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
-        
-        # Log success metrics
-        my $response_length = length($ai_response);
-        my $model_used = $response->{model} || $ollama->model;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'chat', "Chat successful for user '$username' - Model: $model_used, Response length: $response_length chars");
-        
+
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
         try {
@@ -1174,8 +1257,8 @@ sub chat :Local :Args(0) {
                 agent_type => 'documentation',
                 model_used => $model_used,
                 metadata => encode_json({
-                    total_duration => $response->{total_duration} || 0,
-                    eval_count => $response->{eval_count} || 0,
+                    total_duration => $response_total_duration,
+                    eval_count => $response_eval_count,
                     is_guest => $is_guest ? 1 : 0,
                     guest_session_id => $guest_session_id
                 }),
@@ -1201,9 +1284,9 @@ sub chat :Local :Args(0) {
             response => $ai_response,
             model => $model_used,
             conversation_id => $final_conversation_id || undef,
-            created_at => $response->{created_at} || '',
-            total_duration => $response->{total_duration} || 0,
-            eval_count => $response->{eval_count} || 0
+            created_at => $response_created_at,
+            total_duration => $response_total_duration,
+            eval_count => $response_eval_count
         };
         
     } catch {
@@ -1344,7 +1427,7 @@ sub models :Local :Args(0) {
         
         if ($user_id) {
             my $keys_rs = $schema->resultset('UserApiKeys')->search(
-                { user_id => $user_id, is_active => 1 },
+                { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
             
@@ -2955,7 +3038,7 @@ sub save_api_key :Local :Args(0) {
             $key_obj = $schema->resultset('UserApiKeys')->create({
                 user_id => $user_id,
                 service => $service,
-                is_active => 1
+                is_active => '1'
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -3079,7 +3162,7 @@ sub get_user_providers :Local :Args(0) {
         try {
             my $schema = $c->model('DBEncy')->schema;
             my $keys_rs = $schema->resultset('UserApiKeys')->search(
-                { user_id => $user_id, is_active => 1 },
+                { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
             

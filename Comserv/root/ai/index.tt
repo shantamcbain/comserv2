@@ -24,21 +24,33 @@
         </div>
     </div>
     
-    <!-- Model Selector (Admin/Developer Only) -->
-    [% IF can_select_model %]
+    <!-- Model Selector (Admin/Developer/Users with API keys) -->
+    [% IF can_select_model || (external_models && external_models.size > 0) %]
     <div class="model-selector-section">
         <label for="model-select">Select Model:</label>
         <select id="model-select" class="model-dropdown">
             [% IF installed_models && installed_models.size > 0 %]
+                <optgroup label="Ollama (Local)">
                 [% FOREACH model IN installed_models %]
-                    <option value="[% model.name %]" [% IF model.name == current_model %]selected[% END %]>
+                    <option value="[% model.name %]" data-provider="ollama" [% IF model.name == current_model %]selected[% END %]>
                         [% model.name %]
                         [% IF model.details && model.details.parameter_size %]
                             ([% model.details.parameter_size %])
                         [% END %]
                     </option>
                 [% END %]
-            [% ELSE %]
+                </optgroup>
+            [% END %]
+            [% IF external_models && external_models.size > 0 %]
+                <optgroup label="External AI">
+                [% FOREACH ext_model IN external_models %]
+                    <option value="[% ext_model.name %]" data-provider="[% ext_model.provider %]">
+                        [% ext_model.label %]
+                    </option>
+                [% END %]
+                </optgroup>
+            [% END %]
+            [% IF (!installed_models || installed_models.size == 0) && (!external_models || external_models.size == 0) %]
                 <option value="">No models available</option>
             [% END %]
         </select>
