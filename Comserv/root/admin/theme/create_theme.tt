@@ -44,7 +44,7 @@
                         <select name="base_theme" id="base_theme" class="form-select">
                             <option value="">— Start from scratch —</option>
                             [% FOREACH bt IN base_themes %]
-                            <option value="[% bt %]">[% themes.$bt.name || (bt | ucfirst) %]</option>
+                            <option value="[% bt %]">[% themes.$bt.name || bt.ucfirst %]</option>
                             [% END %]
                         </select>
                         <div class="form-text">Copies all variables from the selected theme before applying your overrides.</div>
