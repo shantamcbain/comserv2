@@ -1776,7 +1776,21 @@ sub begin :Private {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
-    
+
+    # Never try to render a template for redirect or no-content responses
+    my $status = $c->response->status || 0;
+    if ($status >= 300 && $status < 400) {
+        return;
+    }
+    if ($status == 204) {
+        return;
+    }
+    # Also skip if a JSON/non-HTML body has already been set
+    if ($c->response->body && $c->response->content_type &&
+        $c->response->content_type !~ m{^text/html}i) {
+        return;
+    }
+
     if ($c->res->content_type && $c->res->content_type =~ m{^text/html}i) {
         $c->res->headers->header(
             'Content-Security-Policy' => 
