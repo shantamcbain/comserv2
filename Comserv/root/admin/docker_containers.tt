@@ -650,17 +650,23 @@
             return;
         }
 
-        const nfsVolumeNames = ['comserv-workshop', 'comserv-logs', 'comserv2_comserv-workshop', 'comserv2_comserv-logs'];
-
         let html = '';
         volumes.forEach(vol => {
-            const isNfs = nfsVolumeNames.some(n => vol.name.endsWith(n)) || vol.driver === 'nfs';
+            const isNfs    = vol.is_nfs === true || vol.is_nfs == 1;
             const typeLabel = isNfs ? 'NFS' : (vol.driver || 'local');
             const typeColor = isNfs ? '#17a2b8' : '#6c757d';
             const typeIcon  = isNfs ? '🌐' : '💾';
 
             const mountDisplay = vol.mountpoint
                 ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                : '';
+
+            const nfsDetail = isNfs
+                ? `<div style="font-size: 12px; color: #17a2b8; margin-bottom: 4px;">
+                       <strong>NFS Server:</strong> ${vol.nfs_server || 'unknown'}
+                       &nbsp;|&nbsp;
+                       <strong>Export:</strong> ${vol.nfs_device || 'unknown'}
+                   </div>`
                 : '';
 
             const labelsDisplay = vol.labels
@@ -678,6 +684,7 @@
                                 <span style="margin-left: 6px; color: #999; font-size: 0.75em;">${vol.scope || ''}</span>
                             </h4>
                             <div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Driver:</strong> ${vol.driver || 'local'}</div>
+                            ${nfsDetail}
                             ${mountDisplay}
                             ${labelsDisplay}
                         </div>
