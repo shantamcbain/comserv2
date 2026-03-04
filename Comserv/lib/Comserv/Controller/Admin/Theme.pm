@@ -124,116 +124,87 @@ sub begin : Private {
 sub index :Path('/admin/theme') :Args(0) {
     my ($self, $c) = @_;
 
-    # Log that we've entered the index method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** ENTERED ADMIN/THEME INDEX METHOD *****");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+        "***** ENTERED ADMIN/THEME INDEX METHOD *****");
 
-    # Get current site from session or use a default
     my $site_name = $c->session->{SiteName} || 'bmast';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Current site name: $site_name");
+    my $site      = { id => 1, name => $site_name, description => 'Site managed by JSON configuration' };
+    my $themes         = {};
+    my @available_themes;
+    my $site_favicon   = '';
 
-    # Check if current site is CSC (gets access to all themes)
-    my $is_csc = (lc($site_name) eq 'csc') ? 1 : 0;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "CSC access: " . ($is_csc ? "Yes" : "No"));
+    try {
+        my $is_csc = (lc($site_name) eq 'csc') ? 1 : 0;
 
-    # Create a simple site object without database access
-    my $site = {
-        id => 1,
-        name => $site_name,
-        description => 'Site managed by JSON configuration'
+        $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site_name) || 'default';
+        $themes        = $c->model('ThemeConfig')->get_all_themes($c) || {};
+        $site_favicon  = $c->model('ThemeConfig')->get_site_favicon($c, $site_name) || '';
+
+        if ($is_csc) {
+            @available_themes = sort keys %$themes;
+        } else {
+            my $current_theme = $site->{theme};
+            foreach my $tk (keys %$themes) {
+                if ($tk eq $current_theme || $tk eq 'default' ||
+                    $tk =~ /^generic/i    || $tk eq $site_name) {
+                    push @available_themes, $tk;
+                }
+            }
+            @available_themes = sort @available_themes;
+        }
+
+        $c->stash->{is_csc} = $is_csc;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "Error loading theme data for site '$site_name': $_");
+        $c->stash->{error_msg} = "An error occurred loading theme data. Please try again.";
     };
 
-    # Get the theme for this site from the theme model
-    $site->{theme} = $c->model('ThemeConfig')->get_site_theme($c, $site_name) || 'default';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Current theme: " . $site->{theme});
-
-    # Create a simple sites array with just this site
-    my @sites = ($site);
-
-    # Get available themes - CSC gets all themes, others get site-specific
-    my $themes = $c->model('ThemeConfig')->get_all_themes($c);
-    my @available_themes;
-    
-    if ($is_csc) {
-        # CSC admin gets access to all themes
-        @available_themes = sort keys %$themes;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "CSC admin - showing all " . scalar(@available_themes) . " themes");
-    } else {
-        # Non-CSC sites only get their own theme(s)
-        # Get themes that are either the current site theme or generic themes
-        my $current_theme = $site->{theme};
-        
-        # Include the current site's theme and any "default" or "generic" themes
-        foreach my $theme_key (keys %$themes) {
-            if ($theme_key eq $current_theme || 
-                $theme_key eq 'default' || 
-                $theme_key =~ /^generic/i ||
-                $theme_key eq $site_name) {
-                push @available_themes, $theme_key;
-            }
-        }
-        
-        @available_themes = sort @available_themes;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "Non-CSC site ($site_name) - showing " . scalar(@available_themes) . " themes: " . 
-            join(", ", @available_themes));
-    }
-
-    # Get the current favicon for this site
-    my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $site_name) || '';
-
-    # Pass data to template
-    $c->stash->{site} = $site;
-    $c->stash->{sites} = \@sites;
-    $c->stash->{available_themes} = \@available_themes;
-    $c->stash->{themes} = $themes;
-    $c->stash->{theme_name} = $site->{theme};
-    $c->stash->{is_csc} = $is_csc;
-    $c->stash->{site_favicon} = $site_favicon;
-    $c->stash->{template} = 'admin/theme/index.tt';
+    $c->stash(
+        site             => $site,
+        sites            => [$site],
+        available_themes => \@available_themes,
+        themes           => $themes,
+        theme_name       => $site->{theme} || 'default',
+        site_favicon     => $site_favicon,
+        template         => 'admin/theme/index.tt',
+    );
 }
 
 # Update theme
 sub update_theme :Path('/admin/theme/update') :Args(0) {
     my ($self, $c) = @_;
 
-    # Log that we've entered the update_theme method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme', "***** ENTERED ADMIN/THEME UPDATE_THEME METHOD *****");
-
-    # Get parameters
-    my $site_id = $c->request->params->{site_id};
-    my $theme = $c->request->params->{theme};
-
-    # Log the parameters
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
-        "Parameters - site_id: " . ($site_id // 'undef') . ", theme: " . ($theme // 'undef'));
+        "***** ENTERED ADMIN/THEME UPDATE_THEME METHOD *****");
 
-    # Get site name from session or use a default
     my $site_name = $c->session->{SiteName} || 'bmast';
+    my $theme     = $c->request->params->{theme} || '';
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
-        "Updating theme for site: $site_name to $theme");
-
-    # Update the theme in JSON mapping
-    my $json_result = $c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme);
-
-    if ($json_result) {
+    try {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_theme',
-            "Successfully updated theme for site $site_name to $theme");
+            "Updating theme for site '$site_name' to '$theme'");
 
-        # Force theme CSS regeneration
-        $c->model('ThemeConfig')->generate_all_theme_css($c);
+        my $ok = $c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme);
 
-        $c->flash->{message} = "Theme updated to $theme for site $site_name";
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
-            "Failed to update theme for site $site_name to $theme");
-        $c->flash->{error} = "Error updating theme. Please check server logs for details.";
+        if ($ok) {
+            $c->model('ThemeConfig')->generate_all_theme_css($c);
+            $c->flash->{message} = "Theme updated to '$theme' for site '$site_name'.";
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
+                "set_site_theme returned false for site '$site_name' → '$theme'");
+            $c->flash->{error} = "Could not save theme selection. Please check server logs.";
+        }
     }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_theme',
+            "Unexpected error updating theme for '$site_name': $_");
+        $c->flash->{error} = "An unexpected error occurred updating the theme.";
+    };
 
-    # Redirect back to theme index
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
 }
 
 # Edit theme CSS
@@ -497,7 +468,9 @@ sub create_custom_theme :Path('/admin/theme/create_custom') :Args(0) {
     }
 
     # Redirect back to theme index
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
 }
 
 # Update CSS for a theme
@@ -579,7 +552,9 @@ sub update_css :Path('/admin/theme/update_css') :Args(1) {
     };
 
     # Redirect back to the edit page
-    $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
+    $c->response->redirect($c->uri_for("/admin/theme/edit/" . $theme_name));
+        $c->response->status(302);
+        return;
 }
 
 
@@ -602,13 +577,17 @@ sub create_theme :Path('/admin/theme/create') :Args(0) {
 
         unless ($theme_name) {
             $c->flash->{error} = "Theme name is required and must contain only letters, numbers, hyphens or underscores.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
             return;
         }
 
         if (exists $themes->{$theme_name}) {
             $c->flash->{error} = "A theme named '$theme_name' already exists. Choose a different name.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
             return;
         }
 
@@ -648,10 +627,14 @@ sub create_theme :Path('/admin/theme/create') :Args(0) {
 
         if ($result) {
             $c->flash->{message} = "Theme '$theme_name' created successfully. You can now edit its CSS or assign it to a site.";
-            $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
+            $c->response->redirect($c->uri_for("/admin/theme/edit/" . $theme_name));
+        $c->response->status(302);
+        return;
         } else {
             $c->flash->{error} = "Error creating theme. Please check server logs.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
         }
         return;
     }
@@ -670,10 +653,18 @@ sub details :Path('/admin/theme/details') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details',
         "Showing details for theme: $theme_name");
 
-    my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
-    my $theme_dir  = $c->model('ThemeConfig')->get_theme_css_directory($c);
-    my $css_file   = "$theme_dir/$theme_name.css";
-    my $css_exists = -f $css_file ? 1 : 0;
+    my ($theme_data, $css_exists) = ({}, 0);
+
+    try {
+        $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
+        my $theme_dir = $c->model('ThemeConfig')->get_theme_css_directory($c);
+        $css_exists   = -f "$theme_dir/$theme_name.css" ? 1 : 0;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details',
+            "Error loading details for theme '$theme_name': $_");
+        $c->stash->{error_msg} = "Could not load theme details.";
+    };
 
     $c->stash(
         template   => 'admin/theme/details.tt',
@@ -683,6 +674,52 @@ sub details :Path('/admin/theme/details') :Args(1) {
         variables  => $theme_data->{variables} || {},
         css_exists => $css_exists,
     );
+}
+
+# Save individual CSS variables from the WYSIWYG inspector (AJAX endpoint)
+sub save_variables :Path('/admin/theme/save_variables') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_variables',
+        "Saving CSS variables for theme: $theme_name");
+
+    my ($result, $err_msg) = (0, '');
+    my %variables;
+
+    try {
+        for my $key (keys %{$c->req->params}) {
+            if ($key =~ /^var-(.+)$/) {
+                $variables{$1} = $c->req->params->{$key};
+            }
+        }
+
+        if (%variables) {
+            my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
+            $theme_data->{variables} ||= {};
+            %{ $theme_data->{variables} } = ( %{ $theme_data->{variables} }, %variables );
+            $result = $c->model('ThemeConfig')->update_theme($c, $theme_name, $theme_data);
+            if ($result) {
+                $c->model('ThemeConfig')->_write_theme_css($c, $theme_name, $theme_data);
+            } else {
+                $err_msg = "Model returned failure saving variables.";
+            }
+        } else {
+            $err_msg = "No variables provided.";
+        }
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_variables',
+            "Error saving variables for theme '$theme_name': $_");
+        $err_msg = "Server error: $_";
+    };
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        success => $result ? 1 : 0,
+        message => $result
+            ? "Saved " . scalar(keys %variables) . " variable(s) to '$theme_name'."
+            : ($err_msg || "Error saving variables."),
+    }));
 }
 
 # Upload / set favicon for the current site
@@ -706,21 +743,31 @@ sub set_favicon :Path('/admin/theme/set_favicon') :Args(0) {
                 my $favicon_url = "/static/images/favicons/$filename";
                 $c->model('ThemeConfig')->set_site_favicon($c, $site_name, $favicon_url);
                 $c->stash->{site_favicon} = $favicon_url;
-                $c->flash->{message} = "Favicon updated successfully for $site_name.";
+                $c->flash->{message} = "Favicon updated successfully for '$site_name'.";
             }
             catch {
-                $c->flash->{error} = "Error saving favicon: $_";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'set_favicon',
+                    "Error saving uploaded favicon for '$site_name': $_");
+                $c->flash->{error} = "Error saving favicon file.";
             };
         } elsif (my $favicon_url = $c->req->params->{favicon_url}) {
             $favicon_url =~ s/[<>"']//g;
-            $c->model('ThemeConfig')->set_site_favicon($c, $site_name, $favicon_url);
-            $c->flash->{message} = "Favicon URL set to $favicon_url for $site_name.";
+            try {
+                $c->model('ThemeConfig')->set_site_favicon($c, $site_name, $favicon_url);
+                $c->flash->{message} = "Favicon URL set to '$favicon_url' for $site_name.";
+            }
+            catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'set_favicon',
+                    "Error setting favicon URL for '$site_name': $_");
+                $c->flash->{error} = "Could not save favicon URL.";
+            };
         } else {
             $c->flash->{error} = "No favicon file or URL provided.";
         }
     }
 
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
 }
 
 # Import a theme from a JSON file or pasted JSON
@@ -741,7 +788,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
 
         unless ($json_text) {
             $c->flash->{error} = "No theme data provided. Upload a JSON file or paste JSON.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         }
 
@@ -751,7 +800,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
         }
         catch {
             $c->flash->{error} = "Invalid JSON: $_";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         };
 
@@ -768,7 +819,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
             $themes_to_import->{$name} = $imported;
         } else {
             $c->flash->{error} = "Unrecognised theme format. Expected {themes:{...}} or {name:..., variables:{...}}.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         }
 
@@ -789,7 +842,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
         }
 
         $c->flash->{message} = join(" | ", @results);
-        $c->response->redirect($c->uri_for($self->action_for('index')));
+        $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
         return;
     }
 
@@ -800,16 +855,27 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
 sub export_theme :Path('/admin/theme/export') :Args(1) {
     my ($self, $c, $theme_name) = @_;
 
-    my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
-    my $export = {
-        name        => $theme_data->{name}        || ucfirst($theme_name),
-        description => $theme_data->{description} || '',
-        variables   => $theme_data->{variables}   || {},
-    };
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'export_theme',
+        "Exporting theme: $theme_name");
 
-    $c->response->content_type('application/json');
-    $c->response->header('Content-Disposition' => "attachment; filename=\"theme-$theme_name.json\"");
-    $c->response->body(encode_json($export));
+    try {
+        my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name) || {};
+        my $export = {
+            name        => $theme_data->{name}        || ucfirst($theme_name),
+            description => $theme_data->{description} || '',
+            variables   => $theme_data->{variables}   || {},
+        };
+        $c->response->content_type('application/json');
+        $c->response->header('Content-Disposition' => "attachment; filename=\"theme-$theme_name.json\"");
+        $c->response->body(encode_json($export));
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'export_theme',
+            "Error exporting theme '$theme_name': $_");
+        $c->response->content_type('application/json');
+        $c->response->status(500);
+        $c->response->body(encode_json({ error => "Could not export theme '$theme_name'." }));
+    };
 }
 
 # Add a compatibility method to handle old URLs
@@ -835,6 +901,34 @@ sub legacy_redirect :Path('/themeadmin') :Args {
 
     $c->response->redirect($c->uri_for($new_path));
     return;
+}
+
+# List images in /static/images/ for the background image picker (AJAX)
+sub list_images :Path('/admin/theme/list_images') :Args(0) {
+    my ($self, $c) = @_;
+
+    my @images;
+
+    try {
+        my $img_root = $c->path_to('root', 'static', 'images');
+        if (-d $img_root) {
+            require File::Find;
+            File::Find::find(sub {
+                return unless /\.(png|jpe?g|gif|svg|webp|ico)$/i;
+                my $full = $File::Find::name;
+                (my $rel = $full) =~ s{^\Q$img_root\E/?}{/static/images/};
+                push @images, $rel;
+            }, "$img_root");
+        }
+        @images = sort @images;
+    }
+    catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_images',
+            "Error scanning images directory: $_");
+    };
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({ images => \@images }));
 }
 
 __PACKAGE__->meta->make_immutable;
