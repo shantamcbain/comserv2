@@ -675,6 +675,8 @@ sub details :Path('/admin/theme/details') :Args(1) {
         template   => 'admin/theme/details.tt',
         theme_name => $theme_name,
         theme_data => $theme_data,
+        theme      => $theme_data,
+        variables  => $theme_data->{variables} || {},
         css_exists => $css_exists,
     );
 }
