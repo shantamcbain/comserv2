@@ -4752,20 +4752,43 @@ sub generate_result_file_content {
 
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-    
+
+    # Port restriction: only accessible from port 3001 (host dev server)
+    my $port = $c->req->uri->port || 0;
+    if ($port == 5000) {
+        $c->response->body('');
+        $c->response->status(403);
+        return;
+    }
+    if ($port && $port != 3001) {
+        my $redirect_uri = $c->req->uri->clone;
+        $redirect_uri->port(3001);
+        $c->response->redirect($redirect_uri);
+        return;
+    }
+
+    # CSC admin only - use AdminAuth (same pattern as all other admin actions)
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Access denied: admin required");
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+
     # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
-    
-    # Check authentication status (allow page view, but operations will require login)
-    my $authenticated = $c->user_exists ? 1 : 0;
-    
+
     $c->stash(
         template => 'admin/docker_containers.tt',
         docker_available => $docker_available,
-        authenticated => $authenticated
+        authenticated => 1,
     );
 }
 
@@ -4810,6 +4833,75 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     }
     
     $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
+        "Docker volumes list API called");
+
+    my $admin_auth_vol = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_vol->check_admin_access($c, 'docker_volumes')) {
+        $c->response->body('{"success": false, "error": "Authentication required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_out = `docker volume ls -q 2>&1`;
+    my $names_exit = $? >> 8;
+
+    if ($names_exit != 0) {
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my @names = grep { $_ ne '' } split /\n/, $names_out;
+
+    if (!@names) {
+        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_str = join(' ', map { quotemeta($_) } @names);
+    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_exit = $? >> 8;
+
+    my @volumes;
+    eval {
+        my $data = decode_json($inspect_out);
+        foreach my $vol (@$data) {
+            my $opts    = $vol->{Options} || {};
+            my $is_nfs  = (lc($opts->{type} || '') eq 'nfs' || lc($opts->{type} || '') eq 'nfs4');
+            my $nfs_addr = '';
+            if ($is_nfs && $opts->{o}) {
+                ($nfs_addr) = ($opts->{o} =~ /addr=([^,]+)/);
+            }
+            push @volumes, {
+                name       => $vol->{Name}       || '',
+                driver     => $vol->{Driver}     || 'local',
+                mountpoint => $vol->{Mountpoint} || '',
+                labels     => ref($vol->{Labels}) eq 'HASH'
+                    ? join(', ', map { "$_=$vol->{Labels}{$_}" } keys %{$vol->{Labels}})
+                    : ($vol->{Labels} || ''),
+                scope      => $vol->{Scope}      || 'local',
+                is_nfs     => $is_nfs ? \1 : \0,
+                nfs_server => $nfs_addr,
+                nfs_device => $opts->{device} || '',
+            };
+        }
+    };
+
+    $c->response->body(encode_json({ success => 1, volumes => \@volumes }));
     $c->response->content_type('application/json');
 }
 
