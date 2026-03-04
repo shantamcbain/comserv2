@@ -32,10 +32,3 @@
     </details>
 </div>
 [% END %]
-
-<footer class="site-footer">
-    <div class="footer-content" style="text-align:center; padding: 1rem 0;">
-        [% USE date %]
-        <p>&copy; [% date.format(date.now, '%Y') %] [% c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
-    </div>
-</footer>
