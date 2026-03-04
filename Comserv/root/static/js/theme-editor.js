@@ -318,7 +318,7 @@ class ThemeEditor {
             background: #4a90e2;
             color: white;
             border: none;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
@@ -326,7 +326,7 @@ class ThemeEditor {
             align-items: center;
             justify-content: center;
         `;
-        
+        this.floatingBtn = toggleBtn;
         toggleBtn.onclick = () => this.toggleInspector();
         document.body.appendChild(toggleBtn);
     }
@@ -543,13 +543,18 @@ class ThemeEditor {
     
     _syncPagetopToggle(isActive) {
         const btn = document.getElementById('css-edit-toggle');
-        if (!btn) return;
-        if (isActive) {
-            btn.innerHTML = '<i class="fas fa-times"></i> Close Editor';
-            btn.classList.add('edit-mode');
-        } else {
-            btn.innerHTML = '<i class="fas fa-paint-brush"></i> Theme Editor';
-            btn.classList.remove('edit-mode');
+        if (btn) {
+            if (isActive) {
+                btn.innerHTML = '<i class="fas fa-times"></i> Close Editor';
+                btn.classList.add('edit-mode');
+            } else {
+                btn.innerHTML = '<i class="fas fa-paint-brush"></i> Theme Editor';
+                btn.classList.remove('edit-mode');
+            }
+        }
+        if (this.floatingBtn) {
+            this.floatingBtn.textContent = isActive ? '✕' : 'Theme';
+            this.floatingBtn.style.background = isActive ? '#dc3545' : '#4a90e2';
         }
         document.body.classList.toggle('css-edit-mode', isActive);
     }
@@ -662,17 +667,24 @@ class ThemeEditor {
     
     handleElementClick(e) {
         if (!this.isInspectorActive) return;
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
+
         const element = e.target;
-        if (element === this.inspectorContainer || this.inspectorContainer.contains(element)) {
+
+        // Never intercept the inspector panel itself or its children
+        if (this.inspectorContainer && (element === this.inspectorContainer || this.inspectorContainer.contains(element))) {
             return;
         }
-        
+
+        // Never intercept the pagetop toggle or the floating button
+        if (element.closest('#css-edit-toggle') || element.closest('#theme-inspector-toggle')) {
+            return;
+        }
+
+        // Only now prevent the click from activating links/buttons on the page
+        e.preventDefault();
+        e.stopPropagation();
+
         this.selectElement(element);
-        return false;
     }
     
     selectElement(element) {
