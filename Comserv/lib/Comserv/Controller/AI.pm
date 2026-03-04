@@ -3043,17 +3043,15 @@ sub save_api_key :Local :Args(0) {
                 return;
             }
             
+            my $tmp = $schema->resultset('UserApiKeys')->new({});
+            my $encrypted = $tmp->encrypt_api_key($api_key);
+            
             $key_obj = $schema->resultset('UserApiKeys')->create({
                 user_id => $user_id,
                 service => $service,
-                is_active => '1'
+                is_active => '1',
+                api_key_encrypted => $encrypted
             });
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'save_api_key', "UserApiKeys record created, ID: " . $key_obj->id . ", now encrypting API key");
-            
-            $key_obj->set_api_key($api_key);
-            $key_obj->update;
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
                 'save_api_key', "API key created successfully for service $service, user $username, key ID: " . $key_obj->id);
