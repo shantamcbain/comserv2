@@ -233,7 +233,9 @@ sub update_theme :Path('/admin/theme/update') :Args(0) {
     }
 
     # Redirect back to theme index
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
 }
 
 # Edit theme CSS
@@ -497,7 +499,9 @@ sub create_custom_theme :Path('/admin/theme/create_custom') :Args(0) {
     }
 
     # Redirect back to theme index
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
 }
 
 # Update CSS for a theme
@@ -579,7 +583,9 @@ sub update_css :Path('/admin/theme/update_css') :Args(1) {
     };
 
     # Redirect back to the edit page
-    $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
+    $c->response->redirect($c->uri_for("/admin/theme/edit/" . $theme_name));
+        $c->response->status(302);
+        return;
 }
 
 
@@ -602,13 +608,17 @@ sub create_theme :Path('/admin/theme/create') :Args(0) {
 
         unless ($theme_name) {
             $c->flash->{error} = "Theme name is required and must contain only letters, numbers, hyphens or underscores.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
             return;
         }
 
         if (exists $themes->{$theme_name}) {
             $c->flash->{error} = "A theme named '$theme_name' already exists. Choose a different name.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
             return;
         }
 
@@ -648,10 +658,14 @@ sub create_theme :Path('/admin/theme/create') :Args(0) {
 
         if ($result) {
             $c->flash->{message} = "Theme '$theme_name' created successfully. You can now edit its CSS or assign it to a site.";
-            $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
+            $c->response->redirect($c->uri_for("/admin/theme/edit/" . $theme_name));
+        $c->response->status(302);
+        return;
         } else {
             $c->flash->{error} = "Error creating theme. Please check server logs.";
-            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            $c->response->redirect($c->uri_for("/admin/theme/create"));
+        $c->response->status(302);
+        return;
         }
         return;
     }
@@ -683,6 +697,39 @@ sub details :Path('/admin/theme/details') :Args(1) {
         variables  => $theme_data->{variables} || {},
         css_exists => $css_exists,
     );
+}
+
+# Save individual CSS variables from the WYSIWYG inspector (AJAX endpoint)
+sub save_variables :Path('/admin/theme/save_variables') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_variables',
+        "Saving CSS variables for theme: $theme_name");
+
+    my %variables;
+    for my $key (keys %{$c->req->params}) {
+        if ($key =~ /^var-(.+)$/) {
+            $variables{$1} = $c->req->params->{$key};
+        }
+    }
+
+    my $result = 0;
+    if (%variables) {
+        my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
+        $theme_data->{variables} ||= {};
+        %{ $theme_data->{variables} } = ( %{ $theme_data->{variables} }, %variables );
+        $result = $c->model('ThemeConfig')->update_theme($c, $theme_name, $theme_data);
+        if ($result) {
+            $c->model('ThemeConfig')->_write_theme_css($c, $theme_name, $theme_data);
+        }
+    }
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({
+        success => $result ? 1 : 0,
+        message => $result ? "Saved " . scalar(keys %variables) . " variable(s) to '$theme_name'."
+                           : ( %variables ? "Error saving variables." : "No variables provided." ),
+    }));
 }
 
 # Upload / set favicon for the current site
@@ -720,7 +767,9 @@ sub set_favicon :Path('/admin/theme/set_favicon') :Args(0) {
         }
     }
 
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+    $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
 }
 
 # Import a theme from a JSON file or pasted JSON
@@ -741,7 +790,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
 
         unless ($json_text) {
             $c->flash->{error} = "No theme data provided. Upload a JSON file or paste JSON.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         }
 
@@ -751,7 +802,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
         }
         catch {
             $c->flash->{error} = "Invalid JSON: $_";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         };
 
@@ -768,7 +821,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
             $themes_to_import->{$name} = $imported;
         } else {
             $c->flash->{error} = "Unrecognised theme format. Expected {themes:{...}} or {name:..., variables:{...}}.";
-            $c->response->redirect($c->uri_for($self->action_for('index')));
+            $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
             return;
         }
 
@@ -789,7 +844,9 @@ sub import_theme :Path('/admin/theme/import') :Args(0) {
         }
 
         $c->flash->{message} = join(" | ", @results);
-        $c->response->redirect($c->uri_for($self->action_for('index')));
+        $c->response->redirect($c->uri_for("/admin/theme"));
+    $c->response->status(302);
+    return;
         return;
     }
 
@@ -835,6 +892,29 @@ sub legacy_redirect :Path('/themeadmin') :Args {
 
     $c->response->redirect($c->uri_for($new_path));
     return;
+}
+
+# List images in /static/images/ for the background image picker (AJAX)
+sub list_images :Path('/admin/theme/list_images') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $img_root = $c->path_to('root', 'static', 'images');
+    my @images;
+
+    if (-d $img_root) {
+        require File::Find;
+        File::Find::find(sub {
+            return unless /\.(png|jpe?g|gif|svg|webp|ico)$/i;
+            my $full = $File::Find::name;
+            (my $rel = $full) =~ s{^\Q$img_root\E/?}{/static/images/};
+            push @images, $rel;
+        }, "$img_root");
+    }
+
+    @images = sort @images;
+
+    $c->response->content_type('application/json');
+    $c->response->body(encode_json({ images => \@images }));
 }
 
 __PACKAGE__->meta->make_immutable;
