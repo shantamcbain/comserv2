@@ -74,7 +74,8 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - /home/shanta/nfs:/data/nfs:rw
+      - comserv-workshop:/data/nfs:rw
+      - comserv-logs:/opt/comserv/root/log:rw
     depends_on:
       redis:
         condition: service_healthy
@@ -133,7 +134,8 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - /home/shanta/nfs:/data/nfs:rw
+      - comserv-workshop:/data/nfs:rw
+      - comserv-logs:/opt/comserv/root/log:rw
     depends_on:
       redis:
         condition: service_healthy
@@ -150,8 +152,14 @@ services:
         max-file: "10"
 
 # Volumes for persistent data
+# comserv-workshop and comserv-logs are named volumes (NOT deleted by docker system prune)
+# To use NFS backend instead, see docker-compose.nfs.yml override
 volumes:
   redis_data:
+    driver: local
+  comserv-workshop:
+    driver: local
+  comserv-logs:
     driver: local
 
 # Shared bridge network for all services

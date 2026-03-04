@@ -6,12 +6,15 @@ use Getopt::Long;
 use File::Basename;
 use IPC::Run3;
 
-my $production_host = '';
+my $production_host = '192.168.1.126';
 my $service = 'web-prod';
-my $ssh_user = 'shanta';
+my $ssh_user = 'ubuntu';
 my $ssh_port = 22;
 my $production_directory = '~/PycharmProjects/comserv2';
 my $rollback_on_failure = 1;
+my $nfs_server = $ENV{NFS_SERVER} || '192.168.1.175';
+my $nfs_log_path = $ENV{NFS_LOG_PATH} || '/mnt/data/comserv/logs';
+my $nfs_workshop_path = $ENV{NFS_WORKSHOP_PATH} || '/mnt/data/comserv/workshop_files';
 
 GetOptions(
     'host=s'      => \$production_host,
@@ -20,10 +23,9 @@ GetOptions(
     'port=i'      => \$ssh_port,
     'directory=s' => \$production_directory,
     'no-rollback' => sub { $rollback_on_failure = 0 },
-) or die "Usage: $0 --host=PRODUCTION_HOST [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--no-rollback]\n";
+) or die "Usage: $0 [--host=PRODUCTION_HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--no-rollback]\n";
 
 die "ERROR: Production host required (--host=HOSTNAME)\n" unless $production_host;
-die "ERROR: Production directory required (--directory=PATH)\n" unless $production_directory;
 
 print "=" x 80 . "\n";
 print "Docker Production Deployment Script\n";
@@ -93,7 +95,7 @@ sub ssh_exec {
 eval {
     # Step 1: Test SSH connection first
     print "\n[TEST] Testing SSH connection to $production_host...\n";
-    my $test_output = ssh_exec("echo 'SSH connection successful'; docker --version");
+    my $test_output = ssh_exec("echo 'SSH connection successful'; sudo docker --version");
     die "SSH connection failed\n" unless $test_output =~ /SSH connection successful/;
     print "✓ SSH connection OK\n";
     print $test_output;
@@ -117,18 +119,18 @@ eval {
     
     # Remove any old -old containers from previous deployments
     print "  Removing old backup containers...\n";
-    my $old_containers = ssh_exec("docker ps -a -q -f name=comserv2-web-prod-old");
+    my $old_containers = ssh_exec("sudo docker ps -a -q -f name=comserv2-web-prod-old");
     if ($old_containers && $old_containers =~ /\w/) {
-        ssh_exec("docker rm -f $old_containers");
+        ssh_exec("sudo docker rm -f $old_containers");
         print "  ✓ Removed old backup containers\n";
     }
     
     # Remove dangling images
     print "  Removing dangling images...\n";
-    ssh_exec("docker image prune -f");
+    ssh_exec("sudo docker image prune -f");
     
     # Show disk usage after cleanup
-    my $docker_df = ssh_exec("docker system df");
+    my $docker_df = ssh_exec("sudo docker system df");
     print $docker_df;
     print "✓ Cleanup complete\n";
     
@@ -141,9 +143,9 @@ eval {
     my $pipe_cmd;
     
     if ($ssh_password) {
-        $pipe_cmd = "docker save $image_name | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host 'docker load'";
+        $pipe_cmd = "docker save ${image_name}:latest | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host 'sudo docker load'";
     } else {
-        $pipe_cmd = "docker save $image_name | ssh -p $ssh_port $ssh_user\@$production_host 'docker load'";
+        $pipe_cmd = "docker save ${image_name}:latest | ssh -p $ssh_port $ssh_user\@$production_host 'sudo docker load'";
     }
     
     print "CMD: $pipe_cmd\n";
@@ -171,7 +173,7 @@ eval {
         my $scp_cmd = "scp -P $ssh_port $tar_file $ssh_user\@$production_host:$remote_dir/";
         run_local($scp_cmd, "Copying tar file to production server");
         
-        run_remote("docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
+        run_remote("sudo docker load -i $remote_dir/${image_name}_${timestamp}.tar", 
                    "Loading image from tar file");
         
         print "\n✓ Image loaded via file transfer\n";
@@ -180,9 +182,9 @@ eval {
     # Step 3: Backup existing container on production
     print "\n[BACKUP] Backing up existing container on production...\n";
     my $container_name = "comserv2-$service";
-    my $container_exists = ssh_exec("docker ps -a --filter name=$container_name -q");
+    my $container_exists = ssh_exec("sudo docker ps -a --filter name=$container_name -q");
     if ($container_exists && $container_exists =~ /\w/) {
-        run_remote("docker commit $container_name $backup_tag", 
+        run_remote("sudo docker commit $container_name $backup_tag",
                    "Creating backup of current container");
         print "✓ Backup created: $backup_tag\n";
     } else {
@@ -192,24 +194,35 @@ eval {
     # Step 4: Rename existing container (for rollback)
     print "\n[RENAME] Renaming existing container for rollback...\n";
     my $old_container_name = "${container_name}-old";
-    my $rename_output = ssh_exec("docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
+    my $rename_output = ssh_exec("sudo docker rename $container_name $old_container_name 2>&1 || echo 'No existing container to rename'");
     print $rename_output;
     
     # Step 5: Stop old container
     print "\n[STOP] Stopping old container on production...\n";
-    my $stop_output = ssh_exec("docker stop $old_container_name 2>&1 || echo 'No container to stop'");
+    my $stop_output = ssh_exec("sudo docker stop $old_container_name 2>&1 || echo 'No container to stop'");
     print $stop_output;
     print "✓ Old container stopped (kept for rollback)\n";
+    
+    # Step 5b: Ensure NFS volumes exist on production
+    print "\n[NFS SETUP] Creating NFS volumes on production...\n";
+    my $nfs_opts = "addr=$nfs_server,rw,noatime,nfsvers=3,soft";
+    ssh_exec("sudo docker volume create --driver local --opt type=nfs --opt o='$nfs_opts' --opt device=':$nfs_log_path' comserv-logs 2>/dev/null || echo 'Volume comserv-logs already exists'");
+    ssh_exec("sudo docker volume create --driver local --opt type=nfs --opt o='$nfs_opts' --opt device=':$nfs_workshop_path' comserv-workshop 2>/dev/null || echo 'Volume comserv-workshop already exists'");
+    print "✓ NFS volumes ready\n";
     
     # Step 6: Start new container
     print "\n[START] Starting new container on production...\n";
     my $port_map = $service eq 'web-prod' ? '5000:3000' : '3000:3000';
-    my $secrets_volume = '-v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro';
-    my $start_cmd = "docker run -d --name $container_name --restart unless-stopped -p $port_map $secrets_volume ${image_name}:latest";
+    my $start_cmd = "sudo docker run -d --name $container_name --restart unless-stopped"
+        . " -p $port_map"
+        . " -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro"
+        . " -v comserv-logs:/opt/comserv/root/log"
+        . " -v comserv-workshop:/data/nfs"
+        . " ${image_name}:latest";
     my $start_output = ssh_exec($start_cmd);
     print $start_output;
     
-    # Step 6: Health check
+    # Step 7: Health check
     print "\n[HEALTH CHECK] Waiting for container to be healthy...\n";
     my $max_attempts = 30;
     my $attempt = 0;
@@ -218,7 +231,7 @@ eval {
     while ($attempt < $max_attempts) {
         sleep 2;
         $attempt++;
-        my $status = ssh_exec("docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
+        my $status = ssh_exec("sudo docker inspect --format='{{.State.Health.Status}}' $container_name 2>/dev/null || echo 'unknown'");
         chomp $status;
         print "  Attempt $attempt/$max_attempts: Status = $status\n";
         
@@ -235,12 +248,12 @@ eval {
         print "\n[ROLLBACK] Starting rollback procedure...\n";
         
         # Stop and remove failed container
-        ssh_exec("docker stop $container_name");
-        ssh_exec("docker rm $container_name");
+        ssh_exec("sudo docker stop $container_name");
+        ssh_exec("sudo docker rm $container_name");
         
         # Restore old container
-        ssh_exec("docker rename $old_container_name $container_name");
-        ssh_exec("docker start $container_name");
+        ssh_exec("sudo docker rename $old_container_name $container_name");
+        ssh_exec("sudo docker start $container_name");
         
         print "✓ Rolled back to previous container\n";
         die "Deployment failed - rolled back to previous version\n";
@@ -248,9 +261,9 @@ eval {
     
     print "\n✓ Container is healthy!\n";
     
-    # Step 7: Remove old container (new one is confirmed working)
+    # Step 8: Remove old container (new one is confirmed working)
     print "\n[CLEANUP] Removing old container...\n";
-    my $rm_old = ssh_exec("docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
+    my $rm_old = ssh_exec("sudo docker rm $old_container_name 2>&1 || echo 'No old container to remove'");
     print $rm_old;
     
     # Step 8: Cleanup temporary files

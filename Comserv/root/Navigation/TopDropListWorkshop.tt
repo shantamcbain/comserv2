@@ -63,6 +63,7 @@
                 <a href="/cloud"><i class="icon-sync"></i>Cloud Sync</a>
             </div>
         </div>
+        [% END %]
 
         <!-- Private Links for logged in users -->
         [% IF c.session.username %]
