@@ -84,7 +84,7 @@
                             <select name="theme" id="theme" class="form-select">
                                 [% FOREACH t IN available_themes %]
                                 <option value="[% t %]" [% IF t == theme_name %]selected[% END %]>
-                                    [% themes.$t.name || (t | ucfirst) %]
+                                    [% themes.$t.name || t.ucfirst %]
                                 </option>
                                 [% END %]
                             </select>
@@ -137,7 +137,7 @@
                         [% FOREACH t IN available_themes %]
                         <tr [% IF t == theme_name %]class="table-active fw-bold"[% END %]>
                             <td>
-                                [% themes.$t.name || (t | ucfirst) %]
+                                [% themes.$t.name || t.ucfirst %]
                                 [% IF t == theme_name %]
                                     <span class="badge bg-success ms-1">Active</span>
                                 [% END %]
@@ -283,7 +283,7 @@
                     <tbody>
                         [% FOREACH t IN available_themes %]
                         <tr>
-                            <td>[% themes.$t.name || (t | ucfirst) %]</td>
+                            <td>[% themes.$t.name || t.ucfirst %]</td>
                             <td class="text-muted small">[% themes.$t.description || '—' %]</td>
                             <td class="text-center">
                                 <a href="[% c.uri_for('/admin/theme/export', t) %]" class="btn btn-sm btn-outline-secondary">
