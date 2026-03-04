@@ -541,6 +541,19 @@ class ThemeEditor {
         }
     }
     
+    _syncPagetopToggle(isActive) {
+        const btn = document.getElementById('css-edit-toggle');
+        if (!btn) return;
+        if (isActive) {
+            btn.innerHTML = '<i class="fas fa-times"></i> Close Editor';
+            btn.classList.add('edit-mode');
+        } else {
+            btn.innerHTML = '<i class="fas fa-paint-brush"></i> Theme Editor';
+            btn.classList.remove('edit-mode');
+        }
+        document.body.classList.toggle('css-edit-mode', isActive);
+    }
+
     closeInspector() {
         console.log('closeInspector called, container exists:', !!this.inspectorContainer);
         if (!this.inspectorContainer) return;
@@ -551,6 +564,9 @@ class ThemeEditor {
         if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
         document.body.style.cursor = '';
         
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(false);
+
         // Remove highlights
         if (this.highlightedElement) {
             this.highlightedElement.classList.remove('highlighted');
@@ -571,6 +587,9 @@ class ThemeEditor {
         
         this.isInspectorActive = false;
         document.body.style.cursor = '';
+
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(false);
         
         // Remove all highlights
         document.querySelectorAll('.highlighted').forEach(el => {
@@ -595,6 +614,9 @@ class ThemeEditor {
         this.inspectorContainer.style.display = 'flex';
         if (this.toggleBtn) this.toggleBtn.textContent = 'Close';
         document.body.style.cursor = 'crosshair';
+
+        // Sync the pagetop toggle button
+        this._syncPagetopToggle(true);
         
         // Update theme variables in the dropdown
         if (typeof this.updateThemeVarSelect === 'function') {
