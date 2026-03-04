@@ -29,7 +29,12 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
+    [%- SET site_favicon = c.stash.site_favicon || '' -%]
+    [% IF site_favicon %]
+    <link rel="shortcut icon" href="[% site_favicon %]">
+    [% ELSE %]
     <link rel="shortcut icon" href="/static/images/favicon.ico">
+    [% END %]
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
