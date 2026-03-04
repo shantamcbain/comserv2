@@ -476,7 +476,9 @@ sub create_custom_theme :Path('/admin/theme/create_custom') :Args(0) {
 
     # Create the custom theme
     my $theme_name = lc($site_name) . '_custom';
-    my $result = $c->model('ThemeConfig')->create_theme($c, $theme_name, $theme_data);
+    $theme_data->{name} = $theme_name;
+    $theme_data->{display_name} = "Custom Theme for " . ucfirst($site_name);
+    my $result = $c->model('ThemeConfig')->create_theme($c, $theme_data);
 
     if ($result) {
         # Set the site to use the new theme
@@ -577,6 +579,107 @@ sub update_css :Path('/admin/theme/update_css') :Args(1) {
 }
 
 
+
+# Create a brand-new theme (GET: show form, POST: save)
+sub create_theme :Path('/admin/theme/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_theme',
+        "***** ENTERED ADMIN/THEME CREATE_THEME METHOD *****");
+
+    my $themes = $c->model('ThemeConfig')->get_all_themes($c);
+    my @base_themes = sort keys %$themes;
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+
+        my $theme_name    = lc($p->{theme_name} || '');
+        $theme_name =~ s/[^a-z0-9_-]//g;
+
+        unless ($theme_name) {
+            $c->flash->{error} = "Theme name is required and must contain only letters, numbers, hyphens or underscores.";
+            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            return;
+        }
+
+        if (exists $themes->{$theme_name}) {
+            $c->flash->{error} = "A theme named '$theme_name' already exists. Choose a different name.";
+            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+            return;
+        }
+
+        my %variables = (
+            'background-color' => $p->{'var-background-color'} || '#ffffff',
+            'text-color'       => $p->{'var-text-color'}       || '#000000',
+            'primary-color'    => $p->{'var-primary-color'}    || '#007bff',
+            'secondary-color'  => $p->{'var-secondary-color'}  || '#6c757d',
+            'accent-color'     => $p->{'var-accent-color'}     || '#fd7e14',
+            'link-color'       => $p->{'var-link-color'}       || '#0000ff',
+            'link-hover-color' => $p->{'var-link-hover-color'} || '#0000aa',
+            'nav-bg'           => $p->{'var-nav-bg'}           || '#f8f9fa',
+            'nav-text'         => $p->{'var-nav-text'}         || '#000000',
+            'nav-hover-bg'     => $p->{'var-nav-hover-bg'}     || 'rgba(0,0,0,0.1)',
+            'button-bg'        => $p->{'var-button-bg'}        || '#007bff',
+            'button-text'      => $p->{'var-button-text'}      || '#ffffff',
+            'button-border'    => $p->{'var-button-border'}    || '#007bff',
+            'button-hover-bg'  => $p->{'var-button-hover-bg'}  || '#0056b3',
+            'border-color'     => $p->{'var-border-color'}     || '#dee2e6',
+            'table-header-bg'  => $p->{'var-table-header-bg'}  || '#f2f2f2',
+            'success-color'    => $p->{'var-success-color'}    || '#28a745',
+            'warning-color'    => $p->{'var-warning-color'}    || '#ffc107',
+            'body-font'        => $p->{'var-body-font'}        || 'Verdana, Helvetica, sans-serif',
+            'header-font'      => $p->{'var-header-font'}      || 'Verdana, Helvetica, sans-serif',
+            'font-size-base'   => $p->{'var-font-size-base'}   || '16px',
+            'font-size-small'  => $p->{'var-font-size-small'}  || '14px',
+            'font-size-large'  => $p->{'var-font-size-large'}  || '20px',
+        );
+
+        my $result = $c->model('ThemeConfig')->create_theme($c, {
+            name         => $theme_name,
+            display_name => $p->{display_name} || ucfirst($theme_name),
+            description  => $p->{description}  || "Custom theme",
+            base_theme   => $p->{base_theme}   || '',
+            variables    => \%variables,
+        });
+
+        if ($result) {
+            $c->flash->{message} = "Theme '$theme_name' created successfully. You can now edit its CSS or assign it to a site.";
+            $c->response->redirect($c->uri_for($self->action_for('edit_css'), [$theme_name]));
+        } else {
+            $c->flash->{error} = "Error creating theme. Please check server logs.";
+            $c->response->redirect($c->uri_for($self->action_for('create_theme')));
+        }
+        return;
+    }
+
+    $c->stash(
+        template    => 'admin/theme/create_theme.tt',
+        base_themes => \@base_themes,
+        themes      => $themes,
+    );
+}
+
+# Theme details page
+sub details :Path('/admin/theme/details') :Args(1) {
+    my ($self, $c, $theme_name) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details',
+        "Showing details for theme: $theme_name");
+
+    my $theme_data = $c->model('ThemeConfig')->get_theme($c, $theme_name);
+    my $theme_dir  = $c->model('ThemeConfig')->get_theme_css_directory($c);
+    my $css_file   = "$theme_dir/$theme_name.css";
+    my $css_exists = -f $css_file ? 1 : 0;
+
+    $c->stash(
+        template   => 'admin/theme/details.tt',
+        theme_name => $theme_name,
+        theme_data => $theme_data,
+        theme      => $theme_data,
+        variables  => $theme_data->{variables} || {},
+        css_exists => $css_exists,
+    );
+}
 
 # Add a compatibility method to handle old URLs
 sub legacy_redirect :Path('/themeadmin') :Args {
