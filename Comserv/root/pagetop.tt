@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
  [% c.session.first_name %] [% c.session.last_name %] User
 [% ELSE %]
  Guest
-[% END %] to [% c.stash.site_display_name || c.session.site_display_name || c.stash.SiteName || c.session.SiteName || 'this site' %]!
+[% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
     </h1>
 
 
