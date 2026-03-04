@@ -138,6 +138,155 @@ sub get_site_theme {
     return $default_theme;
 }
 
+# Set the theme for a specific site (persists to JSON)
+sub set_site_theme {
+    my ($self, $c, $site_name, $theme_name) = @_;
+
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
+        "Setting theme for site '$site_name' to '$theme_name'");
+
+    try {
+        my $config_file = $self->get_theme_definitions_path($c);
+
+        my $config_data = {};
+        if (-f $config_file) {
+            my $json = read_file($config_file);
+            $config_data = decode_json($json);
+        }
+
+        $config_data->{site_themes} ||= {};
+        $config_data->{site_themes}{ lc($site_name) } = $theme_name;
+
+        write_file($config_file, encode_json($config_data));
+
+        # Update session cache
+        $c->session->{"theme_$site_name"} = $theme_name if $c->session;
+
+        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'set_site_theme',
+            "Successfully set theme '$theme_name' for site '$site_name'");
+        return 1;
+    }
+    catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'set_site_theme',
+            "Error setting theme '$theme_name' for site '$site_name': $_");
+        return 0;
+    };
+}
+
+# Create a new theme definition
+sub create_theme {
+    my ($self, $c, $theme_data) = @_;
+
+    my $theme_name = $theme_data->{name} or return 0;
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'create_theme',
+        "Creating new theme: $theme_name");
+
+    try {
+        my $config_file = $self->get_theme_definitions_path($c);
+
+        my $config_data = {};
+        if (-f $config_file) {
+            my $json = read_file($config_file);
+            $config_data = decode_json($json);
+        }
+
+        $config_data->{themes} ||= {};
+
+        # If based on an existing theme, copy its variables first
+        my $variables = {};
+        if (my $base = $theme_data->{base_theme}) {
+            my $base_vars = ($config_data->{themes}{$base} || {})->{variables} || {};
+            %$variables = %$base_vars;
+        }
+
+        # Overlay any provided variables
+        if ($theme_data->{variables} && ref $theme_data->{variables} eq 'HASH') {
+            %$variables = (%$variables, %{ $theme_data->{variables} });
+        }
+
+        $config_data->{themes}{$theme_name} = {
+            name        => $theme_data->{display_name} || ucfirst($theme_name),
+            description => $theme_data->{description}  || "Custom theme",
+            variables   => $variables,
+        };
+
+        write_file($config_file, encode_json($config_data));
+
+        # Generate the CSS file for the new theme
+        $self->_write_theme_css($c, $theme_name, $config_data->{themes}{$theme_name});
+
+        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'create_theme',
+            "Successfully created theme: $theme_name");
+        return 1;
+    }
+    catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'create_theme',
+            "Error creating theme '$theme_name': $_");
+        return 0;
+    };
+}
+
+# Regenerate CSS files for all themes
+sub generate_all_theme_css {
+    my ($self, $c) = @_;
+
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'generate_all_theme_css',
+        "Regenerating CSS files for all themes");
+
+    my $config_file = $self->get_theme_definitions_path($c);
+    return unless -f $config_file;
+
+    try {
+        my $json        = read_file($config_file);
+        my $config_data = decode_json($json);
+        my $themes      = $config_data->{themes} || {};
+
+        foreach my $theme_name (keys %$themes) {
+            $self->_write_theme_css($c, $theme_name, $themes->{$theme_name});
+        }
+    }
+    catch {
+        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'generate_all_theme_css',
+            "Error generating CSS files: $_");
+    };
+}
+
+# Internal helper – write a single theme's CSS file
+sub _write_theme_css {
+    my ($self, $c, $theme_name, $theme_data) = @_;
+
+    my $theme_dir = $self->get_theme_css_directory($c);
+
+    unless (-d $theme_dir) {
+        require File::Path;
+        File::Path::make_path($theme_dir)
+            or do {
+            $self->log_with_details($c, 'error', __FILE__, __LINE__, '_write_theme_css',
+                "Cannot create themes directory: $!");
+            return;
+        };
+    }
+
+    my $variables = $theme_data->{variables} || {};
+    my $css = "/* Theme: $theme_name */\n:root {\n";
+    foreach my $var (sort keys %$variables) {
+        $css .= "  --$var: $variables->{$var};\n";
+    }
+    $css .= "}\n";
+
+    if (my $special = $theme_data->{special_styles}) {
+        foreach my $selector (keys %$special) {
+            $css .= "\n$selector {\n  $special->{$selector}\n}\n";
+        }
+    }
+
+    my $css_file = "$theme_dir/$theme_name.css";
+    write_file($css_file, $css);
+
+    $self->log_with_details($c, 'info', __FILE__, __LINE__, '_write_theme_css',
+        "Written CSS file: $css_file");
+}
+
 # Save theme data to the theme definitions file
 sub save_theme {
     my ($self, $c, $theme_name, $theme_data) = @_;
@@ -174,6 +323,12 @@ sub save_theme {
             "Error saving theme '$theme_name': $_");
         return 0;
     };
+}
+
+# Update (replace) an existing theme's data - alias for save_theme
+sub update_theme {
+    my ($self, $c, $theme_name, $theme_data) = @_;
+    return $self->save_theme($c, $theme_name, $theme_data);
 }
 
 __PACKAGE__->meta->make_immutable;
