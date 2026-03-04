@@ -2629,7 +2629,7 @@ last_updated = '2026/02/08'
         <p>
             This section records the planning and implementation workflow for the CSS Theme Management system.
             For the end-user admin guide see
-            <a href="[% c.uri_for('/Documentation/view', 'admin/documentation/CssThemes') %]">CssThemes documentation</a>
+            <a href="[% c.uri_for('/Documentation/CssThemes') %]">CssThemes documentation</a>
             or click <em>View Documentation</em> from the Theme Management page.
         </p>
 
@@ -2720,7 +2720,7 @@ last_updated = '2026/02/08'
         <h2>See Also</h2>
         <ul>
             <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
-            <li><a href="[% c.uri_for('/Documentation/view', 'admin/documentation/CssThemes') %]">CSS Theme System — Admin Guide</a></li>
+            <li><a href="[% c.uri_for('/Documentation/CssThemes') %]">CSS Theme System — Admin Guide</a></li>
             <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
         </ul>
     </div>

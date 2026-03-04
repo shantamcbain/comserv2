@@ -284,6 +284,8 @@ sub auto :Private {
             alarm(3);  # 3 second timeout for theme fetch
             my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
             $c->stash->{theme_name} = $theme_name;
+            my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
+            $c->stash->{site_favicon} = $site_favicon if $site_favicon;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
