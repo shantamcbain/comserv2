@@ -4524,29 +4524,51 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $output = `docker volume ls --format json 2>&1`;
-    my $exit_code = $? >> 8;
+    my $names_out = `docker volume ls -q 2>&1`;
+    my $names_exit = $? >> 8;
 
-    if ($exit_code != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $output" }));
+    if ($names_exit != 0) {
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
         $c->response->content_type('application/json');
         return;
     }
 
+    my @names = grep { $_ ne '' } split /\n/, $names_out;
+
+    if (!@names) {
+        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_str = join(' ', map { quotemeta($_) } @names);
+    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_exit = $? >> 8;
+
     my @volumes;
-    foreach my $line (split /\n/, $output) {
-        next unless $line =~ /^\{/;
-        eval {
-            my $vol = decode_json($line);
+    eval {
+        my $data = decode_json($inspect_out);
+        foreach my $vol (@$data) {
+            my $opts    = $vol->{Options} || {};
+            my $is_nfs  = (lc($opts->{type} || '') eq 'nfs' || lc($opts->{type} || '') eq 'nfs4');
+            my $nfs_addr = '';
+            if ($is_nfs && $opts->{o}) {
+                ($nfs_addr) = ($opts->{o} =~ /addr=([^,]+)/);
+            }
             push @volumes, {
                 name       => $vol->{Name}       || '',
                 driver     => $vol->{Driver}     || 'local',
                 mountpoint => $vol->{Mountpoint} || '',
-                labels     => $vol->{Labels}     || '',
+                labels     => ref($vol->{Labels}) eq 'HASH'
+                    ? join(', ', map { "$_=$vol->{Labels}{$_}" } keys %{$vol->{Labels}})
+                    : ($vol->{Labels} || ''),
                 scope      => $vol->{Scope}      || 'local',
+                is_nfs     => $is_nfs ? \1 : \0,
+                nfs_server => $nfs_addr,
+                nfs_device => $opts->{device} || '',
             };
-        };
-    }
+        }
+    };
 
     $c->response->body(encode_json({ success => 1, volumes => \@volumes }));
     $c->response->content_type('application/json');
