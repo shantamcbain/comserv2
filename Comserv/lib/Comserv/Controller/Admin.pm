@@ -4441,8 +4441,18 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
         return;
     }
 
-    # CSC admin only
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # CSC admin only - check session roles directly
+    my $has_admin = 0;
+    if ($c->user_exists) {
+        my $roles = $c->session->{roles};
+        if (ref($roles) eq 'ARRAY') {
+            $has_admin = 1 if grep { lc($_) eq 'admin' } @$roles;
+        } elsif (defined $roles && !ref($roles)) {
+            $has_admin = 1 if $roles =~ /\badmin\b/i;
+        }
+        $has_admin = 1 if $c->session->{is_admin};
+    }
+    unless ($has_admin) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
             "Access denied: CSC admin required");
         $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
@@ -4512,7 +4522,17 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
         "Docker volumes list API called");
 
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $has_admin_vol = 0;
+    if ($c->user_exists) {
+        my $roles = $c->session->{roles};
+        if (ref($roles) eq 'ARRAY') {
+            $has_admin_vol = 1 if grep { lc($_) eq 'admin' } @$roles;
+        } elsif (defined $roles && !ref($roles)) {
+            $has_admin_vol = 1 if $roles =~ /\badmin\b/i;
+        }
+        $has_admin_vol = 1 if $c->session->{is_admin};
+    }
+    unless ($has_admin_vol) {
         $c->response->body('{"success": false, "error": "Authentication required"}');
         $c->response->content_type('application/json');
         return;
