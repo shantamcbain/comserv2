@@ -2,7 +2,7 @@
 <footer>
     <div class="footer-content">
         [% USE date %]
-        <p>&copy; [% date.format(date.now, '%Y') %] [% site_display_name || SiteDisplayName || SiteName || 'Comserv' %]. All rights reserved.</p>
+        <p style="text-align:center;">&copy; [% date.format(date.now, '%Y') %] [% site_display_name || SiteDisplayName || SiteName || 'Comserv' %]. All rights reserved.</p>
         [% IF c.session.debug_mode == 1 %]
         <p>[% PageVersion %]</p>
         <p><a href="/reset_session">Reset Session</a></p>
