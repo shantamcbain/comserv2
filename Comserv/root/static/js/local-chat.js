@@ -202,9 +202,11 @@
                                 const grp = document.createElement('optgroup');
                                 grp.label = 'External AI (xAI)';
                                 [
-                                    { val: 'grok|grok-2-latest', label: 'Grok 2 Latest' },
-                                    { val: 'grok|grok-beta',     label: 'Grok Beta' },
-                                    { val: 'grok|grok-2-1212',   label: 'Grok 2-1212' }
+                                    { val: 'grok|grok-3-mini',             label: 'Grok 3 Mini (fast)' },
+                                    { val: 'grok|grok-3',                  label: 'Grok 3' },
+                                    { val: 'grok|grok-4-0709',             label: 'Grok 4' },
+                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
+                                    { val: 'grok|grok-code-fast-1',        label: 'Grok Code Fast' }
                                 ].forEach(function(m) {
                                     const opt = document.createElement('option');
                                     opt.value = m.val;
