@@ -69,6 +69,7 @@
             <button type="button" id="clear-chat" class="ai-topbar-btn" title="New chat">✏️</button>
             <a href="/" class="ai-topbar-btn" title="Return to menu">🏠</a>
             <button type="button" id="toggle-sidebar-btn" class="ai-topbar-btn ai-sidebar-toggle" title="Toggle history panel" aria-label="History">🕐</button>
+            <button type="button" id="flip-sidebar-btn" class="ai-topbar-btn" title="Move sidebar to other side">⇄</button>
         </div>
     </div>
 
@@ -397,7 +398,8 @@
     overflow: hidden;
     transition: width 0.25s ease;
 }
-.ai-sidebar.collapsed { width: 0; border-left: none; }
+.ai-sidebar.collapsed { width: 0; border-left: none; border-right: none; }
+.ai-sidebar.sidebar-left { border-left: none; border-right: 1px solid var(--border-color); }
 
 .sidebar-nav {
     display: flex;
@@ -541,6 +543,33 @@ function setSidebar(open) {
 
 toggleSidebarBtn.addEventListener('click', function() { setSidebar(!sidebarOpen); });
 
+// ── Sidebar flip (left/right) ─────────────────────────────────────────────────
+const flipSidebarBtn = document.getElementById('flip-sidebar-btn');
+const aiBody = document.querySelector('.ai-body');
+
+function applySidebarPosition(pos) {
+    if (pos === 'left') {
+        sidebarEl.classList.add('sidebar-left');
+        aiBody.insertBefore(sidebarEl, aiBody.firstChild);
+    } else {
+        sidebarEl.classList.remove('sidebar-left');
+        aiBody.appendChild(sidebarEl);
+    }
+}
+
+// Restore saved position
+try {
+    const savedPos = localStorage.getItem('ai_sidebar_pos');
+    if (savedPos) applySidebarPosition(savedPos);
+} catch(e) {}
+
+flipSidebarBtn.addEventListener('click', function() {
+    const isLeft = sidebarEl.classList.contains('sidebar-left');
+    const newPos = isLeft ? 'right' : 'left';
+    applySidebarPosition(newPos);
+    try { localStorage.setItem('ai_sidebar_pos', newPos); } catch(e) {}
+});
+
 // Sidebar tab switching
 document.querySelectorAll('.sidebar-nav-btn:not([disabled])').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -677,6 +706,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Kick off sidebar
     setSidebar(true);
+
+    // Auto-resume conversation if URL ?resume=ID param present (e.g. from widget detach)
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const resumeId = urlParams.get('resume');
+        if (resumeId && !isNaN(resumeId)) {
+            setTimeout(function() {
+                loadSidebarConversation(resumeId, null);
+            }, 800);
+        }
+    } catch(e) {}
     
     // Set up event listeners
     chatForm.addEventListener('submit', handleSubmit);
