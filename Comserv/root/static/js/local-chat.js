@@ -114,6 +114,27 @@
         return null;
     }
     
+    // Extract visible text content from the current page for context
+    function extractPageContent() {
+        const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
+        const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
+        for (const sel of contentSelectors) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
+            const text = clone.textContent.replace(/\s+/g, ' ').trim();
+            if (text.length > 200) {
+                return text.substring(0, 3000);
+            }
+        }
+        // Fallback: body text
+        const bodyClone = document.body.cloneNode(true);
+        bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
+        const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
+        return bodyText.substring(0, 2000);
+    }
+
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
         const pathname = window.location.pathname;
@@ -129,18 +150,23 @@
             page_url: window.location.href
         };
         
+        // Extract current page content for context awareness
+        const pageContent = extractPageContent();
+        
         if (selectedAgent) {
             context.page_type = selectedAgent.id;
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
-            context.system_prompt = selectedAgent.system_prompt;
+            context.system_prompt = selectedAgent.system_prompt +
+                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
             context.capabilities = selectedAgent.capabilities;
             context.model_settings = selectedAgent.model_settings;
         } else {
             // Fallback to general
             context.page_type = 'general';
             context.agent_id = 'general';
-            context.system_prompt = 'You are a helpful AI assistant ready to assist with general questions and tasks.';
+            context.system_prompt = 'You are a helpful AI assistant ready to assist with general questions and tasks.' +
+                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
         }
         
         return context;
@@ -176,6 +202,7 @@
             '<div class="chat-header-buttons">' +
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="detach-chat" class="chat-header-icon-btn" title="Detach to moveable window (works across monitors)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
 
@@ -347,6 +374,7 @@
         chatButton.addEventListener('click', function() { openChat(); });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
+        document.getElementById('detach-chat').addEventListener('click', function() { detachToPopup(); });
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -512,6 +540,20 @@
         });
     }
     
+    // Detach widget to a standalone popup window (moveable to any monitor)
+    function detachToPopup() {
+        const convId = state.currentConversationId;
+        const url = '/ai' + (convId ? '?resume=' + convId : '');
+        const popup = window.open(url, 'ai-chat-popup',
+            'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+        if (popup) {
+            closeChat();
+        } else {
+            const statusIndicator = document.getElementById('chat-status');
+            statusIndicator.textContent = 'Please allow popups for this site to detach chat';
+        }
+    }
+
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
@@ -538,11 +580,13 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
         
-        // Show status if resuming conversation
+        // Auto-reload messages if resuming a conversation
         if (state.currentConversationId) {
-            const statusIndicator = document.getElementById('chat-status');
-            statusIndicator.textContent = `Resuming conversation #${state.currentConversationId}`;
-            console.debug('Resuming conversation:', state.currentConversationId);
+            const chatMessages = document.getElementById('chat-messages');
+            const hasMessages = chatMessages && chatMessages.children.length > 1;
+            if (!hasMessages) {
+                loadConversation(state.currentConversationId);
+            }
         }
         
         // Focus on the input field
