@@ -79,8 +79,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'grok-beta',
-    documentation => 'Grok model to use (default: grok-beta)'
+    default => 'grok-3-mini',
+    documentation => 'Grok model to use (default: grok-3-mini)'
 );
 
 has 'timeout' => (
