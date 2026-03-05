@@ -745,8 +745,8 @@ document.addEventListener('DOMContentLoaded', function() {
         startServerBtn.addEventListener('click', startOllamaServer);
         // Check server status on page load
         checkServerStatus();
-        // Check server status every 5 seconds
-        setInterval(checkServerStatus, 5000);
+        // Check server status every 60 seconds (reduced from 5s to avoid hammering)
+        setInterval(checkServerStatus, 60000);
     }
 });
 
@@ -840,6 +840,11 @@ async function handleHostChange() {
 
 // Check Ollama server status
 async function checkServerStatus() {
+    // Skip Ollama check if an external provider (Grok etc.) is selected
+    const selectedModel = document.getElementById('model-select');
+    if (selectedModel && selectedModel.value && selectedModel.value.startsWith('grok')) {
+        return;
+    }
     const currentHost = hostSelect ? hostSelect.value : '[% current_host || "localhost" %]';
     
     // Only show button for localhost
