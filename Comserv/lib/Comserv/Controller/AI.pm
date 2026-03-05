@@ -117,9 +117,11 @@ sub index :Path :Args(0) {
                 )->first;
             }
             if ($grok_key && $grok_key->api_key_encrypted) {
-                push @external_models, { name => 'grok-2-latest', provider => 'grok', label => 'Grok 2 Latest (xAI)' };
-                push @external_models, { name => 'grok-beta',     provider => 'grok', label => 'Grok Beta (xAI)' };
-                push @external_models, { name => 'grok-2-1212',   provider => 'grok', label => 'Grok 2-1212 (xAI)' };
+                push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
+                push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
             }
         } catch {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
