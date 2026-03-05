@@ -198,6 +198,7 @@ sub generate :Local :Args(0) {
     my $format = '';
     my $system = '';
     my $provider = 'ollama';  # Default provider: ollama, grok, or deepseek
+    my $model = '';           # Specific model name (used for Grok model selection)
     my $page_context = 'general';
     my $page_path = '';
     my $page_title = '';
@@ -260,7 +261,8 @@ sub generate :Local :Args(0) {
             $page_title = $json_data->{page_title} || '';
             $agent_id = $json_data->{agent_id} || 'general';
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
-            $conversation_id = $json_data->{conversation_id};  # May be undef if new conversation
+            $conversation_id = $json_data->{conversation_id};
+            $model = $json_data->{model} || '';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
         } else {
@@ -339,6 +341,27 @@ sub generate :Local :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
     
+    # Require login for external AI models (Grok etc.) before entering try block
+    if (lc($provider) eq 'grok' && $is_guest) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'generate', "Guest user attempted to use Grok - login required");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Please log in to use external AI models (Grok/xAI).'
+        }));
+        return;
+    }
+
+    # Compute admin permission for provider fallback
+    my $user_roles_gen = $c->session->{roles} || [];
+    if (!ref($user_roles_gen)) {
+        $user_roles_gen = [split(/\s*,\s*/, $user_roles_gen)] if $user_roles_gen;
+    }
+    my $can_select_model_gen = 0;
+    if (ref($user_roles_gen) eq 'ARRAY') {
+        $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
+    }
+
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
@@ -349,20 +372,41 @@ sub generate :Local :Args(0) {
         # Route to the appropriate provider
         if (lc($provider) eq 'grok') {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Using Grok provider for query");
+                'generate', "Using Grok provider for query, user_id: $user_id");
             
+            # Fetch API key from database (user's own key, or any active for admins)
+            my $grok_api_key = '';
+            try {
+                my $schema = $c->model('DBEncy')->schema;
+                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                if (!$key_obj && $can_select_model_gen) {
+                    $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+                if ($key_obj && $key_obj->api_key_encrypted) {
+                    $grok_api_key = $key_obj->get_api_key() || '';
+                }
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "Failed to fetch grok API key: $_");
+            };
+
+            unless ($grok_api_key) {
+                die "No Grok API key found. Please add your xAI API key at /ai/manage_api_keys";
+            }
+
             my $grok = $c->model('Grok');
             unless ($grok) {
                 die "Failed to load Grok model";
             }
-            
-            # Check if API key is configured
-            unless ($grok->api_key) {
-                die "Grok API key not configured. Set GROK_API_KEY environment variable or configure Kubernetes secret.";
-            }
+            $grok->api_key($grok_api_key);
+            $grok->model($model) if $model;
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Querying Grok API");
+                'generate', "Querying Grok API (model: " . $grok->model . ")");
             
             $response = $grok->chat(
                 messages => [
@@ -406,28 +450,12 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Ollama model configured (host: $current_host), checking connection...");
             
-            # Check if server is connected, if not try to start it
-            unless ($ollama->check_connection()) {
-                # Only localhost can be auto-started
-                if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                        'generate', "Ollama not connected on $current_host, attempting to start server...");
-                    
-                    my $start_result = $ollama->start_server(method => 'command', async => 0);
-                    if ($start_result && $start_result->{success}) {
-                        $ollama_started = 1;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                            'generate', "Ollama server started successfully for user '$username'");
-                    } else {
-                        my $error = $start_result->{error} || 'Unknown error';
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                            'generate', "Failed to auto-start Ollama server for user '$username': $error");
-                    }
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                        'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
-                }
+            # Fast availability check (3-second timeout) before committing
+            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
+            unless ($fast_check && $fast_check->check_connection()) {
+                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
+            $ollama->timeout(60);
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Ollama API with model: $current_model");
@@ -639,13 +667,15 @@ sub generate :Local :Args(0) {
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'generate', "Ollama query failed for user '$username': $error");
+            'generate', "AI query failed for user '$username' (provider: $provider): $error");
+        
+        my $user_error = "$error";
+        $user_error =~ s/ at \/.*? line \d+.*$//s;
         
         $response_data = {
             success => JSON::false,
-            error => 'Failed to process AI request'
+            error => $user_error || 'Failed to process AI request'
         };
-        $c->response->status(500);
     };
     
     my $json_response = encode_json($response_data);
@@ -2329,7 +2359,6 @@ sub _get_current_ollama_config {
     # Configure the ollama model with the determined host
     try {
         $ollama->set_host($current_host);
-        $ollama->timeout(30);
         $current_port = $ollama->port;
         $current_model = $ollama->model;
         
@@ -3208,23 +3237,49 @@ sub get_user_providers :Local :Args(0) {
         cohere => 'Cohere'
     );
     
+    my $user_roles_prov = $c->session->{roles} || [];
+    if (!ref($user_roles_prov)) {
+        $user_roles_prov = [split(/\s*,\s*/, $user_roles_prov)] if $user_roles_prov;
+    }
+    my $is_admin = ref($user_roles_prov) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_prov
+        : 0;
+
     if ($user_id) {
         try {
             my $schema = $c->model('DBEncy')->schema;
-            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+            my %seen_services;
+
+            # User's own keys
+            my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
-            
-            foreach my $key ($keys_rs->all) {
+            foreach my $key ($own_keys->all) {
+                next if $seen_services{$key->service}++;
                 push @providers, {
                     service => $key->service,
                     display_name => $service_display{$key->service} || ucfirst($key->service)
                 };
             }
+
+            # Admins: also pick up any active keys not owned by this user
+            if ($is_admin) {
+                my $any_keys = $schema->resultset('UserApiKeys')->search(
+                    { is_active => '1' },
+                    { order_by => { -asc => 'service' } }
+                );
+                foreach my $key ($any_keys->all) {
+                    next if $seen_services{$key->service}++;
+                    push @providers, {
+                        service => $key->service,
+                        display_name => $service_display{$key->service} || ucfirst($key->service)
+                    };
+                }
+            }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id");
+                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id (is_admin: $is_admin)");
         } catch {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
                 'get_user_providers', "Failed to fetch providers: $_");
