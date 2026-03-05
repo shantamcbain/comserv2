@@ -15,7 +15,7 @@
 [% END %]
 
 <!-- Live chat implementation -->
-<script type="text/javascript" src="/static/js/local-chat.js?v=20260305c"></script>
+<script type="text/javascript" src="/static/js/local-chat.js?v=20260305d"></script>
 
 <!-- Debug information about the current page -->
 [% IF c.session.debug_mode == 1 %]

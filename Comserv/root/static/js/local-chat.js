@@ -148,153 +148,263 @@
     
     // Create chat widget elements
     function createChatWidget() {
-        // Create main container
+        // ── Floating chat button ──────────────────────────────────────────────
         const chatContainer = document.createElement('div');
         chatContainer.id = 'local-chat-widget';
         chatContainer.className = 'local-chat-widget';
-        
-        // Create chat button
+
         const chatButton = document.createElement('button');
         chatButton.id = 'chat-button';
         chatButton.className = 'chat-button';
         chatButton.innerHTML = '<span class="chat-icon">🤖</span> Chat with AI';
-        
-        // Create chat panel (initially hidden)
+        chatContainer.appendChild(chatButton);
+        document.body.appendChild(chatContainer);
+
+        // ── Chat panel ────────────────────────────────────────────────────────
         const chatPanel = document.createElement('div');
         chatPanel.id = 'chat-panel';
         chatPanel.className = 'chat-panel';
         chatPanel.style.display = 'none';
-        
-        // Create chat header
+        document.body.appendChild(chatPanel);  // direct child of body for z-index
+
+        // Header (drag handle)
         const chatHeader = document.createElement('div');
         chatHeader.className = 'chat-header';
-        chatHeader.innerHTML = '<h3>AI Assistant</h3><div class="chat-header-buttons"><select id="conversation-selector" class="conversation-selector" title="Select conversation"><option value="">Current Chat</option></select><button id="new-chat" class="new-chat-btn" title="Start new conversation">New Chat</button><button id="close-chat">×</button></div>';
-        
-        // Create chat messages area
+        chatHeader.innerHTML =
+            '<div class="chat-header-drag" id="chat-drag-handle" title="Drag to move">⠿</div>' +
+            '<h3 id="chat-title">AI Assistant</h3>' +
+            '<div class="chat-header-buttons">' +
+                '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
+                '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
+            '</div>';
+
+        // History drawer (hidden by default, slides in from top of messages area)
+        const historyDrawer = document.createElement('div');
+        historyDrawer.id = 'widget-history-drawer';
+        historyDrawer.className = 'widget-history-drawer';
+        historyDrawer.style.display = 'none';
+        historyDrawer.innerHTML =
+            '<div class="widget-history-header">' +
+                '<span>Recent Conversations</span>' +
+                '<button id="history-close-btn" class="chat-header-icon-btn" title="Close history">✕</button>' +
+            '</div>' +
+            '<div id="widget-history-list" class="widget-history-list"><div class="wh-loading">Loading…</div></div>';
+
+        // Messages area
         const chatMessages = document.createElement('div');
         chatMessages.id = 'chat-messages';
         chatMessages.className = 'chat-messages';
-        
-        // Add welcome message
         const welcomeMessage = document.createElement('div');
         welcomeMessage.className = 'message system-message';
         welcomeMessage.textContent = 'Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.';
         chatMessages.appendChild(welcomeMessage);
-        
-        // Create provider selector
+
+        // Provider / model selector bar
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
-        providerSelector.innerHTML = '<label for="ai-provider">AI Model:</label>' +
-                                    '<select id="ai-provider">' +
-                                    '<option value="ollama">Ollama (Local)</option>' +
-                                    '</select>' +
-                                    '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage your API keys">⚙️</a>';
-        
-        // Fetch available providers and populate dropdown
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.providers && data.providers.length > 0) {
-                    const sel = document.getElementById('ai-provider');
-                    if (sel) {
-                        data.providers.forEach(function(p) {
-                            if (p.service === 'grok') {
-                                const grp = document.createElement('optgroup');
-                                grp.label = 'External AI (xAI)';
-                                // Use synced models from server if available, else hardcoded fallback
-                                const grokModels = (p.models && p.models.length > 0)
-                                    ? p.models
-                                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
-                                        .map(function(m) {
-                                            const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-                                            return { val: 'grok|' + m.id, label: label + ' (xAI)' };
-                                        })
-                                    : [
-                                        { val: 'grok|grok-3-mini',             label: 'Grok 3 Mini (fast)' },
-                                        { val: 'grok|grok-3',                  label: 'Grok 3' },
-                                        { val: 'grok|grok-4-0709',             label: 'Grok 4' },
-                                        { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                        { val: 'grok|grok-code-fast-1',        label: 'Grok Code Fast' }
-                                    ];
-                                grokModels.forEach(function(m) {
-                                    const opt = document.createElement('option');
-                                    opt.value = m.val;
-                                    opt.textContent = m.label;
-                                    grp.appendChild(opt);
-                                });
-                                sel.appendChild(grp);
-                            }
-                        });
-                    }
-                }
-            })
-            .catch(function() {});
-        
-        // Create chat input area
-        const chatInput = document.createElement('div');
-        chatInput.className = 'chat-input';
-        chatInput.innerHTML = '<textarea id="message-input" placeholder="Type your message..."></textarea>' +
-                             '<button id="send-message">Send</button>';
-        
-        // Create status indicator
+        providerSelector.innerHTML =
+            '<label for="ai-provider">AI Model:</label>' +
+            '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
+
+        // Status indicator
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'chat-status';
         statusIndicator.className = 'chat-status';
         statusIndicator.textContent = 'AI Ready';
-        
-        // Assemble the chat panel
+
+        // Input area
+        const chatInput = document.createElement('div');
+        chatInput.className = 'chat-input';
+        chatInput.innerHTML =
+            '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
+            '<button id="send-message">Send</button>';
+
+        // Assemble panel
         chatPanel.appendChild(chatHeader);
+        chatPanel.appendChild(historyDrawer);
         chatPanel.appendChild(chatMessages);
         chatPanel.appendChild(providerSelector);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
-        
-        // Add button to the container
-        chatContainer.appendChild(chatButton);
-        
-        // Add the container to the body
-        document.body.appendChild(chatContainer);
-        
-        // Add the panel directly to the body (not to container) to avoid stacking context issues
-        document.body.appendChild(chatPanel);
-        
-        // Add event listeners
-        chatButton.addEventListener('click', function() {
-            openChat();
+
+        // ── Populate provider dropdown ────────────────────────────────────────
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(r => r.json())
+            .then(function(data) {
+                if (data.success && data.providers && data.providers.length > 0) {
+                    const sel = document.getElementById('ai-provider');
+                    if (!sel) return;
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'grok') {
+                            const grp = document.createElement('optgroup');
+                            grp.label = 'External AI (xAI)';
+                            const grokModels = (p.models && p.models.length > 0)
+                                ? p.models
+                                    .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                                    .map(function(m) {
+                                        const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+                                        return { val: 'grok|' + m.id, label: label + ' (xAI)' };
+                                    })
+                                : [
+                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
+                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
+                                    { val: 'grok|grok-4-0709',               label: 'Grok 4' },
+                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
+                                    { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                                ];
+                            grokModels.forEach(function(m) {
+                                const opt = document.createElement('option');
+                                opt.value = m.val; opt.textContent = m.label;
+                                grp.appendChild(opt);
+                            });
+                            sel.appendChild(grp);
+                        }
+                    });
+                }
+            })
+            .catch(function() {});
+
+        // ── Drag to move ──────────────────────────────────────────────────────
+        (function initDrag() {
+            const handle = document.getElementById('chat-drag-handle');
+            let dragging = false, startX, startY, origLeft, origBottom, origTop, origRight;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                dragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                // Switch from bottom/right positioning to top/left for free movement
+                chatPanel.style.bottom = 'auto';
+                chatPanel.style.right  = 'auto';
+                chatPanel.style.top    = rect.top + 'px';
+                chatPanel.style.left   = rect.left + 'px';
+                chatPanel.style.margin = '0';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!dragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                const newTop  = Math.max(0, Math.min(window.innerHeight - 60, rect.top + dy));
+                const newLeft = Math.max(0, Math.min(window.innerWidth  - 60, rect.left + dx));
+                chatPanel.style.top  = newTop  + 'px';
+                chatPanel.style.left = newLeft + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                dragging = false;
+                document.body.style.userSelect = '';
+            });
+
+            // Touch support
+            handle.addEventListener('touchstart', function(e) {
+                const t = e.touches[0];
+                startX = t.clientX; startY = t.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                chatPanel.style.bottom = 'auto'; chatPanel.style.right = 'auto';
+                chatPanel.style.top = rect.top + 'px'; chatPanel.style.left = rect.left + 'px';
+                chatPanel.style.margin = '0';
+            }, { passive: true });
+
+            document.addEventListener('touchmove', function(e) {
+                if (!handle._touching) return;
+                const t = e.touches[0];
+                const dx = t.clientX - startX; const dy = t.clientY - startY;
+                startX = t.clientX; startY = t.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                chatPanel.style.top  = Math.max(0, rect.top  + dy) + 'px';
+                chatPanel.style.left = Math.max(0, rect.left + dx) + 'px';
+            }, { passive: true });
+
+            handle.addEventListener('touchstart', function() { handle._touching = true; }, { passive: true });
+            handle.addEventListener('touchend',   function() { handle._touching = false; });
+        })();
+
+        // ── History drawer ────────────────────────────────────────────────────
+        document.getElementById('toggle-history-btn').addEventListener('click', function() {
+            const drawer = document.getElementById('widget-history-drawer');
+            if (drawer.style.display === 'none') {
+                drawer.style.display = 'flex';
+                loadWidgetHistory();
+            } else {
+                drawer.style.display = 'none';
+            }
         });
-        
-        document.getElementById('close-chat').addEventListener('click', function() {
-            closeChat();
+
+        document.getElementById('history-close-btn').addEventListener('click', function() {
+            document.getElementById('widget-history-drawer').style.display = 'none';
         });
-        
-        document.getElementById('new-chat').addEventListener('click', function() {
-            resetConversation();
-        });
-        
+
+        // ── Other events ──────────────────────────────────────────────────────
+        chatButton.addEventListener('click', function() { openChat(); });
+        document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
+        document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
-        
-        // Add provider selector change listener
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
-            console.debug('Provider changed to:', state.selectedProvider);
-            const statusIndicator = document.getElementById('chat-status');
             const parts = state.selectedProvider.split('|');
-            statusIndicator.textContent = `AI Ready (${parts[0] === 'grok' ? 'Grok' : 'Ollama'})`;
+            document.getElementById('chat-status').textContent = 'AI Ready (' + (parts[0] === 'grok' ? 'Grok' : 'Ollama') + ')';
         });
-        
-        // Add conversation selector change listener
-        document.getElementById('conversation-selector').addEventListener('change', function(e) {
-            const conversationId = parseInt(e.target.value);
-            if (conversationId) {
-                loadConversation(conversationId);
-            }
-        });
+    }
+
+    // Load conversation list into widget history drawer
+    function loadWidgetHistory() {
+        const list = document.getElementById('widget-history-list');
+        if (!list) return;
+        list.innerHTML = '<div class="wh-loading">Loading…</div>';
+        fetch('/ai/get_conversation_list', { credentials: 'include' })
+            .then(r => r.json())
+            .then(function(data) {
+                list.innerHTML = '';
+                if (!data.success || !data.conversations || !data.conversations.length) {
+                    list.innerHTML = '<div class="wh-empty">No conversations yet</div>';
+                    return;
+                }
+                data.conversations.forEach(function(conv) {
+                    const item = document.createElement('button');
+                    item.className = 'wh-item' + (state.currentConversationId && String(conv.id) === String(state.currentConversationId) ? ' active' : '');
+                    item.innerHTML =
+                        '<div class="wh-title">' + escWidgetHtml(conv.title || 'Untitled') + '</div>' +
+                        '<div class="wh-meta">' + (conv.message_count || 0) + ' msgs · ' + wRelTime(conv.updated_at) + '</div>';
+                    item.addEventListener('click', function() {
+                        loadConversation(conv.id);
+                        document.getElementById('widget-history-drawer').style.display = 'none';
+                        document.getElementById('chat-title').textContent = conv.title || 'AI Assistant';
+                        document.querySelectorAll('.wh-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                    });
+                    list.appendChild(item);
+                });
+            })
+            .catch(function() { list.innerHTML = '<div class="wh-empty">Failed to load</div>'; });
+    }
+
+    function escWidgetHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function wRelTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr.replace(' ','T'));
+            const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+            if (mins < 2)  return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24)  return hrs + 'h ago';
+            return Math.floor(hrs / 24) + 'd ago';
+        } catch(e) { return ''; }
     }
     
     // Load conversation list and populate dropdown
@@ -712,25 +822,65 @@
             .chat-header {
                 background-color: var(--primary-color);
                 color: var(--text-color);
-                padding: 10px 15px;
+                padding: 8px 12px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                gap: 6px;
+                flex-shrink: 0;
             }
-            
+
+            .chat-header-drag {
+                cursor: grab; font-size: 18px; opacity: 0.5; padding: 0 4px;
+                user-select: none; letter-spacing: -2px; flex-shrink: 0;
+            }
+            .chat-header-drag:active { cursor: grabbing; }
+
             .chat-header h3 {
-                margin: 0;
-                font-size: 16px;
+                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis;
             }
             
             .chat-header-buttons {
-                display: flex;
-                gap: 8px;
-                align-items: center;
+                display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
-            
+
+            .chat-header-icon-btn {
+                background: none; border: none; color: var(--text-color);
+                font-size: 15px; cursor: pointer; padding: 2px 5px;
+                border-radius: 4px; opacity: 0.75; transition: opacity 0.15s, background 0.15s;
+            }
+            .chat-header-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+
+            /* History drawer */
+            .widget-history-drawer {
+                display: flex; flex-direction: column;
+                background-color: var(--background-color);
+                border-bottom: 1px solid var(--border-color);
+                max-height: 220px; overflow: hidden; flex-shrink: 0;
+            }
+            .widget-history-header {
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 6px 10px; font-size: 12px; font-weight: 600;
+                border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+            }
+            .widget-history-list {
+                overflow-y: auto; padding: 4px;
+                display: flex; flex-direction: column; gap: 2px;
+            }
+            .wh-item {
+                width: 100%; text-align: left; background: transparent; border: none;
+                border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
+                color: var(--text-color); transition: background 0.15s;
+            }
+            .wh-item:hover { background: var(--secondary-color); }
+            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
+            .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
+
             .conversation-selector {
                 background: var(--background-color);
                 border: 1px solid var(--border-color);
@@ -743,26 +893,14 @@
             }
             
             #new-chat {
-                background: var(--nav-hover-bg);
-                border: 1px solid var(--border-color);
-                color: var(--text-color);
-                font-size: 12px;
-                padding: 4px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                transition: background-color 0.2s;
-            }
-            
-            #new-chat:hover {
-                background: var(--secondary-color);
+                background: none; border: none; color: var(--text-color);
+                font-size: 15px; cursor: pointer; padding: 2px 5px;
+                border-radius: 4px; opacity: 0.75;
             }
             
             #close-chat {
-                background: none;
-                border: none;
-                color: var(--text-color);
-                font-size: 20px;
-                cursor: pointer;
+                background: none; border: none; color: var(--text-color);
+                font-size: 18px; cursor: pointer; opacity: 0.75;
             }
             
             .chat-messages {
