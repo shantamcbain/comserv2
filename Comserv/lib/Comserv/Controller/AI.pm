@@ -94,20 +94,47 @@ sub index :Path :Args(0) {
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
     # Check if user has external API keys configured (grok, openai, etc.)
+    # Admins can use any active key, other users only their own key
     my @external_models;
     my $user_id = $c->session->{user_id};
     if ($user_id) {
         try {
             my $schema = $c->model('DBEncy')->schema;
-            my $keys_rs = $schema->resultset('UserApiKeys')->search(
-                { user_id => $user_id, is_active => '1' },
-                { order_by => { -asc => 'service' } }
-            );
-            foreach my $key ($keys_rs->all) {
-                if ($key->api_key_encrypted && $key->service eq 'grok') {
-                    push @external_models, { name => 'grok-2-latest', provider => 'grok', label => 'Grok 2 Latest (xAI)' };
-                    push @external_models, { name => 'grok-beta',      provider => 'grok', label => 'Grok Beta (xAI)' };
-                    push @external_models, { name => 'grok-2-1212',   provider => 'grok', label => 'Grok 2-1212 (xAI)' };
+            my $grok_key;
+            if ($can_select_model) {
+                # Admins: use their own key first, fall back to any active key
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                unless ($grok_key) {
+                    $grok_key = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+            } else {
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+            }
+            if ($grok_key && $grok_key->api_key_encrypted) {
+                # Use synced models from metadata if available, else hardcoded fallback
+                my $meta = $grok_key->get_metadata() || {};
+                my $synced = $meta->{available_models};
+                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                    foreach my $m (@$synced) {
+                        my $id = $m->{id} || $m->{name} || '';
+                        next unless $id;
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
+                        (my $label = $id) =~ s/-/ /g;
+                        $label = ucfirst($label) . ' (xAI)';
+                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                    }
+                } else {
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
                 }
             }
         } catch {
@@ -187,6 +214,7 @@ sub generate :Local :Args(0) {
     my $format = '';
     my $system = '';
     my $provider = 'ollama';  # Default provider: ollama, grok, or deepseek
+    my $model = '';           # Specific model name (used for Grok model selection)
     my $page_context = 'general';
     my $page_path = '';
     my $page_title = '';
@@ -249,7 +277,8 @@ sub generate :Local :Args(0) {
             $page_title = $json_data->{page_title} || '';
             $agent_id = $json_data->{agent_id} || 'general';
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
-            $conversation_id = $json_data->{conversation_id};  # May be undef if new conversation
+            $conversation_id = $json_data->{conversation_id};
+            $model = $json_data->{model} || '';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
         } else {
@@ -328,6 +357,27 @@ sub generate :Local :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "Agent type normalization: agent_id=$agent_id -> normalized_agent_type=$normalized_agent_type");
     
+    # Require login for external AI models (Grok etc.) before entering try block
+    if (lc($provider) eq 'grok' && $is_guest) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'generate', "Guest user attempted to use Grok - login required");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Please log in to use external AI models (Grok/xAI).'
+        }));
+        return;
+    }
+
+    # Compute admin permission for provider fallback
+    my $user_roles_gen = $c->session->{roles} || [];
+    if (!ref($user_roles_gen)) {
+        $user_roles_gen = [split(/\s*,\s*/, $user_roles_gen)] if $user_roles_gen;
+    }
+    my $can_select_model_gen = 0;
+    if (ref($user_roles_gen) eq 'ARRAY') {
+        $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
+    }
+
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
@@ -338,20 +388,41 @@ sub generate :Local :Args(0) {
         # Route to the appropriate provider
         if (lc($provider) eq 'grok') {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Using Grok provider for query");
+                'generate', "Using Grok provider for query, user_id: $user_id");
             
+            # Fetch API key from database (user's own key, or any active for admins)
+            my $grok_api_key = '';
+            try {
+                my $schema = $c->model('DBEncy')->schema;
+                my $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                )->first;
+                if (!$key_obj && $can_select_model_gen) {
+                    $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+                if ($key_obj && $key_obj->api_key_encrypted) {
+                    $grok_api_key = $key_obj->get_api_key() || '';
+                }
+            } catch {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'generate', "Failed to fetch grok API key: $_");
+            };
+
+            unless ($grok_api_key) {
+                die "No Grok API key found. Please add your xAI API key at /ai/manage_api_keys";
+            }
+
             my $grok = $c->model('Grok');
             unless ($grok) {
                 die "Failed to load Grok model";
             }
-            
-            # Check if API key is configured
-            unless ($grok->api_key) {
-                die "Grok API key not configured. Set GROK_API_KEY environment variable or configure Kubernetes secret.";
-            }
+            $grok->api_key($grok_api_key);
+            $grok->model($model) if $model;
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Querying Grok API");
+                'generate', "Querying Grok API (model: " . $grok->model . ")");
             
             $response = $grok->chat(
                 messages => [
@@ -395,28 +466,12 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Ollama model configured (host: $current_host), checking connection...");
             
-            # Check if server is connected, if not try to start it
-            unless ($ollama->check_connection()) {
-                # Only localhost can be auto-started
-                if ($current_host eq 'localhost' || $current_host eq '127.0.0.1') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                        'generate', "Ollama not connected on $current_host, attempting to start server...");
-                    
-                    my $start_result = $ollama->start_server(method => 'command', async => 0);
-                    if ($start_result && $start_result->{success}) {
-                        $ollama_started = 1;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                            'generate', "Ollama server started successfully for user '$username'");
-                    } else {
-                        my $error = $start_result->{error} || 'Unknown error';
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                            'generate', "Failed to auto-start Ollama server for user '$username': $error");
-                    }
-                } else {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
-                        'generate', "Ollama not connected on remote host $current_host, cannot auto-start");
-                }
+            # Fast availability check (3-second timeout) before committing
+            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
+            unless ($fast_check && $fast_check->check_connection()) {
+                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
+            $ollama->timeout(60);
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Ollama API with model: $current_model");
@@ -628,13 +683,15 @@ sub generate :Local :Args(0) {
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'generate', "Ollama query failed for user '$username': $error");
+            'generate', "AI query failed for user '$username' (provider: $provider): $error");
+        
+        my $user_error = "$error";
+        $user_error =~ s/ at \/.*? line \d+.*$//s;
         
         $response_data = {
             success => JSON::false,
-            error => 'Failed to process AI request'
+            error => $user_error || 'Failed to process AI request'
         };
-        $c->response->status(500);
     };
     
     my $json_response = encode_json($response_data);
@@ -826,7 +883,7 @@ sub result :Local :Args(0) {
                 agent_type => 'documentation',
                 model_used => $response_metadata->{model},
                 metadata => encode_json($user_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -856,7 +913,7 @@ sub result :Local :Args(0) {
                 model_used => $response_metadata->{model},
                 response_time_ms => $response_time,
                 metadata => encode_json($ai_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -1059,6 +1116,18 @@ sub chat :Local :Args(0) {
     # Detect if selected model is a Grok (xAI) model
     my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
 
+    # Require login for external AI models - check before entering try block
+    if ($is_grok_model && $is_guest) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'chat', "Guest user attempted to use Grok model - login required");
+        $c->response->status(401);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error => 'Please log in to use external AI models (Grok/xAI). Click the login link above.'
+        }));
+        return;
+    }
+
     try {
         my $ai_response = '';
         my $model_used = 'unknown';
@@ -1066,19 +1135,31 @@ sub chat :Local :Args(0) {
         my $response_total_duration = 0;
         my $response_eval_count = 0;
 
-        if ($is_grok_model && $user_id) {
+        if ($is_grok_model) {
             # Route to Grok API using user's stored API key
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Routing to Grok API for model: $model");
+                'chat', "Routing to Grok API for model: $model, user_id: $user_id");
 
             my $grok_api_key = '';
+            my $key_found = 0;
             try {
                 my $schema = $c->model('DBEncy')->schema;
                 my $key_obj = $schema->resultset('UserApiKeys')->search(
                     { user_id => $user_id, service => 'grok', is_active => '1' },
                 )->first;
+                # Admins fall back to any active Grok key if they don't have their own
+                if (!$key_obj && $can_select_model_perm) {
+                    $key_obj = $schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first;
+                }
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                    'chat', "Grok key lookup result: " . ($key_obj ? "found (id=" . $key_obj->id . ", owner=" . $key_obj->user_id . ")" : "not found"));
                 if ($key_obj && $key_obj->api_key_encrypted) {
+                    $key_found = 1;
                     $grok_api_key = $key_obj->get_api_key() || '';
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                        'chat', "Grok key decrypted, length: " . length($grok_api_key));
                 }
             } catch {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -1086,7 +1167,10 @@ sub chat :Local :Args(0) {
             };
 
             unless ($grok_api_key) {
-                die "No Grok API key configured. Please add your xAI API key at /ai/manage_api_keys";
+                my $msg = $key_found
+                    ? 'Failed to decrypt your Grok API key. Please re-save it at /ai/manage_api_keys'
+                    : 'No Grok API key found. Please add your xAI API key at /ai/manage_api_keys';
+                die $msg;
             }
 
             my $grok = $c->model('Grok');
@@ -1121,12 +1205,19 @@ sub chat :Local :Args(0) {
             # Default: Use Ollama
             my $ollama = $c->model('Ollama');
             unless ($ollama) {
-                die "Failed to load Ollama model";
+                die "Ollama service is not available";
             }
 
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model_perm);
 
+            # Quick availability check before committing to a long request
+            my $avail_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
+            unless ($avail_check && $avail_check->check_connection()) {
+                die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
+            }
+
             $ollama->set_host($current_host);
+            $ollama->timeout(60);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
@@ -1238,7 +1329,7 @@ sub chat :Local :Args(0) {
                     is_guest => $is_guest ? 1 : 0,
                     guest_session_id => $guest_session_id
                 }),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
@@ -1262,7 +1353,7 @@ sub chat :Local :Args(0) {
                     is_guest => $is_guest ? 1 : 0,
                     guest_session_id => $guest_session_id
                 }),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
@@ -1292,13 +1383,16 @@ sub chat :Local :Args(0) {
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'chat', "Ollama chat failed for user '$username': $error");
+            'chat', "AI chat failed for user '$username' (model: $model): $error");
+        
+        my $user_error = "$error";
+        $user_error =~ s/ at \/.*? line \d+.*$//s;
         
         $response_data = {
             success => JSON::false,
-            error => 'Failed to process AI chat request'
+            error => $user_error || 'Failed to process AI chat request'
         };
-        $c->response->status(500);
+        $c->response->status(200);
     };
     
     my $json_response = encode_json($response_data);
@@ -2244,7 +2338,7 @@ sub _get_current_ollama_config {
     
     # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
     unless ($can_select_model) {
-        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
         if ($test_ollama && $test_ollama->check_connection()) {
             $current_host = 'localhost';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2265,7 +2359,7 @@ sub _get_current_ollama_config {
         } else {
             # Test localhost first, fallback to 192.168.1.171 if not available
             # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
-            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434);
+            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
             if ($test_ollama && $test_ollama->check_connection()) {
                 $current_host = 'localhost';
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2284,14 +2378,17 @@ sub _get_current_ollama_config {
         $current_port = $ollama->port;
         $current_model = $ollama->model;
         
-        # Try to get installed models if connected
-        if ($ollama->check_connection()) {
+        # Quick connection check (uses 3s timeout via temporary UA)
+        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => 11434, timeout => 3);
+        if ($check_ollama && $check_ollama->check_connection()) {
             my $models = $ollama->list_models();
             $installed_models = $models if $models && ref($models) eq 'ARRAY';
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Ollama configured: $current_host:$current_port, model: $current_model, installed models: " . scalar(@$installed_models));
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                '_get_current_ollama_config', "Ollama unavailable at $current_host - no local models available");
         }
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-            '_get_current_ollama_config', "Ollama configured: $current_host:$current_port, model: $current_model, installed models: " . scalar(@$installed_models));
             
     } catch {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -3156,23 +3253,61 @@ sub get_user_providers :Local :Args(0) {
         cohere => 'Cohere'
     );
     
+    my $user_roles_prov = $c->session->{roles} || [];
+    if (!ref($user_roles_prov)) {
+        $user_roles_prov = [split(/\s*,\s*/, $user_roles_prov)] if $user_roles_prov;
+    }
+    my $is_admin = ref($user_roles_prov) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_prov
+        : 0;
+
     if ($user_id) {
         try {
             my $schema = $c->model('DBEncy')->schema;
-            my $keys_rs = $schema->resultset('UserApiKeys')->search(
+            my %seen_services;
+
+            my %synced_models_by_service;
+
+            # User's own keys
+            my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
-            
-            foreach my $key ($keys_rs->all) {
+            foreach my $key ($own_keys->all) {
+                next if $seen_services{$key->service}++;
+                my $meta = $key->get_metadata() || {};
+                if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
+                    $synced_models_by_service{$key->service} = $meta->{available_models};
+                }
                 push @providers, {
-                    service => $key->service,
-                    display_name => $service_display{$key->service} || ucfirst($key->service)
+                    service      => $key->service,
+                    display_name => $service_display{$key->service} || ucfirst($key->service),
+                    models       => $synced_models_by_service{$key->service} || undef
                 };
+            }
+
+            # Admins: also pick up any active keys not owned by this user
+            if ($is_admin) {
+                my $any_keys = $schema->resultset('UserApiKeys')->search(
+                    { is_active => '1' },
+                    { order_by => { -asc => 'service' } }
+                );
+                foreach my $key ($any_keys->all) {
+                    next if $seen_services{$key->service}++;
+                    my $meta = $key->get_metadata() || {};
+                    if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
+                        $synced_models_by_service{$key->service} = $meta->{available_models};
+                    }
+                    push @providers, {
+                        service      => $key->service,
+                        display_name => $service_display{$key->service} || ucfirst($key->service),
+                        models       => $synced_models_by_service{$key->service} || undef
+                    };
+                }
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id");
+                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id (is_admin: $is_admin)");
         } catch {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
                 'get_user_providers', "Failed to fetch providers: $_");
@@ -3203,6 +3338,147 @@ sub reset_conversation :Local :Args(0) {
     $c->response->body($response);
 }
 
+=head2 sync_models
+
+Fetch available models from a provider's API and store in user_api_keys metadata.
+Returns JSON with the synced model list.
+
+=cut
+
+sub sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_id  = $c->session->{user_id};
+    my $service  = $c->request->params->{service} || 'grok';
+
+    my $user_roles_sync = $c->session->{roles} || [];
+    if (!ref($user_roles_sync)) {
+        $user_roles_sync = [split(/\s*,\s*/, $user_roles_sync)] if $user_roles_sync;
+    }
+    my $is_admin_sync = ref($user_roles_sync) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles_sync : 0;
+
+    unless ($is_admin_sync) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+
+        # Find the API key record (user's own first, then any active)
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => $service, is_active => '1' }
+        )->first;
+        unless ($key_obj) {
+            $key_obj = $schema->resultset('UserApiKeys')->search(
+                { service => $service, is_active => '1' }
+            )->first;
+        }
+
+        unless ($key_obj && $key_obj->api_key_encrypted) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "No active $service API key found. Please add one first."
+            }));
+            return;
+        }
+
+        my $api_key = $key_obj->get_api_key() || '';
+        unless ($api_key) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Failed to decrypt $service API key. Please re-save it."
+            }));
+            return;
+        }
+
+        # Provider endpoint map
+        my %models_endpoint = (
+            grok    => 'https://api.x.ai/v1/models',
+            openai  => 'https://api.openai.com/v1/models',
+        );
+
+        my $endpoint = $models_endpoint{lc($service)};
+        unless ($endpoint) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Model sync not supported for service: $service"
+            }));
+            return;
+        }
+
+        # Fetch models from the provider
+        require LWP::UserAgent;
+        require HTTP::Request;
+        my $ua = LWP::UserAgent->new(timeout => 15);
+        $ua->agent('Comserv/1.0');
+        my $req = HTTP::Request->new(GET => $endpoint);
+        $req->header('Authorization' => "Bearer $api_key");
+        $req->header('Content-Type'  => 'application/json');
+
+        my $resp = $ua->request($req);
+
+        unless ($resp->is_success) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'sync_models', "Failed to fetch models from $service: " . $resp->status_line);
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Provider returned error: " . $resp->status_line
+            }));
+            return;
+        }
+
+        my $data = eval { decode_json($resp->content) };
+        if ($@) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Invalid JSON from provider" }));
+            return;
+        }
+
+        # Extract model list (OpenAI-compatible format: data[].id)
+        my @models;
+        if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
+            foreach my $m (@{$data->{data}}) {
+                next unless $m->{id};
+                push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+            }
+        }
+
+        # Sort models alphabetically
+        @models = sort { $a->{id} cmp $b->{id} } @models;
+
+        # Store model list in metadata of the key record
+        my $existing_meta = $key_obj->get_metadata() || {};
+        $existing_meta->{available_models} = \@models;
+        $existing_meta->{models_synced_at} = time();
+        $key_obj->set_metadata($existing_meta);
+        $key_obj->update;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+
+        $c->response->body(encode_json({
+            success => JSON::true,
+            service => $service,
+            models  => \@models,
+            count   => scalar(@models)
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'sync_models', "Error syncing models: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
+    };
+}
+
 =head1 AUTHOR
 
 AI Assistant
@@ -3212,6 +3488,149 @@ AI Assistant
 This library is part of the Comserv application.
 
 =cut
+
+=head2 get_page_doc
+
+Fetch plain-text content from a Documentation file so the AI can advise
+the user on how to use a page.  Strips TT directives and HTML tags.
+
+Query params:
+  page  - page name or URL path, e.g. "AI", "/Documentation/ApplicationTtTemplate",
+          "/admin/documentation/Planning"
+
+Returns JSON: { success, content, page, file }
+
+=cut
+
+sub get_page_doc :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $page = $c->request->params->{page} || '';
+    $page =~ s{^\s+|\s+$}{}g;
+
+    unless ($page) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'page param required' }));
+        return;
+    }
+
+    # Resolve page name → candidate file paths (relative to root/)
+    my @candidates = _doc_candidates($page);
+
+    my $root = $c->path_to('root');
+    my ($found_file, $content);
+
+    for my $rel (@candidates) {
+        my $full = "$root/$rel";
+        next unless -f $full;
+        local $/;
+        open my $fh, '<:encoding(UTF-8)', $full or next;
+        $content = <$fh>;
+        close $fh;
+        $found_file = $rel;
+        last;
+    }
+
+    unless ($found_file) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => "No documentation file found for: $page",
+            tried   => \@candidates,
+        }));
+        return;
+    }
+
+    # Strip TT directives [% ... %] (including multi-line META blocks)
+    $content =~ s/\[%-?.*?-?%\]//gs;
+
+    # Strip HTML tags
+    $content =~ s/<[^>]+>//gs;
+
+    # Decode common HTML entities
+    $content =~ s/&amp;/&/g;
+    $content =~ s/&lt;/</g;
+    $content =~ s/&gt;/>/g;
+    $content =~ s/&quot;/"/g;
+    $content =~ s/&#39;/'/g;
+    $content =~ s/&nbsp;/ /g;
+
+    # Collapse whitespace
+    $content =~ s/[ \t]+/ /g;
+    $content =~ s/(\n[ \t]*){3,}/\n\n/g;
+    $content =~ s/^\s+|\s+$//g;
+
+    # Cap at 6000 chars to keep system prompt reasonable
+    $content = substr($content, 0, 6000) . '…' if length($content) > 6000;
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'get_page_doc', "Served doc for '$page' from $found_file (" . length($content) . " chars)");
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        page    => $page,
+        file    => $found_file,
+        content => $content,
+    }));
+}
+
+# Build candidate file paths for a given page name or URL path.
+sub _doc_candidates {
+    my ($page) = @_;
+    my @cands;
+
+    # Normalise: strip leading slash, collapse slashes
+    (my $norm = $page) =~ s{^/+}{};
+    $norm =~ s{//+}{/}g;
+
+    # 1. If the path already looks like a Documentation path, use it directly
+    if ($norm =~ m{^(Documentation|admin/documentation)/}i) {
+        my $base = $norm;
+        push @cands, "$base.tt", "$base.md", $base;
+    }
+
+    # 2. Strip known route prefixes to get the page-name portion
+    (my $leaf = $norm) =~ s{^(Documentation|documentation|admin/documentation|admin)/}{}i;
+    $leaf =~ s{/.*$}{};   # take only the first segment after prefix
+    $leaf =~ s{\?.*$}{};  # drop query string
+    $leaf =~ s/\s+//g;
+
+    # 3. Derive a CamelCase variant in case the user passed a lowercase path
+    my $camel = join('', map { ucfirst($_) } split(/_|-/, $leaf));
+
+    for my $name ($leaf, $camel) {
+        next unless $name;
+        push @cands,
+            "Documentation/$name.tt",
+            "Documentation/$name.md",
+            "admin/documentation/$name.tt",
+            "admin/documentation/$name.md";
+    }
+
+    # 4. Special-case known URL→doc mappings
+    my %url_map = (
+        'ai'            => ['Documentation/AI.tt', 'Documentation/AI_Chat_System_Master_Audit.tt'],
+        'ai/models'     => ['Documentation/AiModelConfig.tt'],
+        'ai/manage_api_keys' => ['Documentation/ApiCredentials.tt'],
+        'project'       => ['Documentation/BMasterController.tt'],
+        'css'           => ['Documentation/CssThemes.tt'],
+        'helpdesk'      => ['Documentation/HelpDesk.tt'],
+        'admin'         => ['Documentation/Admin.tt'],
+        'Documentation' => ['Documentation/AllDocs.tt'],
+        'documentation' => ['Documentation/AllDocs.tt'],
+    );
+    if (exists $url_map{$norm}) {
+        push @cands, @{$url_map{$norm}};
+    }
+    # Try the normalised path without prefix too
+    (my $norm_no_prefix = $norm) =~ s{^(ai|admin|Documentation|documentation)/}{}i;
+    if (exists $url_map{$norm_no_prefix}) {
+        push @cands, @{$url_map{$norm_no_prefix}};
+    }
+
+    # De-duplicate while preserving order
+    my %seen;
+    return grep { !$seen{$_}++ } @cands;
+}
 
 __PACKAGE__->meta->make_immutable;
 
