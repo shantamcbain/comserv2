@@ -117,11 +117,25 @@ sub index :Path :Args(0) {
                 )->first;
             }
             if ($grok_key && $grok_key->api_key_encrypted) {
-                push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
-                push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
+                # Use synced models from metadata if available, else hardcoded fallback
+                my $meta = $grok_key->get_metadata() || {};
+                my $synced = $meta->{available_models};
+                if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
+                    foreach my $m (@$synced) {
+                        my $id = $m->{id} || $m->{name} || '';
+                        next unless $id;
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
+                        (my $label = $id) =~ s/-/ /g;
+                        $label = ucfirst($label) . ' (xAI)';
+                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                    }
+                } else {
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-4-0709',               provider => 'grok', label => 'Grok 4 (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-code-fast-1',          provider => 'grok', label => 'Grok Code Fast (xAI)' };
+                }
             }
         } catch {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -869,7 +883,7 @@ sub result :Local :Args(0) {
                 agent_type => 'documentation',
                 model_used => $response_metadata->{model},
                 metadata => encode_json($user_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -899,7 +913,7 @@ sub result :Local :Args(0) {
                 model_used => $response_metadata->{model},
                 response_time_ms => $response_time,
                 metadata => encode_json($ai_metadata),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
             });
             
@@ -1315,7 +1329,7 @@ sub chat :Local :Args(0) {
                     is_guest => $is_guest ? 1 : 0,
                     guest_session_id => $guest_session_id
                 }),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
@@ -1339,7 +1353,7 @@ sub chat :Local :Args(0) {
                     is_guest => $is_guest ? 1 : 0,
                     guest_session_id => $guest_session_id
                 }),
-                ip_address => $c->request->remote_address,
+                ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
             
@@ -3252,6 +3266,8 @@ sub get_user_providers :Local :Args(0) {
             my $schema = $c->model('DBEncy')->schema;
             my %seen_services;
 
+            my %synced_models_by_service;
+
             # User's own keys
             my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
@@ -3259,9 +3275,14 @@ sub get_user_providers :Local :Args(0) {
             );
             foreach my $key ($own_keys->all) {
                 next if $seen_services{$key->service}++;
+                my $meta = $key->get_metadata() || {};
+                if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
+                    $synced_models_by_service{$key->service} = $meta->{available_models};
+                }
                 push @providers, {
-                    service => $key->service,
-                    display_name => $service_display{$key->service} || ucfirst($key->service)
+                    service      => $key->service,
+                    display_name => $service_display{$key->service} || ucfirst($key->service),
+                    models       => $synced_models_by_service{$key->service} || undef
                 };
             }
 
@@ -3273,9 +3294,14 @@ sub get_user_providers :Local :Args(0) {
                 );
                 foreach my $key ($any_keys->all) {
                     next if $seen_services{$key->service}++;
+                    my $meta = $key->get_metadata() || {};
+                    if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
+                        $synced_models_by_service{$key->service} = $meta->{available_models};
+                    }
                     push @providers, {
-                        service => $key->service,
-                        display_name => $service_display{$key->service} || ucfirst($key->service)
+                        service      => $key->service,
+                        display_name => $service_display{$key->service} || ucfirst($key->service),
+                        models       => $synced_models_by_service{$key->service} || undef
                     };
                 }
             }
@@ -3310,6 +3336,147 @@ sub reset_conversation :Local :Args(0) {
     
     $c->response->content_type('application/json');
     $c->response->body($response);
+}
+
+=head2 sync_models
+
+Fetch available models from a provider's API and store in user_api_keys metadata.
+Returns JSON with the synced model list.
+
+=cut
+
+sub sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_id  = $c->session->{user_id};
+    my $service  = $c->request->params->{service} || 'grok';
+
+    my $user_roles_sync = $c->session->{roles} || [];
+    if (!ref($user_roles_sync)) {
+        $user_roles_sync = [split(/\s*,\s*/, $user_roles_sync)] if $user_roles_sync;
+    }
+    my $is_admin_sync = ref($user_roles_sync) eq 'ARRAY'
+        ? grep { $_ =~ /^(admin|developer)$/i } @$user_roles_sync : 0;
+
+    unless ($is_admin_sync) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+
+        # Find the API key record (user's own first, then any active)
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => $service, is_active => '1' }
+        )->first;
+        unless ($key_obj) {
+            $key_obj = $schema->resultset('UserApiKeys')->search(
+                { service => $service, is_active => '1' }
+            )->first;
+        }
+
+        unless ($key_obj && $key_obj->api_key_encrypted) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "No active $service API key found. Please add one first."
+            }));
+            return;
+        }
+
+        my $api_key = $key_obj->get_api_key() || '';
+        unless ($api_key) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Failed to decrypt $service API key. Please re-save it."
+            }));
+            return;
+        }
+
+        # Provider endpoint map
+        my %models_endpoint = (
+            grok    => 'https://api.x.ai/v1/models',
+            openai  => 'https://api.openai.com/v1/models',
+        );
+
+        my $endpoint = $models_endpoint{lc($service)};
+        unless ($endpoint) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Model sync not supported for service: $service"
+            }));
+            return;
+        }
+
+        # Fetch models from the provider
+        require LWP::UserAgent;
+        require HTTP::Request;
+        my $ua = LWP::UserAgent->new(timeout => 15);
+        $ua->agent('Comserv/1.0');
+        my $req = HTTP::Request->new(GET => $endpoint);
+        $req->header('Authorization' => "Bearer $api_key");
+        $req->header('Content-Type'  => 'application/json');
+
+        my $resp = $ua->request($req);
+
+        unless ($resp->is_success) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'sync_models', "Failed to fetch models from $service: " . $resp->status_line);
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => "Provider returned error: " . $resp->status_line
+            }));
+            return;
+        }
+
+        my $data = eval { decode_json($resp->content) };
+        if ($@) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Invalid JSON from provider" }));
+            return;
+        }
+
+        # Extract model list (OpenAI-compatible format: data[].id)
+        my @models;
+        if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
+            foreach my $m (@{$data->{data}}) {
+                next unless $m->{id};
+                push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
+            }
+        }
+
+        # Sort models alphabetically
+        @models = sort { $a->{id} cmp $b->{id} } @models;
+
+        # Store model list in metadata of the key record
+        my $existing_meta = $key_obj->get_metadata() || {};
+        $existing_meta->{available_models} = \@models;
+        $existing_meta->{models_synced_at} = time();
+        $key_obj->set_metadata($existing_meta);
+        $key_obj->update;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+
+        $c->response->body(encode_json({
+            success => JSON::true,
+            service => $service,
+            models  => \@models,
+            count   => scalar(@models)
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'sync_models', "Error syncing models: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
+    };
 }
 
 =head1 AUTHOR

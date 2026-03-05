@@ -201,13 +201,22 @@
                             if (p.service === 'grok') {
                                 const grp = document.createElement('optgroup');
                                 grp.label = 'External AI (xAI)';
-                                [
-                                    { val: 'grok|grok-3-mini',             label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                  label: 'Grok 3' },
-                                    { val: 'grok|grok-4-0709',             label: 'Grok 4' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                    { val: 'grok|grok-code-fast-1',        label: 'Grok Code Fast' }
-                                ].forEach(function(m) {
+                                // Use synced models from server if available, else hardcoded fallback
+                                const grokModels = (p.models && p.models.length > 0)
+                                    ? p.models
+                                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                                        .map(function(m) {
+                                            const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+                                            return { val: 'grok|' + m.id, label: label + ' (xAI)' };
+                                        })
+                                    : [
+                                        { val: 'grok|grok-3-mini',             label: 'Grok 3 Mini (fast)' },
+                                        { val: 'grok|grok-3',                  label: 'Grok 3' },
+                                        { val: 'grok|grok-4-0709',             label: 'Grok 4' },
+                                        { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
+                                        { val: 'grok|grok-code-fast-1',        label: 'Grok Code Fast' }
+                                    ];
+                                grokModels.forEach(function(m) {
                                     const opt = document.createElement('option');
                                     opt.value = m.val;
                                     opt.textContent = m.label;
