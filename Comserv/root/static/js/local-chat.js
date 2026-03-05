@@ -190,6 +190,35 @@
                                     '</select>' +
                                     '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage your API keys">⚙️</a>';
         
+        // Fetch available providers and populate dropdown
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.providers && data.providers.length > 0) {
+                    const sel = document.getElementById('ai-provider');
+                    if (sel) {
+                        data.providers.forEach(function(p) {
+                            if (p.service === 'grok') {
+                                const grp = document.createElement('optgroup');
+                                grp.label = 'External AI (xAI)';
+                                [
+                                    { val: 'grok|grok-2-latest', label: 'Grok 2 Latest' },
+                                    { val: 'grok|grok-beta',     label: 'Grok Beta' },
+                                    { val: 'grok|grok-2-1212',   label: 'Grok 2-1212' }
+                                ].forEach(function(m) {
+                                    const opt = document.createElement('option');
+                                    opt.value = m.val;
+                                    opt.textContent = m.label;
+                                    grp.appendChild(opt);
+                                });
+                                sel.appendChild(grp);
+                            }
+                        });
+                    }
+                }
+            })
+            .catch(function() {});
+        
         // Create chat input area
         const chatInput = document.createElement('div');
         chatInput.className = 'chat-input';
@@ -244,7 +273,8 @@
             state.selectedProvider = e.target.value;
             console.debug('Provider changed to:', state.selectedProvider);
             const statusIndicator = document.getElementById('chat-status');
-            statusIndicator.textContent = `AI Ready (${state.selectedProvider === 'grok' ? 'Grok' : 'Ollama'})`;
+            const parts = state.selectedProvider.split('|');
+            statusIndicator.textContent = `AI Ready (${parts[0] === 'grok' ? 'Grok' : 'Ollama'})`;
         });
         
         // Add conversation selector change listener
@@ -481,10 +511,15 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+        // Parse provider|model format (e.g. "grok|grok-2-latest" or "ollama")
+        const providerParts = (state.selectedProvider || 'ollama').split('|');
+        const providerName = providerParts[0];
+        const modelName = providerParts[1] || null;
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
-            provider: state.selectedProvider,
+            provider: providerName,
             page_context: state.pageContext.page_type,
             page_path: state.pageContext.page_path,
             page_title: state.pageContext.page_title,
@@ -493,6 +528,11 @@
             agent_name: state.pageContext.agent_name
         };
         
+        // Include selected model for Grok
+        if (modelName) {
+            requestPayload.model = modelName;
+        }
+
         // Include model settings if available
         if (state.pageContext.model_settings) {
             requestPayload.model_settings = state.pageContext.model_settings;
@@ -522,12 +562,7 @@
             },
             body: JSON.stringify(requestPayload)
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             // Remove loading message
             const loading = document.getElementById('ai-loading');
