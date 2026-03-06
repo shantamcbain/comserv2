@@ -688,9 +688,52 @@ sub generate :Local :Args(0) {
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
         
+        # Save user question and error to DB so the conversation record is complete
+        if ($user_id && $prompt) {
+            eval {
+                my $schema = $c->model('DBEncy')->schema;
+                if ($schema) {
+                    unless ($conversation_id && $conversation_id =~ /^\d+$/) {
+                        my $title = substr($prompt, 0, 80);
+                        $title =~ s/\n/ /g;
+                        $title ||= 'AI Query';
+                        my $conv = $schema->resultset('AiConversation')->create({
+                            user_id  => $user_id,
+                            title    => $title,
+                            status   => 'active',
+                            metadata => encode_json({ page_context => $page_context, page_path => $page_path })
+                        });
+                        $conversation_id = $conv ? $conv->id : undef;
+                        $c->session->{current_conversation_id} = $conversation_id if $conversation_id;
+                    }
+                    if ($conversation_id) {
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $conversation_id,
+                            user_id  => $user_id,
+                            role     => 'user',
+                            content  => $prompt,
+                            agent_type => $agent_id || 'general',
+                            model_used => $provider || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $conversation_id,
+                            user_id  => $user_id,
+                            role     => 'assistant',
+                            content  => '[ERROR] ' . ($user_error || 'Failed to process AI request'),
+                            agent_type => $agent_id || 'general',
+                            model_used => $provider || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                    }
+                }
+            };
+        }
+
         $response_data = {
             success => JSON::false,
-            error => $user_error || 'Failed to process AI request'
+            error => $user_error || 'Failed to process AI request',
+            conversation_id => $conversation_id || undef,
         };
     };
     
@@ -3315,8 +3358,10 @@ sub get_user_providers :Local :Args(0) {
     }
     
     $c->response->body(encode_json({
-        success => JSON::true,
-        providers => \@providers
+        success  => JSON::true,
+        providers => \@providers,
+        username  => $c->session->{username} || 'You',
+        user_id   => $user_id || 0,
     }));
 }
 
