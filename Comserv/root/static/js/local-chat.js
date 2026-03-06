@@ -23,7 +23,9 @@
         currentAgent: null,
         agentsConfig: null,
         selectedProvider: 'ollama',
-        conversationMessages: []
+        conversationMessages: [],
+        username: 'You',
+        activeModel: null
     };
     
     // Load persisted state from sessionStorage
@@ -278,6 +280,12 @@
         fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
             .then(r => r.json())
             .then(function(data) {
+                if (data.success) {
+                    // Capture username
+                    if (data.username) {
+                        state.username = data.username;
+                    }
+                }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
                     if (!sel) return;
@@ -400,7 +408,11 @@
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
             const parts = state.selectedProvider.split('|');
-            document.getElementById('chat-status').textContent = 'AI Ready (' + (parts[0] === 'grok' ? 'Grok' : 'Ollama') + ')';
+            const modelDisplay = parts[1] || (parts[0] === 'grok' ? 'Grok' : 'Ollama');
+            state.activeModel = modelDisplay;
+            const statusEl = document.getElementById('chat-status');
+            statusEl.textContent = '🟢 Connected: ' + modelDisplay;
+            statusEl.className = 'chat-status connected';
         });
     }
 
@@ -783,8 +795,10 @@
                     }
                 }
                 
-                // Update status
-                statusIndicator.textContent = 'AI Ready';
+                // Update status with model name
+                const modelName = data.model || state.activeModel || 'AI';
+                state.activeModel = modelName;
+                statusIndicator.textContent = '🟢 ' + modelName;
                 statusIndicator.className = 'chat-status connected';
                 
                 // Add AI response
@@ -838,13 +852,31 @@
         }
     }
     
-    // Function to add a message to the chat
+    // Function to add a message to the chat with sender label
     function addMessage(text, className) {
         const chatMessages = document.getElementById('chat-messages');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
+
+        // Sender label
+        const label = document.createElement('div');
+        label.className = 'msg-label';
+        if (className === 'user-message') {
+            label.textContent = state.username;
+        } else if (className === 'ai-message') {
+            const modelLabel = state.activeModel || (state.pageContext && state.pageContext.agent_name) || 'AI Assistant';
+            label.textContent = modelLabel;
+        } else {
+            label.textContent = 'System';
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
         messageElement.textContent = text;
-        chatMessages.appendChild(messageElement);
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(messageElement);
+        chatMessages.appendChild(wrapper);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
@@ -856,7 +888,7 @@
                 position: fixed;
                 bottom: 20px;
                 right: 20px;
-                z-index: 1000;
+                z-index: 9999;
                 font-family: inherit;
             }
             
@@ -872,7 +904,7 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                 font-family: inherit;
                 position: relative;
-                z-index: 1001;
+                z-index: 10000;
             }
             
             .chat-icon {
@@ -885,14 +917,20 @@
                 bottom: 90px;
                 right: 20px;
                 width: 380px;
+                min-width: 280px;
+                max-width: 90vw;
                 height: 500px;
+                min-height: 300px;
+                max-height: 90vh;
                 background-color: var(--background-color);
                 border-radius: 10px;
                 box-shadow: var(--dropdown-shadow);
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
-                z-index: 1002;
+                z-index: 10001;
+                resize: both;
+                overflow: hidden;
             }
             
             .chat-header {
@@ -981,17 +1019,27 @@
             
             .chat-messages {
                 flex-grow: 1;
-                padding: 15px;
+                padding: 10px 12px;
                 overflow-y: auto;
                 background-color: var(--background-color);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .msg-wrapper { display: flex; flex-direction: column; max-width: 85%; gap: 2px; }
+            .msg-wrapper-user { align-self: flex-end; align-items: flex-end; }
+            .msg-wrapper-ai  { align-self: flex-start; align-items: flex-start; }
+            .msg-label {
+                font-size: 10px; font-weight: 600; opacity: 0.6;
+                padding: 0 4px; text-transform: uppercase; letter-spacing: 0.04em;
             }
             
             .message {
-                margin-bottom: 10px;
                 padding: 8px 12px;
                 border-radius: 18px;
-                max-width: 80%;
                 word-wrap: break-word;
+                margin: 0;
             }
             
             .system-message {
