@@ -471,7 +471,7 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-            $ollama->timeout(60);
+            $ollama->timeout(30);
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Querying Ollama API with model: $current_model");
@@ -1260,7 +1260,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(60);
+            $ollama->timeout(30);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
