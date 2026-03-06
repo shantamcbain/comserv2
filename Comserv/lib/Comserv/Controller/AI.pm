@@ -458,13 +458,20 @@ sub generate :Local :Args(0) {
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
             
+            # Context-aware model selection when user has not picked a specific model
+            unless ($model) {
+                $current_model = $self->_select_model_for_context($agent_id, $page_context, $installed_models, $current_model);
+            } else {
+                $current_model = $model;
+            }
+
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
             $ollama->clear_endpoint;
             
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Ollama model configured (host: $current_host), checking connection...");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Ollama model selected: $current_model (agent=$agent_id context=$page_context)");
             
             # Fast availability check (3-second timeout) before committing
             my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
@@ -2376,6 +2383,68 @@ sub start_server :Local :Args(0) {
     
     my $json_response = encode_json($response_data);
     $c->response->body($json_response);
+}
+
+=head2 _select_model_for_context
+
+Choose the best installed Ollama model for a given agent/page context.
+
+  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
+  code / developer / docker         → prefer starcoder2 or qwen-coder
+  fallback                          → first installed model, then hardcoded default
+
+=cut
+
+sub _select_model_for_context {
+    my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
+
+    $agent_id    //= 'general';
+    $page_context //= 'general';
+    $installed_models //= [];
+
+    # Build a quick lookup: short name → full model name
+    my %installed;
+    for my $m (@$installed_models) {
+        my $name = ref($m) ? ($m->{name} || '') : ($m || '');
+        next unless $name;
+        $installed{$name} = $name;
+        (my $short = $name) =~ s/:.*$//;
+        $installed{$short} = $name;
+    }
+
+    # Preferred models per context (ordered: first match wins)
+    my %context_prefs = (
+        chat      => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        helpdesk  => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        ency      => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
+        bmaster   => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
+        general   => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        code      => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
+        developer => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
+        docker    => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+    );
+
+    my $ctx = lc($agent_id);
+    $ctx = 'helpdesk' if $ctx =~ /helpdesk/;
+    $ctx = 'code'     if $ctx =~ /code|developer/;
+    $ctx = 'ency'     if $ctx =~ /ency|beekeeping|bmast/;
+    $ctx = 'docker'   if $ctx =~ /docker/;
+    $ctx = 'general'  unless exists $context_prefs{$ctx};
+
+    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+
+    for my $pref (@$prefs) {
+        for my $key (keys %installed) {
+            if ($key =~ /\Q$pref\E/i) {
+                return $installed{$key};
+            }
+        }
+    }
+
+    # Fall back: default_model if installed, else first available, else hardcoded
+    return $default_model if $default_model && ($installed{$default_model} || grep { $_ eq $default_model } values %installed);
+    return (values %installed)[0] if %installed;
+    return 'llama3.1:latest';
 }
 
 =head2 _get_current_ollama_config
