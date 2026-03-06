@@ -19,10 +19,13 @@
         isOpen: false,
         currentConversationId: null,
         pageContext: null,
+        pageDocFetched: false,
         currentAgent: null,
         agentsConfig: null,
         selectedProvider: 'ollama',
-        conversationMessages: []
+        conversationMessages: [],
+        username: 'You',
+        activeModel: null
     };
     
     // Load persisted state from sessionStorage
@@ -265,6 +268,12 @@
             '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
             '<button id="send-message">Send</button>';
 
+        // Resize handle (bottom-right corner)
+        const resizeHandle = document.createElement('div');
+        resizeHandle.id = 'chat-resize-handle';
+        resizeHandle.className = 'chat-resize-handle';
+        resizeHandle.title = 'Drag to resize';
+
         // Assemble panel
         chatPanel.appendChild(chatHeader);
         chatPanel.appendChild(historyDrawer);
@@ -272,11 +281,18 @@
         chatPanel.appendChild(providerSelector);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
+        chatPanel.appendChild(resizeHandle);
 
         // ── Populate provider dropdown ────────────────────────────────────────
         fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
             .then(r => r.json())
             .then(function(data) {
+                if (data.success) {
+                    // Capture username
+                    if (data.username) {
+                        state.username = data.username;
+                    }
+                }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
                     if (!sel) return;
@@ -372,6 +388,48 @@
             handle.addEventListener('touchend',   function() { handle._touching = false; });
         })();
 
+        // ── Resize handle ─────────────────────────────────────────────────────
+        (function initResize() {
+            const handle = document.getElementById('chat-resize-handle');
+            let resizing = false, startX, startY, startW, startH;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                resizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                startW = rect.width;
+                startH = rect.height;
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!resizing) return;
+                const newW = Math.max(280, Math.min(window.innerWidth  - 20, startW + (e.clientX - startX)));
+                const newH = Math.max(300, Math.min(window.innerHeight - 20, startH + (e.clientY - startY)));
+                chatPanel.style.width  = newW + 'px';
+                chatPanel.style.height = newH + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                resizing = false;
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // ── Textarea auto-grow ────────────────────────────────────────────────
+        (function initTextareaGrow() {
+            const ta = document.getElementById('message-input');
+            if (!ta) return;
+            ta.addEventListener('input', function() {
+                this.style.height = 'auto';
+                const max = 140;
+                this.style.height = Math.min(this.scrollHeight, max) + 'px';
+                this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
+            });
+        })();
+
         // ── History drawer ────────────────────────────────────────────────────
         document.getElementById('toggle-history-btn').addEventListener('click', function() {
             const drawer = document.getElementById('widget-history-drawer');
@@ -399,7 +457,16 @@
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
             const parts = state.selectedProvider.split('|');
-            document.getElementById('chat-status').textContent = 'AI Ready (' + (parts[0] === 'grok' ? 'Grok' : 'Ollama') + ')';
+            let modelDisplay;
+            if (parts[0] === 'grok') {
+                modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
+            } else {
+                modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+            }
+            state.activeModel = modelDisplay;
+            const statusEl = document.getElementById('chat-status');
+            statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
+            statusEl.className = 'chat-status connected';
         });
     }
 
@@ -596,6 +663,17 @@
         chatPanel.style.display = 'flex';
         chatButton.style.display = 'none';
         state.isOpen = true;
+
+        // Set initial model label from current dropdown selection
+        if (!state.activeModel) {
+            const sel = document.getElementById('ai-provider');
+            if (sel) {
+                const parts = sel.value.split('|');
+                state.activeModel = parts[0] === 'grok'
+                    ? 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '')
+                    : 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+            }
+        }
         
         // Auto-reload messages if resuming a conversation
         if (state.currentConversationId) {
@@ -678,9 +756,23 @@
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            
-            // Send the request (extracted to helper function below)
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+
+            // Fetch documentation for the current page (cached after first load)
+            const docPromise = state.pageDocFetched
+                ? Promise.resolve('')
+                : fetchPageDoc(window.location.pathname).then(function(docText) {
+                    state.pageDocFetched = true;
+                    if (docText && state.pageContext) {
+                        state.pageContext.system_prompt =
+                            (state.pageContext.system_prompt || '') +
+                            '\n\n--- Page Documentation ---\n' + docText;
+                    }
+                    return docText;
+                });
+
+            docPromise.then(function() {
+                sendAIRequest(prompt, statusIndicator, loadingMessage);
+            });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
             // Fallback: still send request with default context
@@ -768,8 +860,18 @@
                     }
                 }
                 
-                // Update status
-                statusIndicator.textContent = 'AI Ready';
+                // Update status with provider + model name
+                const providerParts2 = (state.selectedProvider || 'ollama').split('|');
+                const provName = providerParts2[0];
+                const rawModel = data.model || providerParts2[1] || '';
+                let modelLabel;
+                if (provName === 'grok') {
+                    modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
+                } else {
+                    modelLabel = 'Ollama (Local)' + (rawModel ? ': ' + rawModel : '');
+                }
+                state.activeModel = modelLabel;
+                statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
                 // Add AI response
@@ -823,13 +925,31 @@
         }
     }
     
-    // Function to add a message to the chat
+    // Function to add a message to the chat with sender label
     function addMessage(text, className) {
         const chatMessages = document.getElementById('chat-messages');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
+
+        // Sender label
+        const label = document.createElement('div');
+        label.className = 'msg-label';
+        if (className === 'user-message') {
+            label.textContent = state.username;
+        } else if (className === 'ai-message') {
+            const modelLabel = state.activeModel || (state.pageContext && state.pageContext.agent_name) || 'AI Assistant';
+            label.textContent = modelLabel;
+        } else {
+            label.textContent = 'System';
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
         messageElement.textContent = text;
-        chatMessages.appendChild(messageElement);
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(messageElement);
+        chatMessages.appendChild(wrapper);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
@@ -841,7 +961,7 @@
                 position: fixed;
                 bottom: 20px;
                 right: 20px;
-                z-index: 1000;
+                z-index: 9999;
                 font-family: inherit;
             }
             
@@ -857,7 +977,7 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                 font-family: inherit;
                 position: relative;
-                z-index: 1001;
+                z-index: 10000;
             }
             
             .chat-icon {
@@ -870,14 +990,20 @@
                 bottom: 90px;
                 right: 20px;
                 width: 380px;
+                min-width: 280px;
+                max-width: 90vw;
                 height: 500px;
+                min-height: 300px;
+                max-height: 90vh;
                 background-color: var(--background-color);
                 border-radius: 10px;
                 box-shadow: var(--dropdown-shadow);
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
-                z-index: 1002;
+                z-index: 10001;
+                resize: both;
+                overflow: hidden;
             }
             
             .chat-header {
@@ -966,17 +1092,27 @@
             
             .chat-messages {
                 flex-grow: 1;
-                padding: 15px;
+                padding: 10px 12px;
                 overflow-y: auto;
                 background-color: var(--background-color);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .msg-wrapper { display: flex; flex-direction: column; max-width: 85%; gap: 2px; }
+            .msg-wrapper-user { align-self: flex-end; align-items: flex-end; }
+            .msg-wrapper-ai  { align-self: flex-start; align-items: flex-start; }
+            .msg-label {
+                font-size: 10px; font-weight: 600; opacity: 0.6;
+                padding: 0 4px; letter-spacing: 0.02em;
             }
             
             .message {
-                margin-bottom: 10px;
                 padding: 8px 12px;
                 border-radius: 18px;
-                max-width: 80%;
                 word-wrap: break-word;
+                margin: 0;
             }
             
             .system-message {
