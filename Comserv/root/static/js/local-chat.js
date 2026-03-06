@@ -390,6 +390,44 @@
 
         // ── Resize handle ─────────────────────────────────────────────────────
         (function initResize() {
+            const rh = document.getElementById('chat-resize-handle');
+            if (!rh) return;
+            let resizing = false, startX, startY, startW, startH;
+            rh.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                resizing = true;
+                startX = e.clientX; startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                startW = rect.width; startH = rect.height;
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!resizing) return;
+                const newW = Math.max(280, Math.min(window.innerWidth  - 20, startW + (e.clientX - startX)));
+                const newH = Math.max(300, Math.min(window.innerHeight - 20, startH + (e.clientY - startY)));
+                chatPanel.style.width  = newW + 'px';
+                chatPanel.style.height = newH + 'px';
+            });
+            document.addEventListener('mouseup', function() {
+                resizing = false;
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // ── Textarea auto-grow ────────────────────────────────────────────────
+        (function initTextareaGrow() {
+            const ta = document.getElementById('message-input');
+            if (!ta) return;
+            ta.addEventListener('input', function() {
+                this.style.height = 'auto';
+                const max = 140;
+                this.style.height = Math.min(this.scrollHeight, max) + 'px';
+                this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
+            });
+        })();
+
+        // ── Resize handle ─────────────────────────────────────────────────────
+        (function initResize() {
             const handle = document.getElementById('chat-resize-handle');
             let resizing = false, startX, startY, startW, startH;
 
@@ -674,7 +712,7 @@
                     : 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
             }
         }
-        
+
         // Auto-reload messages if resuming a conversation
         if (state.currentConversationId) {
             const chatMessages = document.getElementById('chat-messages');
@@ -827,16 +865,22 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Send to AI as JSON (not FormData)
+        // Send to AI as JSON with 45s client-side timeout to prevent browser lockup
+        const abortCtrl = new AbortController();
+        const abortTimer = setTimeout(function() {
+            abortCtrl.abort();
+        }, 45000);
+
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestPayload)
+            body: JSON.stringify(requestPayload),
+            signal: abortCtrl.signal
         })
-        .then(response => response.json())
+        .then(function(response) { clearTimeout(abortTimer); return response.json(); })
         .then(data => {
             // Remove loading message
             const loading = document.getElementById('ai-loading');
@@ -893,6 +937,7 @@
             }
         })
         .catch(error => {
+            clearTimeout(abortTimer);
             // Remove loading message
             const loading = document.getElementById('ai-loading');
             if (loading) {
@@ -903,8 +948,10 @@
             statusIndicator.textContent = 'AI Error';
             statusIndicator.className = 'chat-status error';
             
-            // Show error in chat
-            addMessage(`Network error: ${error.message}. Please check console and try again.`, 'error-message');
+            const msg = error.name === 'AbortError'
+                ? 'Request timed out after 45 seconds. The AI server may be busy or unavailable.'
+                : `Network error: ${error.message}. Please check console and try again.`;
+            addMessage(msg, 'error-message');
         });
     }
     
@@ -1001,6 +1048,8 @@
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
+                z-index: 10001;
+                overflow: hidden;
                 z-index: 10001;
                 resize: both;
                 overflow: hidden;
@@ -1268,6 +1317,20 @@
                 color: var(--schema-text-muted);
                 cursor: not-allowed;
             }
+
+            .chat-resize-handle {
+                position: absolute;
+                bottom: 0;
+                right: 0;
+                width: 16px;
+                height: 16px;
+                cursor: se-resize;
+                background: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
+                border-bottom-right-radius: 10px;
+                opacity: 0.6;
+                z-index: 10;
+            }
+            .chat-resize-handle:hover { opacity: 1; }
         `;
         document.head.appendChild(style);
     }

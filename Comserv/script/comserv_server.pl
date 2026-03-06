@@ -163,8 +163,9 @@ if ($ENV{CATALYST_DEBUG}) {
 sub _apply_safe_restart_defaults {
     my @args = @_;
 
-    my $has_restart = 0;
+    my $has_restart       = 0;
     my $has_restart_regex = 0;
+    my $has_fork          = 0;
 
     for (my $i = 0; $i < @args; $i++) {
         my $arg = $args[$i];
@@ -182,12 +183,23 @@ sub _apply_safe_restart_defaults {
         if ($arg =~ /^-rr=/ || $arg =~ /^--restart_regex=/) {
             $has_restart_regex = 1;
         }
+
+        if ($arg eq '-f' || $arg eq '--fork') {
+            $has_fork = 1;
+        }
     }
 
     if ($has_restart && !$has_restart_regex) {
         my $safe_restart_regex =
             '^(?!.*(?:^|[\\/])logs?(?:[\\/]|$)).*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
         push @args, ('--restart_regex', $safe_restart_regex);
+    }
+
+    # Outside Docker, enable --fork so long-running AI/Ollama requests do not
+    # block the server from handling other requests (each request gets its own
+    # forked process).  -r/--restart continues to work normally alongside --fork.
+    unless ($has_fork || $ENV{DOCKER_ENV} || $ENV{CATALYST_NO_FORK}) {
+        push @args, '--fork';
     }
 
     return @args;
