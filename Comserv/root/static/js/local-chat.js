@@ -854,15 +854,16 @@
                     }
                 }
                 
-                // Update status with provider + model name
+                // Update status with provider + model name + host
                 const providerParts2 = (state.selectedProvider || 'ollama').split('|');
-                const provName = providerParts2[0];
+                const provName = data.provider || providerParts2[0];
                 const rawModel = data.model || providerParts2[1] || '';
                 let modelLabel;
                 if (provName === 'grok') {
                     modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
                 } else {
-                    modelLabel = 'Ollama (Local)' + (rawModel ? ': ' + rawModel : '');
+                    const hostLabel = data.ollama_host ? ' @' + data.ollama_host : ' (Local)';
+                    modelLabel = 'Ollama' + hostLabel + (rawModel ? ': ' + rawModel : '');
                 }
                 state.activeModel = modelLabel;
                 statusIndicator.textContent = '🟢 ' + modelLabel;
