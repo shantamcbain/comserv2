@@ -1498,18 +1498,24 @@ sub models :Local :Args(0) {
     # Initialize servers data structure for multiple Ollama servers
     my $servers = [];
     
-    # Configure servers based on user permissions
+    # Configure servers from comserv.conf <Ollama> block
+    my $ollama_cfg2   = $c->config->{Ollama} || {};
+    my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
+    my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
+    my $cfg_port      = $ollama_cfg2->{port}          || 11434;
+
     my @server_configs;
     if ($can_select_model) {
-        # Admin/Developer/Editor users see all servers with location info
         @server_configs = (
-            { name => 'Local Server (localhost)', host => 'localhost', port => 11434, location => 'Local Machine' },
-            { name => 'Network Server (192.168.1.199)', host => '192.168.1.199', port => 11434, location => 'Network Server' }
+            { name => "Local ($cfg_host)",    host => $cfg_host,     port => $cfg_port, location => 'Primary' },
         );
+        if ($cfg_fallback ne $cfg_host) {
+            push @server_configs,
+                { name => "Fallback ($cfg_fallback)", host => $cfg_fallback, port => $cfg_port, location => 'Fallback' };
+        }
     } else {
-        # Regular users only see 192.168.1.199, no address shown in name
         @server_configs = (
-            { name => 'AI Server', host => '192.168.1.199', port => 11434, location => 'Remote' }
+            { name => 'AI Server', host => $cfg_host, port => $cfg_port, location => 'Primary' }
         );
     }
     
@@ -2455,46 +2461,38 @@ Private method to determine current Ollama configuration with automatic fallback
 
 sub _get_current_ollama_config {
     my ($self, $c, $can_select_model) = @_;
-    
+
+    # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
+    my $ollama_cfg      = $c->config->{Ollama} || {};
+    my $primary_host    = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
+    my $config_port     = $ollama_cfg->{port}          || 11434;
+
     my $ollama = $c->model('Ollama');
-    my $current_host = 'localhost';  # Default
-    my $current_port = 11434;
-    my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
+    my $current_host  = $primary_host;
+    my $current_port  = $config_port;
+    my $current_model = 'llama3.1:latest';
     my $installed_models = [];
-    
-    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.199
-    unless ($can_select_model) {
-        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
-        if ($test_ollama && $test_ollama->check_connection()) {
-            $current_host = 'localhost';
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
-        } else {
-            $current_host = '192.168.1.199';
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
-        }
+
+    # Session override (admin/privileged users can switch host via /ai/models UI)
+    if ($can_select_model && $c->session->{ollama_host}) {
+        $current_host = $c->session->{ollama_host};
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            '_get_current_ollama_config', "Using session preferred host: $current_host");
     } else {
-        # For privileged users, check session preference or test localhost first
-        my $preferred_host = $c->session->{ollama_host};
-        
-        if ($preferred_host) {
-            $current_host = $preferred_host;
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Using session preferred host: $current_host");
+        # Try primary host; fall back to fallback_host if unreachable
+        my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
+        if ($test && $test->check_connection()) {
+            $current_host = $primary_host;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host available");
+        } elsif ($fallback_host ne $primary_host) {
+            $current_host = $fallback_host;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host unavailable, using fallback $fallback_host");
         } else {
-            # Test localhost first, fallback to 192.168.1.199 if not available
-            # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
-            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
-            if ($test_ollama && $test_ollama->check_connection()) {
-                $current_host = 'localhost';
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    '_get_current_ollama_config', "Localhost is available, using localhost");
-            } else {
-                $current_host = '192.168.1.199';
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    '_get_current_ollama_config', "Localhost not available, falling back to $current_host");
-            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Ollama host $primary_host is not reachable");
         }
     }
     
