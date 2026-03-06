@@ -1504,12 +1504,12 @@ sub models :Local :Args(0) {
         # Admin/Developer/Editor users see all servers with location info
         @server_configs = (
             { name => 'Local Server (localhost)', host => 'localhost', port => 11434, location => 'Local Machine' },
-            { name => 'Network Server (192.168.1.171)', host => '192.168.1.171', port => 11434, location => 'Network Server' }
+            { name => 'Network Server (192.168.1.199)', host => '192.168.1.199', port => 11434, location => 'Network Server' }
         );
     } else {
-        # Regular users only see 192.168.1.171, no address shown in name
+        # Regular users only see 192.168.1.199, no address shown in name
         @server_configs = (
-            { name => 'AI Server', host => '192.168.1.171', port => 11434, location => 'Remote' }
+            { name => 'AI Server', host => '192.168.1.199', port => 11434, location => 'Remote' }
         );
     }
     
@@ -2462,7 +2462,7 @@ sub _get_current_ollama_config {
     my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
     my $installed_models = [];
     
-    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
+    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.199
     unless ($can_select_model) {
         my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
         if ($test_ollama && $test_ollama->check_connection()) {
@@ -2470,7 +2470,7 @@ sub _get_current_ollama_config {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
         } else {
-            $current_host = '192.168.1.171';
+            $current_host = '192.168.1.199';
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
         }
@@ -2483,7 +2483,7 @@ sub _get_current_ollama_config {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 '_get_current_ollama_config', "Using session preferred host: $current_host");
         } else {
-            # Test localhost first, fallback to 192.168.1.171 if not available
+            # Test localhost first, fallback to 192.168.1.199 if not available
             # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
             my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
             if ($test_ollama && $test_ollama->check_connection()) {
@@ -2491,7 +2491,7 @@ sub _get_current_ollama_config {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     '_get_current_ollama_config', "Localhost is available, using localhost");
             } else {
-                $current_host = '192.168.1.171';
+                $current_host = '192.168.1.199';
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                     '_get_current_ollama_config', "Localhost not available, falling back to $current_host");
             }
