@@ -1380,6 +1380,9 @@ sub chat :Local :Args(0) {
                     'chat', "Continuing existing conversation ID: $final_conversation_id for user: $username");
             }
             
+            # Store in session so widget and /ai page share the same conversation
+            $c->session->{current_conversation_id} = $final_conversation_id if $final_conversation_id;
+            
             # Save user's message
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
@@ -1455,6 +1458,49 @@ sub chat :Local :Args(0) {
         
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
+        
+        # Save failed request to DB so conversation record is complete
+        if ($user_id && $prompt) {
+            eval {
+                my $schema = $c->model('DBEncy')->schema;
+                if ($schema) {
+                    my $save_conv_id = $conversation_id;
+                    unless ($save_conv_id && $save_conv_id =~ /^\d+$/) {
+                        my $title = substr($prompt, 0, 80);
+                        $title =~ s/\n/ /g;
+                        $title ||= 'Chat Error';
+                        my $conv = $schema->resultset('AiConversation')->create({
+                            user_id => $user_id,
+                            title   => $title,
+                            status  => 'active',
+                            metadata => encode_json({ is_guest => $is_guest ? 1 : 0 })
+                        });
+                        $save_conv_id = $conv ? $conv->id : undef;
+                        $c->session->{current_conversation_id} = $save_conv_id if $save_conv_id;
+                    }
+                    if ($save_conv_id) {
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $save_conv_id,
+                            user_id  => $user_id,
+                            role     => 'user',
+                            content  => $prompt,
+                            agent_type => 'documentation',
+                            model_used => $model || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $save_conv_id,
+                            user_id  => $user_id,
+                            role     => 'assistant',
+                            content  => '[ERROR] ' . $user_error,
+                            agent_type => 'documentation',
+                            model_used => $model || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                    }
+                }
+            };
+        }
         
         $response_data = {
             success => JSON::false,
