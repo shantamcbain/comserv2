@@ -408,10 +408,15 @@
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
             const parts = state.selectedProvider.split('|');
-            const modelDisplay = parts[1] || (parts[0] === 'grok' ? 'Grok' : 'Ollama');
+            let modelDisplay;
+            if (parts[0] === 'grok') {
+                modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
+            } else {
+                modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+            }
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
-            statusEl.textContent = '🟢 Connected: ' + modelDisplay;
+            statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
             statusEl.className = 'chat-status connected';
         });
     }
@@ -795,10 +800,18 @@
                     }
                 }
                 
-                // Update status with model name
-                const modelName = data.model || state.activeModel || 'AI';
-                state.activeModel = modelName;
-                statusIndicator.textContent = '🟢 ' + modelName;
+                // Update status with provider + model name
+                const providerParts2 = (state.selectedProvider || 'ollama').split('|');
+                const provName = providerParts2[0];
+                const rawModel = data.model || providerParts2[1] || '';
+                let modelLabel;
+                if (provName === 'grok') {
+                    modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
+                } else {
+                    modelLabel = 'Ollama (Local)' + (rawModel ? ': ' + rawModel : '');
+                }
+                state.activeModel = modelLabel;
+                statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
                 // Add AI response
@@ -1032,7 +1045,7 @@
             .msg-wrapper-ai  { align-self: flex-start; align-items: flex-start; }
             .msg-label {
                 font-size: 10px; font-weight: 600; opacity: 0.6;
-                padding: 0 4px; text-transform: uppercase; letter-spacing: 0.04em;
+                padding: 0 4px; letter-spacing: 0.02em;
             }
             
             .message {
