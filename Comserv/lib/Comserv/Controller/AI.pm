@@ -471,22 +471,29 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-            $ollama->timeout(30);
+            $ollama->timeout(90);
             
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Querying Ollama API with model: $current_model");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Querying Ollama host=$current_host model=$current_model timeout=90s prompt_len=" . length($prompt));
             
+            my $query_start = time();
             # Query the API
             $response = $ollama->query(
                 prompt => $prompt,
                 format => $format eq 'json' ? 'json' : undef,
                 system => $system || undef
             );
+            my $query_elapsed = time() - $query_start;
             
             unless ($response) {
                 my $error = $ollama->last_error || 'Unknown error';
+                my $error_class = ref($error) || 'string';
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                    'generate', "Ollama FAILED host=$current_host model=$current_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 die "Ollama query failed: $error";
             }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Ollama SUCCESS elapsed=${query_elapsed}s model=" . ($response->{model} || $current_model));
             
             $model_used = $response->{model} || $ollama->model;
         }
@@ -1260,7 +1267,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(30);
+            $ollama->timeout(90);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
@@ -1268,15 +1275,22 @@ sub chat :Local :Args(0) {
                 $ollama->model($model);
             }
 
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                'chat', "Ollama model configured (host: $current_host), calling chat API...");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=90s messages=" . scalar(@messages));
 
+            my $chat_start = time();
             my $response = $ollama->chat(messages => \@messages);
+            my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
                 my $error = $ollama->last_error || 'Unknown error';
+                my $error_class = ref($error) || 'string';
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'chat', "Ollama FAILED host=$current_host model=" . $ollama->model . " elapsed=${chat_elapsed}s error_class=$error_class error=$error");
                 die "Ollama chat failed: $error";
             }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'chat', "Ollama SUCCESS elapsed=${chat_elapsed}s model=" . ($response->{model} || $ollama->model));
 
             if ($response->{message} && $response->{message}->{content}) {
                 $ai_response = $response->{message}->{content};
