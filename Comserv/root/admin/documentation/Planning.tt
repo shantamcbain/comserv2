@@ -2445,6 +2445,97 @@ last_updated = '2026/02/08'
                     </ul>
                 </div>
             </details>
+
+            <!-- Ollama VM -->
+            <div id="anchor-ollama-vm" class="nav-anchor"></div>
+            <details id="ollama-vm-plan" class="priority-container">
+                <summary class="priority-summary">🖥️ Ollama Proxmox VM — Isolation &amp; Non-Blocking AI</summary>
+                <div class="priority-content">
+                    <p><strong>Status:</strong> <span class="status-pending">PLANNED</span></p>
+                    <p><strong>Why:</strong> Running Ollama on the same host as Catalyst blocks the entire dev/prod server during long AI requests (LWP is synchronous). A dedicated VM isolates memory/GPU pressure, protects the production server, and enables non-blocking requests (the VM can queue requests independently).</p>
+
+                    <h4>📋 Phase 1 — Create the Ollama VM in Proxmox</h4>
+                    <ol>
+                        <li>In Proxmox web UI → <strong>Create VM</strong>
+                            <ul>
+                                <li>VM ID: choose next available (e.g. 200)</li>
+                                <li>Name: <code>ollama-dev</code></li>
+                                <li>OS: Ubuntu 24.04 LTS (minimal server ISO)</li>
+                                <li>CPU: 4 cores (or more if GPU passthrough planned)</li>
+                                <li>RAM: 16 GB minimum (32 GB recommended for 7B+ models)</li>
+                                <li>Disk: 100 GB (models are large; llama3 ~5 GB, mistral ~4 GB)</li>
+                                <li>Network: VirtIO, bridge to same LAN as app server (e.g. <code>vmbr0</code>)</li>
+                            </ul>
+                        </li>
+                        <li>Install Ubuntu, set static IP (e.g. <code>192.168.1.180</code>), enable SSH</li>
+                        <li>(Optional) GPU passthrough: add PCIe GPU to VM via Proxmox hardware tab — required for GPU-accelerated inference</li>
+                    </ol>
+
+                    <h4>📋 Phase 2 — Install Ollama on the VM</h4>
+                    <pre style="background:#f8f9fa;padding:10px;border-radius:3px;overflow-x:auto;">
+# On the VM (SSH in as root or sudo user)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Make Ollama listen on all interfaces (not just localhost)
+# Edit the systemd service:
+systemctl edit ollama
+# Add:
+# [Service]
+# Environment="OLLAMA_HOST=0.0.0.0"
+
+systemctl daemon-reload
+systemctl restart ollama
+systemctl enable ollama
+
+# Pull models you need
+ollama pull llama3
+ollama pull mistral
+ollama pull starcoder2:3b
+
+# Verify
+curl http://localhost:11434/api/tags</pre>
+
+                    <h4>📋 Phase 3 — Firewall Rules</h4>
+                    <ul>
+                        <li>Allow port <strong>11434</strong> from app server IP only (Proxmox firewall or ufw)</li>
+                        <li><code>ufw allow from 192.168.1.X to any port 11434</code></li>
+                        <li>Block port 11434 from outside LAN entirely</li>
+                    </ul>
+
+                    <h4>📋 Phase 4 — Update Application Config</h4>
+                    <ul>
+                        <li>In <code>/ai/models</code> admin UI, change Ollama host from <code>localhost</code> to VM IP (e.g. <code>192.168.1.180</code>)</li>
+                        <li>Or set env var: <code>OLLAMA_HOST=192.168.1.180</code></li>
+                        <li>Test: <code>curl http://192.168.1.180:11434/api/tags</code> from app server</li>
+                        <li>The existing pre-flight check in <code>AI.pm</code> will validate the connection on each request</li>
+                    </ul>
+
+                    <h4>📋 Phase 5 — Multi-Worker / Non-Blocking (Long-Term)</h4>
+                    <p>Moving Ollama to a VM solves production safety but the Catalyst worker still blocks during the HTTP call. For fully non-blocking AI, implement one of:</p>
+                    <ol>
+                        <li><strong>Multiple Plack workers</strong> (immediate, done in comserv_server.pl via <code>--fork</code>):
+                            <br>Already enabled in dev server. For production Docker, update <code>Dockerfile</code>:
+                            <pre style="background:#f8f9fa;padding:6px;border-radius:3px;">CMD ["starman", "--workers", "5", "-p", "5000", "script/comserv_server.psgi"]</pre>
+                        </li>
+                        <li><strong>Background job queue</strong> (best UX): AI request goes into a job queue (e.g. <code>Minion</code> or <code>TheSchwartz</code>), browser polls <code>/ai/job_status/ID</code> every 2 seconds. Fully non-blocking, shows live progress. This is a separate development step.</li>
+                    </ol>
+
+                    <h4>📋 Phase 6 — Live AI Thinking Display (Application Step — Separate)</h4>
+                    <p>The "🤔 AI Thinking Live" display (showing files read, tools used, elapsed time) is <strong>strictly an application feature</strong> — it requires server-sent events (SSE) streaming from the backend, independent of VM setup. Steps:</p>
+                    <ul>
+                        <li>Add <code>/ai/stream_generate</code> endpoint using Catalyst streaming response</li>
+                        <li>Widget switches from <code>fetch()</code> to <code>EventSource</code> or <code>ReadableStream</code></li>
+                        <li>Server emits progress events: <code>data: {"status":"thinking","file":"Planning.tt"}</code></li>
+                        <li>Can be done after VM setup or in parallel — no dependency</li>
+                    </ul>
+
+                    <h4>🔗 Related</h4>
+                    <ul>
+                        <li><a href="/ai/models" target="_blank">Ollama Model Configuration (Admin)</a></li>
+                        <li><a href="http://192.168.1.180:11434" target="_blank">Ollama VM API (when configured)</a></li>
+                    </ul>
+                </div>
+            </details>
             </div>
         </details>
 
