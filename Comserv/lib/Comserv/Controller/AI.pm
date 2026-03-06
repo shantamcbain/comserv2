@@ -381,6 +381,7 @@ sub generate :Local :Args(0) {
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
+    my $active_ollama_host = '';
     
     try {
         my $response;
@@ -457,6 +458,7 @@ sub generate :Local :Args(0) {
                 $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
+            $active_ollama_host = $current_host;
             
             # Context-aware model selection when user has not picked a specific model
             unless ($model) {
@@ -688,6 +690,8 @@ sub generate :Local :Args(0) {
             success => JSON::true,
             response => $ai_response,
             model => $model_used,
+            provider => $provider,
+            ollama_host => ($provider eq 'ollama' ? $active_ollama_host : ''),
             conversation_id => $conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
