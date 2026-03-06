@@ -812,11 +812,14 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Send to AI as JSON with 45s client-side timeout to prevent browser lockup
+        // Provider-aware client timeout: Ollama (local) can be slow with large models,
+        // so match the server-side 90s. External APIs (Grok etc.) should be fast; cap at 30s.
+        const isOllama = providerName === 'ollama';
+        const clientTimeoutMs = isOllama ? 95000 : 30000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
-        }, 45000);
+        }, clientTimeoutMs);
 
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
@@ -896,7 +899,7 @@
             statusIndicator.className = 'chat-status error';
             
             const msg = error.name === 'AbortError'
-                ? 'Request timed out after 45 seconds. The AI server may be busy or unavailable.'
+                ? `Request timed out after ${clientTimeoutMs / 1000}s. ${isOllama ? 'Ollama may be loading a large model — try a smaller model or wait and retry.' : 'The AI server may be busy or unavailable.'}`
                 : `Network error: ${error.message}. Please check console and try again.`;
             addMessage(msg, 'error-message');
         });
