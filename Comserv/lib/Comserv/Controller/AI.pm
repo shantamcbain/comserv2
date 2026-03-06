@@ -3489,6 +3489,149 @@ This library is part of the Comserv application.
 
 =cut
 
+=head2 get_page_doc
+
+Fetch plain-text content from a Documentation file so the AI can advise
+the user on how to use a page.  Strips TT directives and HTML tags.
+
+Query params:
+  page  - page name or URL path, e.g. "AI", "/Documentation/ApplicationTtTemplate",
+          "/admin/documentation/Planning"
+
+Returns JSON: { success, content, page, file }
+
+=cut
+
+sub get_page_doc :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $page = $c->request->params->{page} || '';
+    $page =~ s{^\s+|\s+$}{}g;
+
+    unless ($page) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'page param required' }));
+        return;
+    }
+
+    # Resolve page name → candidate file paths (relative to root/)
+    my @candidates = _doc_candidates($page);
+
+    my $root = $c->path_to('root');
+    my ($found_file, $content);
+
+    for my $rel (@candidates) {
+        my $full = "$root/$rel";
+        next unless -f $full;
+        local $/;
+        open my $fh, '<:encoding(UTF-8)', $full or next;
+        $content = <$fh>;
+        close $fh;
+        $found_file = $rel;
+        last;
+    }
+
+    unless ($found_file) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => "No documentation file found for: $page",
+            tried   => \@candidates,
+        }));
+        return;
+    }
+
+    # Strip TT directives [% ... %] (including multi-line META blocks)
+    $content =~ s/\[%-?.*?-?%\]//gs;
+
+    # Strip HTML tags
+    $content =~ s/<[^>]+>//gs;
+
+    # Decode common HTML entities
+    $content =~ s/&amp;/&/g;
+    $content =~ s/&lt;/</g;
+    $content =~ s/&gt;/>/g;
+    $content =~ s/&quot;/"/g;
+    $content =~ s/&#39;/'/g;
+    $content =~ s/&nbsp;/ /g;
+
+    # Collapse whitespace
+    $content =~ s/[ \t]+/ /g;
+    $content =~ s/(\n[ \t]*){3,}/\n\n/g;
+    $content =~ s/^\s+|\s+$//g;
+
+    # Cap at 6000 chars to keep system prompt reasonable
+    $content = substr($content, 0, 6000) . '…' if length($content) > 6000;
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'get_page_doc', "Served doc for '$page' from $found_file (" . length($content) . " chars)");
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        page    => $page,
+        file    => $found_file,
+        content => $content,
+    }));
+}
+
+# Build candidate file paths for a given page name or URL path.
+sub _doc_candidates {
+    my ($page) = @_;
+    my @cands;
+
+    # Normalise: strip leading slash, collapse slashes
+    (my $norm = $page) =~ s{^/+}{};
+    $norm =~ s{//+}{/}g;
+
+    # 1. If the path already looks like a Documentation path, use it directly
+    if ($norm =~ m{^(Documentation|admin/documentation)/}i) {
+        my $base = $norm;
+        push @cands, "$base.tt", "$base.md", $base;
+    }
+
+    # 2. Strip known route prefixes to get the page-name portion
+    (my $leaf = $norm) =~ s{^(Documentation|documentation|admin/documentation|admin)/}{}i;
+    $leaf =~ s{/.*$}{};   # take only the first segment after prefix
+    $leaf =~ s{\?.*$}{};  # drop query string
+    $leaf =~ s/\s+//g;
+
+    # 3. Derive a CamelCase variant in case the user passed a lowercase path
+    my $camel = join('', map { ucfirst($_) } split(/_|-/, $leaf));
+
+    for my $name ($leaf, $camel) {
+        next unless $name;
+        push @cands,
+            "Documentation/$name.tt",
+            "Documentation/$name.md",
+            "admin/documentation/$name.tt",
+            "admin/documentation/$name.md";
+    }
+
+    # 4. Special-case known URL→doc mappings
+    my %url_map = (
+        'ai'            => ['Documentation/AI.tt', 'Documentation/AI_Chat_System_Master_Audit.tt'],
+        'ai/models'     => ['Documentation/AiModelConfig.tt'],
+        'ai/manage_api_keys' => ['Documentation/ApiCredentials.tt'],
+        'project'       => ['Documentation/BMasterController.tt'],
+        'css'           => ['Documentation/CssThemes.tt'],
+        'helpdesk'      => ['Documentation/HelpDesk.tt'],
+        'admin'         => ['Documentation/Admin.tt'],
+        'Documentation' => ['Documentation/AllDocs.tt'],
+        'documentation' => ['Documentation/AllDocs.tt'],
+    );
+    if (exists $url_map{$norm}) {
+        push @cands, @{$url_map{$norm}};
+    }
+    # Try the normalised path without prefix too
+    (my $norm_no_prefix = $norm) =~ s{^(ai|admin|Documentation|documentation)/}{}i;
+    if (exists $url_map{$norm_no_prefix}) {
+        push @cands, @{$url_map{$norm_no_prefix}};
+    }
+
+    # De-duplicate while preserving order
+    my %seen;
+    return grep { !$seen{$_}++ } @cands;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
