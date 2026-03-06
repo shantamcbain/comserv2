@@ -19,6 +19,7 @@
         isOpen: false,
         currentConversationId: null,
         pageContext: null,
+        pageDocFetched: false,
         currentAgent: null,
         agentsConfig: null,
         selectedProvider: 'ollama',
@@ -114,6 +115,23 @@
         return null;
     }
     
+    // Fetch documentation content for the current page from the server.
+    // Returns a Promise that resolves to a string (empty if not found).
+    function fetchPageDoc(pagePath) {
+        return fetch('/ai/get_page_doc?page=' + encodeURIComponent(pagePath), {
+            credentials: 'include'
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+            if (data && data.success && data.content) {
+                console.debug('[AI widget] Doc loaded from', data.file, '(' + data.content.length + ' chars)');
+                return data.content;
+            }
+            return '';
+        })
+        .catch(function() { return ''; });
+    }
+
     // Extract visible text content from the current page for context
     function extractPageContent() {
         const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
@@ -661,9 +679,23 @@
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            
-            // Send the request (extracted to helper function below)
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+
+            // Fetch documentation for the current page (cached after first load)
+            const docPromise = state.pageDocFetched
+                ? Promise.resolve('')
+                : fetchPageDoc(window.location.pathname).then(function(docText) {
+                    state.pageDocFetched = true;
+                    if (docText && state.pageContext) {
+                        state.pageContext.system_prompt =
+                            (state.pageContext.system_prompt || '') +
+                            '\n\n--- Page Documentation ---\n' + docText;
+                    }
+                    return docText;
+                });
+
+            docPromise.then(function() {
+                sendAIRequest(prompt, statusIndicator, loadingMessage);
+            });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
             // Fallback: still send request with default context
