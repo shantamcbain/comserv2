@@ -306,8 +306,10 @@ sub chat {
         return undef;
     }
     
+    my $use_search = $args{use_search} || 0;
+    
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
-        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages));
+        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages) . ", web_search: $use_search");
     
     # Build the request payload
     my $payload = {
@@ -316,6 +318,17 @@ sub chat {
         temperature => $self->temperature,
         max_tokens => $self->max_tokens,
     };
+    
+    # Enable xAI live web search when requested
+    # xAI search_parameters: mode "on" = always search, "auto" = model decides, "off" = never
+    if ($use_search) {
+        $payload->{search_parameters} = {
+            mode            => 'auto',
+            return_citations => JSON::true,
+        };
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
+            "Web search enabled (mode=auto, return_citations=true)");
+    }
     
     return $self->_send_request($payload, 'chat');
 }
@@ -441,12 +454,25 @@ sub _send_request {
             }
         }
         
+        # Extract citations if web search was used
+        my @citations;
+        if ($data->{citations} && ref($data->{citations}) eq 'ARRAY') {
+            @citations = @{$data->{citations}};
+        } elsif ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
+            my $choice = $data->{choices}->[0];
+            if ($choice->{finish_reason} && $choice->{search_results}) {
+                @citations = map { { url => $_->{url}, title => $_->{title} } }
+                    grep { $_->{url} } @{$choice->{search_results}};
+            }
+        }
+        
         $result = {
-            success => 1,
-            response => $response_text,
-            model => $self->model,
+            success    => 1,
+            response   => $response_text,
+            model      => $data->{model} || $self->model,
             created_at => $data->{created_at} || '',
-            usage => $data->{usage} || {},
+            usage      => $data->{usage} || {},
+            citations  => \@citations,
         };
     } catch {
         my $error = "Failed to parse Grok API response: $_";
