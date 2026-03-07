@@ -450,7 +450,23 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                die "Grok query failed: $error";
+                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
+                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
+                    $grok->model('grok-3-mini');
+                    $response = $grok->chat(
+                        messages => [
+                            { role => 'system', content => $system || 'You are a helpful assistant.' },
+                            { role => 'user', content => $prompt }
+                        ],
+                        use_search => $use_search,
+                    );
+                }
+                unless ($response) {
+                    $error = $grok->last_error || $error;
+                    die "Grok query failed: $error";
+                }
             }
             
             $model_used = $response->{model} || $grok->model;
@@ -2496,14 +2512,24 @@ sub _build_role_system_prompt {
     my $is_guest = !@role_list || (grep { /guest/i } @role_list);
 
     if ($is_admin) {
-        return "You have access to the following internal application APIs when you need live data:\n"
-             . "- Workshops (GET $base_url/workshop/list_active) — returns JSON list of active workshops\n"
-             . "- Encyclopedia search (GET $base_url/ency/search?q=TERM) — searches the Ency system\n"
-             . "- Todos for a project (GET $base_url/todo/list?project_id=ID) — lists todos\n"
-             . "- Projects (GET $base_url/project/list) — lists all projects\n"
-             . "When a user asks about current data (workshops, projects, tasks), CALL the relevant API "
-             . "and base your answer on the result. Do not invent data.\n"
-             . ($provider eq 'grok' ? "Web search may also be available if the user has enabled it.\n" : '');
+        if ($provider eq 'grok') {
+            # Grok can describe what APIs exist; web search may supplement
+            return "You are assisting an admin user. "
+                 . "The application has these internal data sources (you cannot call them directly, but can tell the user how to access them):\n"
+                 . "- Active workshops: $base_url/workshop/list_active\n"
+                 . "- Encyclopedia search: $base_url/ency/search?q=TERM\n"
+                 . "- Project todos: $base_url/todo/list?project_id=ID\n"
+                 . "- Projects: $base_url/project/list\n"
+                 . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
+                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n";
+        } else {
+            # Ollama has NO network access — never pretend to call APIs
+            return "You are assisting an admin user. "
+                 . "You have NO ability to call external URLs or databases. "
+                 . "If the user asks about live data such as workshops, projects, or tasks, "
+                 . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
+                 . "Never invent or simulate API results.";
+        }
     }
 
     if ($is_guest) {
