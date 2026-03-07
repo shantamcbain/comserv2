@@ -221,6 +221,7 @@ sub generate :Local :Args(0) {
     my $agent_id = 'general';
     my $agent_name = 'AI Assistant';
     my $conversation_id = undef;  # For continuing existing conversations
+    my $use_search = 0;           # Grok web search toggle
     
     # Check if request body is JSON
     my $content_type = $c->request->content_type || '';
@@ -279,8 +280,9 @@ sub generate :Local :Args(0) {
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
             $conversation_id = $json_data->{conversation_id};
             $model = $json_data->{model} || '';
+            $use_search = $json_data->{use_search} ? 1 : 0;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'generate', "JSON parsing resulted in no data or invalid hash");
@@ -378,6 +380,19 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
+    # Role-based capability injection into system prompt
+    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider);
+    if ($role_prompt && $system) {
+        $system .= "\n\n" . $role_prompt;
+    } elsif ($role_prompt) {
+        $system = $role_prompt;
+    }
+
+    # Only admins/editors may use web search (costs money per call)
+    unless ($can_select_model_gen) {
+        $use_search = 0;
+    }
+
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
@@ -429,7 +444,8 @@ sub generate :Local :Args(0) {
                 messages => [
                     { role => 'system', content => $system || 'You are a helpful assistant.' },
                     { role => 'user', content => $prompt }
-                ]
+                ],
+                use_search => $use_search,
             );
             
             unless ($response) {
@@ -692,6 +708,7 @@ sub generate :Local :Args(0) {
             model => $model_used,
             provider => $provider,
             ollama_host => ($provider eq 'ollama' ? $active_ollama_host : ''),
+            citations => (ref($response->{citations}) eq 'ARRAY' ? $response->{citations} : []),
             conversation_id => $conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
@@ -1121,6 +1138,7 @@ sub chat :Local :Args(0) {
     my $model = $json_data->{model} || $c->request->params->{model} || '';
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
+    my $use_search_chat = $json_data->{use_search} ? 1 : 0;
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1176,6 +1194,12 @@ sub chat :Local :Args(0) {
 
     # Detect if selected model is a Grok (xAI) model
     my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
+
+    # Role-based capability injection into messages (insert as system message)
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama');
+
+    # Only admins/editors may use web search
+    $use_search_chat = 0 unless $can_select_model_perm;
 
     # Require login for external AI models - check before entering try block
     if ($is_grok_model && $is_guest) {
@@ -1243,9 +1267,15 @@ sub chat :Local :Args(0) {
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                'chat', "Calling Grok API with model: " . $grok->model);
+                'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
 
-            my $response = $grok->chat(messages => \@messages);
+            # Prepend role-based system prompt if available
+            my @final_messages = @messages;
+            if ($role_prompt_chat) {
+                unshift @final_messages, { role => 'system', content => $role_prompt_chat };
+            }
+
+            my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
@@ -2439,6 +2469,66 @@ sub start_server :Local :Args(0) {
     
     my $json_response = encode_json($response_data);
     $c->response->body($json_response);
+}
+
+=head2 _build_role_system_prompt
+
+Build a role-aware addition to the system prompt granting or restricting
+capabilities based on the user's session roles.
+
+  admin/developer/editor  → full internal API access (workshop, ency, todo, project)
+  normal user             → general help
+  guest                   → HelpDesk, navigation, documentation only
+
+=cut
+
+sub _build_role_system_prompt {
+    my ($self, $c, $roles, $provider) = @_;
+
+    $roles   //= [];
+    $provider //= 'ollama';
+
+    my $base_url = '';
+    eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
+
+    my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split(/\s*,\s*/, $roles || '');
+    my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
+    my $is_guest = !@role_list || (grep { /guest/i } @role_list);
+
+    if ($is_admin) {
+        return "You have access to the following internal application APIs when you need live data:\n"
+             . "- Workshops (GET $base_url/workshop/list_active) — returns JSON list of active workshops\n"
+             . "- Encyclopedia search (GET $base_url/ency/search?q=TERM) — searches the Ency system\n"
+             . "- Todos for a project (GET $base_url/todo/list?project_id=ID) — lists todos\n"
+             . "- Projects (GET $base_url/project/list) — lists all projects\n"
+             . "When a user asks about current data (workshops, projects, tasks), CALL the relevant API "
+             . "and base your answer on the result. Do not invent data.\n"
+             . ($provider eq 'grok' ? "Web search may also be available if the user has enabled it.\n" : '');
+    }
+
+    if ($is_guest) {
+        my $guest_no_internet = ($provider ne 'grok')
+            ? " You have NO internet access. Never invent live data such as workshop lists, "
+            . "event schedules, or website content — say 'I don't have access to that information'."
+            : '';
+        return "You are a HelpDesk assistant for guest users. "
+             . "Provide: navigation help, general application guidance, "
+             . "and information from public documentation only. "
+             . "Do NOT access private data or APIs. "
+             . "If the user needs account-specific help, ask them to log in."
+             . $guest_no_internet;
+    }
+
+    my $no_internet = ($provider ne 'grok')
+        ? " You have NO internet access and NO knowledge of live data. "
+        . "If asked about current events, live website content, or dynamic data you were not given, "
+        . "say 'I don't have access to that information right now' — never invent an answer."
+        : '';
+
+    return "You are a helpful assistant for logged-in users of this application. "
+         . "Answer based on the page content and documentation provided. "
+         . "Do not invent data; if you don't know something, say so."
+         . $no_internet;
 }
 
 =head2 _select_model_for_context
