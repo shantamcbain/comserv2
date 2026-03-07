@@ -258,6 +258,11 @@
         providerSelector.innerHTML =
             '<label for="ai-provider">AI Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
+              '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
+                '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
+              '</label>' +
+            '</span>' +
             '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
 
         // Status indicator
@@ -459,7 +464,8 @@
             state.selectedProvider = e.target.value;
             const parts = state.selectedProvider.split('|');
             let modelDisplay;
-            if (parts[0] === 'grok') {
+            const isGrok = parts[0] === 'grok';
+            if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {
                 modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
@@ -468,6 +474,9 @@
             const statusEl = document.getElementById('chat-status');
             statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
             statusEl.className = 'chat-status connected';
+            // Show web search toggle only for Grok (admin users see it; controlled server-side too)
+            const wsToggle = document.getElementById('web-search-toggle');
+            if (wsToggle) wsToggle.style.display = isGrok ? 'inline' : 'none';
         });
     }
 
@@ -797,6 +806,12 @@
             requestPayload.model = modelName;
         }
 
+        // Include web search flag (Grok only; server enforces admin-only)
+        const webSearchEl = document.getElementById('enable-web-search');
+        if (webSearchEl && webSearchEl.checked && providerName === 'grok') {
+            requestPayload.use_search = true;
+        }
+
         // Include model settings if available
         if (state.pageContext.model_settings) {
             requestPayload.model_settings = state.pageContext.model_settings;
@@ -876,6 +891,20 @@
                 
                 // Add AI response
                 addMessage(data.response, 'ai-message');
+
+                // Append web search citations if returned
+                if (data.citations && data.citations.length > 0) {
+                    const citationHtml = '<div class="chat-citations"><strong>🔍 Sources:</strong><ul>'
+                        + data.citations.map(function(c) {
+                            const label = c.title || c.url;
+                            return '<li><a href="' + c.url + '" target="_blank" rel="noopener">' + label + '</a></li>';
+                          }).join('')
+                        + '</ul></div>';
+                    const citEl = document.createElement('div');
+                    citEl.className = 'chat-message system-message';
+                    citEl.innerHTML = citationHtml;
+                    document.getElementById('chat-messages').appendChild(citEl);
+                }
                 
                 // Log context information for debugging
                 console.debug('AI Query Success', {
