@@ -2346,7 +2346,7 @@ last_updated = '2026/02/08'
                         <li>✅ <strong>Conversation Persistence</strong>: Backend saves all messages with conversation_id</li>
                         <li>✅ <strong>Conversation List Page</strong>: <code>/ai/conversations</code> displays past chats</li>
                         <li>✅ <strong>Model Selection</strong>: Role-based dropdowns for admin/developer/editor</li>
-                        <li>✅ <strong>Multi-Server Support</strong>: Toggle between localhost and remote Ollama (192.168.1.171)</li>
+                        <li>✅ <strong>Multi-Server Support</strong>: Toggle between localhost and remote Ollama (192.168.1.199)</li>
                         <li>✅ <strong>Guest Sessions</strong>: Anonymous users can use AI chat without login</li>
                         <li>✅ <strong>API Key UI</strong>: <code>/ai/manage_api_keys</code> with add/edit/delete forms</li>
                     </ul>
