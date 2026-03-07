@@ -221,6 +221,7 @@ sub generate :Local :Args(0) {
     my $agent_id = 'general';
     my $agent_name = 'AI Assistant';
     my $conversation_id = undef;  # For continuing existing conversations
+    my $use_search = 0;           # Grok web search toggle
     
     # Check if request body is JSON
     my $content_type = $c->request->content_type || '';
@@ -279,8 +280,9 @@ sub generate :Local :Args(0) {
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
             $conversation_id = $json_data->{conversation_id};
             $model = $json_data->{model} || '';
+            $use_search = $json_data->{use_search} ? 1 : 0;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW'));
+                'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'generate', "JSON parsing resulted in no data or invalid hash");
@@ -378,9 +380,23 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
+    # Role-based capability injection into system prompt
+    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider);
+    if ($role_prompt && $system) {
+        $system .= "\n\n" . $role_prompt;
+    } elsif ($role_prompt) {
+        $system = $role_prompt;
+    }
+
+    # Only admins/editors may use web search (costs money per call)
+    unless ($can_select_model_gen) {
+        $use_search = 0;
+    }
+
     my $response_data;
     my $ollama_started = 0;
     my $model_used = 'unknown';
+    my $active_ollama_host = '';
     
     try {
         my $response;
@@ -428,12 +444,29 @@ sub generate :Local :Args(0) {
                 messages => [
                     { role => 'system', content => $system || 'You are a helpful assistant.' },
                     { role => 'user', content => $prompt }
-                ]
+                ],
+                use_search => $use_search,
             );
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                die "Grok query failed: $error";
+                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
+                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
+                    $grok->model('grok-3-mini');
+                    $response = $grok->chat(
+                        messages => [
+                            { role => 'system', content => $system || 'You are a helpful assistant.' },
+                            { role => 'user', content => $prompt }
+                        ],
+                        use_search => $use_search,
+                    );
+                }
+                unless ($response) {
+                    $error = $grok->last_error || $error;
+                    die "Grok query failed: $error";
+                }
             }
             
             $model_used = $response->{model} || $grok->model;
@@ -457,14 +490,22 @@ sub generate :Local :Args(0) {
                 $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
             }
             my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
+            $active_ollama_host = $current_host;
             
+            # Context-aware model selection when user has not picked a specific model
+            unless ($model) {
+                $current_model = $self->_select_model_for_context($agent_id, $page_context, $installed_models, $current_model);
+            } else {
+                $current_model = $model;
+            }
+
             $ollama->host($current_host);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
             $ollama->clear_endpoint;
             
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'generate', "Ollama model configured (host: $current_host), checking connection...");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'generate', "Ollama model selected: $current_model (agent=$agent_id context=$page_context)");
             
             # Fast availability check (3-second timeout) before committing
             my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
@@ -681,6 +722,9 @@ sub generate :Local :Args(0) {
             success => JSON::true,
             response => $ai_response,
             model => $model_used,
+            provider => $provider,
+            ollama_host => ($provider eq 'ollama' ? $active_ollama_host : ''),
+            citations => (ref($response->{citations}) eq 'ARRAY' ? $response->{citations} : []),
             conversation_id => $conversation_id || undef,
             created_at => $response->{created_at} || '',
             total_duration => $response->{total_duration} || 0,
@@ -1110,6 +1154,7 @@ sub chat :Local :Args(0) {
     my $model = $json_data->{model} || $c->request->params->{model} || '';
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
+    my $use_search_chat = $json_data->{use_search} ? 1 : 0;
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1165,6 +1210,12 @@ sub chat :Local :Args(0) {
 
     # Detect if selected model is a Grok (xAI) model
     my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
+
+    # Role-based capability injection into messages (insert as system message)
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama');
+
+    # Only admins/editors may use web search
+    $use_search_chat = 0 unless $can_select_model_perm;
 
     # Require login for external AI models - check before entering try block
     if ($is_grok_model && $is_guest) {
@@ -1232,9 +1283,15 @@ sub chat :Local :Args(0) {
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
-                'chat', "Calling Grok API with model: " . $grok->model);
+                'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
 
-            my $response = $grok->chat(messages => \@messages);
+            # Prepend role-based system prompt if available
+            my @final_messages = @messages;
+            if ($role_prompt_chat) {
+                unshift @final_messages, { role => 'system', content => $role_prompt_chat };
+            }
+
+            my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
@@ -1369,6 +1426,9 @@ sub chat :Local :Args(0) {
                     'chat', "Continuing existing conversation ID: $final_conversation_id for user: $username");
             }
             
+            # Store in session so widget and /ai page share the same conversation
+            $c->session->{current_conversation_id} = $final_conversation_id if $final_conversation_id;
+            
             # Save user's message
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
@@ -1445,6 +1505,49 @@ sub chat :Local :Args(0) {
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
         
+        # Save failed request to DB so conversation record is complete
+        if ($user_id && $prompt) {
+            eval {
+                my $schema = $c->model('DBEncy')->schema;
+                if ($schema) {
+                    my $save_conv_id = $conversation_id;
+                    unless ($save_conv_id && $save_conv_id =~ /^\d+$/) {
+                        my $title = substr($prompt, 0, 80);
+                        $title =~ s/\n/ /g;
+                        $title ||= 'Chat Error';
+                        my $conv = $schema->resultset('AiConversation')->create({
+                            user_id => $user_id,
+                            title   => $title,
+                            status  => 'active',
+                            metadata => encode_json({ is_guest => $is_guest ? 1 : 0 })
+                        });
+                        $save_conv_id = $conv ? $conv->id : undef;
+                        $c->session->{current_conversation_id} = $save_conv_id if $save_conv_id;
+                    }
+                    if ($save_conv_id) {
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $save_conv_id,
+                            user_id  => $user_id,
+                            role     => 'user',
+                            content  => $prompt,
+                            agent_type => 'documentation',
+                            model_used => $model || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                        $schema->resultset('AiMessage')->create({
+                            conversation_id => $save_conv_id,
+                            user_id  => $user_id,
+                            role     => 'assistant',
+                            content  => '[ERROR] ' . $user_error,
+                            agent_type => 'documentation',
+                            model_used => $model || 'unknown',
+                            ip_address => $c->request->address,
+                        });
+                    }
+                }
+            };
+        }
+        
         $response_data = {
             success => JSON::false,
             error => $user_error || 'Failed to process AI chat request'
@@ -1491,18 +1594,24 @@ sub models :Local :Args(0) {
     # Initialize servers data structure for multiple Ollama servers
     my $servers = [];
     
-    # Configure servers based on user permissions
+    # Configure servers from comserv.conf <Ollama> block
+    my $ollama_cfg2   = $c->config->{Ollama} || {};
+    my $cfg_host      = $ollama_cfg2->{host}          || 'localhost';
+    my $cfg_fallback  = $ollama_cfg2->{fallback_host} || $cfg_host;
+    my $cfg_port      = $ollama_cfg2->{port}          || 11434;
+
     my @server_configs;
     if ($can_select_model) {
-        # Admin/Developer/Editor users see all servers with location info
         @server_configs = (
-            { name => 'Local Server (localhost)', host => 'localhost', port => 11434, location => 'Local Machine' },
-            { name => 'Network Server (192.168.1.171)', host => '192.168.1.171', port => 11434, location => 'Network Server' }
+            { name => "Local ($cfg_host)",    host => $cfg_host,     port => $cfg_port, location => 'Primary' },
         );
+        if ($cfg_fallback ne $cfg_host) {
+            push @server_configs,
+                { name => "Fallback ($cfg_fallback)", host => $cfg_fallback, port => $cfg_port, location => 'Fallback' };
+        }
     } else {
-        # Regular users only see 192.168.1.171, no address shown in name
         @server_configs = (
-            { name => 'AI Server', host => '192.168.1.171', port => 11434, location => 'Remote' }
+            { name => 'AI Server', host => $cfg_host, port => $cfg_port, location => 'Primary' }
         );
     }
     
@@ -2378,6 +2487,138 @@ sub start_server :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 _build_role_system_prompt
+
+Build a role-aware addition to the system prompt granting or restricting
+capabilities based on the user's session roles.
+
+  admin/developer/editor  → full internal API access (workshop, ency, todo, project)
+  normal user             → general help
+  guest                   → HelpDesk, navigation, documentation only
+
+=cut
+
+sub _build_role_system_prompt {
+    my ($self, $c, $roles, $provider) = @_;
+
+    $roles   //= [];
+    $provider //= 'ollama';
+
+    my $base_url = '';
+    eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
+
+    my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split(/\s*,\s*/, $roles || '');
+    my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
+    my $is_guest = !@role_list || (grep { /guest/i } @role_list);
+
+    if ($is_admin) {
+        if ($provider eq 'grok') {
+            # Grok can describe what APIs exist; web search may supplement
+            return "You are assisting an admin user. "
+                 . "The application has these internal data sources (you cannot call them directly, but can tell the user how to access them):\n"
+                 . "- Active workshops: $base_url/workshop/list_active\n"
+                 . "- Encyclopedia search: $base_url/ency/search?q=TERM\n"
+                 . "- Project todos: $base_url/todo/list?project_id=ID\n"
+                 . "- Projects: $base_url/project/list\n"
+                 . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
+                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n";
+        } else {
+            # Ollama has NO network access — never pretend to call APIs
+            return "You are assisting an admin user. "
+                 . "You have NO ability to call external URLs or databases. "
+                 . "If the user asks about live data such as workshops, projects, or tasks, "
+                 . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
+                 . "Never invent or simulate API results.";
+        }
+    }
+
+    if ($is_guest) {
+        my $guest_no_internet = ($provider ne 'grok')
+            ? " You have NO internet access. Never invent live data such as workshop lists, "
+            . "event schedules, or website content — say 'I don't have access to that information'."
+            : '';
+        return "You are a HelpDesk assistant for guest users. "
+             . "Provide: navigation help, general application guidance, "
+             . "and information from public documentation only. "
+             . "Do NOT access private data or APIs. "
+             . "If the user needs account-specific help, ask them to log in."
+             . $guest_no_internet;
+    }
+
+    my $no_internet = ($provider ne 'grok')
+        ? " You have NO internet access and NO knowledge of live data. "
+        . "If asked about current events, live website content, or dynamic data you were not given, "
+        . "say 'I don't have access to that information right now' — never invent an answer."
+        : '';
+
+    return "You are a helpful assistant for logged-in users of this application. "
+         . "Answer based on the page content and documentation provided. "
+         . "Do not invent data; if you don't know something, say so."
+         . $no_internet;
+}
+
+=head2 _select_model_for_context
+
+Choose the best installed Ollama model for a given agent/page context.
+
+  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
+  code / developer / docker         → prefer starcoder2 or qwen-coder
+  fallback                          → first installed model, then hardcoded default
+
+=cut
+
+sub _select_model_for_context {
+    my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
+
+    $agent_id    //= 'general';
+    $page_context //= 'general';
+    $installed_models //= [];
+
+    # Build a quick lookup: short name → full model name
+    my %installed;
+    for my $m (@$installed_models) {
+        my $name = ref($m) ? ($m->{name} || '') : ($m || '');
+        next unless $name;
+        $installed{$name} = $name;
+        (my $short = $name) =~ s/:.*$//;
+        $installed{$short} = $name;
+    }
+
+    # Preferred models per context (ordered: first match wins)
+    my %context_prefs = (
+        chat      => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        helpdesk  => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        ency      => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
+        bmaster   => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
+        general   => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        code      => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
+        developer => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
+        docker    => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+    );
+
+    my $ctx = lc($agent_id);
+    $ctx = 'helpdesk' if $ctx =~ /helpdesk/;
+    $ctx = 'code'     if $ctx =~ /code|developer/;
+    $ctx = 'ency'     if $ctx =~ /ency|beekeeping|bmast/;
+    $ctx = 'docker'   if $ctx =~ /docker/;
+    $ctx = 'general'  unless exists $context_prefs{$ctx};
+
+    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+
+    for my $pref (@$prefs) {
+        for my $key (keys %installed) {
+            if ($key =~ /\Q$pref\E/i) {
+                return $installed{$key};
+            }
+        }
+    }
+
+    # Fall back: default_model if installed, else first available, else hardcoded
+    return $default_model if $default_model && ($installed{$default_model} || grep { $_ eq $default_model } values %installed);
+    return (values %installed)[0] if %installed;
+    return 'llama3.1:latest';
+}
+
 =head2 _get_current_ollama_config
 
 Private method to determine current Ollama configuration with automatic fallback.
@@ -2386,46 +2627,38 @@ Private method to determine current Ollama configuration with automatic fallback
 
 sub _get_current_ollama_config {
     my ($self, $c, $can_select_model) = @_;
-    
+
+    # ── Single source of truth: comserv.conf <Ollama> block ──────────────────
+    my $ollama_cfg      = $c->config->{Ollama} || {};
+    my $primary_host    = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host   = $ollama_cfg->{fallback_host} || $primary_host;
+    my $config_port     = $ollama_cfg->{port}          || 11434;
+
     my $ollama = $c->model('Ollama');
-    my $current_host = 'localhost';  # Default
-    my $current_port = 11434;
-    my $current_model = 'qwen2.5-coder:1.5b-base';  # Default to 1.5B model for low-memory systems (was llama3.1:8b which requires 5.6GB)
+    my $current_host  = $primary_host;
+    my $current_port  = $config_port;
+    my $current_model = 'llama3.1:latest';
     my $installed_models = [];
-    
-    # For regular users (non-admin/developer/editor), test localhost first, then fallback to 192.168.1.171
-    unless ($can_select_model) {
-        my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
-        if ($test_ollama && $test_ollama->check_connection()) {
-            $current_host = 'localhost';
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Regular user: localhost is available, using localhost");
-        } else {
-            $current_host = '192.168.1.171';
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Regular user: localhost unavailable, using fallback $current_host");
-        }
+
+    # Session override (admin/privileged users can switch host via /ai/models UI)
+    if ($can_select_model && $c->session->{ollama_host}) {
+        $current_host = $c->session->{ollama_host};
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            '_get_current_ollama_config', "Using session preferred host: $current_host");
     } else {
-        # For privileged users, check session preference or test localhost first
-        my $preferred_host = $c->session->{ollama_host};
-        
-        if ($preferred_host) {
-            $current_host = $preferred_host;
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                '_get_current_ollama_config', "Using session preferred host: $current_host");
+        # Try primary host; fall back to fallback_host if unreachable
+        my $test = Comserv::Model::Ollama->new(host => $primary_host, port => $config_port, timeout => 3);
+        if ($test && $test->check_connection()) {
+            $current_host = $primary_host;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host available");
+        } elsif ($fallback_host ne $primary_host) {
+            $current_host = $fallback_host;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Primary host $primary_host unavailable, using fallback $fallback_host");
         } else {
-            # Test localhost first, fallback to 192.168.1.171 if not available
-            # NOTE: Create a temporary instance for testing to avoid modifying the shared model instance
-            my $test_ollama = Comserv::Model::Ollama->new(host => 'localhost', port => 11434, timeout => 3);
-            if ($test_ollama && $test_ollama->check_connection()) {
-                $current_host = 'localhost';
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    '_get_current_ollama_config', "Localhost is available, using localhost");
-            } else {
-                $current_host = '192.168.1.171';
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                    '_get_current_ollama_config', "Localhost not available, falling back to $current_host");
-            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                '_get_current_ollama_config', "Ollama host $primary_host is not reachable");
         }
     }
     
@@ -3591,10 +3824,15 @@ sub get_page_doc :Local :Args(0) {
     }
 
     unless ($found_file) {
+        # Return a guidance string rather than an error so the widget can still
+        # include it in the system prompt and the AI won't hallucinate doc paths.
         $c->response->body(encode_json({
-            success => JSON::false,
-            error   => "No documentation file found for: $page",
-            tried   => \@candidates,
+            success => JSON::true,
+            page    => $page,
+            file    => '',
+            content => "No dedicated documentation file exists for the page '$page'. "
+                     . "Answer based ONLY on the page content already provided to you. "
+                     . "Do NOT invent documentation paths, file names, or URLs.",
         }));
         return;
     }

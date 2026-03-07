@@ -177,16 +177,21 @@
             context.page_type = selectedAgent.id;
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
-            context.system_prompt = selectedAgent.system_prompt +
-                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
+            context.system_prompt = selectedAgent.system_prompt
+                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
             context.capabilities = selectedAgent.capabilities;
             context.model_settings = selectedAgent.model_settings;
         } else {
             // Fallback to general
             context.page_type = 'general';
             context.agent_id = 'general';
-            context.system_prompt = 'You are a helpful AI assistant ready to assist with general questions and tasks.' +
-                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
+            context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
+                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
+                + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
         }
         
         return context;
@@ -253,6 +258,11 @@
         providerSelector.innerHTML =
             '<label for="ai-provider">AI Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
+              '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
+                '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
+              '</label>' +
+            '</span>' +
             '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
 
         // Status indicator
@@ -496,7 +506,8 @@
             state.selectedProvider = e.target.value;
             const parts = state.selectedProvider.split('|');
             let modelDisplay;
-            if (parts[0] === 'grok') {
+            const isGrok = parts[0] === 'grok';
+            if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {
                 modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
@@ -505,6 +516,9 @@
             const statusEl = document.getElementById('chat-status');
             statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
             statusEl.className = 'chat-status connected';
+            // Show web search toggle only for Grok (admin users see it; controlled server-side too)
+            const wsToggle = document.getElementById('web-search-toggle');
+            if (wsToggle) wsToggle.style.display = isGrok ? 'inline' : 'none';
         });
     }
 
@@ -845,6 +859,12 @@
             requestPayload.model = modelName;
         }
 
+        // Include web search flag (Grok only; server enforces admin-only)
+        const webSearchEl = document.getElementById('enable-web-search');
+        if (webSearchEl && webSearchEl.checked && providerName === 'grok') {
+            requestPayload.use_search = true;
+        }
+
         // Include model settings if available
         if (state.pageContext.model_settings) {
             requestPayload.model_settings = state.pageContext.model_settings;
@@ -865,11 +885,14 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Send to AI as JSON with 45s client-side timeout to prevent browser lockup
+        // Provider-aware client timeout: Ollama (local) can be slow with large models,
+        // so match the server-side 90s. External APIs (Grok etc.) should be fast; cap at 30s.
+        const isOllama = providerName === 'ollama';
+        const clientTimeoutMs = isOllama ? 95000 : 30000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
-        }, 45000);
+        }, clientTimeoutMs);
 
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
@@ -904,15 +927,16 @@
                     }
                 }
                 
-                // Update status with provider + model name
+                // Update status with provider + model name + host
                 const providerParts2 = (state.selectedProvider || 'ollama').split('|');
-                const provName = providerParts2[0];
+                const provName = data.provider || providerParts2[0];
                 const rawModel = data.model || providerParts2[1] || '';
                 let modelLabel;
                 if (provName === 'grok') {
                     modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
                 } else {
-                    modelLabel = 'Ollama (Local)' + (rawModel ? ': ' + rawModel : '');
+                    const hostLabel = data.ollama_host ? ' @' + data.ollama_host : ' (Local)';
+                    modelLabel = 'Ollama' + hostLabel + (rawModel ? ': ' + rawModel : '');
                 }
                 state.activeModel = modelLabel;
                 statusIndicator.textContent = '🟢 ' + modelLabel;
@@ -920,6 +944,20 @@
                 
                 // Add AI response
                 addMessage(data.response, 'ai-message');
+
+                // Append web search citations if returned
+                if (data.citations && data.citations.length > 0) {
+                    const citationHtml = '<div class="chat-citations"><strong>🔍 Sources:</strong><ul>'
+                        + data.citations.map(function(c) {
+                            const label = c.title || c.url;
+                            return '<li><a href="' + c.url + '" target="_blank" rel="noopener">' + label + '</a></li>';
+                          }).join('')
+                        + '</ul></div>';
+                    const citEl = document.createElement('div');
+                    citEl.className = 'chat-message system-message';
+                    citEl.innerHTML = citationHtml;
+                    document.getElementById('chat-messages').appendChild(citEl);
+                }
                 
                 // Log context information for debugging
                 console.debug('AI Query Success', {
@@ -949,7 +987,7 @@
             statusIndicator.className = 'chat-status error';
             
             const msg = error.name === 'AbortError'
-                ? 'Request timed out after 45 seconds. The AI server may be busy or unavailable.'
+                ? `Request timed out after ${clientTimeoutMs / 1000}s. ${isOllama ? 'Ollama may be loading a large model — try a smaller model or wait and retry.' : 'The AI server may be busy or unavailable.'}`
                 : `Network error: ${error.message}. Please check console and try again.`;
             addMessage(msg, 'error-message');
         });
