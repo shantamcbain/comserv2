@@ -3708,10 +3708,15 @@ sub get_page_doc :Local :Args(0) {
     }
 
     unless ($found_file) {
+        # Return a guidance string rather than an error so the widget can still
+        # include it in the system prompt and the AI won't hallucinate doc paths.
         $c->response->body(encode_json({
-            success => JSON::false,
-            error   => "No documentation file found for: $page",
-            tried   => \@candidates,
+            success => JSON::true,
+            page    => $page,
+            file    => '',
+            content => "No dedicated documentation file exists for the page '$page'. "
+                     . "Answer based ONLY on the page content already provided to you. "
+                     . "Do NOT invent documentation paths, file names, or URLs.",
         }));
         return;
     }
