@@ -54,7 +54,7 @@
             [% IF can_select_model %]
             <select id="host-select" class="ai-host-select" title="Ollama server">
                 <option value="localhost" [% IF current_host == 'localhost' || current_host == '127.0.0.1' %]selected[% END %]>localhost</option>
-                <option value="192.168.1.171" [% IF current_host == '192.168.1.171' %]selected[% END %]>192.168.1.171</option>
+                <option value="192.168.1.199" [% IF current_host == '192.168.1.199' %]selected[% END %]>192.168.1.199</option>
             </select>
             <span id="connection-status" class="ai-conn-status">
                 <span class="status-indicator" id="status-indicator"></span>
