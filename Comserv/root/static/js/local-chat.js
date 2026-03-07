@@ -177,16 +177,21 @@
             context.page_type = selectedAgent.id;
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
-            context.system_prompt = selectedAgent.system_prompt +
-                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
+            context.system_prompt = selectedAgent.system_prompt
+                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
             context.capabilities = selectedAgent.capabilities;
             context.model_settings = selectedAgent.model_settings;
         } else {
             // Fallback to general
             context.page_type = 'general';
             context.agent_id = 'general';
-            context.system_prompt = 'You are a helpful AI assistant ready to assist with general questions and tasks.' +
-                (pageContent ? '\n\nCurrent page "' + pageTitle + '" (' + pathname + ') content:\n' + pageContent : '');
+            context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
+                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
+                + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
         }
         
         return context;
