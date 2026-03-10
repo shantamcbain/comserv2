@@ -103,14 +103,14 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'qwen3-coder:30b',
-    documentation => 'Ollama model to use (default: qwen3-coder:30b; alternatives: starcoder2:3b, deepseek-v3.2:cloud)'
+    default => 'llama3.1:latest',
+    documentation => 'Ollama model to use (default: llama3.1:latest; alternatives: qwen3-coder:30b, deepseek-v3.2:cloud)'
 );
 
 has 'timeout' => (
     is => 'rw',
     isa => 'Int',
-    default => 120,
+    default => 300,
     documentation => 'Request timeout in seconds'
 );
 
@@ -298,20 +298,24 @@ sub query {
     # Send the request
     my $response;
     try {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
+            "Ollama API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $status = $response->status_line;
+        my $content = $response->content || '';
+        my $error = "HTTP request failed: $status";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
-            $error);
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
+            "Ollama API Failure: Status=$status, Response=$content");
         return undef;
     }
     
@@ -430,20 +434,24 @@ sub chat {
     # Send the request
     my $response;
     try {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
+            "Ollama Chat API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $status = $response->status_line;
+        my $content = $response->content || '';
+        my $error = "HTTP request failed: $status";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
-            $error);
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
+            "Ollama Chat API Failure: Status=$status, Response=$content");
         return undef;
     }
     

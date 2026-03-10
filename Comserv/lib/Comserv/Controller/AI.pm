@@ -22,6 +22,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
@@ -48,6 +49,13 @@ has 'logging' => (
     documentation => 'Logging instance for standardized logging'
 );
 
+has 'admin_auth' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub { Comserv::Util::AdminAuth->new() },
+    documentation => 'Admin authentication utility'
+);
+
 =head1 METHODS
 
 =head2 index
@@ -62,6 +70,10 @@ sub index :Path :Args(0) {
     # Determine if user is authenticated or guest
     my $username = $c->session->{username};
     my $guest_session_id = $c->session->{guest_session_id};
+    my $user_id = $c->session->{user_id};
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'index', "Session check - username: " . ($username || 'none') . ", user_id: " . ($user_id || 'none') . ", guest_id: " . ($guest_session_id || 'none'));
     
     # If not logged in, create guest session for accessing the UI
     unless ($username) {
@@ -86,51 +98,109 @@ sub index :Path :Args(0) {
         $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
     }
     my $can_select_model = 0;
+    my $is_csc_admin = 0;
+    my $has_admin_role = 0;
     if (ref($user_roles) eq 'ARRAY') {
         $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+        
+        # Determine if user is CSC Admin or standard Admin
+        $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+        
+        # If not explicitly CSC site admin but has admin role, they are a standard admin
+        $has_admin_role = grep { $_ =~ /^admin$/i } @$user_roles;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'index', "Permissions check - is_csc_admin: $is_csc_admin, has_admin_role: $has_admin_role");
     }
     
     # Get or set the current Ollama configuration
     my ($current_host, $current_port, $current_model, $installed_models) = $self->_get_current_ollama_config($c, $can_select_model);
 
     # Check if user has external API keys configured (grok, openai, etc.)
-    # Admins can use any active key, other users only their own key
+    # Guests see ONLY Ollama (local) - don't fetch external models for guests
     my @external_models;
-    my $user_id = $c->session->{user_id};
-    if ($user_id) {
+    
+    # Only authenticated users with appropriate roles can see external models
+    if ($user_id && $user_id != 199 && $can_select_model) {
         try {
             my $schema = $c->model('DBEncy')->schema;
             my $grok_key;
-            if ($can_select_model) {
-                # Admins: use their own key first, fall back to any active key
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'index', "Fetching external models for user_id: $user_id, can_select: $can_select_model");
+            
+            # Admins: use their own key first. 
+            # CSC Admin can fall back to any active key.
+            # Regular admins only see their own keys.
+            $grok_key = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, service => 'grok', is_active => '1' }
+            )->first;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'index', "Primary Grok key search: " . ($grok_key ? "found(id=" . $grok_key->id . ")" : "not found"));
+            
+            if (!$grok_key && ($is_csc_admin || $has_admin_role)) {
                 $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
-                )->first;
-                unless ($grok_key) {
-                    $grok_key = $schema->resultset('UserApiKeys')->search(
-                        { service => 'grok', is_active => '1' }
-                    )->first;
-                }
-            } else {
-                $grok_key = $schema->resultset('UserApiKeys')->search(
-                    { user_id => $user_id, service => 'grok', is_active => '1' }
+                    { service => 'grok', is_active => '1' }
                 )->first;
             }
+
             if ($grok_key && $grok_key->api_key_encrypted) {
-                # Use synced models from metadata if available, else hardcoded fallback
+                # Use synced models from metadata if available, else fetch and sync
                 my $meta = $grok_key->get_metadata() || {};
                 my $synced = $meta->{available_models};
+                
+                if (!$synced || ref($synced) ne 'ARRAY' || !@$synced) {
+                    # No models in metadata, try to fetch from API
+                    try {
+                        my $grok_model = $c->model('Grok');
+                        my $decrypted_key = $grok_key->decrypt_api_key();
+                        if ($grok_model && $decrypted_key) {
+                            $grok_model->db_key($decrypted_key);
+                            my $api_models = $grok_model->list_models();
+                            if ($api_models && ref($api_models) eq 'ARRAY' && @$api_models) {
+                                # Transform and save to metadata
+                                my @to_save = map { { id => $_->{id}, created => $_->{created} } } @$api_models;
+                                $meta->{available_models} = \@to_save;
+                                $meta->{last_sync} = time();
+                                $grok_key->set_metadata($meta);
+                                $grok_key->update();
+                                $synced = \@to_save;
+                                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                                    'index', "Dynamically synced " . scalar(@to_save) . " Grok models for user " . $user_id);
+                            }
+                        }
+                    } catch {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                            'index', "Failed to dynamically sync Grok models: $_");
+                    };
+                }
+
                 if ($synced && ref($synced) eq 'ARRAY' && @$synced) {
                     foreach my $m (@$synced) {
                         my $id = $m->{id} || $m->{name} || '';
                         next unless $id;
-                        next if $id =~ /^(grok-imagine|grok-.*video)/i;  # skip image/video models
+                        
+                        # Filtering logic based on roles:
+                        # Admins see all models. Others see only standard models.
+                        unless ($is_csc_admin || $has_admin_role) {
+                            # Exclude image and video models for non-admins
+                            next if $id =~ /^(grok-imagine|grok-.*video)/i;
+                        }
+                        
+                        my $cost_label = 'Paid';
+                        if ($id =~ /mini/i) {
+                            $cost_label = '$'; # Cheaper
+                        } elsif ($id =~ /vision|imagine/i) {
+                            $cost_label = '$$$'; # Expensive
+                        } else {
+                            $cost_label = '$$'; # Standard
+                        }
+                        
                         (my $label = $id) =~ s/-/ /g;
-                        $label = ucfirst($label) . ' (xAI)';
-                        push @external_models, { name => $id, provider => 'grok', label => $label };
+                        $label = ucfirst($label) . " ($cost_label - xAI)";
+                        push @external_models, { name => $id, provider => 'grok', label => $label, cost => $cost_label };
                     }
-                } else {
-                    # Hardcoded static models removed - dynamic only now
                 }
             }
         } catch {
@@ -156,6 +226,564 @@ sub index :Path :Args(0) {
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
 }
 
+=head2 get_conversation_list
+
+API endpoint to get the list of conversations for the current user.
+
+=cut
+
+sub get_conversation_list :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # For guests, we use user_id 199 as per standards
+    unless ($user_id) {
+        $user_id = 199 if $guest_session_id;
+    }
+    
+    # Check if user has permission to see conversations
+    # Only admins, developers, editors can see history. Guests and plain 'user' cannot.
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_see_history = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_see_history = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+    
+    # Check for CSC Admin override
+    if ($self->admin_auth->is_csc_admin($c)) {
+        $can_see_history = 1;
+    }
+    
+    unless ($user_id && $can_see_history) {
+        $c->response->body(encode_json({ 
+            success => JSON::true, 
+            conversations => [],
+            message => 'History not available for your role' 
+        }));
+        return;
+    }
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'get_conversation_list', "Fetching conversations for user_id: $user_id");
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        unless ($schema) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'get_conversation_list', "Failed to get schema for DBEncy");
+            $c->response->body(encode_json({ success => JSON::false, error => 'Database connection failed' }));
+            return;
+        }
+        
+        my @conversations_data;
+        
+        # Fetch conversations for the user, ordered by most recent update
+        my $conversations_rs = $schema->resultset('AiConversation')->search(
+            { user_id => $user_id, status => 'active' },
+            { order_by => { -desc => 'updated_at' }, rows => 50 }
+        );
+        
+        my $count = $conversations_rs->count;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+            'get_conversation_list', "Found $count active conversations for user $user_id");
+        
+        while (my $conv = $conversations_rs->next) {
+            push @conversations_data, {
+                id => $conv->id,
+                title => $conv->title || 'Untitled Conversation',
+                updated_at => $conv->updated_at->strftime('%Y-%m-%d %H:%M:%S'),
+                message_count => $conv->ai_messages->count,
+            };
+        }
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversations => \@conversations_data
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_list', "Failed to fetch conversations: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "Database error: $_" }));
+    };
+}
+
+=head2 get_conversation_messages
+
+API endpoint to get messages for a specific conversation.
+
+=cut
+
+sub get_conversation_messages :Local :Args(1) {
+    my ($self, $c, $conversation_id) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my $guest_session_id = $c->session->{guest_session_id};
+    
+    # Guests use user_id 199
+    unless ($user_id) {
+        $user_id = 199 if $guest_session_id;
+    }
+    
+    # Check if user has permission to see conversations
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    my $can_see_history = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_see_history = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+    }
+    
+    # Check for CSC Admin override
+    if ($self->admin_auth->is_csc_admin($c)) {
+        $can_see_history = 1;
+    }
+    
+    unless ($user_id && $conversation_id && $can_see_history) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Access denied' }));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        
+        # Verify conversation belongs to user
+        my $conversation = $schema->resultset('AiConversation')->find({
+            id => $conversation_id,
+            user_id => $user_id
+        });
+        
+        unless ($conversation) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'Conversation not found' }));
+            return;
+        }
+        
+        # Fetch messages in chronological order
+        my $messages_rs = $conversation->ai_messages->search(
+            {},
+            { order_by => { -asc => 'created_at' } }
+        );
+        
+        my @messages_data;
+        while (my $msg = $messages_rs->next) {
+            push @messages_data, {
+                role => $msg->role,
+                content => $msg->content,
+                created_at => $msg->created_at->strftime('%Y-%m-%d %H:%M:%S'),
+                model_used => $msg->model_used,
+            };
+        }
+        
+        # Update session with current conversation
+        $c->session->{current_conversation_id} = $conversation_id;
+        
+        $c->response->body(encode_json({
+            success => JSON::true,
+            conversation => {
+                id => $conversation->id,
+                title => $conversation->title,
+            },
+            messages => \@messages_data
+        }));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'get_conversation_messages', "Failed to fetch messages: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "Database error: $_" }));
+    };
+}
+
+=head2 reset_conversation
+
+API endpoint to clear the current conversation from session.
+
+=cut
+
+
+=head2 _check_user_roles
+
+Internal helper to check if a user has a specific role in their session.
+Replaces missing Catalyst::Plugin::Authorization::Roles functionality.
+
+=cut
+
+sub _check_user_roles {
+    my ($self, $c, $role) = @_;
+    
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    
+    return 0 unless ref($user_roles) eq 'ARRAY';
+    
+    # Check if any role matches (case-insensitive)
+    return 1 if grep { lc($_) eq lc($role) } @$user_roles;
+    
+    return 0;
+}
+
+sub server_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Restrict to admins
+    unless ($self->_check_user_roles($c, 'admin')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'server_status', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    
+    my %status_data;
+    
+    # 1. System Info
+    try {
+        $status_data{system} = Comserv::Util::SystemInfo->get_system_info();
+    } catch {
+        $status_data{system} = { error => "Failed to get system info: $_" };
+    };
+    
+    # 2. Database Connections
+    my @db_status;
+    foreach my $model_name (qw/DBEncy DBForager RemoteDB/) {
+        my $db_info = { name => $model_name, status => 'Down' };
+        try {
+            my $model = $c->model($model_name);
+            if ($model && $model->storage->dbh->ping) {
+                $db_info->{status} = 'Up';
+                # Extract host/database from DSN if possible
+                my $dsn = $model->storage->connect_info->[0]->{dsn} || '';
+                if ($dsn =~ /database=([^;]+)/) { $db_info->{database} = $1; }
+                if ($dsn =~ /host=([^;]+)/) { $db_info->{host} = $1; }
+            }
+        } catch {
+            $db_info->{error} = $_;
+        };
+        push @db_status, $db_info;
+    }
+    $status_data{databases} = \@db_status;
+    
+    # 3. AI Services
+    # Ollama
+    my $ollama_status = { name => 'Ollama (Local)', status => 'Down' };
+    try {
+        my $ollama = $c->model('Ollama');
+        if ($ollama && $ollama->check_connection()) {
+            $ollama_status->{status} = 'Up';
+            $ollama_status->{host} = $ollama->host;
+            $ollama_status->{port} = $ollama->port;
+        }
+    } catch {
+        $ollama_status->{error} = $_;
+    };
+    
+    # Grok
+    my $grok_status = { name => 'Grok (xAI)', status => 'Down' };
+    try {
+        my $grok = $c->model('Grok');
+        # Try to use a saved key if available
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my $key_row = $c->model('DBEncy')->resultset('UserApiKeys')->search({
+                user_id => $user_id, service => 'grok', is_active => '1'
+            })->first;
+            if ($key_row) {
+                my $decrypted = $key_row->decrypt_api_key();
+                $grok->db_key($decrypted) if $decrypted;
+            }
+        }
+        
+        if ($grok && $grok->check_connection()) {
+            $grok_status->{status} = 'Up';
+            $grok_status->{model} = $grok->model;
+        }
+    } catch {
+        $grok_status->{error} = $_;
+    };
+    
+    # 4. Email System
+    my $email_status = { name => 'Email (SMTP)', status => 'Unknown' };
+    try {
+        use Comserv::Util::EmailNotification;
+        my $email_util = Comserv::Util::EmailNotification->new(logging => $self->logging);
+        my $sitename = $c->stash->{SiteName} || 'CSC';
+        my $config = $email_util->get_smtp_config($c, $sitename);
+        
+        # Fallback to defaults if needed
+        unless ($config && $config->{smtp_host}) {
+            $config = $email_util->_get_default_smtp_config();
+        }
+        
+        if ($config && $config->{smtp_host}) {
+            $email_status->{host} = $config->{smtp_host};
+            $email_status->{port} = $config->{smtp_port} || 587;
+            $email_status->{user} = $config->{smtp_username};
+            
+            # Test transport creation (dry run)
+            my $ssl_val = ($config->{smtp_ssl} && $config->{smtp_ssl} ne '0') ? 1 : 0;
+            if ($email_status->{port} == 587 && $ssl_val) { $ssl_val = 'starttls'; }
+            
+            my $transport = Email::Sender::Transport::SMTP->new({
+                host => $config->{smtp_host},
+                port => $email_status->{port},
+                ssl  => $ssl_val,
+                sasl_username => $config->{smtp_username},
+                sasl_password => $config->{smtp_password},
+                timeout => 5,
+            });
+            
+            if ($transport) {
+                $email_status->{status} = 'Configured (Transport OK)';
+            }
+        } else {
+            $email_status->{status} = 'Not Configured';
+        }
+    } catch {
+        $email_status->{status} = 'Error';
+        $email_status->{error} = $_;
+    };
+    
+    $c->stash(
+        template => 'ai/ServerStatus.tt',
+        page_title => 'AI & System Server Status',
+        status => \%status_data,
+        ollama_status => $ollama_status,
+        grok_status => $grok_status,
+        email_status => $email_status,
+    );
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'server_status', "Server status page loaded by " . $c->session->{username});
+}
+
+sub reset_conversation :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    delete $c->session->{current_conversation_id};
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        message => 'Conversation reset'
+    }));
+}
+
+=head2 get_user_providers
+
+API endpoint used by the chat widget to get available AI providers and models.
+Follows role-based visibility rules.
+
+=cut
+
+sub get_user_providers :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id = $c->session->{user_id};
+    my $user_roles = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+    
+    my $can_select_model = 0;
+    my $is_csc_admin = 0;
+    if (ref($user_roles) eq 'ARRAY') {
+        $can_select_model = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles;
+        
+        # Determine if user is CSC Admin or standard Admin
+        $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+        
+        if ($is_csc_admin) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'get_user_providers', "Detected CSC Admin (SiteName=CSC, role=admin)");
+        }
+    }
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+        'get_user_providers', "User $username (id=$user_id) - can_select=$can_select_model, is_csc_admin=$is_csc_admin, roles=" . join(',', @$user_roles));
+
+    my @providers;
+    
+    # 1. Ollama (Local) - fetch installed models
+    try {
+        my $ollama = $c->model('Ollama');
+        if ($ollama) {
+            # Ensure model is configured correctly
+            my $can_select = $can_select_model;
+            my $current_host = $c->session->{ollama_host} || $ollama->host || 'localhost';
+            my $current_port = $c->session->{ollama_port} || $ollama->port || 11434;
+            $ollama->host($current_host);
+            $ollama->port($current_port);
+            
+            my $installed_models = $ollama->list_models() || [];
+            
+            push @providers, {
+                service => 'ollama',
+                name => 'Ollama (Local)',
+                is_local => 1,
+                models => [ map { { id => $_->{name}, details => $_->{details} } } @$installed_models ]
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'get_user_providers', "Error fetching Ollama models: $_");
+        
+        # Fallback to generic Ollama option if fetch fails
+        push @providers, {
+            service => 'ollama',
+            name => 'Ollama (Local)',
+            is_local => 1
+        };
+    };
+    
+    # 2. External providers (Grok/xAI) - only for authenticated admins
+    if ($user_id && $user_id != 199 && $can_select_model) {
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+            'get_user_providers', "Checking for external providers for user_id=$user_id");
+        try {
+            my $schema = $c->model('DBEncy')->schema;
+            # Admins: use their own key first. 
+            # CSC Admin can fall back to any active key.
+            # Regular admins only see their own keys.
+            my $grok_key = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id, service => 'grok', is_active => '1' }
+            )->first;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                'get_user_providers', "User key search result: " . ($grok_key ? "found (id=" . $grok_key->id . ")" : "not found"));
+
+            # Determine if user is an admin
+            my $has_admin_role = grep { $_ =~ /^admin$/i } @$user_roles;
+
+            if (!$grok_key && ($is_csc_admin || $has_admin_role)) {
+                $grok_key = $schema->resultset('UserApiKeys')->search(
+                    { service => 'grok', is_active => '1' }
+                )->first;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'get_user_providers', "Admin fallback key search result: " . ($grok_key ? "found (id=" . $grok_key->id . ")" : "not found"));
+            }
+            
+            if ($grok_key && $grok_key->api_key_encrypted) {
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'get_user_providers', "Grok key found, loading metadata");
+                my $meta = $grok_key->get_metadata() || {};
+                my $models = $meta->{available_models} || [];
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
+                    'get_user_providers', "Metadata models count: " . scalar(@$models));
+
+                # If no models in metadata, trigger a sync attempt
+                if (!@$models) {
+                    my $grok_model = $c->model('Grok');
+                    my $decrypted_key = $grok_key->decrypt_api_key();
+                    if ($grok_model && $decrypted_key) {
+                        $grok_model->db_key($decrypted_key);
+                        my $api_models = $grok_model->list_models();
+                        if ($api_models && ref($api_models) eq 'ARRAY' && @$api_models) {
+                            $models = [ map { { id => $_->{id} } } @$api_models ];
+                            $meta->{available_models} = $models;
+                            $meta->{last_sync} = time();
+                            $grok_key->set_metadata($meta);
+                            $grok_key->update();
+                        }
+                    }
+                }
+                
+                # Filter models based on role
+                my @filtered_models;
+                foreach my $m (@$models) {
+                    my $id = $m->{id};
+                    next unless $id;
+                    
+                    # Admins see everything. Others see only standard models.
+                    unless ($is_csc_admin || $has_admin_role) {
+                        next if $id =~ /^(grok-imagine|grok-.*video)/i;
+                    }
+                    
+                    my $cost_label = 'Paid';
+                    if ($id =~ /mini/i) {
+                        $cost_label = '$';
+                    } elsif ($id =~ /vision|imagine/i) {
+                        $cost_label = '$$$';
+                    } else {
+                        $cost_label = '$$';
+                    }
+                    
+                    push @filtered_models, { id => $id, cost => $cost_label };
+                }
+                
+                if (@filtered_models) {
+                    push @providers, {
+                        service => 'grok',
+                        name => 'xAI (Grok)',
+                        models => \@filtered_models
+                    };
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'get_user_providers', "Error fetching external providers: $_");
+        };
+    }
+    
+    $c->response->body(encode_json({
+        success => JSON::true,
+        username => $username,
+        is_guest => ($user_id && $user_id != 199) ? 0 : 1,
+        can_access_history => $can_select_model ? 1 : 0,
+        providers => \@providers
+    }));
+}
+
+=head2 _get_current_ollama_config
+
+Helper to get current Ollama configuration from session or defaults.
+
+=cut
+
+sub _get_current_ollama_config {
+    my ($self, $c, $can_select) = @_;
+    
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            '_get_current_ollama_config', "Failed to load Ollama model");
+        return ('localhost', 11434, 'llama3.1:latest', []);
+    }
+    
+    # Get current settings from session or use defaults from model
+    my $current_host = $c->session->{ollama_host} || $ollama->host || 'localhost';
+    my $current_port = $c->session->{ollama_port} || $ollama->port || 11434;
+    my $current_model = $c->session->{ollama_model} || $ollama->model || 'llama3.1:latest';
+    
+    # Update model instance with current settings
+    $ollama->host($current_host);
+    $ollama->port($current_port);
+    $ollama->model($current_model);
+    
+    # Get list of installed models from the server
+    my $installed_models = [];
+    try {
+        $installed_models = $ollama->list_models() || [];
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            '_get_current_ollama_config', "Failed to list installed models: $_");
+    };
+    
+    return ($current_host, $current_port, $current_model, $installed_models);
+}
+
 =head2 generate
 
 API endpoint for AI query processing. Returns JSON responses.
@@ -172,6 +800,8 @@ sub generate :Local :Args(0) {
     
     # Set response content type
     $c->response->content_type('application/json');
+    
+    my $response_data = { success => JSON::false, error => 'Unknown error' };
     
     # Determine if user is authenticated or guest
     my $username = $c->session->{username};
@@ -389,7 +1019,7 @@ sub generate :Local :Args(0) {
         $use_search = 0;
     }
 
-    my $response_data;
+    $response_data = undef;
     my $ollama_started = 0;
     my $model_used = 'unknown';
     my $active_ollama_host = '';
@@ -402,20 +1032,23 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
                 'generate', "Using Grok provider for query, user_id: $user_id");
             
-            # Fetch API key from database (user's own key, or any active for admins)
+            # Fetch API key from database (user's own key, or any active for CSC Admin)
             my $grok_api_key = '';
             try {
                 my $schema = $c->model('DBEncy')->schema;
                 my $key_obj = $schema->resultset('UserApiKeys')->search(
                     { user_id => $user_id, service => 'grok', is_active => '1' }
                 )->first;
-                if (!$key_obj && $can_select_model_gen) {
+                
+                # Only CSC Admin can fall back to any active key
+                if (!$key_obj && $self->admin_auth->is_csc_admin($c)) {
                     $key_obj = $schema->resultset('UserApiKeys')->search(
                         { service => 'grok', is_active => '1' }
                     )->first;
                 }
+                
                 if ($key_obj && $key_obj->api_key_encrypted) {
-                    $grok_api_key = $key_obj->get_api_key() || '';
+                    $grok_api_key = $key_obj->decrypt_api_key() || '';
                 }
             } catch {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
@@ -430,7 +1063,7 @@ sub generate :Local :Args(0) {
             unless ($grok) {
                 die "Failed to load Grok model";
             }
-            $grok->api_key($grok_api_key);
+            $grok->db_key($grok_api_key);
             $grok->model($model) if $model;
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -442,23 +1075,20 @@ sub generate :Local :Args(0) {
                     { role => 'user', content => $prompt }
                 ],
                 use_search => $use_search,
+                c => $c,
             );
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
-                # Auto-fallback: if model is deprecated (410/404), retry with grok-3-mini
-                if ($error =~ /410|404|no longer available|not found/ && $grok->model ne 'grok-3-mini') {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+                    'generate', "CRITICAL: Grok query failed for user '$username' (provider: $provider, model: " . ($model || 'default') . "): $error");
+                
+                # Check for 410 (Gone) or 404 (Not Found) to provide better user guidance
+                if ($error =~ /410|404/i) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                        'generate', "Model " . $grok->model . " unavailable, retrying with grok-3-mini");
-                    $grok->model('grok-3-mini');
-                    $response = $grok->chat(
-                        messages => [
-                            { role => 'system', content => $system || 'You are a helpful assistant.' },
-                            { role => 'user', content => $prompt }
-                        ],
-                        use_search => $use_search,
-                    );
+                        'generate', "Model deprecation or missing error detected. Consider syncing models or selecting another.");
                 }
+                
                 unless ($response) {
                     $error = $grok->last_error || $error;
                     die "Grok query failed: $error";
@@ -508,10 +1138,10 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-            $ollama->timeout(90);
+            $ollama->timeout(300);
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Querying Ollama host=$current_host model=$current_model timeout=90s prompt_len=" . length($prompt));
+                'generate', "Querying Ollama host=$current_host model=$current_model timeout=300s prompt_len=" . length($prompt));
             
             my $query_start = time();
             # Query the API
@@ -655,7 +1285,7 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($user_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'user'))
             });
             
             unless ($user_msg) {
@@ -690,7 +1320,7 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'user'))
             });
             
             unless ($ai_msg) {
@@ -729,8 +1359,8 @@ sub generate :Local :Args(0) {
         
     } catch {
         my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-            'generate', "AI query failed for user '$username' (provider: $provider): $error");
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
+            'generate', "AI query failed for user '$username' (provider: $provider, model: " . ($model || 'default') . ", prompt_len: " . (defined($prompt) ? length($prompt) : 0) . ", conversation_id: " . ($conversation_id || 'new') . "): $error");
         
         my $user_error = "$error";
         $user_error =~ s/ at \/.*? line \d+.*$//s;
@@ -974,7 +1604,7 @@ sub result :Local :Args(0) {
                 model_used => $response_metadata->{model},
                 metadata => encode_json($user_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'user'))
             });
             
             if ($user_msg) {
@@ -1004,7 +1634,7 @@ sub result :Local :Args(0) {
                 response_time_ms => $response_time,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'user'))
             });
             
             if ($ai_msg) {
@@ -1275,7 +1905,7 @@ sub chat :Local :Args(0) {
                 die "Failed to load Grok model";
             }
 
-            $grok->api_key($grok_api_key);
+            $grok->db_key($grok_api_key);
             $grok->model($model) if $model;
 
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
@@ -1287,7 +1917,11 @@ sub chat :Local :Args(0) {
                 unshift @final_messages, { role => 'system', content => $role_prompt_chat };
             }
 
-            my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+            my $response = $grok->chat(
+                messages => \@final_messages,
+                use_search => $use_search_chat,
+                c => $c
+            );
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
@@ -1320,7 +1954,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(90);
+            $ollama->timeout(300);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
@@ -1329,7 +1963,7 @@ sub chat :Local :Args(0) {
             }
 
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=90s messages=" . scalar(@messages));
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=300s messages=" . scalar(@messages));
 
             my $chat_start = time();
             my $response = $ollama->chat(messages => \@messages);
@@ -1443,7 +2077,7 @@ sub chat :Local :Args(0) {
                     guest_session_id => $guest_session_id
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'normal'))
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1467,7 +2101,7 @@ sub chat :Local :Args(0) {
                     guest_session_id => $guest_session_id
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'normal'))
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -1641,7 +2275,10 @@ sub models :Local :Args(0) {
                     # Get installed models
                     my $installed = $ollama->list_models();
                     if ($installed && ref($installed) eq 'ARRAY') {
-                        $server_info->{installed_models} = $installed;
+                        # Map to structure expected by models.tt
+                        $server_info->{installed_models} = [ 
+                            map { { name => $_->{name}, size => $_->{size} || 'Unknown' } } @$installed 
+                        ];
                         
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                             'models', "Retrieved " . scalar(@$installed) . " installed models from $config->{host}:$config->{port}");
@@ -1653,7 +2290,8 @@ sub models :Local :Args(0) {
                     # Get available models (this returns static list)
                     my $available = $ollama->list_available_models();
                     if ($available && ref($available) eq 'ARRAY') {
-                        $server_info->{available_models} = $available;
+                        # Map to structure expected by models.tt (it uses simple string in select option)
+                        $server_info->{available_models} = [ map { $_->{name} } @$available ];
                         
                         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                             'models', "Retrieved " . scalar(@$available) . " available models from catalog");
@@ -2422,4 +3060,448 @@ sub start_server :Local :Args(0) {
     my $server_port = $json_data->{port} || 11434;
     my $method = $json_data->{method} || 'systemctl';  # Default to systemctl
     my $async = $json_data->{async} || 0;              # Default to synchronous
+    
+    my $response_data;
+    try {
+        my $ollama = $c->model('Ollama');
+        unless ($ollama) {
+            die "Failed to load Ollama model";
+        }
+        
+        $response_data = $ollama->start_server(
+            method => $method,
+            async => $async
+        );
+        
+        if ($response_data && $response_data->{success}) {
+            $c->response->status(200);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+                'start_server', "Ollama server started successfully via $method");
+        } else {
+            # Map success values to JSON::true/false
+            $response_data->{success} = $response_data->{success} ? JSON::true : JSON::false;
+            $c->response->status(500);
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+                'start_server', "Failed to start Ollama server: " . ($response_data->{error} || 'Unknown error'));
+        }
+        
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'start_server', "Exception starting Ollama server: $error");
+        
+        $response_data = {
+            success => JSON::false,
+            error => "Failed to start server: $error"
+        };
+        $c->response->status(500);
+    };
+    
+    my $json_response = encode_json($response_data);
+    $c->response->body($json_response);
+}
+
+=head2 manage_api_keys
+
+Display and manage user's AI API keys.
+
+=cut
+
+sub manage_api_keys :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = "You must be logged in to manage API keys.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    my $username = $c->session->{username};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
+        'manage_api_keys', "User $username (ID: $user_id) accessing API key management. CSC Admin: " . ($is_csc_admin ? 'Yes' : 'No'));
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $api_keys_rs;
+        
+        if ($is_csc_admin) {
+            # CSC Admin sees ALL keys
+            $api_keys_rs = $schema->resultset('UserApiKeys')->search(
+                {},
+                { order_by => { -desc => 'created_at' } }
+            );
+        } else {
+            # Regular users see only their own keys
+            $api_keys_rs = $schema->resultset('UserApiKeys')->search(
+                { user_id => $user_id },
+                { order_by => { -desc => 'created_at' } }
+            );
+        }
+        
+        my @api_keys = $api_keys_rs->all;
+        
+        $c->stash(
+            api_keys => \@api_keys,
+            template => 'ai/manage_api_keys.tt',
+            page_title => 'Manage AI API Keys'
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'manage_api_keys', "Error fetching API keys: $_");
+        $c->stash(
+            error_msg => "Failed to load API keys: $_",
+            template => 'ai/manage_api_keys.tt'
+        );
+    };
+}
+
+=head2 add_api_key
+
+Form to add a new API key.
+
+=cut
+
+sub add_api_key :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = "You must be logged in to add API keys.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    $c->stash(
+        template => 'ai/add_api_key.tt',
+        page_title => 'Add AI API Key'
+    );
+}
+
+=head2 edit_api_key
+
+Form to edit an existing API key.
+
+=cut
+
+sub edit_api_key :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = "You must be logged in to edit API keys.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key;
+        
+        if ($is_csc_admin) {
+            $key = $schema->resultset('UserApiKeys')->find($id);
+        } else {
+            $key = $schema->resultset('UserApiKeys')->find({ id => $id, user_id => $user_id });
+        }
+        
+        unless ($key) {
+            $c->flash->{error_msg} = "API key not found or access denied.";
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        $c->stash(
+            key_id => $key->id,
+            service => $key->service,
+            is_active => $key->is_active,
+            template => 'ai/add_api_key.tt',
+            page_title => 'Edit AI API Key'
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'edit_api_key', "Error fetching API key for edit: $_");
+        $c->flash->{error_msg} = "Error loading key: $_";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    };
+}
+
+=head2 save_api_key
+
+Save or update an API key.
+
+=cut
+
+sub save_api_key :Local :POST {
+    my ($self, $c) = @_;
+    
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = "You must be logged in to save API keys.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $params = $c->request->params;
+    my $id = $params->{id};
+    my $service = $params->{service};
+    my $api_key = $params->{api_key};
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    
+    unless ($service) {
+        $c->flash->{error_msg} = "Service provider is required.";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        return;
+    }
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj;
+        
+        if ($id) {
+            # Update existing
+            if ($is_csc_admin) {
+                $key_obj = $schema->resultset('UserApiKeys')->find($id);
+            } else {
+                $key_obj = $schema->resultset('UserApiKeys')->find({ id => $id, user_id => $user_id });
+            }
+            
+            unless ($key_obj) {
+                $c->flash->{error_msg} = "API key not found or access denied.";
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            if ($api_key && $api_key ne '') {
+                $key_obj->set_api_key($api_key);
+            }
+            
+            $key_obj->update();
+            $c->flash->{status_msg} = "API key for $service updated successfully.";
+        } else {
+            # Create new
+            unless ($api_key) {
+                $c->flash->{error_msg} = "API key is required for new entries.";
+                $c->response->redirect($c->uri_for('/ai/add_api_key'));
+                return;
+            }
+            
+            # Check if key for this service already exists for this user
+            my $existing = $schema->resultset('UserApiKeys')->find({
+                user_id => $user_id,
+                service => $service
+            });
+            
+            if ($existing) {
+                $c->flash->{error_msg} = "An API key for $service already exists. Please edit the existing one.";
+                $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+                return;
+            }
+            
+            $key_obj = $schema->resultset('UserApiKeys')->create({
+                user_id => $user_id,
+                service => $service,
+                is_active => 1
+            });
+            
+            $key_obj->set_api_key($api_key);
+            $key_obj->update();
+            
+            $c->flash->{status_msg} = "API key for $service added successfully.";
+        }
+        
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'save_api_key', "Error saving API key: $_");
+        $c->flash->{error_msg} = "Failed to save API key: $_";
+        $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+    };
+}
+
+=head2 delete_api_key
+
+Delete an API key.
+
+=cut
+
+sub delete_api_key :Local :POST :Args(1) {
+    my ($self, $c, $id) = @_;
+    
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->flash->{error_msg} = "You must be logged in to delete API keys.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key;
+        
+        if ($is_csc_admin) {
+            $key = $schema->resultset('UserApiKeys')->find($id);
+        } else {
+            $key = $schema->resultset('UserApiKeys')->find({ id => $id, user_id => $user_id });
+        }
+        
+        unless ($key) {
+            $c->flash->{error_msg} = "API key not found or access denied.";
+            $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+            return;
+        }
+        
+        my $service = $key->service;
+        $key->delete();
+        
+        $c->flash->{status_msg} = "API key for $service deleted.";
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'delete_api_key', "Error deleting API key: $_");
+        $c->flash->{error_msg} = "Failed to delete API key: $_";
+    };
+    
+    $c->response->redirect($c->uri_for('/ai/manage_api_keys'));
+}
+
+=head2 sync_models
+
+AJAX endpoint to sync available models for an API provider.
+
+=cut
+
+sub sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json');
+    
+    my $user_id = $c->session->{user_id};
+    my $service = $c->request->params->{service};
+    
+    unless ($user_id && $service) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Missing user or service' }));
+        return;
+    }
+    
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj;
+        
+        if ($is_csc_admin) {
+            # CSC Admin can sync any key
+            $key_obj = $schema->resultset('UserApiKeys')->search({ service => $service, is_active => 1 })->first;
+        } else {
+            $key_obj = $schema->resultset('UserApiKeys')->find({ user_id => $user_id, service => $service });
+        }
+        
+        unless ($key_obj) {
+            $c->response->body(encode_json({ success => JSON::false, error => "No active API key found for $service" }));
+            return;
+        }
+        
+        my $decrypted_key = $key_obj->decrypt_api_key();
+        unless ($decrypted_key) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to decrypt API key" }));
+            return;
+        }
+        
+        my @models;
+        if ($service eq 'grok') {
+            my $grok = $c->model('Grok');
+            $grok->db_key($decrypted_key);
+            my $api_models = $grok->list_models();
+            
+            if ($api_models && ref($api_models) eq 'ARRAY') {
+                @models = map { { id => $_->{id}, created => $_->{created} } } @$api_models;
+            }
+        } else {
+            $c->response->body(encode_json({ success => JSON::false, error => "Sync not implemented for $service yet" }));
+            return;
+        }
+        
+        if (@models) {
+            my $meta = $key_obj->get_metadata() || {};
+            $meta->{available_models} = \@models;
+            $meta->{last_sync} = time();
+            $key_obj->set_metadata($meta);
+            $key_obj->update();
+            
+            $c->response->body(encode_json({ 
+                success => JSON::true, 
+                count => scalar(@models),
+                models => \@models
+            }));
+        } else {
+            $c->response->body(encode_json({ success => JSON::false, error => "No models returned from provider" }));
+        }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+            'sync_models', "Error syncing models for $service: $_");
+        $c->response->body(encode_json({ success => JSON::false, error => "$_" }));
+    };
+}
+
+=head2 _build_role_system_prompt
+
+Internal helper to add role-specific instructions to the system prompt.
+
+=cut
+
+sub _build_role_system_prompt {
+    my ($self, $c, $roles, $provider) = @_;
+    
+    my $role_context = "";
+    
+    if (ref($roles) eq 'ARRAY' && @$roles) {
+        if (grep { $_ =~ /^admin$/i } @$roles) {
+            $role_context = "You are assisting an Administrator with full system access.";
+        } elsif (grep { $_ =~ /^developer$/i } @$roles) {
+            $role_context = "You are assisting a Developer. You may provide technical details and code.";
+        } elsif (grep { $_ =~ /^editor$/i } @$roles) {
+            $role_context = "You are assisting an Editor. Focus on content and documentation.";
+        } else {
+            $role_context = "You are assisting a standard User.";
+        }
+    } else {
+        $role_context = "You are assisting a standard User.";
+    }
+    
+    return $role_context;
+}
+
+=head2 _select_model_for_context
+
+Internal helper to select an appropriate Ollama model based on agent and page context.
+
+=cut
+
+sub _select_model_for_context {
+    my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
+    
+    # Return default if no models installed
+    return $default_model unless $installed_models && ref($installed_models) eq 'ARRAY' && @$installed_models;
+    
+    # Simple logic: use llama3.1 if available for documentation
+    if (($agent_id || '') eq 'documentation' || ($page_context || '') eq 'documentation') {
+        foreach my $m (@$installed_models) {
+            my $name = ref($m) eq 'HASH' ? $m->{name} : $m;
+            return $name if $name && $name =~ /llama3\.1/i;
+        }
+    }
+    
+    return $default_model;
+}
+
+__PACKAGE__->meta->make_immutable;
+
+
+1;
 
