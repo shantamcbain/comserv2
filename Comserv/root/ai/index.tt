@@ -23,7 +23,7 @@
             </span>
         </div>
         <div class="ai-topbar-center">
-            [% IF can_select_model || (external_models && external_models.size > 0) %]
+            [% IF (can_select_model || (external_models && external_models.size > 0)) && (username && !username.match('^Guest-')) %]
             <select id="model-select" class="ai-model-select" title="Select AI model">
                 [% IF installed_models && installed_models.size > 0 %]
                     <optgroup label="Ollama (Local)">
@@ -64,12 +64,16 @@
             [% END %]
         </div>
         <div class="ai-topbar-right">
+            [% IF username && !username.match('^Guest-') %]
             <a href="/ai/manage_api_keys" class="ai-topbar-btn" title="Manage API keys">🔑</a>
             <a href="/ai/models" class="ai-topbar-btn" title="Manage models">⚙️</a>
+            [% END %]
             <button type="button" id="clear-chat" class="ai-topbar-btn" title="New chat">✏️</button>
             <a href="/" class="ai-topbar-btn" title="Return to menu">🏠</a>
+            [% IF username && !username.match('^Guest-') && can_select_model %]
             <button type="button" id="toggle-sidebar-btn" class="ai-topbar-btn ai-sidebar-toggle" title="Toggle history panel" aria-label="History">🕐</button>
             <button type="button" id="flip-sidebar-btn" class="ai-topbar-btn" title="Move sidebar to other side">⇄</button>
+            [% END %]
         </div>
     </div>
 
@@ -82,7 +86,7 @@
                 <div class="welcome-message">
                     <div class="welcome-icon">🤖</div>
                     <h2>How can I help you today?</h2>
-                    <p>Ask me anything. Select a model above to use Ollama (local) or an external AI like Grok.</p>
+                    <p>Ask me anything. [% IF can_select_model %]Select a model above to use Ollama (local) or an external AI like Grok.[% END %]</p>
                 </div>
             </div>
 
@@ -96,7 +100,7 @@
                         rows="1"
                         required
                     ></textarea>
-                    <button type="submit" id="send-button" class="ai-send-btn" title="Send">
+                    <button type="submit" id="send-button" class="ai-send-btn" title="Send message">
                         <span class="button-text">➤</span>
                         <span class="button-spinner" style="display:none;">⏳</span>
                     </button>
@@ -106,6 +110,7 @@
         </div>
 
         <!-- Right sidebar -->
+        [% IF can_select_model %]
         <div class="ai-sidebar" id="ai-sidebar">
             <nav class="sidebar-nav">
                 <button class="sidebar-nav-btn active" data-panel="history" title="Conversation History">
@@ -149,6 +154,7 @@
                 </div>
             </div>
         </div>
+        [% END %]
 
     </div><!-- /.ai-body -->
 

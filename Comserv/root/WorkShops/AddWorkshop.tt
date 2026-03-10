@@ -23,9 +23,9 @@
         
         <div class="content-primary">
             
-            [% IF error_msg %]
-                <div class="error">[% error_msg %]</div>
-            [% END %]
+            [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+            [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+            [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
             
             <div class="form-container">
                 <form method="POST" action="/workshop/addworkshop" class="app-form">
