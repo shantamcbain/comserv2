@@ -216,7 +216,7 @@
             </div>
             
             <div class="data-container">
-                <details class="priority-container">
+                <details class="priority-container" open>
                     <summary class="priority-summary">Past Workshops ([% past_workshops.size || 0 %])</summary>
                     
                     [% IF past_workshops.size > 0 %]

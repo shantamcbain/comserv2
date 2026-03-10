@@ -276,7 +276,7 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
-            '<button id="send-message">Send</button>';
+            '<button id="send-message" title="Send message">Send</button>';
 
         // Resize handle (bottom-right corner)
         const resizeHandle = document.createElement('div');
@@ -293,48 +293,8 @@
         chatPanel.appendChild(chatInput);
         chatPanel.appendChild(resizeHandle);
 
-        // ── Populate provider dropdown ────────────────────────────────────────
-        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
-            .then(r => r.json())
-            .then(function(data) {
-                if (data.success) {
-                    // Capture username
-                    if (data.username) {
-                        state.username = data.username;
-                    }
-                }
-                if (data.success && data.providers && data.providers.length > 0) {
-                    const sel = document.getElementById('ai-provider');
-                    if (!sel) return;
-                    data.providers.forEach(function(p) {
-                        if (p.service === 'grok') {
-                            const grp = document.createElement('optgroup');
-                            grp.label = 'External AI (xAI)';
-                            const grokModels = (p.models && p.models.length > 0)
-                                ? p.models
-                                    .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
-                                    .map(function(m) {
-                                        const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-                                        return { val: 'grok|' + m.id, label: label + ' (xAI)' };
-                                    })
-                                : [
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
-                                    { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                    { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
-                                ];
-                            grokModels.forEach(function(m) {
-                                const opt = document.createElement('option');
-                                opt.value = m.val; opt.textContent = m.label;
-                                grp.appendChild(opt);
-                            });
-                            sel.appendChild(grp);
-                        }
-                    });
-                }
-            })
-            .catch(function() {});
+        // Populate providers immediately
+        loadUserProviders();
 
         // ── Drag to move ──────────────────────────────────────────────────────
         (function initDrag() {
@@ -646,29 +606,81 @@
         });
     }
     
-    // Load user's available AI providers
+    // Load user's available AI providers and populate the model selector
     function loadUserProviders() {
+        const sel = document.getElementById('ai-provider');
+        if (!sel) return;
+
         fetch('/ai/get_user_providers', {
             method: 'GET',
             credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.providers) {
-                const providerSelect = document.getElementById('ai-provider');
+            if (data.success) {
+                // Hide provider selector for guests or plain users
+                if (data.is_guest || !data.can_access_history) {
+                    const selectorBar = document.querySelector('.provider-selector');
+                    if (selectorBar) {
+                        selectorBar.style.display = 'none';
+                    }
+                }
                 
-                // Clear existing options except Ollama
-                providerSelect.innerHTML = '<option value="ollama">Ollama (Local)</option>';
+                // Hide history button for those without history access
+                if (!data.can_access_history) {
+                    const historyBtn = document.getElementById('toggle-history-btn');
+                    if (historyBtn) {
+                        historyBtn.style.display = 'none';
+                    }
+                }
+
+                // Capture username
+                if (data.username) {
+                    state.username = data.username;
+                }
                 
-                // Add user's configured providers
-                data.providers.forEach(provider => {
-                    const option = document.createElement('option');
-                    option.value = provider.service;
-                    option.textContent = provider.display_name;
-                    providerSelect.appendChild(option);
-                });
-                
-                console.debug('Loaded', data.providers.length, 'user providers');
+                if (data.providers && data.providers.length > 0) {
+                    // Clear existing options
+                    sel.innerHTML = '';
+                    
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'ollama') {
+                            const grp = document.createElement('optgroup');
+                            grp.label = 'Ollama (Local)';
+                            
+                            if (p.models && p.models.length > 0) {
+                                p.models.forEach(function(m) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'ollama|' + m.id;
+                                    opt.textContent = m.id;
+                                    grp.appendChild(opt);
+                                });
+                            } else {
+                                const opt = document.createElement('option');
+                                opt.value = 'ollama';
+                                opt.textContent = 'Ollama Default';
+                                grp.appendChild(opt);
+                            }
+                            sel.appendChild(grp);
+                        } else if (p.service === 'grok') {
+                            const grp = document.createElement('optgroup');
+                            grp.label = 'External AI (xAI)';
+                            
+                            if (p.models && p.models.length > 0) {
+                                p.models.forEach(function(m) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'grok|' + m.id;
+                                    const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+                                    const cost = m.cost ? ' (' + m.cost + ')' : '';
+                                    opt.textContent = label + cost + ' (xAI)';
+                                    grp.appendChild(opt);
+                                });
+                            }
+                            sel.appendChild(grp);
+                        }
+                    });
+                    console.debug('Populated', data.providers.length, 'providers into widget selector');
+                }
             }
         })
         .catch(error => {
@@ -695,15 +707,6 @@
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
         
-        // Load persisted conversation state
-        loadPersistedState();
-        
-        // Load conversation list for dropdown
-        loadConversationList();
-        
-        // Load user's available providers
-        loadUserProviders();
-        
         // Update chat header with selected agent info
         const chatHeader = document.querySelector('.chat-header h3');
         if (state.pageContext && state.pageContext.agent_name) {
@@ -716,6 +719,35 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
 
+        // Load user's available providers first to check roles
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Update state and UI based on roles
+                    if (!data.can_access_history) {
+                        // Hide history UI if not already hidden
+                        const historyBtn = document.getElementById('toggle-history-btn');
+                        if (historyBtn) historyBtn.style.display = 'none';
+                        const selectorBar = document.querySelector('.provider-selector');
+                        if (selectorBar) selectorBar.style.display = 'none';
+                    } else {
+                        // Authorized for history: Load state and list
+                        loadPersistedState();
+                        loadConversationList();
+                        
+                        // Auto-reload messages if resuming a conversation
+                        if (state.currentConversationId) {
+                            const chatMessages = document.getElementById('chat-messages');
+                            const hasMessages = chatMessages && chatMessages.children.length > 1;
+                            if (!hasMessages) {
+                                loadConversation(state.currentConversationId);
+                            }
+                        }
+                    }
+                }
+            });
+        
         // Set initial model label from current dropdown selection
         if (!state.activeModel) {
             const sel = document.getElementById('ai-provider');
@@ -724,15 +756,6 @@
                 state.activeModel = parts[0] === 'grok'
                     ? 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '')
                     : 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
-            }
-        }
-
-        // Auto-reload messages if resuming a conversation
-        if (state.currentConversationId) {
-            const chatMessages = document.getElementById('chat-messages');
-            const hasMessages = chatMessages && chatMessages.children.length > 1;
-            if (!hasMessages) {
-                loadConversation(state.currentConversationId);
             }
         }
         
@@ -886,9 +909,9 @@
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
         // Provider-aware client timeout: Ollama (local) can be slow with large models,
-        // so match the server-side 90s. External APIs (Grok etc.) should be fast; cap at 30s.
+        // so we use a 300s timeout. External APIs (Grok etc.) cap at 60s.
         const isOllama = providerName === 'ollama';
-        const clientTimeoutMs = isOllama ? 95000 : 30000;
+        const clientTimeoutMs = isOllama ? 300000 : 60000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();

@@ -70,10 +70,10 @@ sub check_admin_access {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
         "Session debug for $action_name - Username: '$username', SiteName: '$sitename', Roles: '$roles_str'");
     
-    # Check for special username
-    if ($username eq 'Shanta' || $username eq 'ai_assistant') {
+    # Check for system/service users
+    if ($username eq 'ai_assistant') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_admin_access',
-            "Access granted for $action_name: Special user '$username'");
+            "Access granted for $action_name: Service user '$username'");
         return 1;
     }
     
@@ -137,9 +137,19 @@ Helper method to check if user is a CSC admin specifically.
 sub is_csc_admin {
     my ($self, $c) = @_;
     
+    # CSC Admin check: SiteName = 'CSC' AND admin role
+    # This identifies the system-level administrator
+    my $roles = $c->session->{roles} || [];
+    my $has_admin_role = 0;
+    if (ref($roles) eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' } @$roles;
+    } elsif ($roles && $roles eq 'admin') {
+        $has_admin_role = 1;
+    }
+    
     return ($c->session->{SiteName} && 
             $c->session->{SiteName} eq 'CSC' && 
-            $c->check_user_roles('admin'));
+            $has_admin_role);
 }
 
 =head2 get_admin_type
@@ -155,7 +165,7 @@ sub get_admin_type {
     my $roles = $c->session->{roles} || [];
     my $sitename = $c->session->{SiteName} || '';
     
-    if ($username eq 'Shanta' || $username eq 'ai_assistant') {
+    if ($username eq 'ai_assistant') {
         return 'special';
     }
     

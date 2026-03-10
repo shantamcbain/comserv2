@@ -23,8 +23,8 @@ sub get_active_workshops {
             ]
         };
 
-        # Admins see all non-draft upcoming workshops; everyone else sees only published
-        $filter->{'me.status'} = $is_admin ? { '!=' => 'draft' } : 'published';
+        # EVERYONE sees all non-draft upcoming workshops
+        $filter->{'me.status'} = { '!=' => 'draft' };
 
         @workshops = $rs->search(
             $filter,

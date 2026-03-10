@@ -388,6 +388,28 @@ sub do_login :Local {
         
         # Assign roles to session (no hard-coded username-based tweaks)
         $c->session->{roles} = $roles;
+
+        # NEW: Check if we need to auto-assign WorkshopLeader role based on return_to
+        if ($return_to && $return_to =~ m{/workshop/add}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                "Detected workshop add redirect, ensuring workshop_leader role for user '" . ($user->username||'') . "'");
+            
+            my @current_roles = @$roles;
+            unless (grep { $_ eq 'workshop_leader' } @current_roles) {
+                push @current_roles, 'workshop_leader';
+                my $roles_str = join(',', @current_roles);
+                eval {
+                    $user->update({ roles => $roles_str });
+                    $c->session->{roles} = \@current_roles;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                        "Auto-assigned workshop_leader role to user '" . ($user->username||'') . "'");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                        "Failed to auto-assign workshop_leader role: $@");
+                }
+            }
+        }
         
         # Log the final roles
         $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
@@ -1244,18 +1266,27 @@ sub complete_profile :Local {
         my $hashed_password = sha256_hex($password);
         
         eval {
+            my $roles_to_assign = 'normal';
+            my $session_return_to = $c->session->{return_to};
+            
+            if ($session_return_to && $session_return_to =~ m{/workshop/add}) {
+                $roles_to_assign = 'normal,workshop_leader';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                    "Auto-assigning workshop_leader role due to return_to: $session_return_to");
+            }
+
             $user->update({
                 first_name        => $first_name,
                 last_name         => $last_name,
                 password          => $hashed_password,
                 status            => 'active',
-                roles             => 'normal',
+                roles             => $roles_to_assign,
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
             my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active");
+                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active roles=$roles_to_assign");
         };
         
         if ($@) {
@@ -1282,8 +1313,11 @@ sub complete_profile :Local {
                 "Failed to send welcome email: $@");
         }
 
+        my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
+        delete $c->session->{return_to};
+        
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($final_redirect);
     } else {
         $c->stash(template => 'user/CompleteProfile.tt');
     }
@@ -2372,6 +2406,13 @@ sub register :Local {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
         'Displaying registration form (Step 1)');
+    
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $c->session->{return_to} = $return_to;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+            "Stored return_to in session: $return_to");
+    }
     
     $c->stash(template => 'user/register.tt');
 }

@@ -132,7 +132,7 @@
 
     <div class="page-header">
         <h1>📁 Workshop Resources</h1>
-        <p style="color: var(--text-muted-color);">Files and links registered for workshop use.</p>
+        <p style="color: var(--text-muted-color);">Files and links registered for workshop use. <a href="/Documentation/WorkshopResourceManagement" style="font-size:0.9em;margin-left:10px;">📖 User Guide</a></p>
     </div>
 
     [% IF c.flash.error_msg %]
@@ -606,10 +606,10 @@
     </div>
     </details>
 
-    [% IF is_admin %]
-    <!-- Admin: lazy NFS filesystem browser -->
-    <details id="nfs-browser-section" style="margin-top:24px;">
-        <summary>🗂️ Browse NFS Filesystem Raw (Admin)
+    [% IF can_browse_nfs %]
+    <!-- NFS Filesystem Browser -->
+    <details id="nfs-browser-section" style="margin-top:24px;" [% IF open_panel == 'nfs' %]open[% END %]>
+        <summary>🗂️ Browse NFS Filesystem
             <span id="nfs-count-badge" style="font-size:0.8em;font-weight:normal;color:var(--text-muted-color);margin-left:8px;"></span>
         </summary>
         <div style="margin:12px 16px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
@@ -633,7 +633,7 @@
                         <th>Ext</th>
                         <th>Size</th>
                         <th>Path</th>
-                        <th>Download</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="nfs-tbody"></tbody>
@@ -643,6 +643,83 @@
     [% END %]
 
 </div>
+<!-- Attach to Workshop Modal -->
+<div id="attach-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="closeAttachModal()">&times;</button>
+        <h3>🔗 Attach to Workshop</h3>
+        <p style="font-size:0.9em;margin-bottom:16px;">
+            Registering file: <strong id="attach-file-name"></strong>
+        </p>
+        
+        <form method="POST" action="/workshop/resource_fs_attach">
+            <input type="hidden" name="path" id="attach-path">
+            
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Target Workshop</label>
+                <select name="workshop_id" required style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="">-- Select Workshop --</option>
+                    [% FOREACH w IN workshops %]
+                    <option value="[% w.id %]">[% w.sitename | html %] — [% w.title | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Site Name</label>
+                <select name="sitename" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="[% sitename | html %]">Current: [% sitename | html %]</option>
+                    <option value="CSC">CSC (System Wide)</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Description (optional)</label>
+                <textarea name="description" rows="2" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;" placeholder="Briefly describe what this file is..."></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom:20px;">
+                <label style="display:block;font-weight:bold;font-size:0.85em;margin-bottom:4px;">Access Level</label>
+                <select name="access_level" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="site_only">My Site Only</option>
+                    <option value="all_leaders">All Leaders</option>
+                    <option value="workshop_specific" selected>Workshop Specific</option>
+                </select>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeAttachModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Attach File</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 9100;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-content {
+    background: #fff;
+    padding: 24px;
+    border-radius: 8px;
+    position: relative;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+.modal-close {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 1.6em; border: none; background: none; cursor: pointer;
+}
+</style>
+
 <!-- View/Info Modal -->
 <div id="resource-modal">
     <div id="resource-modal-inner" style="max-width:900px;">
@@ -809,17 +886,30 @@
                 ? '<img src="' + dl + '" alt="" loading="lazy" style="max-height:46px;max-width:56px;object-fit:cover;border-radius:3px;cursor:pointer;display:block;margin:auto;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'' + icon + '\',style:\'font-size:1.6em;cursor:pointer\'}))">'
                 : '<span style="font-size:1.6em;cursor:pointer;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + icon + '</span>';
             var searchBlob = ((f.file_name || '') + ' ' + (f.file_path || '')).toLowerCase();
+            var attachBtn = '<button class="btn btn-sm" style="background:#28a745;color:#fff;" onclick="openAttachModal(\'' + jsEsc(f.file_name) + '\', \'' + jsEsc(f.file_path) + '\')" title="Attach to Workshop">➕</button>';
+            var dbBadge = f.db_id ? '<span class="badge-access badge-site" title="Registered in Database">DB</span>' : '';
+            
             return '<tr data-name="' + escHtml(f.file_name.toLowerCase()) + '" data-search="' + escHtml(searchBlob) + '" data-ftype="' + ftype + '">' +
                 '<td style="text-align:center;white-space:nowrap;">' + previewHtml + '</td>' +
-                '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span></td>' +
+                '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span> ' + dbBadge + '</td>' +
                 '<td>' + escHtml((f.file_ext || '').toUpperCase()) + '</td>' +
                 '<td style="white-space:nowrap;">' + sizeLabel + '</td>' +
                 '<td style="font-size:0.78em;color:#666;">' + escHtml(f.file_path) + '</td>' +
-                '<td><a href="' + dl + '" class="btn btn-sm">⬇️</a></td>' +
+                '<td><div style="display:flex;gap:4px;"><a href="' + dl + '" class="btn btn-sm">⬇️</a>' + attachBtn + '</div></td>' +
                 '</tr>';
         });
         tbody.innerHTML = rows.join('');
     }
+
+    /* ---- Attach to Workshop Modal logic ---- */
+    window.openAttachModal = function(name, path) {
+        document.getElementById('attach-file-name').textContent = name;
+        document.getElementById('attach-path').value = path;
+        document.getElementById('attach-modal').classList.add('open');
+    };
+    window.closeAttachModal = function() {
+        document.getElementById('attach-modal').classList.remove('open');
+    };
 
     function filterNfsTable(q) {
         var rows = document.querySelectorAll('#nfs-tbody tr');

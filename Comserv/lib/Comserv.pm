@@ -116,12 +116,39 @@ sub psgi_app {
     my $self = shift;
 
     my $app = $self->SUPER::psgi_app(@_);
+    my $request_count = 0;
 
     return sub {
         my $env = shift;
 
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+
+        # Periodic memory monitoring (every 100 requests)
+        $request_count++;
+        if ($request_count % 100 == 0) {
+            eval {
+                if (-f "/proc/self/status") {
+                    open my $fh, '<', "/proc/self/status";
+                    while (<$fh>) {
+                        if (/^VmRSS:\s+(\d+)\s+kB/) {
+                            my $rss_kb = $1;
+                            # If RSS > 512MB, log an ERROR to notify admins
+                            if ($rss_kb > 512 * 1024) {
+                                my $rss_mb = sprintf("%.2f", $rss_kb / 1024);
+                                Comserv::Util::Logging->instance->log_with_details(
+                                    undef, 'ERROR', __FILE__, __LINE__, 'psgi_app_monitor',
+                                    "CRITICAL MEMORY ALERT: Worker process $$ using $rss_mb MB RSS. " .
+                                    "Requests handled: $request_count. Starman will soon recycle this worker."
+                                );
+                            }
+                            last;
+                        }
+                    }
+                    close $fh;
+                }
+            };
+        }
 
         return $app->($env);
     };
