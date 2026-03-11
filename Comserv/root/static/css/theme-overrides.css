@@ -28,12 +28,25 @@ body[class*="theme-"] .content-primary,
 body[class*="theme-"] .content-section,
 body[class*="theme-"] .form-section,
 body[class*="theme-"] .table-container {
-  background-color: rgba(255, 255, 255, 0.4) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
   backdrop-filter: blur(2px);
   padding: 20px;
   border-radius: 8px;
   margin-bottom: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.priority-summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.priority-summary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Specific transparency for workshop pages to show background image */

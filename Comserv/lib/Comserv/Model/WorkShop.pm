@@ -1,6 +1,7 @@
 package Comserv::Model::WorkShop;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use Comserv::Util::AdminAuth;
 
 extends 'Catalyst::Model';
