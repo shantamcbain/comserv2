@@ -4758,6 +4758,22 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 
     # Port restriction: only accessible from port 3001 (host dev server)
     my $port = $c->req->uri->port || 0;
+    
+    # Check if we're inside a Docker container
+    my $is_docker = -f '/.dockerenv';
+
+    if ($is_docker) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Attempted Docker management from within container");
+        $c->stash(
+            template => 'admin/docker_containers.tt',
+            docker_available => 0,
+            authenticated => 1,
+            error_msg => "Docker management is not available from within a container. Please use the host development server on port 3001."
+        );
+        return;
+    }
+
     if ($port == 5000) {
         $c->response->body('');
         $c->response->status(403);
@@ -5275,6 +5291,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
     my $service = $c->req->params->{service} || 'web-prod';
+    my $recreate_volumes = $c->req->params->{recreate_volumes} || 0;
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -5297,18 +5314,66 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
     
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
+    my $log_file = $c->path_to('root', 'log', 'deploy_latest.log');
+    my $pid_file = "$log_file.pid";
     
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
+    # Check if a deployment is already running
+    if (-f $pid_file) {
+        $c->response->body(encode_json({ success => 0, error => "A deployment is already in progress." }));
+        $c->response->content_type('application/json');
+        return;
+    }
     
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        output => $output,
-        exit_code => $exit_code
-    };
+    # Reset log file
+    if (open my $fh, '>', $log_file) {
+        print $fh "--- Deployment Started at " . localtime() . " ---\n";
+        close $fh;
+    }
     
-    $c->response->body(encode_json($result));
+    # Run in background
+    my $safe_password = $ssh_password;
+    $safe_password =~ s/'/'\\''/g; # Escape single quotes for shell
+    
+    my $cmd = "SSHPASS='$safe_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory'";
+    $cmd .= " --recreate-volumes" if $recreate_volumes;
+    $cmd .= " > $log_file 2>&1";
+    
+    my $pid = fork();
+    if ($pid == 0) {
+        # Child process
+        system("echo $$ > $pid_file");
+        system($cmd);
+        unlink($pid_file);
+        exit(0);
+    }
+    
+    $c->response->body(encode_json({ 
+        success => 1, 
+        message => "Deployment started in background",
+        log_file => "$log_file"
+    }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $log_file = $c->path_to('root', 'log', 'deploy_latest.log');
+    my $content = "";
+    
+    if (-f $log_file) {
+        if (open my $fh, '<', $log_file) {
+            local $/;
+            $content = <$fh>;
+            close $fh;
+        }
+    }
+    
+    $c->response->body(encode_json({ 
+        success => 1, 
+        output => $content,
+        is_running => (-f "$log_file.pid" ? 1 : 0)
+    }));
     $c->response->content_type('application/json');
 }
 

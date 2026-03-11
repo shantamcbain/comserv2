@@ -20,7 +20,6 @@
 .resource-card {
     border: 1px solid var(--border-color, #dee2e6);
     border-radius: 6px;
-    background: var(--card-bg, #fff);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -33,7 +32,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--table-header-bg, #f8f9fa);
     border-bottom: 1px solid var(--border-color, #dee2e6);
     font-size: 3em;
     cursor: pointer;
@@ -109,7 +107,7 @@
 }
 #resource-modal.open { display: flex; }
 #resource-modal-inner {
-    background: var(--card-bg, #fff);
+    background: var(--background-color, #fff);
     border-radius: 8px;
     max-width: 700px;
     width: 95%;
@@ -142,19 +140,19 @@
         <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
     [% END %]
     [% IF db_error %]
-        <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:16px;">
+        <div class="warning">
             <strong>Database error:</strong> Could not load resource records.
             [% IF c.session.debug_mode == 1 %]<br><small>[% db_error | html %]</small>[% END %]
         </div>
     [% END %]
 
     [% IF is_admin %]
-    <div style="background:#d1ecf1;border:1px solid #bee5eb;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:0.9em;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div class="content-section" style="font-size:0.9em;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
         <span><strong>Admin:</strong> NFS at <code>[% nfs_root | html %]</code>
             [% IF nfs_available %]— <span style="color:#155724;">✓ mounted</span>[% ELSE %]— <span style="color:#721c24;">✗ not mounted</span>[% END %]
         </span>
         [% IF is_csc %]
-        <a href="/workshop/resource_sync" class="btn btn-sm" style="background:#17a2b8;color:#fff;text-decoration:none;">🔄 NFS Sync Tool</a>
+        <a href="/workshop/resource_sync" class="btn btn-sm">🔄 NFS Sync Tool</a>
         [% END %]
     </div>
     [% END %]
@@ -279,7 +277,7 @@
                     [% IF r.file_id %]
                     <details style="display:inline-block;position:relative;">
                         <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;">✏️ Edit</summary>
-                        <div style="position:absolute;right:0;top:100%;z-index:210;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                        <div style="position:absolute;right:0;top:100%;z-index:210;background:var(--background-color, #fff);border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/file_update">
                                 <input type="hidden" name="file_id" value="[% r.file_id %]">
                                 <div style="margin-bottom:7px;">
