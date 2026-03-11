@@ -1,109 +1,173 @@
 package Comserv::Controller::WorkShop;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use Data::FormValidator;
+use Data::Dumper;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::Logging;
+use Comserv::Util::EmailNotification;
+use Comserv::Util::NfsPath;
+
 BEGIN { extends 'Catalyst::Controller'; }
+
+has 'logging' => (
+    is => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+has 'nfs_path' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub { Comserv::Util::NfsPath->new() }
+);
+
+has 'email_notification' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub {
+        my $self = shift;
+        return Comserv::Util::EmailNotification->new(logging => $self->logging);
+    },
+);
+
+sub send_error_notification {
+    my ($self, $c, $subject, $error_details) = @_;
+    
+    my $sitename = $c->stash->{SiteName} || 'CSC';
+    my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin) ? $site->mail_to_admin : 'helpdesk@computersystemconsulting.ca';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_error_notification',
+        "Sending error notification to admin: $admin_email");
+    
+    eval {
+        $self->email_notification->send_error_notification($c, $admin_email, $subject, $error_details);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_error_notification',
+            "Failed to send error notification: $@");
+    }
+}
 
 # In Workshop Controller
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
     my ($workshops, $error);
-    ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
-    
-    # Apply client-side filters based on query parameters
-    my $site_filter = $c->request->params->{site_filter} || '';
-    my $status_filter = $c->request->params->{status_filter} || '';
-    
-    if ($site_filter || $status_filter) {
+    my ($past_workshops, $past_error);
+    my (@workshops_hash, @past_workshops_hash);
+    my ($is_admin, $can_access_dashboard);
+
+    eval {
+        ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+        
+        my $site_filter = $c->request->params->{site_filter} || '';
+        my $status_filter = $c->request->params->{status_filter} || '';
+        my $current_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $today = DateTime->today->ymd;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Workshop index: current_site=$current_site, site_filter=" . ($site_filter || 'NONE') . 
+            ", workshops_from_model=" . scalar(@$workshops));
+
         my @filtered_workshops;
         for my $workshop (@$workshops) {
-            my $include = 1;
+            # Double check date to ensure it belongs in active section
+            my $is_active = (!$workshop->date || $workshop->date ge $today) ? 1 : 0;
+            next unless $is_active;
+
+            # Base visibility check based on SiteName or Public (handled by _check_workshop_access)
+            my $include = $self->_check_workshop_access($c, $workshop, 'view');
             
-            # Apply site filter
-            if ($site_filter eq 'public') {
-                $include = 0 unless $workshop->share eq 'public';
-            } elsif ($site_filter eq 'my_site') {
-                my $sitename = $c->session->{SiteName};
-                $include = 0 unless $workshop->sitename eq $sitename;
+            # Apply explicit site filter if requested via UI
+            if ($include && $site_filter eq 'public') {
+                $include = 0 unless ($workshop->share // '') eq 'public';
+            } elsif ($include && $site_filter eq 'my_site') {
+                $include = 0 unless ($workshop->sitename // '') eq $current_site;
             }
             
-            # Apply status filter
+            # Apply status filter if requested via UI
             if ($status_filter && $include) {
                 $include = 0 unless $workshop->status eq $status_filter;
             }
             
-            push @filtered_workshops, $workshop if $include;
+            if ($include) {
+                my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+                my %workshop_hash = $workshop->get_columns;
+                $workshop_hash{file} = \@file;
+                
+                if ($workshop->creator) {
+                    $workshop_hash{creator} = {
+                        id => $workshop->creator->id,
+                        username => $workshop->creator->username,
+                        first_name => $workshop->creator->first_name,
+                        last_name => $workshop->creator->last_name,
+                    };
+                }
+                push @workshops_hash, \%workshop_hash;
+            }
         }
-        $workshops = \@filtered_workshops;
-    }
 
-    my @workshops_hash;
-    for my $workshop (@$workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
+        ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
         
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
-        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Past workshops from model: " . scalar(@$past_workshops) . " (today=$today)");
 
-        push @workshops_hash, \%workshop_hash;
-    }
-
-    my ($past_workshops, $past_error);
-    ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
-    
-    # Apply filters to past workshops too
-    if ($site_filter || $status_filter) {
-        my @filtered_past;
         for my $workshop (@$past_workshops) {
-            my $include = 1;
+            # Double check date to ensure it belongs in past section
+            my $is_past = ($workshop->date && $workshop->date lt $today) ? 1 : 0;
             
-            if ($site_filter eq 'public') {
-                $include = 0 unless $workshop->share eq 'public';
-            } elsif ($site_filter eq 'my_site') {
-                my $sitename = $c->session->{SiteName};
-                $include = 0 unless $workshop->sitename eq $sitename;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                "Checking past workshop: ID=" . $workshop->id . " Date=" . ($workshop->date // 'NULL') . " is_past=$is_past");
+
+            next unless $is_past;
+
+            # Base visibility check (all non-draft past workshops visible per requirement)
+            my $include = $self->_check_workshop_access($c, $workshop, 'view');
+            
+            # Apply UI filters
+            if ($include && $site_filter eq 'public') {
+                $include = 0 unless ($workshop->share // '') eq 'public';
+            } elsif ($include && $site_filter eq 'my_site') {
+                $include = 0 unless ($workshop->sitename // '') eq $current_site;
             }
             
             if ($status_filter && $include) {
                 $include = 0 unless $workshop->status eq $status_filter;
             }
             
-            push @filtered_past, $workshop if $include;
-        }
-        $past_workshops = \@filtered_past;
-    }
-
-    my @past_workshops_hash;
-    for my $workshop (@$past_workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
-        
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
+            if ($include) {
+                my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+                my %workshop_hash = $workshop->get_columns;
+                $workshop_hash{file} = \@file;
+                
+                if ($workshop->creator) {
+                    $workshop_hash{creator} = {
+                        id => $workshop->creator->id,
+                        username => $workshop->creator->username,
+                        first_name => $workshop->creator->first_name,
+                        last_name => $workshop->creator->last_name,
+                    };
+                }
+                push @past_workshops_hash, \%workshop_hash;
+            }
         }
 
-        push @past_workshops_hash, \%workshop_hash;
-    }
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
+        my $admin_type = $admin_auth->get_admin_type($c);
+        my $roles = $c->session->{roles} || [];
+        my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+        $can_access_dashboard = ($is_admin || $has_workshop_leader_role) ? 1 : 0;
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "Error loading workshop index: $err");
+        $c->stash(error_msg => "An error occurred while loading workshops: $err");
+    }
 
     $c->stash(
         workshops => \@workshops_hash,
@@ -112,11 +176,10 @@ sub index :Path :Args(0) {
         past_error => $past_error,
         sitename => $c->session->{SiteName},
         is_admin => $is_admin,
+        can_access_dashboard => $can_access_dashboard,
         template => 'WorkShops/Workshops.tt',
     );
-    if ($@) {
-    $c->stash(error => "Error fetching active workshops: $@");
-}
+    $c->forward($c->view('TT'));
 }
 sub dashboard :Local {
     my ( $self, $c ) = @_;
@@ -140,7 +203,6 @@ sub dashboard :Local {
     my $user_id = $c->session->{user_id};
     my $sitename = $c->session->{SiteName};
     my $schema = $c->model('DBEncy');
-
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
 
@@ -154,11 +216,11 @@ sub dashboard :Local {
     } else {
         $search_filter = {
             -or => [
-                { created_by => $user_id },
+                { 'me.created_by' => $user_id },
             ]
         };
         if ($sitename) {
-            push @{$search_filter->{-or}}, { sitename => $sitename, created_by => undef };
+            push @{$search_filter->{-or}}, { 'me.sitename' => $sitename, 'me.created_by' => undef };
         }
         $c->log->debug("Dashboard: Regular admin filter applied");
     }
@@ -183,8 +245,8 @@ sub dashboard :Local {
     if (@workshop_leader_ids) {
         my @leader_workshops = $schema->resultset('WorkShop')->search(
             {
-                id => { -in => \@workshop_leader_ids },
-                created_by => { '!=' => $user_id }
+                'me.id' => { -in => \@workshop_leader_ids },
+                'me.created_by' => { '!=' => $user_id }
             },
             { prefetch => 'creator' }
         )->all;
@@ -209,16 +271,48 @@ sub dashboard :Local {
         workshops => \@workshops_with_stats,
         template => 'WorkShops/Dashboard.tt',
     );
+    $c->forward($c->view('TT'));
 }
 
 sub add :Local {
     my ( $self, $c ) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_add');
+    
+    my $roles = $c->session->{roles} || [];
+    my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+
+    # If not logged in and not admin bypass, redirect to login
+    unless ($c->user_exists || $c->session->{user_id} || $has_admin) {
+        $c->flash->{error_msg} = "Please login or register to add a workshop. You will be given the Workshop Leader role.";
+        $c->response->redirect($c->uri_for('/user/login', { 
+            return_to => $c->uri_for($self->action_for('add'))->as_string 
+        }));
+        return;
+    }
+
+    unless ($has_admin || $has_workshop_leader_role) {
+        # This shouldn't happen if we auto-assign the role on login/registration from the 'add' flow,
+        # but as a safety check:
+        $c->flash->{error_msg} = "Access denied. You need the Workshop Leader role to add workshops.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
     # Set the TT template to use
     $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
+    $c->stash->{csrf_token} = $c->session->{csrf_token};
+    $c->forward($c->view('TT'));
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->stash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
+        return;
+    }
 
     # Retrieve the form data from the request
     my $params = $c->request->parameters;
@@ -266,11 +360,11 @@ sub addworkshop :Local {
             date                => $params->{dateOfWorkshop},
             location            => $params->{location},
             instructor          => $params->{instructor},
-            max_participants    => $params->{maxMinAttendees},
+            max_participants    => (defined $params->{maxMinAttendees} && $params->{maxMinAttendees} ne '') ? $params->{maxMinAttendees} : undef,
             share               => $params->{share} || 'private',
             status              => $params->{status} || 'draft',
-            registration_deadline => $params->{registration_deadline},
-            end_time            => $params->{end_time},
+            registration_deadline => (defined $params->{registration_deadline} && $params->{registration_deadline} ne '') ? $params->{registration_deadline} : undef,
+            end_time            => $params->{end_time} || undef,
             time                => $time,
             created_by          => $c->session->{user_id},
             site_id             => $creator_site_id,
@@ -299,30 +393,32 @@ sub addworkshop :Local {
         }
     };
 
-    if ($@) {
+    my $err = "$@" if $@;
+    if ($err) {
         # Log error with details and send email to site admin
-        my $error_msg = "Failed to create workshop: $@";
-        $c->log->error($error_msg);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'addworkshop',
+            "Failed to create workshop: $err");
         
         # Send error notification to site admin
-        $self->_send_error_notification($c, {
-            error_type => 'Workshop Creation Error',
-            error_message => $error_msg,
-            user_id => $c->session->{user_id},
-            username => $c->session->{username},
-            site => $c->session->{SiteName},
-            form_data => $params,
-        });
+        $self->send_error_notification($c, 'Workshop Creation Error', "Failed to create workshop: $err\n\nForm Data: " . Data::Dumper::Dumper($params));
         
         # Show user-friendly error message
-        $c->stash->{error_msg} = 'An error occurred while creating the workshop. The site administrator has been notified.';
-        $c->stash->{form_data} = $params; # Add the form data to the stash
-        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
+        $c->stash(
+            error_msg => "An error occurred while creating the workshop: $err",
+            form_data => $params,
+            template => 'WorkShops/AddWorkshop.tt'
+        );
+        $c->forward($c->view('TT'));
         return;
     }
 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addworkshop',
+        "Workshop created successfully with ID: " . $workshop->id);
+    
     # Redirect the user to the index action on success
+    $c->flash->{success_msg} = 'Workshop created successfully.';
     $c->response->redirect($c->uri_for($self->action_for('index')));
+    return;
 }
 
 sub validate_form_data {
@@ -398,7 +494,14 @@ sub details :Path('/workshop/details') :Args(0) {
         return;
     }
 
-    # Workshop details are viewable by all users
+    # Access control: check if the user/site is authorized to view this workshop
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. This workshop is not available for your site.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Workshop details are viewable by authorized users
     # Edit access is restricted to admins/leaders via separate authorization checks
 
     # Format workshop date safely
@@ -481,16 +584,20 @@ sub details :Path('/workshop/details') :Args(0) {
         { order_by => { -asc => 'sort_order' } }
     )->all;
 
-    # Pass the workshop to the view
+    my $admin_auth_d = Comserv::Util::AdminAuth->new();
+    my $is_admin_d = $admin_auth_d->check_admin_access($c, 'workshop_details');
+
     $c->stash(
         workshop => $workshop,
         formatted_date => $formatted_date,
         is_user_registered => $is_user_registered,
         is_workshop_leader => $is_workshop_leader,
+        is_admin => $is_admin_d,
         workshop_files => \@workshop_files,
         workshop_content => \@workshop_content,
         template => 'WorkShops/Details.tt',
     );
+    $c->forward($c->view('TT'));
 }
 
 
@@ -545,13 +652,20 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $c->stash(
             workshop => $workshop,
             formatted_date => $formatted_date,
+            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/Edit.tt'
         );
+        $c->forward($c->view('TT'));
         return;
     }
 
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
+        unless ($self->_verify_csrf_token($c)) {
+            $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+            $c->response->redirect($c->uri_for($self->action_for('edit'), [$id]));
+            return;
+        }
         my $params = $c->request->body_parameters;
         my $old_share = $workshop->share;
         my $new_share = $params->{share};
@@ -560,15 +674,15 @@ sub edit :Path('/workshop/edit') :Args(1) {
             $workshop->update({
                 title                => $params->{title},
                 description          => $params->{description},
-                date                 => $params->{date},
-                time                 => $params->{time},
-                end_time             => $params->{end_time},
+                date                 => $params->{date} || undef,
+                time                 => $params->{time} || undef,
+                end_time             => $params->{end_time} || undef,
                 location             => $params->{location},
                 instructor           => $params->{instructor},
-                max_participants     => $params->{max_participants},
+                max_participants     => (defined $params->{max_participants} && $params->{max_participants} ne '') ? $params->{max_participants} : undef,
                 share                => $new_share,
                 status               => $params->{status},
-                registration_deadline => $params->{registration_deadline},
+                registration_deadline => (defined $params->{registration_deadline} && $params->{registration_deadline} ne '') ? $params->{registration_deadline} : undef,
             });
             
             # Update site_workshop records if share setting changed
@@ -601,10 +715,22 @@ sub edit :Path('/workshop/edit') :Args(1) {
                 }
             }
         };
-
-        if ($@) {
-            $c->stash->{error_msg} = 'Failed to update workshop: ' . $@;
+        
+        my $err = "$@" if $@;
+        if ($err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
+                "Failed to update workshop: $err");
+            $self->send_error_notification($c, 'Workshop Update Error', "Failed to update workshop: $err");
+            $c->stash(
+                workshop => $workshop,
+                error_msg => "Failed to update workshop: $err",
+                template => 'WorkShops/Edit.tt'
+            );
+            $c->forward($c->view('TT'));
+            return;
         } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
+                "Workshop " . $workshop->id . " updated successfully");
             $c->flash->{success_msg} = 'Workshop updated successfully.';
             $c->res->redirect($c->uri_for($self->action_for('index')));
             return;
@@ -617,74 +743,74 @@ sub _check_workshop_access {
     
     $required_level ||= 'view';
     
+    my $current_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today = DateTime->today->ymd;
+
+    # View access rules
     if ($required_level eq 'view') {
-        # Public workshops are visible to everyone (even non-logged-in users)
-        if ($workshop->share eq 'public') {
+        # 1. Public workshops are visible to everyone
+        return 1 if ($workshop->share // '') eq 'public';
+
+        # 2. ALL past workshops are visible to everyone (regardless of site/public status)
+        # Requirement: "All users should see ... all past workshops"
+        if ($workshop->date && $workshop->date lt $today) {
             return 1;
+        }
+
+        # 3. Workshops for the current site are visible to everyone on that site
+        return 1 if ($workshop->sitename // '') eq $current_site;
+
+        # 4. Check explicit site access via site_workshop table
+        my $schema = $c->model('DBEncy');
+        my $site = $schema->resultset('Site')->search({ name => $current_site })->first;
+        if ($site) {
+            my $site_access = $schema->resultset('SiteWorkshop')->search({
+                site_id => $site->id,
+                workshop_id => $workshop->id
+            })->count > 0;
+            
+            return 1 if $site_access;
+        }
+
+        # 5. Check if user is a registered participant
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my $is_participant = $c->model('DBEncy::Participant')->search({
+                workshop_id => $workshop->id,
+                user_id => $user_id,
+                status => { -in => ['registered', 'attended'] }
+            })->count > 0;
+            
+            return 1 if $is_participant;
         }
     }
     
-    # For non-view access or private workshops, user must be logged in
-    # Use session data - this app uses session-based auth, not Catalyst::Plugin::Authentication
+    # Leader/Edit/Admin access rules - require login
     my $user_id = $c->session->{user_id};
     return 0 unless $user_id;
-    my $sitename = $c->session->{SiteName};
-    my $roles = $c->session->{roles} || [];
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     
-    # CSC admin has god-level access
-    if ($admin_type eq 'csc' || $admin_type eq 'special') {
-        return 1;
-    }
-    
-    if ($required_level eq 'view') {
-        # Check if user's site has access via site_workshop table
-        if ($sitename) {
-            my $schema = $c->model('DBEncy');
-            my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
-            if ($site) {
-                my $site_access = $schema->resultset('SiteWorkshop')->search({
-                    site_id => $site->id,
-                    workshop_id => $workshop->id
-                })->count > 0;
-                
-                return 1 if $site_access;
-            }
-        }
-        
-        # Check if user is a registered participant
-        my $is_participant = $c->model('DBEncy::Participant')->search({
-            workshop_id => $workshop->id,
-            user_id => $user_id,
-            status => { -in => ['registered', 'attended'] }
-        })->count > 0;
-        
-        return 1 if $is_participant;
-    }
+    # CSC/Special admin has full access
+    return 1 if $admin_type eq 'csc' || $admin_type eq 'special';
     
     if ($required_level eq 'leader' || $required_level eq 'edit') {
-        # Site admin can edit workshops from their site
-        if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
-            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
+        # Site admin for the workshop's site
+        my $user_sitename = $c->session->{SiteName} || $current_site;
+        if ($admin_type eq 'standard' && $user_sitename eq ($workshop->sitename // '')) {
             return 1;
         }
         
-        # Workshop leader (creator or workshop_roles)
-        if ($self->_is_workshop_leader($c, $workshop)) {
-            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
-            return 1;
-        }
+        # Workshop leader (creator or assigned role)
+        return 1 if $self->_is_workshop_leader($c, $workshop);
         
-        # Fallback: If created_by is NULL and user is admin, allow edit
-        if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
-            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
+        # Admin can edit if no creator is assigned
+        if (!$workshop->created_by && $admin_type eq 'standard') {
             return 1;
         }
     }
     
-    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -926,6 +1052,13 @@ sub register :Local :Args(1) {
         return;
     }
     
+    # Access control: check if the user/site is authorized to register for this workshop
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to register for this workshop.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
     unless ($workshop->status eq 'published') {
         $c->flash->{error_msg} = 'This workshop is not open for registration.';
         $c->response->redirect($c->uri_for($self->action_for('details'), { id => $id }));
@@ -1100,22 +1233,22 @@ sub participants :Local :Args(1) {
     
     my @registered = $c->model('DBEncy::Participant')->search(
         {
-            workshop_id => $id,
-            status => 'registered'
+            'me.workshop_id' => $id,
+            'me.status' => 'registered'
         },
         {
-            order_by => { -asc => 'registered_at' },
+            order_by => { -asc => 'me.registered_at' },
             prefetch => 'user'
         }
     )->all;
     
     my @waitlist = $c->model('DBEncy::Participant')->search(
         {
-            workshop_id => $id,
-            status => 'waitlist'
+            'me.workshop_id' => $id,
+            'me.status' => 'waitlist'
         },
         {
-            order_by => { -asc => 'registered_at' },
+            order_by => { -asc => 'me.registered_at' },
             prefetch => 'user'
         }
     )->all;
@@ -1323,13 +1456,13 @@ sub upload :Local :Args(1) {
     my $filename = $upload->filename;
     my $filesize = $upload->size;
     
-    my @allowed_extensions = ('.ppt', '.pptx', '.pdf', '.PPT', '.PPTX', '.PDF');
+    my @allowed_extensions = ('.ppt', '.pptx', '.pdf', '.odp', '.PPT', '.PPTX', '.PDF', '.ODP');
     my $max_size = 50 * 1024 * 1024;
     
     my ($file_extension) = $filename =~ /(\.[^.]+)$/;
     
     unless ($file_extension && grep { lc($_) eq lc($file_extension) } @allowed_extensions) {
-        $c->stash->{error_msg} = 'Invalid file type. Only PowerPoint (PPT, PPTX) and PDF files are allowed.';
+        $c->stash->{error_msg} = 'Invalid file type. PowerPoint (PPT, PPTX), PDF, and LibreOffice (ODP) files are allowed.';
         $c->stash(
             workshop => $workshop,
             template => 'WorkShops/Upload.tt',
@@ -1347,7 +1480,7 @@ sub upload :Local :Args(1) {
         return;
     }
     
-    my $upload_dir = $c->config->{workshop_upload_dir} || $ENV{HOME} . '/workshop_files';
+    my $upload_dir = $self->_nfs_root();
     
     unless (-d $upload_dir) {
         mkdir $upload_dir or do {
@@ -1398,10 +1531,13 @@ sub upload :Local :Args(1) {
 sub download :Local :Args(1) {
     my ($self, $c, $file_id) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
     my $user_id = $c->session->{user_id};
-    unless ($user_id) {
+
+    unless ($user_id || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to download workshop files.';
-        $c->response->redirect($c->uri_for('/login'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1418,8 +1554,6 @@ sub download :Local :Args(1) {
         : $c->uri_for($self->action_for('index'));
 
     # Access: admin, file owner, workshop leader, or registered attendee
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
     my $is_owner   = ($file->user_id && $file->user_id == $user_id);
 
     my ($is_leader, $is_registered) = (0, 0);
@@ -1447,22 +1581,25 @@ sub download :Local :Args(1) {
     my $file_data;
     if ($file->file_data) {
         $file_data = $file->file_data;
-    } elsif ($file->file_path && -f $file->file_path) {
-        eval {
-            open my $fh, '<:raw', $file->file_path or die $!;
-            $file_data = do { local $/; <$fh> };
-            close $fh;
-        };
-        if ($@) {
-            $c->log->error("download read error: $@");
-            $c->flash->{error_msg} = 'Failed to read file.';
+    } else {
+        my $full_path = $self->_resolve_storage_path($c, $file->nfs_path // $file->file_path // '');
+        if ($full_path && -f $full_path) {
+            eval {
+                open my $fh, '<:raw', $full_path or die $!;
+                $file_data = do { local $/; <$fh> };
+                close $fh;
+            };
+            if ($@) {
+                $c->log->error("download read error: $@");
+                $c->flash->{error_msg} = 'Failed to read file.';
+                $c->response->redirect($back_url);
+                return;
+            }
+        } else {
+            $c->flash->{error_msg} = 'File data not available.';
             $c->response->redirect($back_url);
             return;
         }
-    } else {
-        $c->flash->{error_msg} = 'File data not available.';
-        $c->response->redirect($back_url);
-        return;
     }
 
     my $content_type = $file->file_type || 'application/octet-stream';
@@ -1472,27 +1609,33 @@ sub download :Local :Args(1) {
 }
 
 sub _nfs_root {
-    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/apis';
-    return $configured if -d $configured;
+    my ($self, $c) = @_;
 
-    # Fallback for dev environments where NFS is not mounted:
-    # try ~/nfs (full NFS mount), /opt/comserv/workshop_resources, then ~/workshop_resources
-    for my $fallback (
-        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
-        '/opt/comserv/workshop_resources',
-        ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
-    ) {
-        if (-d $fallback) {
-            return $fallback;
-        }
-        # Auto-create the fallback dir if we can write to its parent
-        my $parent = $fallback =~ s{/[^/]+$}{}r;
-        if (-d $parent && -w $parent) {
-            mkdir($fallback, 0755) and return $fallback;
-        }
+    # Use configuration if available
+    if ($c && $c->config->{workshop_upload_dir}) {
+        return $c->config->{workshop_upload_dir};
     }
 
-    return $configured;  # Return configured path even if not mounted
+    return $self->nfs_path->get_nfs_root();
+}
+
+sub _site_scoped_nfs_root {
+    my ($self, $c) = @_;
+    my $root = $self->_nfs_root();
+    return $root unless $c;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    return $root if $admin_type eq 'csc' || $admin_type eq 'special';
+
+    my $sitename = $c->session->{SiteName} // '';
+    if (lc($sitename) eq 'bmaster' && -d "$root/apis") {
+        return "$root/apis";
+    }
+    if ($sitename && -d "$root/$sitename") {
+        return "$root/$sitename";
+    }
+    return $root;
 }
 
 sub _can_manage_resource {
@@ -1520,6 +1663,7 @@ sub _can_access_resources {
 
 my %MIME_MAP = (
     pdf  => 'application/pdf',
+    odp  => 'application/vnd.oasis.opendocument.presentation',
     ppt  => 'application/vnd.ms-powerpoint',
     pptx => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     doc  => 'application/msword',
@@ -1545,12 +1689,135 @@ my %MIME_MAP = (
     m4a  => 'audio/mp4',
 );
 
+sub resource_fs_attach :Path('/workshop/resource_fs_attach') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $params      = $c->request->body_parameters;
+    my $rel_path    = $params->{path} // '';
+    my $workshop_id = $params->{workshop_id};
+    my $sitename    = $params->{sitename} || $c->session->{SiteName} || 'CSC';
+    my $description = $params->{description} // '';
+    my $access_level= $params->{access_level} // 'site_only';
+
+    unless ($rel_path) {
+        $c->flash->{error_msg} = 'No file selected.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $nfs_root = $self->_nfs_root();
+    my $full_path = "$nfs_root/$rel_path";
+    unless (-f $full_path) {
+        $c->flash->{error_msg} = "File not found on NFS: $rel_path";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $user_id = $c->session->{user_id};
+    my ($filename) = ($rel_path =~ m{([^/]+)$});
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    $ext = lc($ext // '');
+    my $file_size = -s $full_path;
+
+    # Check if workshop_id is valid and user has access
+    if ($workshop_id) {
+        my $workshop = $schema->resultset('WorkShop')->find($workshop_id);
+        unless ($workshop && $self->_can_edit_workshop($c, $workshop)) {
+            $c->flash->{error_msg} = 'Invalid workshop or access denied.';
+            $c->response->redirect($c->uri_for('/workshop/resources'));
+            return;
+        }
+    }
+
+    eval {
+        # 1. Create record in files table if not already there
+        my $file_record = $schema->resultset('File')->search({ nfs_path => $rel_path })->first;
+        unless ($file_record) {
+            $file_record = $schema->resultset('File')->create({
+                file_name   => $filename,
+                nfs_path    => $rel_path,
+                file_path   => $rel_path,
+                file_size   => $file_size,
+                file_format => $ext,
+                file_type   => $self->_normalized_mime('', $ext),
+                sitename    => $sitename,
+                user_id     => $user_id,
+                upload_date => DateTime->now,
+                access_level => $access_level,
+                description => $description,
+                source_type => 'nfs',
+            });
+        }
+
+        # 2. Create record in workshop_resource table
+        $schema->resultset('WorkshopResource')->create({
+            file_id      => $file_record->id,
+            workshop_id  => $workshop_id,
+            file_name    => $filename,
+            file_path    => $rel_path,
+            file_ext     => $ext,
+            file_size    => $file_size,
+            file_type    => $file_record->file_type,
+            description  => $description || $file_record->description,
+            uploaded_by  => $user_id,
+            sitename     => $sitename,
+            access_level => $access_level,
+        });
+    };
+
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'resource_fs_attach',
+            "Failed to attach NFS file: $err");
+        $c->flash->{error_msg} = "Failed to attach file: $err";
+    } else {
+        $c->flash->{success_msg} = "File '$filename' successfully attached to workshop.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
+sub _normalized_mime {
+    my ($self, $mime, $ext) = @_;
+    $mime = lc($mime // '');
+    return $mime if $mime =~ m{^[a-z0-9.+-]+/[a-z0-9.+-]+$};
+
+    $ext = lc($ext // '');
+    $ext =~ s/^\.//;
+    return $MIME_MAP{$ext} // 'application/octet-stream';
+}
+
+sub _resolve_storage_path {
+    my ($self, $c, $stored_path) = @_;
+    return $self->nfs_path->resolve_path($stored_path);
+}
+
 sub resources :Path('/workshop/resources') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to access the resource library.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -1562,14 +1829,19 @@ sub resources :Path('/workshop/resources') :Args(0) {
 
     my $user_id    = $c->session->{user_id};
     my $sitename   = $c->session->{SiteName} // '';
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
-    my $is_admin   = $admin_type && $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
     my $nfs_available = -d $nfs_root;
 
     my $schema = $c->model('DBEncy');
+    my $res_filter = lc($c->req->param('res_filter') // 'all');
+    my $res_search = lc($c->req->param('res_search') // '');
+    my $lib_filter = lc($c->req->param('lib_filter') // 'all');
+    my $open_panel = lc($c->req->param('open_panel') // '');
+    my $show_archived = $c->req->param('show_archived') ? 1 : 0;
+    my %allowed_filter = map { $_ => 1 } qw(all image office pdf video audio text other link backup);
+    $res_filter = 'all' unless $allowed_filter{$res_filter};
+    $lib_filter = 'all' unless $allowed_filter{$lib_filter};
 
     # --- Workshop resources (attached to workshops) ---
     my @resources;
@@ -1587,15 +1859,21 @@ sub resources :Path('/workshop/resources') :Args(0) {
         }
         my @db_rows = $schema->resultset('WorkshopResource')->search(
             $filter,
-            { order_by => { -desc => 'me.created_at' }, prefetch => 'uploader' }
+            { order_by => { -asc => 'me.file_name' }, prefetch => 'uploader' }
         )->all;
         for my $row (@db_rows) {
+            my $ext = lc($row->file_ext // '');
+            if (!$ext) {
+                my $nameish = $row->file_name // $row->file_path // '';
+                ($ext) = ($nameish =~ /\.([^.\/\\]+)$/);
+                $ext = lc($ext // '');
+            }
             push @resources, {
                 id           => $row->id,
                 file_id      => $row->file_id,
                 file_name    => $row->file_name,
                 file_path    => $row->file_path // '',
-                file_ext     => $row->file_ext // '',
+                file_ext     => $ext,
                 file_size    => $row->file_size // 0,
                 file_type    => $row->file_type // '',
                 description  => $row->description // '',
@@ -1614,12 +1892,56 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $db_error = $@;
         $c->log->error("Resource library DB error: $db_error");
     }
+    my $matches_filter = sub {
+        my ($row, $filter_name, $search_text) = @_;
+        $filter_name ||= 'all';
+        $search_text ||= '';
+
+        my $ext = lc($row->{file_ext} // '');
+        my $blob = lc(join(' ',
+            $row->{file_name} // '',
+            $row->{description} // '',
+            $row->{file_path} // '',
+            $row->{nfs_path} // '',
+            $row->{sitename} // '',
+        ));
+        return 0 if $search_text ne '' && CORE::index($blob, $search_text) < 0;
+
+        my $is_link  = ($row->{external_url} // '') ne '' ? 1 : 0;
+        my $is_image = $ext =~ /^(?:jpg|jpeg|png|gif|svg|webp)$/ ? 1 : 0;
+        my $is_office = $ext =~ /^(?:ppt|pptx|doc|docx|xls|xlsx|odt|odp|ods)$/ ? 1 : 0;
+        my $is_pdf   = $ext eq 'pdf' ? 1 : 0;
+        my $is_video = $ext =~ /^(?:mp4|mov|avi|webm)$/ ? 1 : 0;
+        my $is_audio = $ext =~ /^(?:mp3|wav|ogg|flac|m4a)$/ ? 1 : 0;
+        my $is_text  = $ext =~ /^(?:txt|csv|md|log|json|xml|yaml|yml)$/ ? 1 : 0;
+        my $is_backup = CORE::index($blob, 'backup') >= 0 ? 1 : 0;
+        my $is_other = (!$is_link && !$is_image && !$is_office && !$is_pdf && !$is_video && !$is_audio && !$is_text) ? 1 : 0;
+
+        return 1 if $filter_name eq 'all';
+        return $is_link if $filter_name eq 'link';
+        return $is_image if $filter_name eq 'image';
+        return $is_office if $filter_name eq 'office';
+        return $is_pdf if $filter_name eq 'pdf';
+        return $is_video if $filter_name eq 'video';
+        return $is_audio if $filter_name eq 'audio';
+        return $is_text if $filter_name eq 'text';
+        return $is_backup if $filter_name eq 'backup';
+        return $is_other if $filter_name eq 'other';
+        return 1;
+    };
+    if ($res_filter ne 'all' || $res_search ne '') {
+        @resources = grep { $matches_filter->($_, $res_filter, $res_search) } @resources;
+    }
 
     # --- File library (files table) with pagination + search ---
     my $lib_search = $c->req->param('lib_search') // '';
     my $lib_page   = int($c->req->param('lib_page') // 1);
     $lib_page = 1 if $lib_page < 1;
     my $lib_per_page = 40;
+    if ($lib_filter ne 'all') {
+        $lib_page = 1;
+        $lib_per_page = 5000;
+    }
 
     my @file_library;
     my ($file_count, $file_pages, $lib_error) = (0, 0, undef);
@@ -1634,19 +1956,28 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 ]
             };
         }
+        my @and_terms;
+        unless ($show_archived) {
+            push @and_terms, { -or => [ { 'me.file_status' => { '!=' => 'archived' } }, { 'me.file_status' => undef } ] };
+        }
         if ($lib_search) {
             my $like = "%$lib_search%";
-            $file_filter = {
-                %$file_filter,
-                -and => [
-                    -or => [
-                        { 'me.file_name'   => { like => $like } },
-                        { 'me.description' => { like => $like } },
-                        { 'me.file_format' => { like => $like } },
-                        { 'me.nfs_path'    => { like => $like } },
-                    ]
+            push @and_terms, {
+                -or => [
+                    { 'me.file_name'   => { like => $like } },
+                    { 'me.description' => { like => $like } },
+                    { 'me.file_format' => { like => $like } },
+                    { 'me.nfs_path'    => { like => $like } },
                 ]
             };
+        }
+        if (@and_terms) {
+            my @existing = ();
+            if (exists $file_filter->{-and}) {
+                my $existing = $file_filter->{-and};
+                @existing = ref($existing) eq 'ARRAY' ? @$existing : ($existing);
+            }
+            $file_filter = { %$file_filter, -and => [ @existing, @and_terms ] };
         }
         my $files_rs = $schema->resultset('File');
         $file_count  = $files_rs->search($file_filter)->count;
@@ -1656,16 +1987,21 @@ sub resources :Path('/workshop/resources') :Args(0) {
         my @rows = $files_rs->search(
             $file_filter,
             {
-                order_by => { -desc => 'me.upload_date' },
+                order_by => { -asc => 'me.file_name' },
                 rows     => $lib_per_page,
                 offset   => ($lib_page - 1) * $lib_per_page,
                 columns  => [qw(id file_name file_format file_size nfs_path file_path external_url
-                                access_level sitename description file_type upload_date file_status)],
+                                access_level sitename description file_type upload_date file_status workshop_id user_id)],
             }
         )->all;
 
         for my $f (@rows) {
             my $ext  = lc($f->file_format // '');
+            if (!$ext) {
+                my $nameish = $f->file_name // $f->nfs_path // $f->file_path // '';
+                ($ext) = ($nameish =~ /\.([^.\/\\]+)$/);
+                $ext = lc($ext // '');
+            }
             my $size = $f->file_size // 0;
             push @file_library, {
                 id           => $f->id,
@@ -1678,6 +2014,10 @@ sub resources :Path('/workshop/resources') :Args(0) {
                 access_level => $f->access_level // 'site_only',
                 sitename     => $f->sitename // '',
                 description  => $f->description // '',
+                file_status  => $f->file_status // 'active',
+                workshop_id  => $f->workshop_id,
+                duplicate_count => 0,
+                duplicate_path_count => 0,
             };
         }
     };
@@ -1685,12 +2025,57 @@ sub resources :Path('/workshop/resources') :Args(0) {
         $lib_error = $@;
         $c->log->error("File library DB error: $lib_error");
     }
+    if ($lib_filter ne 'all') {
+        @file_library = grep { $matches_filter->($_, $lib_filter, '') } @file_library;
+        $file_count = scalar @file_library;
+        $file_pages = int(($file_count + $lib_per_page - 1) / $lib_per_page) || 1;
+    }
+
+    my (%res_name_counts, %file_name_counts, %file_path_counts);
+    for my $r (@resources) {
+        my $k = lc($r->{file_name} // '');
+        next unless $k ne '';
+        $res_name_counts{$k}++;
+    }
+    for my $f (@file_library) {
+        my $nk = lc($f->{file_name} // '');
+        $file_name_counts{$nk}++ if $nk ne '';
+        my $pk = lc($f->{nfs_path} // '');
+        $file_path_counts{$pk}++ if $pk ne '';
+    }
+    for my $r (@resources) {
+        my $k = lc($r->{file_name} // '');
+        my $count = $k ne '' ? ($res_name_counts{$k} // 0) : 0;
+        $r->{duplicate_count} = $count;
+    }
+    for my $f (@file_library) {
+        my $nk = lc($f->{file_name} // '');
+        my $pk = lc($f->{nfs_path} // '');
+        $f->{duplicate_count} = $nk ne '' ? ($file_name_counts{$nk} // 0) : 0;
+        $f->{duplicate_path_count} = $pk ne '' ? ($file_path_counts{$pk} // 0) : 0;
+    }
+
+    my $open_resources = ($open_panel eq 'resources' || $res_filter ne 'all' || $res_search ne '') ? 1 : 0;
+    my $open_library   = ($open_panel eq 'files' || $lib_filter ne 'all' || $lib_search ne '') ? 1 : 0;
 
     # --- Workshops list for "Attach to Workshop" dropdown ---
     my @workshops;
     eval {
+        my $w_filter = {};
+        unless ($is_csc) {
+            my @workshop_leader_ids = $schema->resultset('WorkshopRole')->search(
+                { user_id => $user_id, role => 'workshop_leader' }
+            )->get_column('workshop_id')->all;
+
+            $w_filter = {
+                -or => [
+                    { created_by => $user_id },
+                    ( @workshop_leader_ids ? { id => { -in => \@workshop_leader_ids } } : () ),
+                ]
+            };
+        }
         @workshops = $schema->resultset('WorkShop')->search(
-            {},
+            $w_filter,
             { columns => ['id', 'title', 'sitename'], order_by => 'title' }
         )->all;
     };
@@ -1703,10 +2088,17 @@ sub resources :Path('/workshop/resources') :Args(0) {
         lib_page      => $lib_page,
         lib_per_page  => $lib_per_page,
         lib_search    => $lib_search,
+        lib_filter    => $lib_filter,
+        res_filter    => $res_filter,
+        res_search    => $res_search,
+        open_resources => $open_resources,
+        open_library   => $open_library,
+        show_archived  => $show_archived,
         lib_error     => $lib_error,
         workshops     => \@workshops,
         is_csc        => $is_csc,
         is_admin      => $is_admin,
+        can_browse_nfs => $self->_can_access_resources($c),
         sitename      => $sitename,
         nfs_root      => $nfs_root,
         nfs_available => $nfs_available,
@@ -1726,29 +2118,43 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         return;
     }
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
-    my $is_admin   = $admin_type && $admin_type ne 'none';
-
-    unless ($is_admin) {
-        $c->stash(json => { error => 'Admin access required' });
+    unless ($self->_can_access_resources($c)) {
+        $c->stash(json => { error => 'Access denied. Workshop leader or admin access required.' });
         $c->forward('View::JSON');
         return;
     }
 
-    my $nfs_root = $self->_nfs_root();
+    my $nfs_root = $self->_site_scoped_nfs_root($c);
     unless (-d $nfs_root) {
         $c->stash(json => { error => 'NFS not available', nfs_available => 0, files => [] });
         $c->forward('View::JSON');
         return;
     }
 
+    # Build lookup of existing nfs_path records to show DB status
+    my %db_files;
+    eval {
+        my @rows = $c->model('DBEncy::File')->search(
+            { nfs_path => { '!=' => undef } },
+            { columns => ['id', 'nfs_path', 'workshop_id'] }
+        )->all;
+        for my $r (@rows) {
+            $db_files{ $r->nfs_path } = { id => $r->id, workshop_id => $r->workshop_id };
+        }
+    };
+
     my @files;
+    my $max_files = int($c->req->param('max_files') // 3000);
+    $max_files = 100 if $max_files < 100;
+    $max_files = 20000 if $max_files > 20000;
+    my $limit_hit = 0;
     my $scan;
     $scan = sub {
         my ($dir, $rel_prefix) = @_;
+        return if $limit_hit;
         return unless opendir(my $dh, $dir);
         while (my $entry = readdir($dh)) {
+            last if $limit_hit;
             next if $entry =~ /^\./;
             my $full = "$dir/$entry";
             my $rel  = $rel_prefix ? "$rel_prefix/$entry" : $entry;
@@ -1762,7 +2168,13 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
                     file_path => $rel,
                     file_ext  => $ext,
                     file_size => (-s $full) + 0,
+                    db_id     => $db_files{$rel} ? $db_files{$rel}{id} : undef,
+                    workshop_id => $db_files{$rel} ? $db_files{$rel}{workshop_id} : undef,
                 };
+                if (@files >= $max_files) {
+                    $limit_hit = 1;
+                    last;
+                }
             }
         }
         closedir($dh);
@@ -1777,6 +2189,8 @@ sub resource_fs_list :Path('/workshop/resource_fs_list') :Args(0) {
         nfs_available => 1,
         nfs_root      => $nfs_root,
         count         => scalar(@files),
+        max_files     => $max_files,
+        truncated     => $limit_hit ? 1 : 0,
         error         => $@ ? "$@" : undef,
     });
     $c->forward('View::JSON');
@@ -1787,7 +2201,13 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to upload files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
         return;
     }
 
@@ -1882,7 +2302,13 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
         return;
     }
 
@@ -1948,7 +2374,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     my $user_id = $c->session->{user_id};
     unless ($user_id) {
         $c->flash->{error_msg} = 'Please log in to download workshop files.';
-        $c->response->redirect($c->uri_for('/login'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2000,9 +2426,7 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
     }
 
     # Serve the file
-    my $full_path = ($resource->file_path // '') =~ m{^/}
-        ? $resource->file_path
-        : $self->_nfs_root() . '/' . ($resource->file_path // '');
+    my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
 
     if ($resource->external_url) {
         $c->response->redirect($resource->external_url);
@@ -2028,7 +2452,8 @@ sub resource_download :Path('/workshop/resource_download') :Args(1) {
         return;
     }
 
-    my $content_type = $resource->file_type || 'application/octet-stream';
+    my ($ext) = (($resource->file_name // '') =~ /\.([^.]+)$/);
+    my $content_type = $self->_normalized_mime($resource->file_type, $ext);
     $c->response->content_type($content_type);
     $c->response->header('Content-Disposition' => 'attachment; filename="' . ($resource->file_name // 'file') . '"');
     $c->response->body($data);
@@ -2055,8 +2480,9 @@ sub resource_view :Path('/workshop/resource_view') :Args(1) {
         return $json_error->(404, $@ ? "DB error: $@" : 'Not found');
     }
 
-    my $full_path  = $self->_nfs_root() . '/' . ($resource->file_path // '');
-    my $mime       = $resource->file_type // '';
+    my $full_path  = $self->_resolve_storage_path($c, $resource->file_path // '');
+    my ($ext) = (($resource->file_name // '') =~ /\.([^.]+)$/);
+    my $mime       = $self->_normalized_mime($resource->file_type, $ext);
     my $is_image   = $mime =~ m{^image/};
     my $is_pdf     = $mime eq 'application/pdf';
     my $is_video   = $mime =~ m{^video/};
@@ -2133,7 +2559,7 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in to delete files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2151,7 +2577,17 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
         return;
     }
 
-    my $full_path = $self->_nfs_root() . '/' . $resource->file_path;
+    my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
+
+    # Security check: Prevent deletion of sensitive paths
+    my $nfs_root = $self->_nfs_root();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $full_path, $resource->sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: resource points to a sensitive or unauthorized path.";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
     if (-f $full_path) {
         unlink($full_path) or $c->log->warn("Could not delete NFS file '$full_path': $!");
     }
@@ -2171,9 +2607,13 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to download files.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -2183,20 +2623,17 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
         return;
     }
 
-    my $rel_path = $c->req->param('path') // '';
-    $rel_path =~ s{\.\.}{}g;  # strip path traversal
-    $rel_path =~ s{^/+}{};
-
-    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    my $stored_path = $c->req->param('path') // '';
+    my $full_path = $self->_resolve_storage_path($c, $stored_path);
     unless (-f $full_path) {
         $c->flash->{error_msg} = 'File not found on storage.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
 
-    my ($filename) = ($rel_path =~ m{([^/]+)$});
+    my ($filename) = ($full_path =~ m{([^/]+)$});
     my ($ext) = ($filename =~ /\.([^.]+)$/);
-    my $content_type = $MIME_MAP{ lc($ext // '') } // 'application/octet-stream';
+    my $content_type = $self->_normalized_mime('', $ext);
 
     my $data;
     eval {
@@ -2219,14 +2656,22 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
 sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
+        return;
+    }
+
     unless ($admin_type eq 'csc' || $admin_type eq 'special') {
         $c->flash->{error_msg} = 'Only CSC admins can delete NFS files directly.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
@@ -2242,10 +2687,20 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     $rel_path =~ s{\.\.}{}g;
     $rel_path =~ s{^/+}{};
 
-    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    my $full_path = $self->_resolve_storage_path($c, $rel_path);
+
+    # Security check: Prevent deletion of sensitive paths
+    my $nfs_root = $self->_nfs_root();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $full_path, $c->session->{SiteName}, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot delete sensitive or unauthorized path '$rel_path'.";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
     my ($filename) = ($rel_path =~ m{([^/]+)$});
 
-    if (-f $full_path) {
+    if ($full_path && -f $full_path) {
         unlink($full_path) or do {
             $c->flash->{error_msg} = "Could not delete '$filename': $!";
             $c->response->redirect($c->uri_for('/workshop/resources'));
@@ -2268,10 +2723,8 @@ sub resource_sync :Path('/workshop/resource_sync') :Args(0) {
         return;
     }
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
-    unless ($admin_type eq 'csc' || $admin_type eq 'special') {
-        $c->flash->{error_msg} = 'Only CSC admins can access the NFS sync tool.';
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
@@ -2356,6 +2809,7 @@ sub resource_sync :Path('/workshop/resource_sync') :Args(0) {
         sitenames     => \@sitenames,
         files_columns => $files_columns,
         wr_columns    => $wr_columns,
+        csrf_token    => $c->session->{csrf_token},
         template      => 'WorkShops/Sync.tt',
     );
 }
@@ -2369,16 +2823,20 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
         return;
     }
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
-    unless ($admin_type eq 'csc' || $admin_type eq 'special') {
-        $c->flash->{error_msg} = 'Only CSC admins can run the NFS scan.';
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
 
     unless ($c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resource_sync')));
         return;
     }
 
@@ -2395,7 +2853,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
     my $sitename  = $c->session->{SiteName} // '';
 
     # Parameters — accept from both the old inline form and the new Sync.tt form
-    my $sub_dir      = $c->req->param('scan_dir')      // 'apis';
+    my $sub_dir      = $c->req->param('scan_dir')      // 'full';
     my $max_files    = int($c->req->param('max_files') // 2000);
     my $target_table = $c->req->param('target_table')  // 'files';
     my $ext_filter   = $c->req->param('ext_filter')    // '';
@@ -2495,6 +2953,16 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                     $cat_desc = $dir_part // '';
                 }
 
+                # If sitename is not provided, infer it from top-level NFS directory.
+                # This supports a root layout where each directory name matches SiteName.
+                my $sitename_for_file = $form_sitename;
+                if (!defined $sitename_for_file || $sitename_for_file eq '') {
+                    my $relative = $full;
+                    $relative =~ s{^\Q$nfs_root\E/?}{};
+                    my ($top) = split('/', $relative, 2);
+                    $sitename_for_file = $top || $sitename || 'CSC';
+                }
+
                 if ($target_table eq 'files' || $target_table eq 'both') {
                     if ($existing_files{$full}) {
                         $skipped++;
@@ -2516,7 +2984,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                                 file_format  => $ext,
                                 file_size    => $size,
                                 source_type  => 'nfs',
-                                sitename     => $form_sitename,
+                                sitename     => $sitename_for_file,
                                 access_level => $access_level,
                                 user_id      => $user_id,
                                 workshop_id  => $workshop_id,
@@ -2547,7 +3015,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
                             file_ext     => $ext,
                             file_type    => $mime,
                             file_size    => $size,
-                            sitename     => $form_sitename,
+                            sitename     => $sitename_for_file,
                             access_level => $access_level,
                             uploaded_by  => $user_id,
                             workshop_id  => $workshop_id,
@@ -2611,7 +3079,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         return;
     }
 
-    my $mime     = $file->file_type // 'application/octet-stream';
+    my $mime     = $self->_normalized_mime($file->file_type, $file->file_format);
     my $is_image = $mime =~ m{^image/};
     my $is_pdf   = $mime eq 'application/pdf';
     my $is_text  = $mime =~ m{^text/};
@@ -2625,7 +3093,7 @@ sub file_view :Path('/workshop/file_view') :Args(1) {
         return;
     }
 
-    my $path = $file->nfs_path || $file->file_path || '';
+    my $path = $self->_resolve_storage_path($c, ($file->nfs_path || $file->file_path || ''));
     unless ($path && -f $path) {
         $c->response->status(404);
         $c->response->body('File not found on storage');
@@ -2653,6 +3121,12 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
         return;
     }
 
@@ -2730,6 +3204,150 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
     $c->response->redirect($c->uri_for('/workshop/resources'));
 }
 
+sub file_update :Path('/workshop/file_update') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
+        return;
+    }
+
+    unless ($self->_can_access_resources($c)) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $file_id = $c->req->param('file_id');
+    unless ($file_id && $file_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid file ID.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $file = eval { $schema->resultset('File')->find($file_id) };
+    unless ($file) {
+        $c->flash->{error_msg} = 'File record not found.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $is_site_admin = ($admin_type eq 'standard' && ($c->session->{SiteName} // '') eq ($file->sitename // ''));
+    my $is_owner = (($file->user_id // 0) == ($c->session->{user_id} // -1));
+    unless ($is_csc_admin || $is_site_admin || $is_owner) {
+        $c->flash->{error_msg} = 'Access denied for editing this file.';
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    my $new_name = $c->req->param('file_name');
+    $new_name = $file->file_name unless defined $new_name;
+    $new_name =~ s/^\s+|\s+$//g;
+    $new_name =~ s{[/\\]}{}g;
+    $new_name = $file->file_name unless length $new_name;
+
+    my $description = $c->req->param('description');
+    $description = '' unless defined $description;
+    $description =~ s/^\s+|\s+$//g;
+
+    my $access_level = $c->req->param('access_level') // ($file->access_level // 'site_only');
+    my %allowed_access = map { $_ => 1 } qw(site_only all_leaders workshop_specific);
+    $access_level = 'site_only' unless $allowed_access{$access_level};
+
+    my $sitename = $c->req->param('sitename');
+    $sitename = $file->sitename unless defined $sitename;
+    $sitename =~ s/^\s+|\s+$//g;
+    $sitename = $file->sitename unless length $sitename;
+    $sitename = $file->sitename unless $is_csc_admin || $is_site_admin;
+
+    my $file_status = $c->req->param('file_status') // ($file->file_status // 'active');
+    my %allowed_status = map { $_ => 1 } qw(active pending archived);
+    $file_status = 'active' unless $allowed_status{$file_status};
+
+    my $workshop_action = $c->req->param('workshop_action') // 'keep';
+    $workshop_action = 'keep' unless $workshop_action =~ /^(keep|attach|detach)$/;
+    my $workshop_id = $c->req->param('workshop_id');
+    $workshop_id = undef unless defined $workshop_id && $workshop_id =~ /^\d+$/;
+
+    my $ok = eval {
+        $file->update({
+            file_name    => $new_name,
+            description  => $description,
+            access_level => $access_level,
+            sitename     => $sitename,
+            file_status  => $file_status,
+        });
+
+        my $wr_rs = $schema->resultset('WorkshopResource');
+        my $ext = lc($file->file_format // ($new_name =~ /\.([^.]+)$/ ? $1 : ''));
+        my $mime = $self->_normalized_mime($file->file_type, $ext);
+
+        # Keep workshop_resource metadata aligned with edited file record.
+        $wr_rs->search({ file_id => $file_id })->update({
+            file_name    => $new_name,
+            sitename     => $sitename,
+            access_level => $access_level,
+            description  => $description,
+            file_ext     => $ext,
+            file_type    => $mime,
+        });
+
+        if ($workshop_action eq 'detach') {
+            my $filter = { file_id => $file_id };
+            $filter->{workshop_id} = $workshop_id if defined $workshop_id;
+            $wr_rs->search($filter)->delete;
+        } elsif ($workshop_action eq 'attach' && defined $workshop_id) {
+            my $existing = $wr_rs->search(
+                { file_id => $file_id, workshop_id => $workshop_id },
+                { rows => 1 }
+            )->first;
+            unless ($existing) {
+                $wr_rs->create({
+                    file_name    => $new_name,
+                    file_path    => $file->nfs_path // $file->file_path // '',
+                    file_ext     => $ext,
+                    file_type    => $mime,
+                    file_size    => $file->file_size,
+                    sitename     => $sitename,
+                    access_level => $access_level,
+                    uploaded_by  => $c->session->{user_id},
+                    workshop_id  => $workshop_id,
+                    description  => $description,
+                    file_id      => $file_id,
+                });
+            }
+            $file->update({ workshop_id => $workshop_id }) unless ($file->workshop_id // '') eq "$workshop_id";
+        }
+        1;
+    };
+
+    if (!$ok || $@) {
+        my $err = $@ || 'unknown error';
+        $c->log->error("file_update failed for file_id=$file_id: $err");
+        $c->flash->{error_msg} = 'Failed to update file record.';
+    } else {
+        $c->flash->{success_msg} = "Updated file '$new_name'.";
+    }
+
+    $c->response->redirect($c->uri_for('/workshop/resources'));
+}
+
 sub content :Local :Args(1) {
     my ($self, $c, $id) = @_;
     
@@ -2779,8 +3397,16 @@ sub add_content :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
+            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/AddContent.tt',
         );
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('add_content'), [$id]));
         return;
     }
     
@@ -2790,12 +3416,13 @@ sub add_content :Local :Args(1) {
     my $content_type = $params->{content_type} || 'text';
     
     unless ($title) {
-        $c->stash->{error_msg} = 'Title is required.';
         $c->stash(
             workshop => $workshop,
+            error_msg => 'Title is required.',
             form_data => $params,
             template => 'WorkShops/AddContent.tt',
         );
+        $c->forward($c->view('TT'));
         return;
     }
     
@@ -2992,6 +3619,7 @@ sub compose_email :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         recipient_count => $registered_count,
+        csrf_token => $c->session->{csrf_token},
         template => 'WorkShops/ComposeEmail.tt',
     );
 }
@@ -3010,6 +3638,12 @@ sub send_email :Local :Args(1) {
     unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
         $c->flash->{error_msg} = 'Access denied. You do not have permission to send emails for this workshop.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('compose_email'), [$id]));
         return;
     }
     
@@ -3034,8 +3668,8 @@ sub send_email :Local :Args(1) {
     
     my @registered_participants = $c->model('DBEncy::Participant')->search(
         {
-            workshop_id => $id,
-            status => 'registered'
+            'me.workshop_id' => $id,
+            'me.status' => 'registered'
         },
         { prefetch => 'user' }
     )->all;
@@ -3159,6 +3793,60 @@ sub send_email :Local :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('email_history'), [$id]));
 }
 
+sub _is_path_allowed {
+    my ($self, $c, $path, $sitename, $nfs_root) = @_;
+    
+    # Validation
+    return (0, undef) unless defined $path && length $path;
+    $path =~ s{\\}{/}g;
+    $path =~ s{^\s+|\s+$}{}g;
+    $path =~ s{/+$}{}; # Remove trailing slash for consistent comparison
+
+    # Security: Prohibit access to sensitive system paths
+    if ($path =~ m{^/(etc|proc|sys|var|boot|root|dev|tmp/session_data)\b}i || $path eq '/') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_is_path_allowed',
+            "SECURITY: Blocked access to sensitive path: $path");
+        return (0, undef);
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    # CSC Admins can access everything in the NFS root
+    if ($is_csc) {
+        if (CORE::index($path, $nfs_root) == 0) {
+            return (1, $nfs_root);
+        }
+    }
+    
+    # Normalize sitename
+    $sitename = lc($sitename // $c->session->{SiteName} // '');
+
+    # Check site-specific roots
+    if ($sitename eq 'bmaster' && CORE::index($path, "$nfs_root/apis") == 0) {
+        return (1, "$nfs_root/apis");
+    }
+    if ($sitename eq 'shanta' && CORE::index($path, "$nfs_root/Shanta") == 0) {
+        return (1, "$nfs_root/Shanta");
+    }
+    
+    # Check allocated dirs
+    my $schema = $c->model('DBEncy');
+    my @allocs = eval { 
+        $schema->resultset('NfsDirectory')->search({ sitename => $c->session->{SiteName}, is_active => 1 })->all 
+    };
+    for my $a (@allocs) {
+        my $apath = $a->nfs_path;
+        my $translated = $self->nfs_path->to_container_path($apath);
+        if (CORE::index($path, $translated) == 0) {
+            return (1, $translated);
+        }
+    }
+    
+    return (0, undef);
+}
+
 sub email_history :Local :Args(1) {
     my ($self, $c, $id) = @_;
     
@@ -3191,59 +3879,16 @@ sub email_history :Local :Args(1) {
     );
 }
 
-sub _send_error_notification {
-    my ($self, $c, $error_details) = @_;
+sub _verify_csrf_token {
+    my ($self, $c) = @_;
+    my $token_from_req = $c->req->param('csrf_token') // '';
+    my $token_from_session = $c->session->{csrf_token} // '';
     
-    # Get site admin email from config or database
-    my $admin_email = $c->config->{admin_email} || 'admin@' . lc($error_details->{site}) . '.ca';
-    
-    # Get site from database to get proper admin email
-    my $site = $c->model('DBEncy::Site')->search({ name => $error_details->{site} })->first;
-    if ($site && $site->admin_email) {
-        $admin_email = $site->admin_email;
-    }
-    
-    # Format error details for email
-    my $error_report = sprintf(
-        "Error Type: %s\n\nError Message:\n%s\n\nUser Details:\n- User ID: %s\n- Username: %s\n- Site: %s\n\nTimestamp: %s\n\nRequest URI: %s\n\n",
-        $error_details->{error_type} || 'Unknown Error',
-        $error_details->{error_message} || 'No error message provided',
-        $error_details->{user_id} || 'N/A',
-        $error_details->{username} || 'N/A',
-        $error_details->{site} || 'N/A',
-        DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
-        $c->req->uri || 'N/A'
-    );
-    
-    # Add form data if provided
-    if ($error_details->{form_data}) {
-        $error_report .= "Form Data:\n";
-        for my $key (sort keys %{$error_details->{form_data}}) {
-            my $value = $error_details->{form_data}->{$key} || '';
-            # Truncate long values
-            $value = substr($value, 0, 200) . '...' if length($value) > 200;
-            $error_report .= "  $key: $value\n";
-        }
-    }
-    
-    # Send email notification
-    eval {
-        $c->stash->{email} = {
-            to       => $admin_email,
-            from     => $c->config->{system_email} || 'noreply@comserv.ca',
-            subject  => '[Workshop System Error] ' . $error_details->{error_type},
-            body     => $error_report,
-        };
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
+        "CSRF check: req=$token_from_req session=$token_from_session");
         
-        $c->forward($c->view('Email'));
-        $c->log->info("Error notification sent to admin: $admin_email");
-    };
-    
-    if ($@) {
-        $c->log->error("Failed to send error notification email: $@");
-    }
+    return (length $token_from_req && $token_from_req eq $token_from_session);
 }
-
 
 __PACKAGE__->meta->make_immutable;
 

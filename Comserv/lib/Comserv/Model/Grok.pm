@@ -69,6 +69,13 @@ has 'api_key' => (
     documentation => 'Grok API key (loaded from K8s secrets or env var)'
 );
 
+has 'db_key' => (
+    is => 'rw',
+    isa => 'Str',
+    default => '',
+    documentation => 'Grok API key loaded from database (set by controller)'
+);
+
 has 'endpoint' => (
     is => 'rw',
     isa => 'Str',
@@ -79,8 +86,8 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'grok-beta',
-    documentation => 'Grok model to use (default: grok-beta)'
+    default => 'grok-3',
+    documentation => 'Grok model to use (default: grok-3)'
 );
 
 has 'timeout' => (
@@ -144,8 +151,9 @@ Post-construction initialization. Currently a no-op but reserved for future use.
 sub BUILD {
     my ($self) = @_;
     unless ($self->api_key) {
-        my $error = "Grok API key not available. Check K8s secret at /run/secrets/grok_api_key or GROK_API_KEY env var.";
+        my $error = "Grok API key not available. Check config file, K8s secret or env var.";
         $self->last_error($error);
+        # Downgraded to info since it's just a startup check
         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'BUILD', $error);
     }
     return;
@@ -153,17 +161,41 @@ sub BUILD {
 
 =head2 _load_api_key
 
-Load Grok API key from K8s secrets or environment variable.
-Priority: K8s secrets > Environment variable
+Load Grok API key from:
+1. Config file (Comserv/config/api/GrokConfig.json)
+2. K8s secrets (/run/secrets/grok_api_key)
+3. Environment variable (GROK_API_KEY)
+
+Priority: Config > K8s secrets > Environment variable
 
 =cut
 
 sub _load_api_key {
     my ($self) = @_;
     
+    my $config_path = '/home/shanta/PycharmProjects/comserv2/Comserv/config/api/GrokConfig.json';
     my $k8s_secret_path = '/run/secrets/grok_api_key';
     
-    # Try loading from K8s secrets first
+    # Try loading from config file first
+    if (-e $config_path) {
+        eval {
+            open my $fh, '<', $config_path or die "Cannot open $config_path: $!";
+            my $json_text = do { local $/; <$fh> };
+            close $fh;
+            my $config = decode_json($json_text);
+            if ($config->{api_key} && length($config->{api_key}) > 0) {
+                $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_api_key',
+                    "Loaded Grok API key from config file: $config_path");
+                return $config->{api_key};
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_api_key',
+                "Error loading Grok config file: $@");
+        }
+    }
+
+    # Try loading from K8s secrets next
     if (-e $k8s_secret_path) {
         if (open my $fh, '<', $k8s_secret_path) {
             my $key = do { local $/; <$fh> };
@@ -184,8 +216,9 @@ sub _load_api_key {
         return $ENV{GROK_API_KEY};
     }
     
-    my $error = "Grok API key not found in K8s secret or GROK_API_KEY env var";
-    $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_load_api_key', $error);
+    my $error = "Grok API key not found in config file, K8s secret or GROK_API_KEY env var";
+    # Downgraded to info for builders; query() will log an error if key is actually needed
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_api_key', $error);
     return '';
 }
 
@@ -306,8 +339,11 @@ sub chat {
         return undef;
     }
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
-        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages));
+    my $use_search = $args{use_search} || 0;
+    my $c = $args{c} || undef;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat',
+        "Querying Grok Chat API with model: " . $self->model . ", messages: " . scalar(@$messages) . ", web_search: $use_search");
     
     # Build the request payload
     my $payload = {
@@ -317,7 +353,29 @@ sub chat {
         max_tokens => $self->max_tokens,
     };
     
-    return $self->_send_request($payload, 'chat');
+    # Enable xAI live web search when requested
+    if ($use_search) {
+        # xAI uses tools for web search in their latest API
+        # Refined structure based on 422 error: 'tools[0]: missing field sources'
+        # Some API versions expect tool options in a sub-object matching the type name.
+        $payload->{tools} = [
+            { 
+                type => 'live_search',
+                live_search => {
+                    sources => ["web"]
+                }
+            }
+        ];
+        
+        # Also include 'sources' at the top level of the tool object as a fallback
+        # This addresses the 'missing field sources' if it expects it there instead.
+        $payload->{tools}[0]{sources} = ["web"];
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'chat',
+            "Web search enabled via tools (type: live_search, sources: ['web'])");
+    }
+    
+    return $self->_send_request($payload, 'chat', $c);
 }
 
 =head2 check_connection
@@ -368,6 +426,79 @@ sub check_connection {
     return 0;
 }
 
+=head2 list_models
+
+Fetch available models from the xAI API.
+
+    my $models = $grok->list_models();
+
+Returns an arrayref of model objects on success, or undef on failure.
+
+=cut
+
+sub list_models {
+    my ($self) = @_;
+    
+    unless ($self->api_key) {
+        $self->last_error("Grok API key not configured");
+        return undef;
+    }
+    
+    # xAI models endpoint
+    my $endpoint = 'https://api.x.ai/v1/models';
+    
+    my $req = HTTP::Request->new(GET => $endpoint);
+    # Priority: db_key (set by controller from DB) > api_key (env/K8s/config)
+    my $key = $self->db_key || $self->api_key;
+    unless ($key) {
+        $self->last_error("Grok API key not configured");
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            "Grok API key not configured");
+        return undef;
+    }
+    
+    $req->header('Authorization' => 'Bearer ' . $key);
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'list_models',
+        "Fetching available models from xAI API");
+        
+    my $response;
+    try {
+        $response = $self->ua->request($req);
+    } catch {
+        my $error = "HTTP request failed: $_";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            $error);
+        return undef;
+    };
+    
+    unless ($response->is_success) {
+        my $error = "Grok API error: " . $response->status_line;
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            $error);
+        return undef;
+    }
+    
+    my $data;
+    try {
+        $data = decode_json($response->content);
+    } catch {
+        my $error = "Failed to parse Grok API response: $_";
+        $self->last_error($error);
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            $error);
+        return undef;
+    };
+    
+    my $models = $data->{data} || [];
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'list_models',
+        "Successfully fetched " . scalar(@$models) . " models from xAI API");
+        
+    return $models;
+}
+
 =head2 _send_request
 
 Internal method to send HTTP request to Grok API and parse response.
@@ -376,7 +507,9 @@ Never exposes API key in error messages.
 =cut
 
 sub _send_request {
-    my ($self, $payload, $method_name) = @_;
+    my ($self, $payload, $method_name, $c) = @_;
+    
+    $c ||= undef; # Ensure $c is explicitly undef if not provided
     
     # Encode the payload
     my $json_payload;
@@ -385,7 +518,7 @@ sub _send_request {
     } catch {
         my $error = "Failed to encode JSON payload: $_";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_send_request',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_send_request',
             $error);
         return undef;
     };
@@ -393,29 +526,58 @@ sub _send_request {
     # Create the HTTP request with Authorization header
     my $req = HTTP::Request->new(POST => $self->endpoint);
     $req->header('Content-Type' => 'application/json');
-    $req->header('Authorization' => 'Bearer ' . $self->api_key);
+    
+    # Priority: db_key (set by controller from DB) > api_key (env/K8s/config)
+    my $key = $self->db_key || $self->api_key;
+    unless ($key) {
+        $self->last_error("Grok API key not configured");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_send_request',
+            "Grok API key not configured");
+        return undef;
+    }
+    
+    $req->header('Authorization' => 'Bearer ' . $key);
     $req->content($json_payload);
     
     # Send the request
     my $response;
+    my $request_start = time();
     try {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_send_request',
+            "Grok API Request: Model=" . ($payload->{model} || 'default') . ", Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         my $error = "HTTP request failed: $_";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_send_request',
-            $error);
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_send_request',
+            "Grok API Transport Error: $error");
         return undef;
     };
+    
+    my $elapsed = time() - $request_start;
     
     # Check response status
     unless ($response->is_success) {
         my $status = $response->status_line;
+        my $content = $response->content || '';
         my $error = "Grok API error: $status";
         
+        # ALWAYS log full response at WARN level for debugging
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_send_request',
+            "Grok API CRITICAL Failure: Status=$status, Elapsed=${elapsed}s, Response=$content, Payload=$json_payload");
+            
         # Add specific handling for common HTTP errors
         if ($status =~ /401|403/) {
             $error = "Grok API authentication failed. Check your API key.";
+        } elsif ($status =~ /410/) {
+            $error = "Grok model '" . ($payload->{model} || 'unknown') . "' returned a 410 error. "
+                   . "This often happens if the selected model version has been deprecated. Please try a different model.";
+        } elsif ($status =~ /422/) {
+            $error = "Grok API error: 422 Unprocessable Entity. "
+                   . "Details: $content";
+        } elsif ($status =~ /404/) {
+            $error = "Grok model '" . ($payload->{model} || 'unknown') . "' not found (404). "
+                   . "Please sync models and select an available one.";
         } elsif ($status =~ /429/) {
             $error = "Grok API rate limited. Please try again later.";
         } elsif ($status =~ /503/) {
@@ -423,7 +585,7 @@ sub _send_request {
         }
         
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_send_request',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_send_request',
             "HTTP request failed: $status");
         return undef;
     }
@@ -441,26 +603,39 @@ sub _send_request {
             }
         }
         
+        # Extract citations if web search was used
+        my @citations;
+        if ($data->{citations} && ref($data->{citations}) eq 'ARRAY') {
+            @citations = @{$data->{citations}};
+        } elsif ($data->{choices} && ref($data->{choices}) eq 'ARRAY' && @{$data->{choices}}) {
+            my $choice = $data->{choices}->[0];
+            if ($choice->{finish_reason} && $choice->{search_results}) {
+                @citations = map { { url => $_->{url}, title => $_->{title} } }
+                    grep { $_->{url} } @{$choice->{search_results}};
+            }
+        }
+        
         $result = {
-            success => 1,
-            response => $response_text,
-            model => $self->model,
+            success    => 1,
+            response   => $response_text,
+            model      => $data->{model} || $self->model,
             created_at => $data->{created_at} || '',
-            usage => $data->{usage} || {},
+            usage      => $data->{usage} || {},
+            citations  => \@citations,
         };
     } catch {
         my $error = "Failed to parse Grok API response: $_";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_send_request',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_send_request',
             $error);
         return undef;
     };
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_send_request',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_send_request',
         "Successfully received response from Grok API (method: $method_name)");
     
     if ($self->debug) {
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_send_request',
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_send_request',
             "Response: " . substr($result->{response}, 0, 200) . "...");
     }
     

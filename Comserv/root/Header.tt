@@ -29,7 +29,12 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
+    [%- SET site_favicon = c.stash.site_favicon || '' -%]
+    [% IF site_favicon %]
+    <link rel="shortcut icon" href="[% site_favicon %]">
+    [% ELSE %]
     <link rel="shortcut icon" href="/static/images/favicon.ico">
+    [% END %]
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
@@ -107,6 +112,12 @@
 
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
+
+    [% IF is_admin %]
+    <!-- Admin-only Health Monitoring -->
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <script src="/static/js/HealthMonitor.js"></script>
+    [% END %]
 
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>

@@ -19,10 +19,13 @@
         isOpen: false,
         currentConversationId: null,
         pageContext: null,
+        pageDocFetched: false,
         currentAgent: null,
         agentsConfig: null,
         selectedProvider: 'ollama',
-        conversationMessages: []
+        conversationMessages: [],
+        username: 'You',
+        activeModel: null
     };
     
     // Load persisted state from sessionStorage
@@ -114,6 +117,44 @@
         return null;
     }
     
+    // Fetch documentation content for the current page from the server.
+    // Returns a Promise that resolves to a string (empty if not found).
+    function fetchPageDoc(pagePath) {
+        return fetch('/ai/get_page_doc?page=' + encodeURIComponent(pagePath), {
+            credentials: 'include'
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+            if (data && data.success && data.content) {
+                console.debug('[AI widget] Doc loaded from', data.file, '(' + data.content.length + ' chars)');
+                return data.content;
+            }
+            return '';
+        })
+        .catch(function() { return ''; });
+    }
+
+    // Extract visible text content from the current page for context
+    function extractPageContent() {
+        const skipSelectors = '#local-chat-widget, #chat-panel, script, style, nav, footer, .navbar, header';
+        const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article', '.container'];
+        for (const sel of contentSelectors) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
+            const text = clone.textContent.replace(/\s+/g, ' ').trim();
+            if (text.length > 200) {
+                return text.substring(0, 3000);
+            }
+        }
+        // Fallback: body text
+        const bodyClone = document.body.cloneNode(true);
+        bodyClone.querySelectorAll(skipSelectors).forEach(function(e) { e.remove(); });
+        const bodyText = bodyClone.textContent.replace(/\s+/g, ' ').trim();
+        return bodyText.substring(0, 2000);
+    }
+
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
         const pathname = window.location.pathname;
@@ -129,18 +170,28 @@
             page_url: window.location.href
         };
         
+        // Extract current page content for context awareness
+        const pageContent = extractPageContent();
+        
         if (selectedAgent) {
             context.page_type = selectedAgent.id;
             context.agent_id = selectedAgent.id;
             context.agent_name = selectedAgent.display_name;
-            context.system_prompt = selectedAgent.system_prompt;
+            context.system_prompt = selectedAgent.system_prompt
+                + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
+                + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
             context.capabilities = selectedAgent.capabilities;
             context.model_settings = selectedAgent.model_settings;
         } else {
             // Fallback to general
             context.page_type = 'general';
             context.agent_id = 'general';
-            context.system_prompt = 'You are a helpful AI assistant ready to assist with general questions and tasks.';
+            context.system_prompt = 'You are a helpful AI assistant for the Comserv web application. '
+                + 'You can only answer based on information explicitly provided to you here. '
+                + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
+                + 'Current page: "' + pageTitle + '" at URL: ' + pathname
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
         }
         
         return context;
@@ -148,112 +199,336 @@
     
     // Create chat widget elements
     function createChatWidget() {
-        // Create main container
+        // ── Floating chat button ──────────────────────────────────────────────
         const chatContainer = document.createElement('div');
         chatContainer.id = 'local-chat-widget';
         chatContainer.className = 'local-chat-widget';
-        
-        // Create chat button
+
         const chatButton = document.createElement('button');
         chatButton.id = 'chat-button';
         chatButton.className = 'chat-button';
         chatButton.innerHTML = '<span class="chat-icon">🤖</span> Chat with AI';
-        
-        // Create chat panel (initially hidden)
+        chatContainer.appendChild(chatButton);
+        document.body.appendChild(chatContainer);
+
+        // ── Chat panel ────────────────────────────────────────────────────────
         const chatPanel = document.createElement('div');
         chatPanel.id = 'chat-panel';
         chatPanel.className = 'chat-panel';
         chatPanel.style.display = 'none';
-        
-        // Create chat header
+        document.body.appendChild(chatPanel);  // direct child of body for z-index
+
+        // Header (drag handle)
         const chatHeader = document.createElement('div');
         chatHeader.className = 'chat-header';
-        chatHeader.innerHTML = '<h3>AI Assistant</h3><div class="chat-header-buttons"><select id="conversation-selector" class="conversation-selector" title="Select conversation"><option value="">Current Chat</option></select><button id="new-chat" class="new-chat-btn" title="Start new conversation">New Chat</button><button id="close-chat">×</button></div>';
-        
-        // Create chat messages area
+        chatHeader.innerHTML =
+            '<div class="chat-header-drag" id="chat-drag-handle" title="Drag to move">⠿</div>' +
+            '<h3 id="chat-title">AI Assistant</h3>' +
+            '<div class="chat-header-buttons">' +
+                '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
+                '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="detach-chat" class="chat-header-icon-btn" title="Detach to moveable window (works across monitors)">⤢</button>' +
+                '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
+            '</div>';
+
+        // History drawer (hidden by default, slides in from top of messages area)
+        const historyDrawer = document.createElement('div');
+        historyDrawer.id = 'widget-history-drawer';
+        historyDrawer.className = 'widget-history-drawer';
+        historyDrawer.style.display = 'none';
+        historyDrawer.innerHTML =
+            '<div class="widget-history-header">' +
+                '<span>Recent Conversations</span>' +
+                '<button id="history-close-btn" class="chat-header-icon-btn" title="Close history">✕</button>' +
+            '</div>' +
+            '<div id="widget-history-list" class="widget-history-list"><div class="wh-loading">Loading…</div></div>';
+
+        // Messages area
         const chatMessages = document.createElement('div');
         chatMessages.id = 'chat-messages';
         chatMessages.className = 'chat-messages';
-        
-        // Add welcome message
         const welcomeMessage = document.createElement('div');
         welcomeMessage.className = 'message system-message';
         welcomeMessage.textContent = 'Hello! I\'m your AI assistant. Ask me anything and I\'ll help you right away.';
         chatMessages.appendChild(welcomeMessage);
-        
-        // Create provider selector
+
+        // Provider / model selector bar
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
-        providerSelector.innerHTML = '<label for="ai-provider">AI Model:</label>' +
-                                    '<select id="ai-provider">' +
-                                    '<option value="ollama">Ollama (Local)</option>' +
-                                    '</select>' +
-                                    '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage your API keys">⚙️</a>';
-        
-        // Create chat input area
-        const chatInput = document.createElement('div');
-        chatInput.className = 'chat-input';
-        chatInput.innerHTML = '<textarea id="message-input" placeholder="Type your message..."></textarea>' +
-                             '<button id="send-message">Send</button>';
-        
-        // Create status indicator
+        providerSelector.innerHTML =
+            '<label for="ai-provider">AI Model:</label>' +
+            '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
+            '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
+              '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
+                '<input type="checkbox" id="enable-web-search" style="vertical-align:middle;"> 🔍 Web' +
+              '</label>' +
+            '</span>' +
+            '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
+
+        // Status indicator
         const statusIndicator = document.createElement('div');
         statusIndicator.id = 'chat-status';
         statusIndicator.className = 'chat-status';
         statusIndicator.textContent = 'AI Ready';
-        
-        // Assemble the chat panel
+
+        // Input area
+        const chatInput = document.createElement('div');
+        chatInput.className = 'chat-input';
+        chatInput.innerHTML =
+            '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
+            '<button id="send-message" title="Send message">Send</button>';
+
+        // Resize handle (bottom-right corner)
+        const resizeHandle = document.createElement('div');
+        resizeHandle.id = 'chat-resize-handle';
+        resizeHandle.className = 'chat-resize-handle';
+        resizeHandle.title = 'Drag to resize';
+
+        // Assemble panel
         chatPanel.appendChild(chatHeader);
+        chatPanel.appendChild(historyDrawer);
         chatPanel.appendChild(chatMessages);
         chatPanel.appendChild(providerSelector);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
-        
-        // Add button to the container
-        chatContainer.appendChild(chatButton);
-        
-        // Add the container to the body
-        document.body.appendChild(chatContainer);
-        
-        // Add the panel directly to the body (not to container) to avoid stacking context issues
-        document.body.appendChild(chatPanel);
-        
-        // Add event listeners
-        chatButton.addEventListener('click', function() {
-            openChat();
+        chatPanel.appendChild(resizeHandle);
+
+        // Populate providers immediately
+        loadUserProviders();
+
+        // ── Drag to move ──────────────────────────────────────────────────────
+        (function initDrag() {
+            const handle = document.getElementById('chat-drag-handle');
+            let dragging = false, startX, startY, origLeft, origBottom, origTop, origRight;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                dragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                // Switch from bottom/right positioning to top/left for free movement
+                chatPanel.style.bottom = 'auto';
+                chatPanel.style.right  = 'auto';
+                chatPanel.style.top    = rect.top + 'px';
+                chatPanel.style.left   = rect.left + 'px';
+                chatPanel.style.margin = '0';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!dragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                const newTop  = Math.max(0, Math.min(window.innerHeight - 60, rect.top + dy));
+                const newLeft = Math.max(0, Math.min(window.innerWidth  - 60, rect.left + dx));
+                chatPanel.style.top  = newTop  + 'px';
+                chatPanel.style.left = newLeft + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                dragging = false;
+                document.body.style.userSelect = '';
+            });
+
+            // Touch support
+            handle.addEventListener('touchstart', function(e) {
+                const t = e.touches[0];
+                startX = t.clientX; startY = t.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                chatPanel.style.bottom = 'auto'; chatPanel.style.right = 'auto';
+                chatPanel.style.top = rect.top + 'px'; chatPanel.style.left = rect.left + 'px';
+                chatPanel.style.margin = '0';
+            }, { passive: true });
+
+            document.addEventListener('touchmove', function(e) {
+                if (!handle._touching) return;
+                const t = e.touches[0];
+                const dx = t.clientX - startX; const dy = t.clientY - startY;
+                startX = t.clientX; startY = t.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                chatPanel.style.top  = Math.max(0, rect.top  + dy) + 'px';
+                chatPanel.style.left = Math.max(0, rect.left + dx) + 'px';
+            }, { passive: true });
+
+            handle.addEventListener('touchstart', function() { handle._touching = true; }, { passive: true });
+            handle.addEventListener('touchend',   function() { handle._touching = false; });
+        })();
+
+        // ── Resize handle ─────────────────────────────────────────────────────
+        (function initResize() {
+            const rh = document.getElementById('chat-resize-handle');
+            if (!rh) return;
+            let resizing = false, startX, startY, startW, startH;
+            rh.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                resizing = true;
+                startX = e.clientX; startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                startW = rect.width; startH = rect.height;
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!resizing) return;
+                const newW = Math.max(280, Math.min(window.innerWidth  - 20, startW + (e.clientX - startX)));
+                const newH = Math.max(300, Math.min(window.innerHeight - 20, startH + (e.clientY - startY)));
+                chatPanel.style.width  = newW + 'px';
+                chatPanel.style.height = newH + 'px';
+            });
+            document.addEventListener('mouseup', function() {
+                resizing = false;
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // ── Textarea auto-grow ────────────────────────────────────────────────
+        (function initTextareaGrow() {
+            const ta = document.getElementById('message-input');
+            if (!ta) return;
+            ta.addEventListener('input', function() {
+                this.style.height = 'auto';
+                const max = 140;
+                this.style.height = Math.min(this.scrollHeight, max) + 'px';
+                this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
+            });
+        })();
+
+        // ── Resize handle ─────────────────────────────────────────────────────
+        (function initResize() {
+            const handle = document.getElementById('chat-resize-handle');
+            let resizing = false, startX, startY, startW, startH;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                resizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = chatPanel.getBoundingClientRect();
+                startW = rect.width;
+                startH = rect.height;
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!resizing) return;
+                const newW = Math.max(280, Math.min(window.innerWidth  - 20, startW + (e.clientX - startX)));
+                const newH = Math.max(300, Math.min(window.innerHeight - 20, startH + (e.clientY - startY)));
+                chatPanel.style.width  = newW + 'px';
+                chatPanel.style.height = newH + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                resizing = false;
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // ── Textarea auto-grow ────────────────────────────────────────────────
+        (function initTextareaGrow() {
+            const ta = document.getElementById('message-input');
+            if (!ta) return;
+            ta.addEventListener('input', function() {
+                this.style.height = 'auto';
+                const max = 140;
+                this.style.height = Math.min(this.scrollHeight, max) + 'px';
+                this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
+            });
+        })();
+
+        // ── History drawer ────────────────────────────────────────────────────
+        document.getElementById('toggle-history-btn').addEventListener('click', function() {
+            const drawer = document.getElementById('widget-history-drawer');
+            if (drawer.style.display === 'none') {
+                drawer.style.display = 'flex';
+                loadWidgetHistory();
+            } else {
+                drawer.style.display = 'none';
+            }
         });
-        
-        document.getElementById('close-chat').addEventListener('click', function() {
-            closeChat();
+
+        document.getElementById('history-close-btn').addEventListener('click', function() {
+            document.getElementById('widget-history-drawer').style.display = 'none';
         });
-        
-        document.getElementById('new-chat').addEventListener('click', function() {
-            resetConversation();
-        });
-        
+
+        // ── Other events ──────────────────────────────────────────────────────
+        chatButton.addEventListener('click', function() { openChat(); });
+        document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
+        document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
+        document.getElementById('detach-chat').addEventListener('click', function() { detachToPopup(); });
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
-        
-        // Add provider selector change listener
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
-            console.debug('Provider changed to:', state.selectedProvider);
-            const statusIndicator = document.getElementById('chat-status');
-            statusIndicator.textContent = `AI Ready (${state.selectedProvider === 'grok' ? 'Grok' : 'Ollama'})`;
-        });
-        
-        // Add conversation selector change listener
-        document.getElementById('conversation-selector').addEventListener('change', function(e) {
-            const conversationId = parseInt(e.target.value);
-            if (conversationId) {
-                loadConversation(conversationId);
+            const parts = state.selectedProvider.split('|');
+            let modelDisplay;
+            const isGrok = parts[0] === 'grok';
+            if (isGrok) {
+                modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
+            } else {
+                modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
             }
+            state.activeModel = modelDisplay;
+            const statusEl = document.getElementById('chat-status');
+            statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
+            statusEl.className = 'chat-status connected';
+            // Show web search toggle only for Grok (admin users see it; controlled server-side too)
+            const wsToggle = document.getElementById('web-search-toggle');
+            if (wsToggle) wsToggle.style.display = isGrok ? 'inline' : 'none';
         });
+    }
+
+    // Load conversation list into widget history drawer
+    function loadWidgetHistory() {
+        const list = document.getElementById('widget-history-list');
+        if (!list) return;
+        list.innerHTML = '<div class="wh-loading">Loading…</div>';
+        fetch('/ai/get_conversation_list', { credentials: 'include' })
+            .then(r => r.json())
+            .then(function(data) {
+                list.innerHTML = '';
+                if (!data.success || !data.conversations || !data.conversations.length) {
+                    list.innerHTML = '<div class="wh-empty">No conversations yet</div>';
+                    return;
+                }
+                data.conversations.forEach(function(conv) {
+                    const item = document.createElement('button');
+                    item.className = 'wh-item' + (state.currentConversationId && String(conv.id) === String(state.currentConversationId) ? ' active' : '');
+                    item.innerHTML =
+                        '<div class="wh-title">' + escWidgetHtml(conv.title || 'Untitled') + '</div>' +
+                        '<div class="wh-meta">' + (conv.message_count || 0) + ' msgs · ' + wRelTime(conv.updated_at) + '</div>';
+                    item.addEventListener('click', function() {
+                        loadConversation(conv.id);
+                        document.getElementById('widget-history-drawer').style.display = 'none';
+                        document.getElementById('chat-title').textContent = conv.title || 'AI Assistant';
+                        document.querySelectorAll('.wh-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                    });
+                    list.appendChild(item);
+                });
+            })
+            .catch(function() { list.innerHTML = '<div class="wh-empty">Failed to load</div>'; });
+    }
+
+    function escWidgetHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function wRelTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr.replace(' ','T'));
+            const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+            if (mins < 2)  return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24)  return hrs + 'h ago';
+            return Math.floor(hrs / 24) + 'd ago';
+        } catch(e) { return ''; }
     }
     
     // Load conversation list and populate dropdown
@@ -331,29 +606,81 @@
         });
     }
     
-    // Load user's available AI providers
+    // Load user's available AI providers and populate the model selector
     function loadUserProviders() {
+        const sel = document.getElementById('ai-provider');
+        if (!sel) return;
+
         fetch('/ai/get_user_providers', {
             method: 'GET',
             credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.providers) {
-                const providerSelect = document.getElementById('ai-provider');
+            if (data.success) {
+                // Hide provider selector for guests or plain users
+                if (data.is_guest || !data.can_access_history) {
+                    const selectorBar = document.querySelector('.provider-selector');
+                    if (selectorBar) {
+                        selectorBar.style.display = 'none';
+                    }
+                }
                 
-                // Clear existing options except Ollama
-                providerSelect.innerHTML = '<option value="ollama">Ollama (Local)</option>';
+                // Hide history button for those without history access
+                if (!data.can_access_history) {
+                    const historyBtn = document.getElementById('toggle-history-btn');
+                    if (historyBtn) {
+                        historyBtn.style.display = 'none';
+                    }
+                }
+
+                // Capture username
+                if (data.username) {
+                    state.username = data.username;
+                }
                 
-                // Add user's configured providers
-                data.providers.forEach(provider => {
-                    const option = document.createElement('option');
-                    option.value = provider.service;
-                    option.textContent = provider.display_name;
-                    providerSelect.appendChild(option);
-                });
-                
-                console.debug('Loaded', data.providers.length, 'user providers');
+                if (data.providers && data.providers.length > 0) {
+                    // Clear existing options
+                    sel.innerHTML = '';
+                    
+                    data.providers.forEach(function(p) {
+                        if (p.service === 'ollama') {
+                            const grp = document.createElement('optgroup');
+                            grp.label = 'Ollama (Local)';
+                            
+                            if (p.models && p.models.length > 0) {
+                                p.models.forEach(function(m) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'ollama|' + m.id;
+                                    opt.textContent = m.id;
+                                    grp.appendChild(opt);
+                                });
+                            } else {
+                                const opt = document.createElement('option');
+                                opt.value = 'ollama';
+                                opt.textContent = 'Ollama Default';
+                                grp.appendChild(opt);
+                            }
+                            sel.appendChild(grp);
+                        } else if (p.service === 'grok') {
+                            const grp = document.createElement('optgroup');
+                            grp.label = 'External AI (xAI)';
+                            
+                            if (p.models && p.models.length > 0) {
+                                p.models.forEach(function(m) {
+                                    const opt = document.createElement('option');
+                                    opt.value = 'grok|' + m.id;
+                                    const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+                                    const cost = m.cost ? ' (' + m.cost + ')' : '';
+                                    opt.textContent = label + cost + ' (xAI)';
+                                    grp.appendChild(opt);
+                                });
+                            }
+                            sel.appendChild(grp);
+                        }
+                    });
+                    console.debug('Populated', data.providers.length, 'providers into widget selector');
+                }
             }
         })
         .catch(error => {
@@ -361,19 +688,24 @@
         });
     }
     
+    // Detach widget to a standalone popup window (moveable to any monitor)
+    function detachToPopup() {
+        const convId = state.currentConversationId;
+        const url = '/ai' + (convId ? '?resume=' + convId : '');
+        const popup = window.open(url, 'ai-chat-popup',
+            'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+        if (popup) {
+            closeChat();
+        } else {
+            const statusIndicator = document.getElementById('chat-status');
+            statusIndicator.textContent = 'Please allow popups for this site to detach chat';
+        }
+    }
+
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
-        
-        // Load persisted conversation state
-        loadPersistedState();
-        
-        // Load conversation list for dropdown
-        loadConversationList();
-        
-        // Load user's available providers
-        loadUserProviders();
         
         // Update chat header with selected agent info
         const chatHeader = document.querySelector('.chat-header h3');
@@ -386,12 +718,45 @@
         chatPanel.style.display = 'flex';
         chatButton.style.display = 'none';
         state.isOpen = true;
+
+        // Load user's available providers first to check roles
+        fetch('/ai/get_user_providers', { method: 'GET', credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Update state and UI based on roles
+                    if (!data.can_access_history) {
+                        // Hide history UI if not already hidden
+                        const historyBtn = document.getElementById('toggle-history-btn');
+                        if (historyBtn) historyBtn.style.display = 'none';
+                        const selectorBar = document.querySelector('.provider-selector');
+                        if (selectorBar) selectorBar.style.display = 'none';
+                    } else {
+                        // Authorized for history: Load state and list
+                        loadPersistedState();
+                        loadConversationList();
+                        
+                        // Auto-reload messages if resuming a conversation
+                        if (state.currentConversationId) {
+                            const chatMessages = document.getElementById('chat-messages');
+                            const hasMessages = chatMessages && chatMessages.children.length > 1;
+                            if (!hasMessages) {
+                                loadConversation(state.currentConversationId);
+                            }
+                        }
+                    }
+                }
+            });
         
-        // Show status if resuming conversation
-        if (state.currentConversationId) {
-            const statusIndicator = document.getElementById('chat-status');
-            statusIndicator.textContent = `Resuming conversation #${state.currentConversationId}`;
-            console.debug('Resuming conversation:', state.currentConversationId);
+        // Set initial model label from current dropdown selection
+        if (!state.activeModel) {
+            const sel = document.getElementById('ai-provider');
+            if (sel) {
+                const parts = sel.value.split('|');
+                state.activeModel = parts[0] === 'grok'
+                    ? 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '')
+                    : 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+            }
         }
         
         // Focus on the input field
@@ -466,9 +831,23 @@
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            
-            // Send the request (extracted to helper function below)
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+
+            // Fetch documentation for the current page (cached after first load)
+            const docPromise = state.pageDocFetched
+                ? Promise.resolve('')
+                : fetchPageDoc(window.location.pathname).then(function(docText) {
+                    state.pageDocFetched = true;
+                    if (docText && state.pageContext) {
+                        state.pageContext.system_prompt =
+                            (state.pageContext.system_prompt || '') +
+                            '\n\n--- Page Documentation ---\n' + docText;
+                    }
+                    return docText;
+                });
+
+            docPromise.then(function() {
+                sendAIRequest(prompt, statusIndicator, loadingMessage);
+            });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
             // Fallback: still send request with default context
@@ -481,10 +860,15 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+        // Parse provider|model format (e.g. "grok|grok-2-latest" or "ollama")
+        const providerParts = (state.selectedProvider || 'ollama').split('|');
+        const providerName = providerParts[0];
+        const modelName = providerParts[1] || null;
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
-            provider: state.selectedProvider,
+            provider: providerName,
             page_context: state.pageContext.page_type,
             page_path: state.pageContext.page_path,
             page_title: state.pageContext.page_title,
@@ -493,6 +877,17 @@
             agent_name: state.pageContext.agent_name
         };
         
+        // Include selected model for Grok
+        if (modelName) {
+            requestPayload.model = modelName;
+        }
+
+        // Include web search flag (Grok only; server enforces admin-only)
+        const webSearchEl = document.getElementById('enable-web-search');
+        if (webSearchEl && webSearchEl.checked && providerName === 'grok') {
+            requestPayload.use_search = true;
+        }
+
         // Include model settings if available
         if (state.pageContext.model_settings) {
             requestPayload.model_settings = state.pageContext.model_settings;
@@ -513,21 +908,25 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Send to AI as JSON (not FormData)
+        // Provider-aware client timeout: Ollama (local) can be slow with large models,
+        // so we use a 300s timeout. External APIs (Grok etc.) cap at 60s.
+        const isOllama = providerName === 'ollama';
+        const clientTimeoutMs = isOllama ? 300000 : 60000;
+        const abortCtrl = new AbortController();
+        const abortTimer = setTimeout(function() {
+            abortCtrl.abort();
+        }, clientTimeoutMs);
+
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestPayload)
+            body: JSON.stringify(requestPayload),
+            signal: abortCtrl.signal
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(function(response) { clearTimeout(abortTimer); return response.json(); })
         .then(data => {
             // Remove loading message
             const loading = document.getElementById('ai-loading');
@@ -551,12 +950,37 @@
                     }
                 }
                 
-                // Update status
-                statusIndicator.textContent = 'AI Ready';
+                // Update status with provider + model name + host
+                const providerParts2 = (state.selectedProvider || 'ollama').split('|');
+                const provName = data.provider || providerParts2[0];
+                const rawModel = data.model || providerParts2[1] || '';
+                let modelLabel;
+                if (provName === 'grok') {
+                    modelLabel = 'Grok (xAI)' + (rawModel ? ': ' + rawModel : '');
+                } else {
+                    const hostLabel = data.ollama_host ? ' @' + data.ollama_host : ' (Local)';
+                    modelLabel = 'Ollama' + hostLabel + (rawModel ? ': ' + rawModel : '');
+                }
+                state.activeModel = modelLabel;
+                statusIndicator.textContent = '🟢 ' + modelLabel;
                 statusIndicator.className = 'chat-status connected';
                 
                 // Add AI response
                 addMessage(data.response, 'ai-message');
+
+                // Append web search citations if returned
+                if (data.citations && data.citations.length > 0) {
+                    const citationHtml = '<div class="chat-citations"><strong>🔍 Sources:</strong><ul>'
+                        + data.citations.map(function(c) {
+                            const label = c.title || c.url;
+                            return '<li><a href="' + c.url + '" target="_blank" rel="noopener">' + label + '</a></li>';
+                          }).join('')
+                        + '</ul></div>';
+                    const citEl = document.createElement('div');
+                    citEl.className = 'chat-message system-message';
+                    citEl.innerHTML = citationHtml;
+                    document.getElementById('chat-messages').appendChild(citEl);
+                }
                 
                 // Log context information for debugging
                 console.debug('AI Query Success', {
@@ -574,6 +998,7 @@
             }
         })
         .catch(error => {
+            clearTimeout(abortTimer);
             // Remove loading message
             const loading = document.getElementById('ai-loading');
             if (loading) {
@@ -584,8 +1009,10 @@
             statusIndicator.textContent = 'AI Error';
             statusIndicator.className = 'chat-status error';
             
-            // Show error in chat
-            addMessage(`Network error: ${error.message}. Please check console and try again.`, 'error-message');
+            const msg = error.name === 'AbortError'
+                ? `Request timed out after ${clientTimeoutMs / 1000}s. ${isOllama ? 'Ollama may be loading a large model — try a smaller model or wait and retry.' : 'The AI server may be busy or unavailable.'}`
+                : `Network error: ${error.message}. Please check console and try again.`;
+            addMessage(msg, 'error-message');
         });
     }
     
@@ -606,13 +1033,31 @@
         }
     }
     
-    // Function to add a message to the chat
+    // Function to add a message to the chat with sender label
     function addMessage(text, className) {
         const chatMessages = document.getElementById('chat-messages');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
+
+        // Sender label
+        const label = document.createElement('div');
+        label.className = 'msg-label';
+        if (className === 'user-message') {
+            label.textContent = state.username;
+        } else if (className === 'ai-message') {
+            const modelLabel = state.activeModel || (state.pageContext && state.pageContext.agent_name) || 'AI Assistant';
+            label.textContent = modelLabel;
+        } else {
+            label.textContent = 'System';
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
         messageElement.textContent = text;
-        chatMessages.appendChild(messageElement);
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(messageElement);
+        chatMessages.appendChild(wrapper);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
@@ -624,7 +1069,7 @@
                 position: fixed;
                 bottom: 20px;
                 right: 20px;
-                z-index: 1000;
+                z-index: 9999;
                 font-family: inherit;
             }
             
@@ -640,7 +1085,7 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                 font-family: inherit;
                 position: relative;
-                z-index: 1001;
+                z-index: 10000;
             }
             
             .chat-icon {
@@ -653,38 +1098,86 @@
                 bottom: 90px;
                 right: 20px;
                 width: 380px;
+                min-width: 280px;
+                max-width: 90vw;
                 height: 500px;
+                min-height: 300px;
+                max-height: 90vh;
                 background-color: var(--background-color);
                 border-radius: 10px;
                 box-shadow: var(--dropdown-shadow);
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
-                z-index: 1002;
+                z-index: 10001;
+                overflow: hidden;
+                z-index: 10001;
+                resize: both;
+                overflow: hidden;
             }
             
             .chat-header {
                 background-color: var(--primary-color);
                 color: var(--text-color);
-                padding: 10px 15px;
+                padding: 8px 12px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                gap: 6px;
+                flex-shrink: 0;
             }
-            
+
+            .chat-header-drag {
+                cursor: grab; font-size: 18px; opacity: 0.5; padding: 0 4px;
+                user-select: none; letter-spacing: -2px; flex-shrink: 0;
+            }
+            .chat-header-drag:active { cursor: grabbing; }
+
             .chat-header h3 {
-                margin: 0;
-                font-size: 16px;
+                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis;
             }
             
             .chat-header-buttons {
-                display: flex;
-                gap: 8px;
-                align-items: center;
+                display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
-            
+
+            .chat-header-icon-btn {
+                background: none; border: none; color: var(--text-color);
+                font-size: 15px; cursor: pointer; padding: 2px 5px;
+                border-radius: 4px; opacity: 0.75; transition: opacity 0.15s, background 0.15s;
+            }
+            .chat-header-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+
+            /* History drawer */
+            .widget-history-drawer {
+                display: flex; flex-direction: column;
+                background-color: var(--background-color);
+                border-bottom: 1px solid var(--border-color);
+                max-height: 220px; overflow: hidden; flex-shrink: 0;
+            }
+            .widget-history-header {
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 6px 10px; font-size: 12px; font-weight: 600;
+                border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+            }
+            .widget-history-list {
+                overflow-y: auto; padding: 4px;
+                display: flex; flex-direction: column; gap: 2px;
+            }
+            .wh-item {
+                width: 100%; text-align: left; background: transparent; border: none;
+                border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
+                color: var(--text-color); transition: background 0.15s;
+            }
+            .wh-item:hover { background: var(--secondary-color); }
+            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
+            .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
+
             .conversation-selector {
                 background: var(--background-color);
                 border: 1px solid var(--border-color);
@@ -697,41 +1190,39 @@
             }
             
             #new-chat {
-                background: var(--nav-hover-bg);
-                border: 1px solid var(--border-color);
-                color: var(--text-color);
-                font-size: 12px;
-                padding: 4px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                transition: background-color 0.2s;
-            }
-            
-            #new-chat:hover {
-                background: var(--secondary-color);
+                background: none; border: none; color: var(--text-color);
+                font-size: 15px; cursor: pointer; padding: 2px 5px;
+                border-radius: 4px; opacity: 0.75;
             }
             
             #close-chat {
-                background: none;
-                border: none;
-                color: var(--text-color);
-                font-size: 20px;
-                cursor: pointer;
+                background: none; border: none; color: var(--text-color);
+                font-size: 18px; cursor: pointer; opacity: 0.75;
             }
             
             .chat-messages {
                 flex-grow: 1;
-                padding: 15px;
+                padding: 10px 12px;
                 overflow-y: auto;
                 background-color: var(--background-color);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .msg-wrapper { display: flex; flex-direction: column; max-width: 85%; gap: 2px; }
+            .msg-wrapper-user { align-self: flex-end; align-items: flex-end; }
+            .msg-wrapper-ai  { align-self: flex-start; align-items: flex-start; }
+            .msg-label {
+                font-size: 10px; font-weight: 600; opacity: 0.6;
+                padding: 0 4px; letter-spacing: 0.02em;
             }
             
             .message {
-                margin-bottom: 10px;
                 padding: 8px 12px;
                 border-radius: 18px;
-                max-width: 80%;
                 word-wrap: break-word;
+                margin: 0;
             }
             
             .system-message {
@@ -887,6 +1378,20 @@
                 color: var(--schema-text-muted);
                 cursor: not-allowed;
             }
+
+            .chat-resize-handle {
+                position: absolute;
+                bottom: 0;
+                right: 0;
+                width: 16px;
+                height: 16px;
+                cursor: se-resize;
+                background: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
+                border-bottom-right-radius: 10px;
+                opacity: 0.6;
+                z-index: 10;
+            }
+            .chat-resize-handle:hover { opacity: 1; }
         `;
         document.head.appendChild(style);
     }

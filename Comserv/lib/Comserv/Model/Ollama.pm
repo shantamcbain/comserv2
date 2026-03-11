@@ -50,14 +50,14 @@ Comserv::Model::Ollama - Catalyst Model for Ollama API integration
     
     # Using remote server
     my $ollama_remote = Comserv::Model::Ollama->new(
-        host => '192.168.1.171',
+        host => '192.168.1.199',
         model => 'llama3.1',
         timeout => 120
     );
     
     # Or specify endpoint directly (legacy method)
     my $ollama_legacy = Comserv::Model::Ollama->new(
-        endpoint => 'http://192.168.1.171:11434/api/generate',
+        endpoint => 'http://192.168.1.199:11434/api/generate',
         model => 'llama3.1',
         timeout => 120
     );
@@ -69,7 +69,7 @@ It handles HTTP communication, streaming responses, error handling, and
 parsing of structured data from LLM responses.
 
 The module supports connecting to Ollama servers on both localhost and remote hosts
-(e.g., 192.168.1.171). You can specify the host and port separately, or provide a
+(e.g., 192.168.1.199). You can specify the host and port separately, or provide a
 complete endpoint URL. The endpoint is automatically built from the host and port
 if not explicitly provided.
 
@@ -81,7 +81,7 @@ has 'host' => (
     is => 'rw',
     isa => 'Str',
     default => 'localhost',
-    documentation => 'Ollama server host (localhost or 192.168.1.171)'
+    documentation => 'Ollama server host (localhost or 192.168.1.199)'
 );
 
 has 'port' => (
@@ -103,14 +103,14 @@ has 'endpoint' => (
 has 'model' => (
     is => 'rw',
     isa => 'Str',
-    default => 'qwen3-coder:30b',
-    documentation => 'Ollama model to use (default: qwen3-coder:30b; alternatives: starcoder2:3b, deepseek-v3.2:cloud)'
+    default => 'llama3.1:latest',
+    documentation => 'Ollama model to use (default: llama3.1:latest; alternatives: qwen3-coder:30b, deepseek-v3.2:cloud)'
 );
 
 has 'timeout' => (
     is => 'rw',
     isa => 'Int',
-    default => 120,
+    default => 300,
     documentation => 'Request timeout in seconds'
 );
 
@@ -298,20 +298,24 @@ sub query {
     # Send the request
     my $response;
     try {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
+            "Ollama API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $status = $response->status_line;
+        my $content = $response->content || '';
+        my $error = "HTTP request failed: $status";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
-            $error);
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'query',
+            "Ollama API Failure: Status=$status, Response=$content");
         return undef;
     }
     
@@ -430,20 +434,24 @@ sub chat {
     # Send the request
     my $response;
     try {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
+            "Ollama Chat API Request: Payload=$json_payload");
         $response = $self->ua->request($req);
     } catch {
         $self->last_error("HTTP request failed: $_");
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
             "HTTP request failed: $_");
         return undef;
     };
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $status = $response->status_line;
+        my $content = $response->content || '';
+        my $error = "HTTP request failed: $status";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
-            $error);
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'chat',
+            "Ollama Chat API Failure: Status=$status, Response=$content");
         return undef;
     }
     
@@ -1275,7 +1283,7 @@ Helper method to change the Ollama server host and automatically rebuild the end
     $ollama->set_host('localhost');
     
     # Switch to remote server
-    $ollama->set_host('192.168.1.171');
+    $ollama->set_host('192.168.1.199');
 
 This method updates both the host attribute and clears the endpoint cache so it will
 be rebuilt with the new host on the next access.
