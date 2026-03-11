@@ -244,6 +244,18 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
+        return;
+    }
+
     my $old_path = $c->req->param('old_path') // '';
     my $new_name = $c->req->param('new_name') // '';
     my $dir      = $c->req->param('dir')      // '';
@@ -370,6 +382,12 @@ sub fs_move :Path('/file/fs_move') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
+        return;
+    }
+
     my $old_path = $c->req->param('old_path') // '';
     my $dest_dir = $c->req->param('dest_dir') // '';
     my $dir      = $c->req->param('dir')      // '';
@@ -478,6 +496,12 @@ sub fs_mkdir :Path('/file/fs_mkdir') :Args(0) {
 
     unless ($is_admin && $c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
         return;
     }
 
@@ -1140,11 +1164,20 @@ sub _db_mark_orphan {
 
 sub _resolve_roles {
     my ($self, $c) = @_;
-    my $sitename = $c->session->{SiteName} // '';
-    my $roles    = $c->session->{roles} || [];
-    $roles = [split /\s*,\s*/, $roles] unless ref $roles;
-    my $is_admin = grep { $_ eq 'admin' } @$roles;
-    my $is_csc   = $is_admin && lc($sitename) eq 'csc';
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = $admin_auth->check_admin_access($c, '_resolve_roles');
+    my $is_csc     = $admin_auth->is_csc_admin($c);
+    my $sitename   = $c->session->{SiteName} // '';
+
+    # Log details about the session and roles for debugging
+    my $session_id = $c->sessionid // 'no-session-id';
+    my $user_id    = $c->session->{user_id} // 'no-user-id';
+    my $roles      = $c->session->{roles} || [];
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_resolve_roles',
+        "RESULT: is_admin=$is_admin is_csc=$is_csc sitename=$sitename session_id=$session_id user_id=$user_id roles=" . (ref $roles ? join(',', @$roles) : $roles));
+
     return ($is_admin, $is_csc, $sitename);
 }
 
@@ -1205,13 +1238,22 @@ sub _gather_nfs_files {
 sub nfs_sync :Path('/file/nfs_sync') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = $admin_auth->check_admin_access($c, 'nfs_sync');
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/'));
         return;
     }
 
     unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
@@ -1372,6 +1414,12 @@ sub nfs_sync_all :Path('/file/nfs_sync_all') :Args(0) {
         return;
     }
     unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
         return;
     }
@@ -1551,6 +1599,12 @@ sub resolve_duplicate :Path('/file/resolve_duplicate') :Args(1) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
     my $action    = $c->req->param('action')   // '';
     my $target_id = $c->req->param('target_id') // $id;
 
@@ -1692,6 +1746,12 @@ sub batch_resolve_duplicates :Path('/file/batch_resolve_duplicates') :Args(0) {
 
     unless ($is_admin && $c->req->method eq 'POST') {
         $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/file/duplicates'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
         $c->response->redirect($c->uri_for('/file/duplicates'));
         return;
     }
@@ -1860,6 +1920,12 @@ sub nfs_allocation_mkdir :Path('/file/nfs_allocation_mkdir') :Args(1) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
     my $schema = $c->model('DBEncy');
     my $alloc;
     eval { $alloc = $schema->resultset('NfsDirectory')->find($id) };
@@ -1907,6 +1973,12 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
     my $alloc_sitename = $c->req->param('sitename')    // '';
     my $nfs_path       = $c->req->param('nfs_path')    // '';
     my $description    = $c->req->param('description') // '';
@@ -1930,6 +2002,14 @@ sub nfs_allocation_create :Path('/file/nfs_allocation_create') :Args(0) {
     my $nfs_root = $self->_nfs_root_for_sync();
     unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
         $nfs_path = "$nfs_root/$nfs_path" unless CORE::index($nfs_path, '/') == 0;
+    }
+
+    # Security check: Prevent allocation of sensitive paths
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
     }
 
     my ($row, $create_err) = $c->model('File')->create_nfs_allocation($c,
@@ -1989,6 +2069,12 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
+    }
+
     my $schema = $c->model('DBEncy');
     my $alloc  = $schema->resultset('NfsDirectory')->find($id);
 
@@ -2026,6 +2112,14 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
     my $nfs_root = $self->_nfs_root_for_sync();
     unless (CORE::index($nfs_path, '/') == 0 || CORE::index($nfs_path, $nfs_root) == 0) {
         $nfs_path = "$nfs_root/$nfs_path";
+    }
+
+    # Security check: Prevent allocation of sensitive paths
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
+        $c->response->redirect($c->uri_for('/file/nfs_allocations'));
+        return;
     }
 
     # Parse site_id - ensure it's either a valid integer or NULL
@@ -2127,6 +2221,12 @@ sub fs_delete :Path('/file/fs_delete') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
+        return;
+    }
+
     my $path     = $c->req->param('path')     // '';
     my $dir      = $c->req->param('dir')      // '';
     my $also_db  = $c->req->param('also_db')  // 0;
@@ -2194,6 +2294,12 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
 
     unless ($is_admin && $c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
         return;
     }
 
@@ -2316,6 +2422,11 @@ sub fs_upload_tree :Path('/file/fs_upload_tree') :Args(0) {
 
     unless ($is_admin && $c->req->method eq 'POST') {
         $c->response->body('{"error":"Access denied"}');
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->response->body('{"error":"CSRF token mismatch"}');
         return;
     }
 
@@ -2499,6 +2610,12 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
 
     unless ($is_admin && $c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/file/admin_browser'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
         return;
     }
 
@@ -2864,6 +2981,12 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
+        return;
+    }
+
     my $dir_path = $c->req->param('dir_path') // '';
     $dir_path =~ s{\.\.}{}g;
 
@@ -2957,11 +3080,29 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
 
 sub _is_path_allowed {
     my ($self, $c, $path, $is_csc, $sitename, $nfs_root) = @_;
-    return (1, $nfs_root) if $is_csc;
     
+    # Validation
     return (0, undef) unless defined $path && length $path;
     $path =~ s{\\}{/}g;
     $path =~ s{^\s+|\s+$}{}g;
+    $path =~ s{/+$}{}; # Remove trailing slash for consistent comparison
+
+    # Security: Prohibit access to sensitive system paths regardless of admin status
+    if ($path =~ m{^/(etc|proc|sys|var|boot|root|dev|tmp/session_data)\b}i || $path eq '/') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_is_path_allowed',
+            "SECURITY: Blocked access to sensitive path: $path");
+        return (0, undef);
+    }
+
+    # CSC Admins can access everything in the NFS root
+    if ($is_csc) {
+        if (CORE::index($path, $nfs_root) == 0) {
+            return (1, $nfs_root);
+        }
+        # If it's outside NFS root but they are CSC admin, we might allow it 
+        # but for now let's keep it scoped to NFS root for safety.
+        # return (1, $nfs_root); 
+    }
     
     # Normalize sitename
     $sitename = lc($sitename // '');
@@ -2988,6 +3129,17 @@ sub _is_path_allowed {
     }
     
     return (0, undef);
+}
+
+sub _verify_csrf_token {
+    my ($self, $c) = @_;
+    my $token_from_req = $c->req->param('csrf_token') // '';
+    my $token_from_session = $c->session->{csrf_token} // '';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
+        "CSRF check: req=$token_from_req session=$token_from_session");
+        
+    return (length $token_from_req && $token_from_req eq $token_from_session);
 }
 
 __PACKAGE__->meta->make_immutable;

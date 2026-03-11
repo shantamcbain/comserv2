@@ -39,11 +39,6 @@ __PACKAGE__->config(
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     default_view => 'TT',
-    use_request_uri_for_path => 1,  # Use the request URI for path matching
-    use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
-    # Configure URI generation to not include port
-    using_frontend_proxy => 1,
-    ignore_frontend_proxy_port => 1,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -202,8 +197,12 @@ around 'finalize_error' => sub {
             my $error = $c->error->[0];
             my $error_msg = ref $error ? $error->message : "$error";
             my $logger = Comserv::Util::Logging->instance;
+            my $session_id = $c->sessionid // 'no-session';
+            my $user_id = $c->session->{user_id} // 'no-user';
+            my $path = $c->req->path;
+            
             $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-                "[GLOBAL ERROR] Unhandled exception: $error_msg");
+                "[GLOBAL ERROR] Unhandled exception: $error_msg (Session: $session_id, User: $user_id, Path: $path)");
         }
     };
 
