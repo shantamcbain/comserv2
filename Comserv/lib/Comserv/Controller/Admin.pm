@@ -134,9 +134,9 @@ sub index :Path :Args(0) {
     else {
         # Check if the user has admin role
         my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
+    
+    # First check if user exists
+    if ($c->user_exists) {
             # Get roles from session
             my $roles = $c->session->{roles};
             
@@ -1384,18 +1384,11 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Starting schema_compare action");
     
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
+    # Check if the user has admin role
+    my $has_admin_role = 0;
+    
+    # First check if user exists
+    if ($c->user_exists) {
             # Get roles from session
             my $roles = $c->session->{roles};
             
@@ -1435,7 +1428,6 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
             }));
             return;
         }
-    }
     
     # Get database environment info
     my $db_env = Comserv::Util::DatabaseEnv->new;
@@ -1529,27 +1521,9 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_table_schema', 
         "Starting get_table_schema action");
     
-    # Check if the user has admin role - use session-based check
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'get_table_schema')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -3695,27 +3669,9 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role (using session-based check like create_table_from_result)
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'sync_table_to_result')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
@@ -4347,26 +4303,9 @@ sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
         "Starting create_table_from_result action");
     
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'create_table_from_result')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');

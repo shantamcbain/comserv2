@@ -37,6 +37,7 @@
       <div class="content-section">
         <h3>File: [% file.file_name | html %] (ID: [% file.id | html %])</h3>
         <form method="post" action="[% c.uri_for('/file/edit', file.id) %]" class="app-form">
+          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
           <div class="form-section">
 
             <div class="form-row">

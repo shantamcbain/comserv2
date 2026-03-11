@@ -30,6 +30,8 @@ sub validate_token {
                  || '';
     my $expected  = $c->session->{csrf_token} || '';
 
+    $c->log->info("CSRF VALIDATION: Submitted='$submitted', Expected='$expected'") if $c->can('log');
+
     return 0 unless $submitted && $expected;
     return ($submitted eq $expected) ? 1 : 0;
 }

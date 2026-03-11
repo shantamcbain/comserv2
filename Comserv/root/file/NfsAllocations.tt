@@ -71,11 +71,13 @@
                   <form method="post" action="[% c.uri_for('/file/nfs_allocation_mkdir', alloc.id) %]"
                         style="display:inline"
                         onsubmit="return confirm('Create directory [% alloc.nfs_path | html %] on the NFS filesystem?')">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <button type="submit" class="btn btn-secondary btn-sm" title="Create the directory on the NFS filesystem">Create Dir</button>
                   </form>
                   [% END %]
                   <form method="post" action="[% c.uri_for('/file/nfs_allocation_edit', alloc.id) %]"
                         style="display:inline">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <input type="hidden" name="description" value="[% alloc.description | html %]" id="desc_[% alloc.id %]">
                     <input type="hidden" name="is_active" value="[% alloc.is_active ? 1 : 0 %]" id="active_[% alloc.id %]">
                     <button type="button" class="btn btn-secondary btn-sm"
@@ -87,6 +89,7 @@
                 <td colspan="7">
                   <form method="post" action="[% c.uri_for('/file/nfs_allocation_edit', alloc.id) %]"
                         class="app-form" style="padding:12px">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <div class="form-section">
                       <div class="form-row">
                         <div class="form-field">
@@ -183,6 +186,7 @@
           NFS root: <code>[% nfs_root | html %]</code>
         </p>
         <form method="post" action="[% c.uri_for('/file/nfs_allocation_create') %]" class="app-form">
+          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
           <div class="form-section">
 
             [%# ── Row 1: SiteName + Site ID ── %]

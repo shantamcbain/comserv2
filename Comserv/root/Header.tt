@@ -113,6 +113,12 @@
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
 
+    [% IF is_admin %]
+    <!-- Admin-only Health Monitoring -->
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <script src="/static/js/HealthMonitor.js"></script>
+    [% END %]
+
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
