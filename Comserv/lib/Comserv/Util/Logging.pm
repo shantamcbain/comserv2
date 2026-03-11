@@ -18,6 +18,7 @@ use File::Copy;
 use FindBin;
 use File::Path qw(make_path);
 use File::Spec;
+use Comserv::Util::NfsPath;
 use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
 
@@ -147,18 +148,27 @@ sub init {
 
     # Determine the base directory for logs
     # Priority 1: Configured path in Database (logging_nfs_dir)
-    # Priority 2: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
-    # Priority 3: Specific log directory from ENV (COMSERV_LOG_DIR)
-    # Priority 4: Default relative to binary
+    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
+    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
+    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
+    # Priority 5: Default relative to binary
     my $log_file;
     my $log_dir;
 
     # Note: DB access in init() might be restricted depending on startup sequence.
     # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
     
+    my $nfs_path_util = Comserv::Util::NfsPath->new();
+    my $standard_nfs = $nfs_path_util->get_nfs_root();
+    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
+    
     my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
     
-    if ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
+    if (-d $standard_log_dir && -w $standard_log_dir) {
+        $log_dir  = $standard_log_dir;
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using standardized NFS log directory: $log_dir");
+    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
         $log_dir  = $nfs_log_dir;
         $log_file = File::Spec->catfile($log_dir, "application.log");
         _print_log("Using centralized log directory: $log_dir");

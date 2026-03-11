@@ -38,9 +38,9 @@ ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
 ENV_VARS="$ENV_VARS,COMSERV_LOG_DIR=/opt/comserv"
 
-# Pass through all COMSERV_DB_* environment variables from container env
-if env | grep -q '^COMSERV_DB_'; then
-  for var in $(env | grep '^COMSERV_DB_' | cut -d= -f1); do
+# Pass through all COMSERV_DB_ and WORKSHOP_ environment variables from container env
+if env | grep -qE '^(COMSERV_DB_|WORKSHOP_)'; then
+  for var in $(env | grep -E '^(COMSERV_DB_|WORKSHOP_)' | cut -d= -f1); do
     ENV_VARS="$ENV_VARS,$var=${!var}"
   done
 fi

@@ -1,17 +1,25 @@
 package Comserv::Controller::WorkShop;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use Data::FormValidator;
 use Data::Dumper;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
 use Comserv::Util::EmailNotification;
+use Comserv::Util::NfsPath;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
+);
+
+has 'nfs_path' => (
+    is => 'ro',
+    lazy => 1,
+    default => sub { Comserv::Util::NfsPath->new() }
 );
 
 has 'email_notification' => (
@@ -47,115 +55,118 @@ sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
     my ($workshops, $error);
-    ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
-    
-    # Apply client-side filters based on query parameters
-    my $site_filter = $c->request->params->{site_filter} || '';
-    my $status_filter = $c->request->params->{status_filter} || '';
-    
-    # If no explicit site_filter is provided and we're on a specific site,
-    # default to showing public + site-specific workshops
-    my $current_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    
-    if ($site_filter || $status_filter || ($current_site && $current_site ne 'CSC')) {
+    my ($past_workshops, $past_error);
+    my (@workshops_hash, @past_workshops_hash);
+    my ($is_admin, $can_access_dashboard);
+
+    eval {
+        ($workshops, $error) = $c->model('WorkShop')->get_active_workshops($c);
+        
+        my $site_filter = $c->request->params->{site_filter} || '';
+        my $status_filter = $c->request->params->{status_filter} || '';
+        my $current_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $today = DateTime->today->ymd;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Workshop index: current_site=$current_site, site_filter=" . ($site_filter || 'NONE') . 
+            ", workshops_from_model=" . scalar(@$workshops));
+
         my @filtered_workshops;
         for my $workshop (@$workshops) {
-            my $include = 1;
+            # Double check date to ensure it belongs in active section
+            my $is_active = (!$workshop->date || $workshop->date ge $today) ? 1 : 0;
+            next unless $is_active;
+
+            # Base visibility check based on SiteName or Public (handled by _check_workshop_access)
+            my $include = $self->_check_workshop_access($c, $workshop, 'view');
             
-            # Apply site filter or current site scope
-            if ($site_filter eq 'public') {
-                $include = 0 unless $workshop->share eq 'public';
-            } elsif ($site_filter eq 'my_site') {
-                my $sitename = $c->session->{SiteName};
-                $include = 0 unless $workshop->sitename eq $sitename;
-            } elsif (!$site_filter && $current_site && $current_site ne 'CSC') {
-                # Default view for a specific site: public workshops OR workshops for this site
-                $include = 0 unless ($workshop->share eq 'public' || ($workshop->sitename // '') eq $current_site);
+            # Apply explicit site filter if requested via UI
+            if ($include && $site_filter eq 'public') {
+                $include = 0 unless ($workshop->share // '') eq 'public';
+            } elsif ($include && $site_filter eq 'my_site') {
+                $include = 0 unless ($workshop->sitename // '') eq $current_site;
             }
             
-            # Apply status filter
+            # Apply status filter if requested via UI
             if ($status_filter && $include) {
                 $include = 0 unless $workshop->status eq $status_filter;
             }
             
-            push @filtered_workshops, $workshop if $include;
-        }
-        $workshops = \@filtered_workshops;
-    }
-
-    my @workshops_hash;
-    for my $workshop (@$workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
-        
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
-        }
-
-        push @workshops_hash, \%workshop_hash;
-    }
-
-    my ($past_workshops, $past_error);
-    ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
-    
-    # Apply filters to past workshops too
-    if ($site_filter || $status_filter || ($current_site && $current_site ne 'CSC')) {
-        my @filtered_past;
-        for my $workshop (@$past_workshops) {
-            my $include = 1;
-            
-            # Everyone (including guests) should see relevant past workshops
-            if ($site_filter eq 'public') {
-                    $include = 0 unless $workshop->share eq 'public';
-                } elsif ($site_filter eq 'my_site') {
-                    my $sitename = $c->session->{SiteName};
-                    $include = 0 unless $workshop->sitename eq $sitename;
-                } elsif (!$site_filter && $current_site && $current_site ne 'CSC') {
-                    # Default view for a specific site: public workshops OR workshops for this site
-                    $include = 0 unless ($workshop->share eq 'public' || $workshop->sitename eq $current_site);
+            if ($include) {
+                my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+                my %workshop_hash = $workshop->get_columns;
+                $workshop_hash{file} = \@file;
+                
+                if ($workshop->creator) {
+                    $workshop_hash{creator} = {
+                        id => $workshop->creator->id,
+                        username => $workshop->creator->username,
+                        first_name => $workshop->creator->first_name,
+                        last_name => $workshop->creator->last_name,
+                    };
                 }
+                push @workshops_hash, \%workshop_hash;
+            }
+        }
+
+        ($past_workshops, $past_error) = $c->model('WorkShop')->get_past_workshops($c);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+            "Past workshops from model: " . scalar(@$past_workshops) . " (today=$today)");
+
+        for my $workshop (@$past_workshops) {
+            # Double check date to ensure it belongs in past section
+            my $is_past = ($workshop->date && $workshop->date lt $today) ? 1 : 0;
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                "Checking past workshop: ID=" . $workshop->id . " Date=" . ($workshop->date // 'NULL') . " is_past=$is_past");
+
+            next unless $is_past;
+
+            # Base visibility check (all non-draft past workshops visible per requirement)
+            my $include = $self->_check_workshop_access($c, $workshop, 'view');
+            
+            # Apply UI filters
+            if ($include && $site_filter eq 'public') {
+                $include = 0 unless ($workshop->share // '') eq 'public';
+            } elsif ($include && $site_filter eq 'my_site') {
+                $include = 0 unless ($workshop->sitename // '') eq $current_site;
+            }
             
             if ($status_filter && $include) {
                 $include = 0 unless $workshop->status eq $status_filter;
             }
             
-            push @filtered_past, $workshop if $include;
-        }
-        $past_workshops = \@filtered_past;
-    }
-
-    my @past_workshops_hash;
-    for my $workshop (@$past_workshops) {
-        my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
-
-        my %workshop_hash = $workshop->get_columns;
-        $workshop_hash{file} = \@file;
-        
-        if ($workshop->creator) {
-            $workshop_hash{creator} = {
-                id => $workshop->creator->id,
-                username => $workshop->creator->username,
-                first_name => $workshop->creator->first_name,
-                last_name => $workshop->creator->last_name,
-            };
+            if ($include) {
+                my @file = $c->model('DBEncy::File')->search({ workshop_id => $workshop->id });
+                my %workshop_hash = $workshop->get_columns;
+                $workshop_hash{file} = \@file;
+                
+                if ($workshop->creator) {
+                    $workshop_hash{creator} = {
+                        id => $workshop->creator->id,
+                        username => $workshop->creator->username,
+                        first_name => $workshop->creator->first_name,
+                        last_name => $workshop->creator->last_name,
+                    };
+                }
+                push @past_workshops_hash, \%workshop_hash;
+            }
         }
 
-        push @past_workshops_hash, \%workshop_hash;
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
+
+        my $roles = $c->session->{roles} || [];
+        my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+        $can_access_dashboard = $is_admin || $has_workshop_leader_role ? 1 : 0;
+    };
+    my $err = "$@" if $@;
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "Error loading workshop index: $err");
+        $c->stash(error_msg => "An error occurred while loading workshops: $err");
     }
-
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
-
-    my $roles = $c->session->{roles} || [];
-    my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
-    my $can_access_dashboard = $is_admin || $has_workshop_leader_role ? 1 : 0;
 
     $c->stash(
         workshops => \@workshops_hash,
@@ -476,7 +487,14 @@ sub details :Path('/workshop/details') :Args(0) {
         return;
     }
 
-    # Workshop details are viewable by all users
+    # Access control: check if the user/site is authorized to view this workshop
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. This workshop is not available for your site.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    # Workshop details are viewable by authorized users
     # Edit access is restricted to admins/leaders via separate authorization checks
 
     # Format workshop date safely
@@ -712,74 +730,74 @@ sub _check_workshop_access {
     
     $required_level ||= 'view';
     
+    my $current_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today = DateTime->today->ymd;
+
+    # View access rules
     if ($required_level eq 'view') {
-        # Public workshops are visible to everyone (even non-logged-in users)
-        if ($workshop->share eq 'public') {
+        # 1. Public workshops are visible to everyone
+        return 1 if ($workshop->share // '') eq 'public';
+
+        # 2. ALL past workshops are visible to everyone (regardless of site/public status)
+        # Requirement: "All users should see ... all past workshops"
+        if ($workshop->date && $workshop->date lt $today) {
             return 1;
+        }
+
+        # 3. Workshops for the current site are visible to everyone on that site
+        return 1 if ($workshop->sitename // '') eq $current_site;
+
+        # 4. Check explicit site access via site_workshop table
+        my $schema = $c->model('DBEncy');
+        my $site = $schema->resultset('Site')->search({ name => $current_site })->first;
+        if ($site) {
+            my $site_access = $schema->resultset('SiteWorkshop')->search({
+                site_id => $site->id,
+                workshop_id => $workshop->id
+            })->count > 0;
+            
+            return 1 if $site_access;
+        }
+
+        # 5. Check if user is a registered participant
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my $is_participant = $c->model('DBEncy::Participant')->search({
+                workshop_id => $workshop->id,
+                user_id => $user_id,
+                status => { -in => ['registered', 'attended'] }
+            })->count > 0;
+            
+            return 1 if $is_participant;
         }
     }
     
-    # For non-view access or private workshops, user must be logged in
-    # Use session data - this app uses session-based auth, not Catalyst::Plugin::Authentication
+    # Leader/Edit/Admin access rules - require login
     my $user_id = $c->session->{user_id};
     return 0 unless $user_id;
-    my $sitename = $c->session->{SiteName};
-    my $roles = $c->session->{roles} || [];
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     
-    # CSC admin has god-level access
-    if ($admin_type eq 'csc' || $admin_type eq 'special') {
-        return 1;
-    }
-    
-    if ($required_level eq 'view') {
-        # Check if user's site has access via site_workshop table
-        if ($sitename) {
-            my $schema = $c->model('DBEncy');
-            my $site = $schema->resultset('Site')->search({ name => $sitename })->first;
-            if ($site) {
-                my $site_access = $schema->resultset('SiteWorkshop')->search({
-                    site_id => $site->id,
-                    workshop_id => $workshop->id
-                })->count > 0;
-                
-                return 1 if $site_access;
-            }
-        }
-        
-        # Check if user is a registered participant
-        my $is_participant = $c->model('DBEncy::Participant')->search({
-            workshop_id => $workshop->id,
-            user_id => $user_id,
-            status => { -in => ['registered', 'attended'] }
-        })->count > 0;
-        
-        return 1 if $is_participant;
-    }
+    # CSC/Special admin has full access
+    return 1 if $admin_type eq 'csc' || $admin_type eq 'special';
     
     if ($required_level eq 'leader' || $required_level eq 'edit') {
-        # Site admin can edit workshops from their site
-        if ($admin_type eq 'standard' && $sitename && $sitename eq $workshop->sitename) {
-            $c->log->info("_check_workshop_access: GRANTED (site admin for " . $sitename . ")");
+        # Site admin for the workshop's site
+        my $user_sitename = $c->session->{SiteName} || $current_site;
+        if ($admin_type eq 'standard' && $user_sitename eq ($workshop->sitename // '')) {
             return 1;
         }
         
-        # Workshop leader (creator or workshop_roles)
-        if ($self->_is_workshop_leader($c, $workshop)) {
-            $c->log->info("_check_workshop_access: GRANTED (workshop leader)");
-            return 1;
-        }
+        # Workshop leader (creator or assigned role)
+        return 1 if $self->_is_workshop_leader($c, $workshop);
         
-        # Fallback: If created_by is NULL and user is admin, allow edit
-        if (!$workshop->created_by && ($admin_type eq 'standard' || $admin_type eq 'csc' || $admin_type eq 'special')) {
-            $c->log->info("_check_workshop_access: GRANTED (created_by is NULL and user is admin)");
+        # Admin can edit if no creator is assigned
+        if (!$workshop->created_by && $admin_type eq 'standard') {
             return 1;
         }
     }
     
-    $c->log->info("_check_workshop_access: DENIED (no matching authorization criteria)");
     return 0;
 }
 
@@ -1017,6 +1035,13 @@ sub register :Local :Args(1) {
     
     unless ($workshop) {
         $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    
+    # Access control: check if the user/site is authorized to register for this workshop
+    unless ($self->_check_workshop_access($c, $workshop, 'view')) {
+        $c->flash->{error_msg} = 'Access denied. You do not have permission to register for this workshop.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
@@ -1542,22 +1567,25 @@ sub download :Local :Args(1) {
     my $file_data;
     if ($file->file_data) {
         $file_data = $file->file_data;
-    } elsif ($file->file_path && -f $file->file_path) {
-        eval {
-            open my $fh, '<:raw', $file->file_path or die $!;
-            $file_data = do { local $/; <$fh> };
-            close $fh;
-        };
-        if ($@) {
-            $c->log->error("download read error: $@");
-            $c->flash->{error_msg} = 'Failed to read file.';
+    } else {
+        my $full_path = $self->_resolve_storage_path($c, $file->nfs_path // $file->file_path // '');
+        if ($full_path && -f $full_path) {
+            eval {
+                open my $fh, '<:raw', $full_path or die $!;
+                $file_data = do { local $/; <$fh> };
+                close $fh;
+            };
+            if ($@) {
+                $c->log->error("download read error: $@");
+                $c->flash->{error_msg} = 'Failed to read file.';
+                $c->response->redirect($back_url);
+                return;
+            }
+        } else {
+            $c->flash->{error_msg} = 'File data not available.';
             $c->response->redirect($back_url);
             return;
         }
-    } else {
-        $c->flash->{error_msg} = 'File data not available.';
-        $c->response->redirect($back_url);
-        return;
     }
 
     my $content_type = $file->file_type || 'application/octet-stream';
@@ -1570,34 +1598,11 @@ sub _nfs_root {
     my ($self, $c) = @_;
 
     # Use configuration if available
-    my $configured;
     if ($c && $c->config->{workshop_upload_dir}) {
-        $configured = $c->config->{workshop_upload_dir};
-    }
-    $configured ||= $ENV{WORKSHOP_RESOURCES_PATH} || '/home/shanta/nfs';
-
-    return $configured if -d $configured;
-
-    # Fallback for dev environments where NFS is not mounted:
-    # try ~/nfs (full NFS mount), /data/nfs, /opt/comserv/workshop_resources, then ~/workshop_resources
-    for my $fallback (
-        ($ENV{HOME} ? "$ENV{HOME}/nfs"                : ()),
-        '/home/shanta/nfs',
-        '/data/nfs',
-        '/opt/comserv/workshop_resources',
-        ($ENV{HOME} ? "$ENV{HOME}/workshop_resources" : ()),
-    ) {
-        if (-d $fallback) {
-            return $fallback;
-        }
-        # Auto-create the fallback dir if we can write to its parent
-        my $parent = $fallback =~ s{/[^/]+$}{}r;
-        if ($parent && -d $parent && -w $parent) {
-            mkdir($fallback, 0755) and return $fallback;
-        }
+        return $c->config->{workshop_upload_dir};
     }
 
-    return $configured;  # Return configured path even if not mounted
+    return $self->nfs_path->get_nfs_root();
 }
 
 sub _site_scoped_nfs_root {
@@ -1783,49 +1788,7 @@ sub _normalized_mime {
 
 sub _resolve_storage_path {
     my ($self, $c, $stored_path) = @_;
-    return '' unless defined $stored_path;
-
-    my $path = $stored_path;
-    $path =~ s{\\}{/}g;
-    $path =~ s{^\s+|\s+$}{}g;
-    return '' unless length $path;
-
-    my $global_root = $self->_nfs_root();
-    my $scoped_root = $self->_site_scoped_nfs_root($c);
-
-    if ($path =~ m{^/}) {
-        return $path if -f $path;
-
-        my @roots = grep { defined $_ && length $_ } ($scoped_root, $global_root);
-        my @host_prefixes = grep { defined $_ && length $_ } (
-            $ENV{WORKSHOP_HOST_NFS_PATH},
-            '/home/shanta/nfs',
-            '/data/nfs',
-        );
-
-        for my $prefix (@host_prefixes) {
-            my $p = $prefix;
-            $p =~ s{/*$}{};
-            next unless $path eq $p || CORE::index($path, "$p/") == 0;
-            my $suffix = substr($path, length($p));
-            $suffix =~ s{^/}{};
-            for my $root (@roots) {
-                my $candidate = "$root/$suffix";
-                return $candidate if -f $candidate;
-            }
-        }
-        return '';
-    }
-
-    return '' if $path =~ m{(?:^|/)\.\.(?:/|$)};
-
-    my $scoped_candidate = "$scoped_root/$path";
-    return $scoped_candidate if -f $scoped_candidate;
-
-    my $global_candidate = "$global_root/$path";
-    return $global_candidate if -f $global_candidate;
-
-    return '';
+    return $self->nfs_path->resolve_path($stored_path);
 }
 
 sub resources :Path('/workshop/resources') :Args(0) {
@@ -2672,10 +2635,10 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     $rel_path =~ s{\.\.}{}g;
     $rel_path =~ s{^/+}{};
 
-    my $full_path = $self->_nfs_root() . '/' . $rel_path;
+    my $full_path = $self->_resolve_storage_path($c, $rel_path);
     my ($filename) = ($rel_path =~ m{([^/]+)$});
 
-    if (-f $full_path) {
+    if ($full_path && -f $full_path) {
         unlink($full_path) or do {
             $c->flash->{error_msg} = "Could not delete '$filename': $!";
             $c->response->redirect($c->uri_for('/workshop/resources'));
