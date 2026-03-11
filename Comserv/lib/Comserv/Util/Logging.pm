@@ -142,6 +142,26 @@ sub _get_timestamp {
     return strftime("%Y-%m-%d %H:%M:%S", localtime);
 }
 
+# Helper function to get the system identifier (Production, Workstation2, etc.)
+sub get_system_identifier {
+    my ($class) = @_;
+    my $identifier = $ENV{'SYSTEM_IDENTIFIER'};
+    
+    # Try hostname first if no env var
+    if (!$identifier || $identifier eq '') {
+        eval {
+            require Sys::Hostname;
+            $identifier = Sys::Hostname::hostname();
+        };
+        $identifier //= 'Unknown-System';
+    }
+
+    # If it's still 'Unknown-System', try to use the workstation2/3/laptop hints from context if possible
+    # In docker, hostname usually matches the container ID or what's set in compose.
+    
+    return $identifier;
+}
+
 # Initialize the logging system
 sub init {
     my ($class) = @_;
@@ -213,7 +233,7 @@ sub init {
     _print_log("Global log file path set to: $LOG_FILE");
 
     # Log initialization message
-    log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
 }
 
 # Constructor for creating a new instance
@@ -236,11 +256,12 @@ sub log_with_details {
 
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
+    my $system_id = __PACKAGE__->get_system_identifier();
 
     # Make sure $line is numeric, default to 0 if not
     $line = 0 unless defined $line && $line =~ /^\d+$/;
 
-    my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
+    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message);
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
@@ -265,6 +286,7 @@ sub log_with_details {
                 message => $message,
                 sitename => ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC',
                 username => ($c->can('session') && $c->session) ? $c->session->{username} : undef,
+                system_identifier => $system_id,
             });
         };
         # Ignore DB errors to ensure file logging always works
@@ -279,7 +301,11 @@ sub log_with_details {
         # So we use a flag or just be careful. 
         # EmailNotification already logs things.
         eval {
-            $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            }
         };
         # Don't log the error of sending the error notification to avoid infinite loop
     }
@@ -313,7 +339,11 @@ sub log_error {
     
     if ($current_prio >= $notify_prio) {
         eval {
-            $self->send_error_notification($c, "Application Error", $log_message);
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Error", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Error", $log_message);
+            }
         };
     }
 
@@ -324,7 +354,8 @@ sub log_error {
 sub send_error_notification {
     my ($self, $c, $subject, $error_details) = @_;
     
-    # Avoid recursion
+    my $system_id = __PACKAGE__->get_system_identifier();
+    $subject = "[$system_id] $subject";
     return if $self->{_sending_email};
     local $self->{_sending_email} = 1;
 

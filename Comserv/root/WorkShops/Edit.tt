@@ -30,6 +30,7 @@
             
             <div class="form-container">
                 <form method="POST" action="/workshop/edit/[% workshop.id %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <h3>Workshop Information</h3>

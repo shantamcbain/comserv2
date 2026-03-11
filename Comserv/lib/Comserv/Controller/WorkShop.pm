@@ -157,9 +157,10 @@ sub index :Path :Args(0) {
         my $admin_auth = Comserv::Util::AdminAuth->new();
         $is_admin = $admin_auth->check_admin_access($c, 'workshop_index');
 
+        my $admin_type = $admin_auth->get_admin_type($c);
         my $roles = $c->session->{roles} || [];
         my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
-        $can_access_dashboard = $is_admin || $has_workshop_leader_role ? 1 : 0;
+        $can_access_dashboard = ($is_admin || $has_workshop_leader_role) ? 1 : 0;
     };
     my $err = "$@" if $@;
     if ($err) {
@@ -276,21 +277,20 @@ sub dashboard :Local {
 sub add :Local {
     my ( $self, $c ) = @_;
 
-    # If not logged in, redirect to login with return_to
-    unless ($c->user_exists || $c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_add');
+    
+    my $roles = $c->session->{roles} || [];
+    my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
+
+    # If not logged in and not admin bypass, redirect to login
+    unless ($c->user_exists || $c->session->{user_id} || $has_admin) {
         $c->flash->{error_msg} = "Please login or register to add a workshop. You will be given the Workshop Leader role.";
         $c->response->redirect($c->uri_for('/user/login', { 
             return_to => $c->uri_for($self->action_for('add'))->as_string 
         }));
         return;
     }
-
-    # Check if user has permission (admin or workshop_leader)
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $has_admin = $admin_auth->check_admin_access($c, 'workshop_add');
-    
-    my $roles = $c->session->{roles} || [];
-    my $has_workshop_leader_role = ref $roles eq 'ARRAY' && grep { $_ eq 'workshop_leader' } @$roles;
 
     unless ($has_admin || $has_workshop_leader_role) {
         # This shouldn't happen if we auto-assign the role on login/registration from the 'add' flow,
@@ -302,10 +302,17 @@ sub add :Local {
 
     # Set the TT template to use
     $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
+    $c->stash->{csrf_token} = $c->session->{csrf_token};
     $c->forward($c->view('TT'));
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->stash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
+        return;
+    }
 
     # Retrieve the form data from the request
     my $params = $c->request->parameters;
@@ -645,6 +652,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $c->stash(
             workshop => $workshop,
             formatted_date => $formatted_date,
+            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/Edit.tt'
         );
         $c->forward($c->view('TT'));
@@ -653,6 +661,11 @@ sub edit :Path('/workshop/edit') :Args(1) {
 
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
+        unless ($self->_verify_csrf_token($c)) {
+            $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+            $c->response->redirect($c->uri_for($self->action_for('edit'), [$id]));
+            return;
+        }
         my $params = $c->request->body_parameters;
         my $old_share = $workshop->share;
         my $new_share = $params->{share};
@@ -1518,8 +1531,11 @@ sub upload :Local :Args(1) {
 sub download :Local :Args(1) {
     my ($self, $c, $file_id) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
     my $user_id = $c->session->{user_id};
-    unless ($user_id) {
+
+    unless ($user_id || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to download workshop files.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -1678,7 +1694,10 @@ my %MIME_MAP = (
 sub resource_fs_attach :Path('/workshop/resource_fs_attach') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -1794,7 +1813,11 @@ sub _resolve_storage_path {
 sub resources :Path('/workshop/resources') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to access the resource library.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -1808,8 +1831,6 @@ sub resources :Path('/workshop/resources') :Args(0) {
 
     my $user_id    = $c->session->{user_id};
     my $sitename   = $c->session->{SiteName} // '';
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
     my $is_admin   = $admin_type && $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
@@ -2187,6 +2208,12 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
+        return;
+    }
+
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
@@ -2279,6 +2306,12 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
         return;
     }
 
@@ -2548,6 +2581,16 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
     }
 
     my $full_path = $self->_resolve_storage_path($c, $resource->file_path // '');
+
+    # Security check: Prevent deletion of sensitive paths
+    my $nfs_root = $self->_nfs_root();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $full_path, $resource->sitename, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: resource points to a sensitive or unauthorized path.";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
     if (-f $full_path) {
         unlink($full_path) or $c->log->warn("Could not delete NFS file '$full_path': $!");
     }
@@ -2567,7 +2610,11 @@ sub resource_delete :Path('/workshop/resource_delete') :Args(1) {
 sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in to download files.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
@@ -2612,14 +2659,22 @@ sub resource_fs_download :Path('/workshop/resource_fs_download') :Args(0) {
 sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     my ($self, $c) = @_;
 
-    unless ($c->session->{user_id}) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_admin   = $admin_type && $admin_type ne 'none';
+
+    unless ($c->session->{user_id} || $is_admin) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $admin_type = $admin_auth->get_admin_type($c);
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
+        return;
+    }
+
     unless ($admin_type eq 'csc' || $admin_type eq 'special') {
         $c->flash->{error_msg} = 'Only CSC admins can delete NFS files directly.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
@@ -2636,6 +2691,16 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
     $rel_path =~ s{^/+}{};
 
     my $full_path = $self->_resolve_storage_path($c, $rel_path);
+
+    # Security check: Prevent deletion of sensitive paths
+    my $nfs_root = $self->_nfs_root();
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $full_path, $c->session->{SiteName}, $nfs_root);
+    unless ($allowed) {
+        $c->flash->{error_msg} = "Access denied: cannot delete sensitive or unauthorized path '$rel_path'.";
+        $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
     my ($filename) = ($rel_path =~ m{([^/]+)$});
 
     if ($full_path && -f $full_path) {
@@ -2747,6 +2812,7 @@ sub resource_sync :Path('/workshop/resource_sync') :Args(0) {
         sitenames     => \@sitenames,
         files_columns => $files_columns,
         wr_columns    => $wr_columns,
+        csrf_token    => $c->session->{csrf_token},
         template      => 'WorkShops/Sync.tt',
     );
 }
@@ -2768,6 +2834,12 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
 
     unless ($c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/workshop/resources'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resource_sync')));
         return;
     }
 
@@ -3055,6 +3127,12 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
         return;
     }
 
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
+        return;
+    }
+
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
         $c->response->redirect($c->uri_for('/workshop/resources'));
@@ -3135,6 +3213,12 @@ sub file_update :Path('/workshop/file_update') :Args(0) {
     unless ($c->session->{user_id}) {
         $c->flash->{error_msg} = 'Please log in.';
         $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('resources')));
         return;
     }
 
@@ -3316,9 +3400,16 @@ sub add_content :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
+            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/AddContent.tt',
         );
         $c->forward($c->view('TT'));
+        return;
+    }
+    
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('add_content'), [$id]));
         return;
     }
     
@@ -3531,6 +3622,7 @@ sub compose_email :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         recipient_count => $registered_count,
+        csrf_token => $c->session->{csrf_token},
         template => 'WorkShops/ComposeEmail.tt',
     );
 }
@@ -3549,6 +3641,12 @@ sub send_email :Local :Args(1) {
     unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
         $c->flash->{error_msg} = 'Access denied. You do not have permission to send emails for this workshop.';
         $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    unless ($self->_verify_csrf_token($c)) {
+        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('compose_email'), [$id]));
         return;
     }
     
@@ -3698,6 +3796,60 @@ sub send_email :Local :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('email_history'), [$id]));
 }
 
+sub _is_path_allowed {
+    my ($self, $c, $path, $sitename, $nfs_root) = @_;
+    
+    # Validation
+    return (0, undef) unless defined $path && length $path;
+    $path =~ s{\\}{/}g;
+    $path =~ s{^\s+|\s+$}{}g;
+    $path =~ s{/+$}{}; # Remove trailing slash for consistent comparison
+
+    # Security: Prohibit access to sensitive system paths
+    if ($path =~ m{^/(etc|proc|sys|var|boot|root|dev|tmp/session_data)\b}i || $path eq '/') {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_is_path_allowed',
+            "SECURITY: Blocked access to sensitive path: $path");
+        return (0, undef);
+    }
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    # CSC Admins can access everything in the NFS root
+    if ($is_csc) {
+        if (CORE::index($path, $nfs_root) == 0) {
+            return (1, $nfs_root);
+        }
+    }
+    
+    # Normalize sitename
+    $sitename = lc($sitename // $c->session->{SiteName} // '');
+
+    # Check site-specific roots
+    if ($sitename eq 'bmaster' && CORE::index($path, "$nfs_root/apis") == 0) {
+        return (1, "$nfs_root/apis");
+    }
+    if ($sitename eq 'shanta' && CORE::index($path, "$nfs_root/Shanta") == 0) {
+        return (1, "$nfs_root/Shanta");
+    }
+    
+    # Check allocated dirs
+    my $schema = $c->model('DBEncy');
+    my @allocs = eval { 
+        $schema->resultset('NfsDirectory')->search({ sitename => $c->session->{SiteName}, is_active => 1 })->all 
+    };
+    for my $a (@allocs) {
+        my $apath = $a->nfs_path;
+        my $translated = $self->nfs_path->to_container_path($apath);
+        if (CORE::index($path, $translated) == 0) {
+            return (1, $translated);
+        }
+    }
+    
+    return (0, undef);
+}
+
 sub email_history :Local :Args(1) {
     my ($self, $c, $id) = @_;
     
@@ -3728,6 +3880,17 @@ sub email_history :Local :Args(1) {
         emails => \@emails,
         template => 'WorkShops/EmailHistory.tt',
     );
+}
+
+sub _verify_csrf_token {
+    my ($self, $c) = @_;
+    my $token_from_req = $c->req->param('csrf_token') // '';
+    my $token_from_session = $c->session->{csrf_token} // '';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
+        "CSRF check: req=$token_from_req session=$token_from_session");
+        
+    return (length $token_from_req && $token_from_req eq $token_from_session);
 }
 
 __PACKAGE__->meta->make_immutable;

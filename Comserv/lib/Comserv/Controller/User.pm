@@ -324,6 +324,19 @@ sub do_login :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
 
+        # CRITICAL: Also authenticate with Catalyst to set $c->user and $c->user_exists
+        # This prevents session loss and makes $c->user available in all controllers
+        eval {
+            $c->authenticate({ 
+                username => $user->username, 
+                password => $password 
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Catalyst authentication failed (expected if using manual hashing): $@");
+        }
+
         # Auto-activate pre-existing accounts that lack a status (created before the status column)
         # or accounts stuck in pending_verification that somehow still have a correct password
         my $acct_status = $user->status || '';
