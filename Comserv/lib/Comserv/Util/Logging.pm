@@ -18,6 +18,7 @@ use File::Copy;
 use FindBin;
 use File::Path qw(make_path);
 use File::Spec;
+use Comserv::Util::NfsPath;
 use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
 
@@ -27,6 +28,16 @@ my $LOG_FILE; # Global log file path
 my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
 my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
 my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
+
+# Level threshold for sending email notifications
+our %LEVEL_PRIORITY = (
+    'CRITICAL' => 5,
+    'ERROR'    => 4,
+    'WARN'     => 3,
+    'INFO'     => 2,
+    'DEBUG'    => 1,
+);
+our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
@@ -131,17 +142,63 @@ sub _get_timestamp {
     return strftime("%Y-%m-%d %H:%M:%S", localtime);
 }
 
+# Helper function to get the system identifier (Production, Workstation2, etc.)
+sub get_system_identifier {
+    my ($class) = @_;
+    my $identifier = $ENV{'SYSTEM_IDENTIFIER'};
+    
+    # Try hostname first if no env var
+    if (!$identifier || $identifier eq '') {
+        eval {
+            require Sys::Hostname;
+            $identifier = Sys::Hostname::hostname();
+        };
+        $identifier //= 'Unknown-System';
+    }
+
+    # If it's still 'Unknown-System', try to use the workstation2/3/laptop hints from context if possible
+    # In docker, hostname usually matches the container ID or what's set in compose.
+    
+    return $identifier;
+}
+
 # Initialize the logging system
 sub init {
     my ($class) = @_;
 
     # Determine the base directory for logs
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    _print_log("Base directory: $base_dir");
+    # Priority 1: Configured path in Database (logging_nfs_dir)
+    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
+    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
+    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
+    # Priority 5: Default relative to binary
+    my $log_file;
+    my $log_dir;
 
-    my $log_dir  = File::Spec->catdir($base_dir, "logs");
-    my $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Log directory: $log_dir");
+    # Note: DB access in init() might be restricted depending on startup sequence.
+    # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
+    
+    my $nfs_path_util = Comserv::Util::NfsPath->new();
+    my $standard_nfs = $nfs_path_util->get_nfs_root();
+    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
+    
+    my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
+    
+    if (-d $standard_log_dir && -w $standard_log_dir) {
+        $log_dir  = $standard_log_dir;
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using standardized NFS log directory: $log_dir");
+    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
+        $log_dir  = $nfs_log_dir;
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using centralized log directory: $log_dir");
+    } else {
+        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir  = File::Spec->catdir($base_dir, "logs");
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using local log directory: $log_dir");
+    }
+
     _print_log("Log file: $log_file");
 
     # Create the log directory if it doesn't exist
@@ -176,7 +233,7 @@ sub init {
     _print_log("Global log file path set to: $LOG_FILE");
 
     # Log initialization message
-    log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
 }
 
 # Constructor for creating a new instance
@@ -199,11 +256,12 @@ sub log_with_details {
 
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
+    my $system_id = __PACKAGE__->get_system_identifier();
 
     # Make sure $line is numeric, default to 0 if not
     $line = 0 unless defined $line && $line =~ /^\d+$/;
 
-    my $log_message = sprintf("[%s] [%s:%d] %s - %s", $timestamp, $file, $line, ($subroutine // 'unknown'), $message);
+    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message);
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
@@ -215,6 +273,42 @@ sub log_with_details {
     # Restore standard behavior: also write to application log file and STDERR
     log_to_file($log_message, undef, $level);
     _print_log($log_message);
+
+    # Log to database
+    if ($c && ref($c) && $c->can('model')) {
+        eval {
+            $c->model('DBEncy')->resultset('SystemLog')->create({
+                timestamp => $timestamp,
+                level => $level,
+                file => $file,
+                line => $line,
+                subroutine => ($subroutine // 'unknown'),
+                message => $message,
+                sitename => ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC',
+                username => ($c->can('session') && $c->session) ? $c->session->{username} : undef,
+                system_identifier => $system_id,
+            });
+        };
+        # Ignore DB errors to ensure file logging always works
+    }
+
+    # Automatically send email notification for levels >= $EMAIL_NOTIFY_THRESHOLD
+    my $current_prio = $LEVEL_PRIORITY{uc($level)} || 0;
+    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 3; # Default to WARN priority
+    
+    if ($current_prio >= $notify_prio) {
+        # We don't want to cause recursion if send_error_notification calls logging
+        # So we use a flag or just be careful. 
+        # EmailNotification already logs things.
+        eval {
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            }
+        };
+        # Don't log the error of sending the error notification to avoid infinite loop
+    }
 
     return $log_message;
 }
@@ -229,7 +323,8 @@ sub log_error {
     my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
 
     # Log to file - this is our primary logging mechanism
-    log_to_file($log_message);
+    # Pass 'ERROR' level explicitly
+    log_to_file($log_message, undef, 'ERROR');
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
@@ -238,7 +333,64 @@ sub log_error {
         push @$debug_errors, $log_message;
     }
 
+    # Automatically send email notification for ERROR level
+    my $current_prio = $LEVEL_PRIORITY{'ERROR'} || 4; # Default ERROR priority
+    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 4;
+    
+    if ($current_prio >= $notify_prio) {
+        eval {
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Error", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Error", $log_message);
+            }
+        };
+    }
+
     return $log_message;
+}
+
+# Send an error notification via email
+sub send_error_notification {
+    my ($self, $c, $subject, $error_details) = @_;
+    
+    my $system_id = __PACKAGE__->get_system_identifier();
+    $subject = "[$system_id] $subject";
+    return if $self->{_sending_email};
+    local $self->{_sending_email} = 1;
+
+    # Always notify CSC Admin for all errors
+    my $csc_admin_email = 'helpdesk@computersystemconsulting.ca';
+    my $site_admin_email;
+    my $sitename = 'CSC';
+
+    if ($c && ref($c) && $c->can('model')) {
+        eval { # Use eval instead of try if Try::Tiny is not explicitly imported or available
+            $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+            if ($site && $site->mail_to_admin) {
+                $site_admin_email = $site->mail_to_admin;
+            }
+        };
+        # Ignore errors here, we have fallbacks
+    }
+
+    # Use the existing email system
+    eval {
+        require Comserv::Util::EmailNotification;
+        my $notifier = Comserv::Util::EmailNotification->new(logging => $self);
+        
+        # 1. Notify CSC Admin
+        $notifier->send_error_notification($c, $csc_admin_email, $subject, $error_details);
+        
+        # 2. Notify Site-specific Admin if different
+        if ($site_admin_email && $site_admin_email ne $csc_admin_email) {
+            $notifier->send_error_notification($c, $site_admin_email, $subject, $error_details);
+        }
+    };
+    if ($@) {
+        _print_log("CRITICAL: Failed to send error email: $@");
+    }
 }
 
 # Log a message to a file (defaults to the global log file)
@@ -446,6 +598,41 @@ sub get_log_file_size {
 
     my $size_bytes = -s $file_path;
     return sprintf("%.2f", $size_bytes / 1024); # Return size in KB
+}
+
+# Refresh settings from database
+sub refresh_settings {
+    my ($self, $c) = @_;
+    return unless $c && ref($c) && $c->can('model');
+    
+    eval {
+        my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+        if ($site) {
+            my $threshold_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id => $site->id,
+                config_key => 'logging_email_threshold'
+            });
+            if ($threshold_cfg) {
+                $EMAIL_NOTIFY_THRESHOLD = uc($threshold_cfg->config_value);
+            }
+            
+            my $nfs_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id => $site->id,
+                config_key => 'logging_nfs_dir'
+            });
+            if ($nfs_cfg && $nfs_cfg->config_value && -d $nfs_cfg->config_value && -w $nfs_cfg->config_value) {
+                my $new_dir = $nfs_cfg->config_value;
+                my $new_file = File::Spec->catfile($new_dir, "application.log");
+                if (!defined $LOG_FILE || $LOG_FILE ne $new_file) {
+                    _print_log("Updating log directory from database: $new_dir");
+                    $LOG_FILE = $new_file;
+                    # We might want to call init() or handle handle closure here
+                    # but let's keep it simple for now to avoid handle issues
+                }
+            }
+        }
+    };
 }
 
 1; # Ensure the module returns true

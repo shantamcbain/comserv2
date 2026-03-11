@@ -210,7 +210,11 @@
                     </a>
                     <a href="[% c.uri_for('/admin/view_log') %]" class="admin-link">
                         <i class="fas fa-file-alt"></i>
-                        <span>View Application Log</span>
+                        <span>View Application Log (Old)</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/logging') %]" class="admin-link">
+                        <i class="fas fa-terminal"></i>
+                        <span>Logging Administration</span>
                     </a>
                     <a href="[% c.uri_for('/admin/system_info') %]" class="admin-link">
                         <i class="fas fa-info-circle"></i>

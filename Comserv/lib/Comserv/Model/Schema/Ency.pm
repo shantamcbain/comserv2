@@ -27,6 +27,8 @@ __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');
+__PACKAGE__->register_class('SystemLog', 'Comserv::Model::Schema::Ency::Result::SystemLog');
+__PACKAGE__->register_class('SiteConfig', 'Comserv::Model::Schema::Ency::Result::SiteConfig');
 
 # Register Workshop system classes
 __PACKAGE__->register_class('WorkshopContent', 'Comserv::Model::Schema::Ency::Result::WorkshopContent');

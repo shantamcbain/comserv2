@@ -48,6 +48,8 @@ services:
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
+      WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
+      SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
@@ -73,6 +75,9 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - workshop_files_nfs:/data/nfs:rw
+      - comserv-logs:/opt/comserv/root/log:rw
+      - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -105,6 +110,8 @@ services:
       CATALYST_DEBUG: 0
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
+      WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
+      SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
@@ -130,6 +137,9 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
+      - workshop_files_nfs:/data/nfs:rw
+      - comserv-logs:/opt/comserv/root/log:rw
+      - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -146,9 +156,19 @@ services:
         max-file: "10"
 
 # Volumes for persistent data
+# comserv-logs is a named volume (NOT deleted by docker system prune)
+# comserv-workshop now uses bind mount to /home/shanta/nfs for direct access
 volumes:
   redis_data:
     driver: local
+  comserv-logs:
+    driver: local
+  workshop_files_nfs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=${NFS_SERVER:-192.168.1.175},rw,noatime,nfsvers=3,soft"
+      device: ":${NFS_WORKSHOP_PATH:-/mnt/data/comserv}"
 
 # Shared bridge network for all services
 networks:

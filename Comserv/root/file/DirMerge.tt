@@ -123,6 +123,7 @@
     <p class="empty-state">Source directory is empty — nothing to merge.</p>
     [% ELSE %]
     <form method="post" action="[% c.uri_for('/file/dir_merge_submit') %]" id="dm-form">
+      <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
       <input type="hidden" name="src"  value="[% src  | html %]">
       <input type="hidden" name="dest" value="[% dest | html %]">
       <input type="hidden" name="back" value="[% back | html %]">

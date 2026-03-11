@@ -58,5 +58,7 @@ else
     --listen ":$PORT" \
     --host 0.0.0.0 \
     --workers "$WORKERS" \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
     "$CATALYST_HOME/script/comserv_server.psgi"
 fi

@@ -131,15 +131,22 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
-# Create workshop files directory if NFS mount exists
-WORKSHOP_DIR="/data/apis/workshop_files"
-if [ -d "/data/apis" ]; then
-  echo "Creating workshop files directory: $WORKSHOP_DIR"
-  mkdir -p "$WORKSHOP_DIR"
-  chmod 755 "$WORKSHOP_DIR"
-  echo "✓ Workshop files directory ready at $WORKSHOP_DIR"
+# Create workshop files directory on shared volume
+if [ "${SKIP_NFS_SETUP}" != "1" ]; then
+  WORKSHOP_DIR="/data/nfs/workshop_files"
+  if [ -d "/data/nfs" ]; then
+    echo "✓ Using existing NFS mount at /data/nfs"
+    if [ ! -d "$WORKSHOP_DIR" ]; then
+        echo "Creating workshop files directory: $WORKSHOP_DIR"
+        mkdir -p "$WORKSHOP_DIR"
+        chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
+        chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
+    fi
+  else
+    echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+  fi
 else
-  echo "⚠ Warning: NFS mount /data/apis not available - workshop file uploads will use fallback directory"
+  echo "✓ Skipping NFS setup (SKIP_NFS_SETUP=1) - using existing NFS mount"
 fi
 
 # Configure log rotation to prevent disk space issues

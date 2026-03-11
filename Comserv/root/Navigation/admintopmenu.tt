@@ -165,11 +165,12 @@
 
         <!-- Logging -->
         <div class="submenu-item">
-            <span class="submenu-header"><a href="/log"><i class="icon-log"></i>Logging</a></span>
+            <span class="submenu-header"><a href="/admin/logging"><i class="icon-log"></i>Logging</a></span>
             <div class="submenu">
-                <a href="/log"><i class="icon-log"></i>Logging System</a>
-                <a href="/admin/view_log"><i class="icon-view"></i>View Application Log</a>
-                <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git Repository</a>
+                <a href="/admin/logging"><i class="icon-log"></i>Logging Administration</a>
+                <a href="/log"><i class="icon-history"></i>Activity Logs (Old)</a>
+                <a href="/admin/view_log"><i class="icon-view"></i>View App Log (Old)</a>
+                <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git</a>
             </div>
         </div>
 
@@ -352,6 +353,17 @@
             </div>
         </div>
         [% END %]
+
+        <!-- Theme & CSS Management -->
+        <div class="submenu-item">
+            <span class="submenu-header"><a href="/admin/theme"><i class="fas fa-paint-brush"></i>Theme &amp; CSS</a></span>
+            <div class="submenu">
+                <a href="/admin/theme"><i class="fas fa-palette"></i>Theme Manager</a>
+                <a href="/admin/theme/create"><i class="fas fa-plus-circle"></i>Create Theme</a>
+                <a href="/admin/theme/import"><i class="fas fa-file-import"></i>Import Theme</a>
+                <a href="/Documentation/CssThemes"><i class="fas fa-book"></i>Theme Docs</a>
+            </div>
+        </div>
 
         <!-- Debug Options -->
         <div class="submenu-item">
