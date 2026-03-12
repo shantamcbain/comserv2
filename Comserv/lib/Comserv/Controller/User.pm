@@ -55,7 +55,6 @@ sub send_error_notification {
 
 sub auto :Private {
     my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
     return 1;
 }
 
@@ -551,14 +550,26 @@ sub hash_password {
 sub _validate_csrf {
     my ($self, $c, $action_name, $redirect_to, $template) = @_;
     $redirect_to //= '/user/login';
-    unless (Comserv::Util::CSRF::validate_token($c)) {
+    my ($valid, $reason) = Comserv::Util::CSRF::validate_token($c);
+    unless ($valid) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
-            'CSRF token validation failed');
+            "CSRF token validation failed: $reason");
+
+        my $msg;
+        if ($reason eq 'session_expired') {
+            $msg = 'Your session has expired. Please log in again.';
+            Comserv::Util::CSRF::ensure_token($c);
+        } elsif ($reason eq 'token_missing') {
+            $msg = 'Form submission is missing a security token. Please reload the page and try again.';
+        } else {
+            $msg = 'Security token mismatch. Please reload the page and try again.';
+        }
+
         if ($template) {
-            $c->stash(error_msg => 'Invalid form submission. Please try again.', template => $template);
+            $c->stash(error_msg => $msg, template => $template);
             $c->forward($c->view('TT'));
         } else {
-            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->flash->{error_msg} = $msg;
             $c->response->redirect($c->uri_for($redirect_to));
         }
         return 0;
