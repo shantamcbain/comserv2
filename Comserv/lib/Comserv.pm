@@ -19,7 +19,7 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
-    Session::Store::File
+    Session::Store::FastMmap
     Authentication
 /;
 
@@ -84,9 +84,7 @@ __PACKAGE__->config(
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
-    },
-    'Plugin::Session::Store::File' => {
-        dir => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session/data',
+        storage => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session/comserv_sessions.mmap',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
