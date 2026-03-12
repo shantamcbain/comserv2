@@ -93,6 +93,12 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Ensure Catalyst session store directory exists and is writable
+SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session/data}"
+mkdir -p "$SESSION_DIR"
+chmod 700 "$SESSION_DIR"
+chown comserv:comserv "$SESSION_DIR" 2>/dev/null || true
+
 # Create base supervisord.conf if missing or empty
 if [ ! -s /etc/supervisor/supervisord.conf ]; then
     mkdir -p /etc/supervisor/conf.d
