@@ -1,6 +1,5 @@
 [% PageVersion = 'Navigation/TopDropListWorkshop.tt,v 0.01 2026/02/28 AI Exp AI ' %]
 
-[% PageVersion = 'Navigation/TopDropListMainWorkshop.tt,v 0.01 2026/02/27 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -9,7 +8,6 @@
 
 <li class="horizontal-dropdown">
     <a href="/workshop" class="dropbtn"><i class="icon-workshop"></i>Workshops</a>
-    <a href="/workshop" class="dropbtn"><i class="icon-main"></i>WorkShops</a>
     <div class="dropdown-content">
         <a href="/workshop" class="menu-item"><i class="icon-home"></i>Workshops Home</a>
         <a href="/workshop/list" class="menu-item"><i class="icon-list"></i>All Workshops</a>
@@ -122,5 +120,3 @@
         [% END %]
     </div>
 </li>
-<!-- End /HTMLTemplates/Default/TopDropListMain.tt-->
-

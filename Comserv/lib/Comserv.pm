@@ -19,7 +19,7 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
-    Session::Store::File
+    Session::Store::FastMmap
     Authentication
 /;
 
@@ -39,11 +39,6 @@ __PACKAGE__->config(
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
     default_view => 'TT',
-    use_request_uri_for_path => 1,  # Use the request URI for path matching
-    use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
-    # Configure URI generation to not include port
-    using_frontend_proxy => 1,
-    ignore_frontend_proxy_port => 1,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -85,13 +80,11 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        expires => 3600,
+        expires => 28800,
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
-    },
-    'Plugin::Session::Store::File' => {
-        dir => '/tmp/session_data',
+        storage => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session/comserv_sessions.mmap',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model
@@ -116,12 +109,39 @@ sub psgi_app {
     my $self = shift;
 
     my $app = $self->SUPER::psgi_app(@_);
+    my $request_count = 0;
 
     return sub {
         my $env = shift;
 
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+
+        # Periodic memory monitoring (every 100 requests)
+        $request_count++;
+        if ($request_count % 100 == 0) {
+            eval {
+                if (-f "/proc/self/status") {
+                    open my $fh, '<', "/proc/self/status";
+                    while (<$fh>) {
+                        if (/^VmRSS:\s+(\d+)\s+kB/) {
+                            my $rss_kb = $1;
+                            # If RSS > 512MB, log an ERROR to notify admins
+                            if ($rss_kb > 512 * 1024) {
+                                my $rss_mb = sprintf("%.2f", $rss_kb / 1024);
+                                Comserv::Util::Logging->instance->log_with_details(
+                                    undef, 'ERROR', __FILE__, __LINE__, 'psgi_app_monitor',
+                                    "CRITICAL MEMORY ALERT: Worker process $$ using $rss_mb MB RSS. " .
+                                    "Requests handled: $request_count. Starman will soon recycle this worker."
+                                );
+                            }
+                            last;
+                        }
+                    }
+                    close $fh;
+                }
+            };
+        }
 
         return $app->($env);
     };
@@ -175,8 +195,12 @@ around 'finalize_error' => sub {
             my $error = $c->error->[0];
             my $error_msg = ref $error ? $error->message : "$error";
             my $logger = Comserv::Util::Logging->instance;
+            my $session_id = $c->sessionid // 'no-session';
+            my $user_id = $c->session->{user_id} // 'no-user';
+            my $path = $c->req->path;
+            
             $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-                "[GLOBAL ERROR] Unhandled exception: $error_msg");
+                "[GLOBAL ERROR] Unhandled exception: $error_msg (Session: $session_id, User: $user_id, Path: $path)");
         }
     };
 
