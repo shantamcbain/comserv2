@@ -34,6 +34,7 @@
             
             <div class="form-container">
                 <form method="POST" action="[% IF content %]/workshop/edit_content/[% content.id %][% ELSE %]/workshop/add_content/[% workshop.id %][% END %]" class="app-form">
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <h3>Content Information</h3>
