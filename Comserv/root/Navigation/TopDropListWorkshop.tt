@@ -22,8 +22,16 @@
 
         [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
         <div class="dropdown-divider"></div>
-        <a href="/file/list" class="menu-item"><i class="icon-files"></i>File Management</a>
-        <a href="/file/duplicates" class="menu-item"><i class="icon-duplicate"></i>Duplicate Files</a>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-folder"></i>Admin</span>
+            <div class="submenu">
+                <a href="/file/list" class="submenu-link"><i class="icon-files"></i>File Management</a>
+                <a href="/file/duplicates" class="submenu-link"><i class="icon-duplicate"></i>Duplicate Files</a>
+                <a href="/Shares" class="submenu-link"><i class="icon-cloud"></i>File Shares</a>
+                <a href="/media" class="submenu-link"><i class="icon-image"></i>Media Server</a>
+                <a href="/cloud" class="submenu-link"><i class="icon-sync"></i>Cloud Sync</a>
+            </div>
+        </div>
         [% END %]
     </div>
 </li>
