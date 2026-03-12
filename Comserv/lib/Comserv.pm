@@ -85,13 +85,13 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        expires => 3600,
+        expires => 28800,
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
     },
     'Plugin::Session::Store::File' => {
-        dir => '/tmp/session_data',
+        dir => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session/data',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model

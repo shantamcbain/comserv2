@@ -30,8 +30,9 @@ sub validate_token {
                  || '';
     my $expected  = $c->session->{csrf_token} || '';
 
-    return 0 unless $submitted && $expected;
-    return ($submitted eq $expected) ? 1 : 0;
+    return (0, 'session_expired') unless $expected;
+    return (0, 'token_missing')   unless $submitted;
+    return ($submitted eq $expected) ? (1, 'ok') : (0, 'token_mismatch');
 }
 
 1;
