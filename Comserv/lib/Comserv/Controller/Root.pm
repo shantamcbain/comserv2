@@ -187,15 +187,25 @@ sub get_server_ip :Private {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Skip everything for health checks and monitoring endpoints immediately
+    # This prevents creating session files for Docker health checks
+    if ($c->req->path =~ m{^/health(?:/|$)}) {
+        return 1;
+    }
+
+    # Detailed session logging for troubleshooting logouts
+    my $session_id = $c->sessionid // 'no-session';
+    my $user_id = $c->session->{user_id} // 'no-user';
+    my $path = $c->req->path;
+    my $method = $c->req->method;
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+        "Request Start: $method $path (Session: $session_id, User: $user_id)");
+
     Comserv::Util::CSRF::ensure_token($c);
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
-        # Skip database queries for health checks and monitoring endpoints
-        if ($c->req->path =~ m{^/health(?:/|$)}) {
-            return 1; # Allow /health to proceed without database setup
-        }
-
         # Skip setup redirect for setup pages themselves and static assets
         # Note: $c->req->path returns path WITHOUT leading slash (e.g., "setup/k8s-secrets")
         unless ($c->req->path =~ m{^/?setup(?:/|$)} || $c->req->path =~ m{^/?static/}) {
@@ -284,6 +294,8 @@ sub auto :Private {
             alarm(3);  # 3 second timeout for theme fetch
             my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
             $c->stash->{theme_name} = $theme_name;
+            my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
+            $c->stash->{site_favicon} = $site_favicon if $site_favicon;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -749,8 +761,23 @@ sub health :Path('/health') :Args(0) {
     
     # Simple health check endpoint - returns 200 OK without database queries
     # Used by Docker health checks and monitoring systems
+    
+    my $db_ok = 0;
+    eval {
+        $db_ok = $c->model('DBEncy')->storage->dbh->ping;
+    };
+
+    my $status = $db_ok ? 'ok' : 'error';
+    my $http_status = $db_ok ? 200 : 503;
+
     $c->response->content_type('application/json');
-    $c->response->body('{"status":"ok","timestamp":"' . time() . '"}');
+    $c->response->status($http_status);
+    $c->response->body(encode_json({
+        status => $status,
+        database => $db_ok ? 'up' : 'down',
+        timestamp => time(),
+        system => $self->logging->get_system_identifier(),
+    }));
     return;
 }
 
@@ -1507,11 +1534,15 @@ sub site_setup {
 
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
-    $domain =~ s/:.*//;  # Remove port if present
+    my $port = $c->req->uri->port;
+    my $host_port = $domain;
+    if ($port && $port != 80 && $port != 443) {
+        $host_port .= ":$port";
+    }
 
     # Set a default HostName based on the current domain
     my $protocol = $c->req->secure ? 'https' : 'http';
-    my $default_hostname = "$protocol://$domain";
+    my $default_hostname = "$protocol://$host_port";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
 
@@ -1779,7 +1810,21 @@ sub begin :Private {
 
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
-    
+
+    # Never try to render a template for redirect or no-content responses
+    my $status = $c->response->status || 0;
+    if ($status >= 300 && $status < 400) {
+        return;
+    }
+    if ($status == 204) {
+        return;
+    }
+    # Also skip if a JSON/non-HTML body has already been set
+    if ($c->response->body && $c->response->content_type &&
+        $c->response->content_type !~ m{^text/html}i) {
+        return;
+    }
+
     if ($c->res->content_type && $c->res->content_type =~ m{^text/html}i) {
         $c->res->headers->header(
             'Content-Security-Policy' => 
