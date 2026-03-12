@@ -218,10 +218,6 @@ last_updated = '2026/02/08'
                         <strong><a href="#group-todo" class="jump-link">✅ Todo System</a></strong>:
                         <a href="#anchor-todo-plan" class="jump-link">TodoSystemUpdate</a>
                     </div>
-                    <div class="jump-line">
-                        <strong><a href="#css-themes-workflow" class="jump-link">🎨 CSS Themes</a></strong>:
-                        <a href="#css-themes-workflow" class="jump-link">ThemeWorkflow</a>
-                    </div>
                 </div>
             </details>
         </div>
@@ -2346,7 +2342,7 @@ last_updated = '2026/02/08'
                         <li>✅ <strong>Conversation Persistence</strong>: Backend saves all messages with conversation_id</li>
                         <li>✅ <strong>Conversation List Page</strong>: <code>/ai/conversations</code> displays past chats</li>
                         <li>✅ <strong>Model Selection</strong>: Role-based dropdowns for admin/developer/editor</li>
-                        <li>✅ <strong>Multi-Server Support</strong>: Toggle between localhost and remote Ollama (192.168.1.199)</li>
+                        <li>✅ <strong>Multi-Server Support</strong>: Toggle between localhost and remote Ollama (192.168.1.171)</li>
                         <li>✅ <strong>Guest Sessions</strong>: Anonymous users can use AI chat without login</li>
                         <li>✅ <strong>API Key UI</strong>: <code>/ai/manage_api_keys</code> with add/edit/delete forms</li>
                     </ul>
@@ -2442,97 +2438,6 @@ last_updated = '2026/02/08'
                         <li><a href="/ai/admin/models" target="_blank">Model Configuration (Admin)</a></li>
                         <li><a href="/ai/admin/agents" target="_blank">Agent Management (Admin)</a></li>
                         <li><a href="#anchor-priority-schema" class="jump-link">Schema Management System</a></li>
-                    </ul>
-                </div>
-            </details>
-
-            <!-- Ollama VM -->
-            <div id="anchor-ollama-vm" class="nav-anchor"></div>
-            <details id="ollama-vm-plan" class="priority-container">
-                <summary class="priority-summary">🖥️ Ollama Proxmox VM — Isolation &amp; Non-Blocking AI</summary>
-                <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-pending">PLANNED</span></p>
-                    <p><strong>Why:</strong> Running Ollama on the same host as Catalyst blocks the entire dev/prod server during long AI requests (LWP is synchronous). A dedicated VM isolates memory/GPU pressure, protects the production server, and enables non-blocking requests (the VM can queue requests independently).</p>
-
-                    <h4>📋 Phase 1 — Create the Ollama VM in Proxmox</h4>
-                    <ol>
-                        <li>In Proxmox web UI → <strong>Create VM</strong>
-                            <ul>
-                                <li>VM ID: choose next available (e.g. 200)</li>
-                                <li>Name: <code>ollama-dev</code></li>
-                                <li>OS: Ubuntu 24.04 LTS (minimal server ISO)</li>
-                                <li>CPU: 4 cores (or more if GPU passthrough planned)</li>
-                                <li>RAM: 16 GB minimum (32 GB recommended for 7B+ models)</li>
-                                <li>Disk: 100 GB (models are large; llama3 ~5 GB, mistral ~4 GB)</li>
-                                <li>Network: VirtIO, bridge to same LAN as app server (e.g. <code>vmbr0</code>)</li>
-                            </ul>
-                        </li>
-                        <li>Install Ubuntu, set static IP (e.g. <code>192.168.1.180</code>), enable SSH</li>
-                        <li>(Optional) GPU passthrough: add PCIe GPU to VM via Proxmox hardware tab — required for GPU-accelerated inference</li>
-                    </ol>
-
-                    <h4>📋 Phase 2 — Install Ollama on the VM</h4>
-                    <pre style="background:#f8f9fa;padding:10px;border-radius:3px;overflow-x:auto;">
-# On the VM (SSH in as root or sudo user)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Make Ollama listen on all interfaces (not just localhost)
-# Edit the systemd service:
-systemctl edit ollama
-# Add:
-# [Service]
-# Environment="OLLAMA_HOST=0.0.0.0"
-
-systemctl daemon-reload
-systemctl restart ollama
-systemctl enable ollama
-
-# Pull models you need
-ollama pull llama3
-ollama pull mistral
-ollama pull starcoder2:3b
-
-# Verify
-curl http://localhost:11434/api/tags</pre>
-
-                    <h4>📋 Phase 3 — Firewall Rules</h4>
-                    <ul>
-                        <li>Allow port <strong>11434</strong> from app server IP only (Proxmox firewall or ufw)</li>
-                        <li><code>ufw allow from 192.168.1.X to any port 11434</code></li>
-                        <li>Block port 11434 from outside LAN entirely</li>
-                    </ul>
-
-                    <h4>📋 Phase 4 — Update Application Config</h4>
-                    <ul>
-                        <li>In <code>/ai/models</code> admin UI, change Ollama host from <code>localhost</code> to VM IP (e.g. <code>192.168.1.180</code>)</li>
-                        <li>Or set env var: <code>OLLAMA_HOST=192.168.1.180</code></li>
-                        <li>Test: <code>curl http://192.168.1.180:11434/api/tags</code> from app server</li>
-                        <li>The existing pre-flight check in <code>AI.pm</code> will validate the connection on each request</li>
-                    </ul>
-
-                    <h4>📋 Phase 5 — Multi-Worker / Non-Blocking (Long-Term)</h4>
-                    <p>Moving Ollama to a VM solves production safety but the Catalyst worker still blocks during the HTTP call. For fully non-blocking AI, implement one of:</p>
-                    <ol>
-                        <li><strong>Multiple Plack workers</strong> (immediate, done in comserv_server.pl via <code>--fork</code>):
-                            <br>Already enabled in dev server. For production Docker, update <code>Dockerfile</code>:
-                            <pre style="background:#f8f9fa;padding:6px;border-radius:3px;">CMD ["starman", "--workers", "5", "-p", "5000", "script/comserv_server.psgi"]</pre>
-                        </li>
-                        <li><strong>Background job queue</strong> (best UX): AI request goes into a job queue (e.g. <code>Minion</code> or <code>TheSchwartz</code>), browser polls <code>/ai/job_status/ID</code> every 2 seconds. Fully non-blocking, shows live progress. This is a separate development step.</li>
-                    </ol>
-
-                    <h4>📋 Phase 6 — Live AI Thinking Display (Application Step — Separate)</h4>
-                    <p>The "🤔 AI Thinking Live" display (showing files read, tools used, elapsed time) is <strong>strictly an application feature</strong> — it requires server-sent events (SSE) streaming from the backend, independent of VM setup. Steps:</p>
-                    <ul>
-                        <li>Add <code>/ai/stream_generate</code> endpoint using Catalyst streaming response</li>
-                        <li>Widget switches from <code>fetch()</code> to <code>EventSource</code> or <code>ReadableStream</code></li>
-                        <li>Server emits progress events: <code>data: {"status":"thinking","file":"Planning.tt"}</code></li>
-                        <li>Can be done after VM setup or in parallel — no dependency</li>
-                    </ul>
-
-                    <h4>🔗 Related</h4>
-                    <ul>
-                        <li><a href="/ai/models" target="_blank">Ollama Model Configuration (Admin)</a></li>
-                        <li><a href="http://192.168.1.180:11434" target="_blank">Ollama VM API (when configured)</a></li>
                     </ul>
                 </div>
             </details>
@@ -2712,107 +2617,10 @@ curl http://localhost:11434/api/tags</pre>
         <p><strong>API returns 401:</strong> Check token validity.</p>
     </div>
 
-    <!-- ============================================================
-         CSS THEMES WORKFLOW
-         ============================================================ -->
-    <div id="css-themes-workflow" class="doc-section">
-        <h2>CSS Themes System — Workflow &amp; Planning</h2>
-        <p>
-            This section records the planning and implementation workflow for the CSS Theme Management system.
-            For the end-user admin guide see
-            <a href="[% c.uri_for('/Documentation/CssThemes') %]">CssThemes documentation</a>
-            or click <em>View Documentation</em> from the Theme Management page.
-        </p>
-
-        <details class="priority-item" open>
-            <summary class="priority-summary">CSS Theme System — Feature Overview &amp; Goals</summary>
-            <div class="priority-content">
-                <h4>Objective</h4>
-                <p>Allow the SiteName admin to manage the visual appearance of their site entirely from within the browser — no SSH, no file editing, no deployment required.</p>
-
-                <h4>Key Capabilities</h4>
-                <ul>
-                    <li><strong>Choose</strong> — Pick any of the pre-installed themes (default, CSC, APIS, USBM, MCoop, dark, ve7tit) and apply it with one click.</li>
-                    <li><strong>Modify</strong> — Edit the CSS variables or raw CSS of an existing theme using the interactive editor or the raw CSS textarea, with a live preview.</li>
-                    <li><strong>Create</strong> — Build a brand-new theme via the Theme Creator form (full variable control + live preview) or the Quick Custom Theme colour-picker shortcut.</li>
-                    <li><strong>Document</strong> — In-system admin guide (<code>admin/documentation/CssThemes.tt</code>) accessible directly from the Theme Management page.</li>
-                </ul>
-
-                <h4>Implementation Summary</h4>
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr><th>Component</th><th>File</th><th>Change</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Theme Config Model</td>
-                            <td><code>Comserv/lib/Comserv/Model/ThemeConfig.pm</code></td>
-                            <td>Added <code>set_site_theme</code>, <code>create_theme</code>, <code>generate_all_theme_css</code>, <code>_write_theme_css</code>, <code>update_theme</code> methods.</td>
-                        </tr>
-                        <tr>
-                            <td>Admin Theme Controller</td>
-                            <td><code>Comserv/lib/Comserv/Controller/Admin/Theme.pm</code></td>
-                            <td>Added <code>create_theme</code> (GET/POST) and <code>details</code> routes. Fixed <code>create_custom_theme</code> call signature.</td>
-                        </tr>
-                        <tr>
-                            <td>Theme Index Template</td>
-                            <td><code>Comserv/root/admin/theme/index.tt</code></td>
-                            <td>Replaced with a 4-step workflow UI: Choose → Modify → Create → Apply.</td>
-                        </tr>
-                        <tr>
-                            <td>Create Theme Template</td>
-                            <td><code>Comserv/root/admin/theme/create_theme.tt</code></td>
-                            <td>New full-featured theme creation form with live colour preview.</td>
-                        </tr>
-                        <tr>
-                            <td>Admin Documentation</td>
-                            <td><code>Comserv/root/admin/documentation/CssThemes.tt</code></td>
-                            <td>New in-system admin guide covering all four workflow steps, variable reference, and FAQ.</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <h4>URL Map</h4>
-                <table class="table table-sm table-bordered table-striped">
-                    <thead class="table-light">
-                        <tr><th>URL</th><th>Method</th><th>Purpose</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr><td><code>/admin/theme</code></td><td>GET</td><td>Theme Management dashboard</td></tr>
-                        <tr><td><code>/admin/theme/update</code></td><td>POST</td><td>Apply existing theme to current site</td></tr>
-                        <tr><td><code>/admin/theme/create</code></td><td>GET / POST</td><td>Create brand-new theme</td></tr>
-                        <tr><td><code>/admin/theme/create_custom</code></td><td>POST</td><td>Quick custom theme (colour pickers)</td></tr>
-                        <tr><td><code>/admin/theme/edit/$theme</code></td><td>GET / POST</td><td>Raw CSS editor</td></tr>
-                        <tr><td><code>/admin/theme/edit_css_interactive/$theme</code></td><td>GET / POST</td><td>Interactive CSS editor with live preview</td></tr>
-                        <tr><td><code>/admin/theme/update_css/$theme</code></td><td>POST</td><td>Save raw CSS changes</td></tr>
-                        <tr><td><code>/admin/theme/details/$theme</code></td><td>GET</td><td>View theme details &amp; metadata</td></tr>
-                    </tbody>
-                </table>
-
-                <h4>Data Storage</h4>
-                <ul>
-                    <li><strong>Theme definitions</strong> — <code>Comserv/root/static/config/theme_definitions.json</code> (JSON; contains <code>themes</code> map and <code>site_themes</code> map).</li>
-                    <li><strong>Compiled CSS</strong> — <code>Comserv/root/static/css/themes/&lt;theme-name&gt;.css</code> (auto-regenerated on save).</li>
-                </ul>
-
-                <h4>Future Improvements</h4>
-                <ul>
-                    <li>Per-site theme isolation so modifying a shared theme cannot affect other sites (copy-on-write approach).</li>
-                    <li>Theme versioning / rollback history.</li>
-                    <li>Import / export theme as a JSON file.</li>
-                    <li>Preview theme on the actual live site in an iframe before applying.</li>
-                    <li>Role-based theme restrictions (e.g. developer can edit, admin can only choose).</li>
-                </ul>
-            </div>
-        </details>
-    </div>
-
     <div id="see-also" class="doc-section">
         <h2>See Also</h2>
         <ul>
             <li><a href="/Documentation/TodoSystemComprehensive">Todo System Documentation</a></li>
-            <li><a href="[% c.uri_for('/Documentation/CssThemes') %]">CSS Theme System — Admin Guide</a></li>
-            <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
         </ul>
     </div>
 

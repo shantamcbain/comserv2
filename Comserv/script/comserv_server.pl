@@ -195,10 +195,14 @@ sub _apply_safe_restart_defaults {
         push @args, ('--restart_regex', $safe_restart_regex);
     }
 
-    # Outside Docker, enable --fork so long-running AI/Ollama requests do not
-    # block the server from handling other requests (each request gets its own
-    # forked process).  -r/--restart continues to work normally alongside --fork.
-    unless ($has_fork || $ENV{DOCKER_ENV} || $ENV{CATALYST_NO_FORK}) {
+    # --fork caused session race-conditions: the pre-login session cookie would
+    # persist after login because concurrent forked child processes (e.g. the
+    # AI AJAX poll) could overwrite the newly-created login session file before
+    # the redirect response reached the browser.
+    # --fork is therefore NO LONGER added automatically.  Pass -f/--fork on the
+    # command line if you explicitly need it (e.g. for AI/Ollama testing), or
+    # set CATALYST_FORCE_FORK=1 in the environment.
+    if (!$has_fork && $ENV{CATALYST_FORCE_FORK}) {
         push @args, '--fork';
     }
 

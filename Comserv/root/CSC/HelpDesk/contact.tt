@@ -37,6 +37,7 @@
     <div class="contact-form">
         <h2>Send Us a Message</h2>
         <form method="post" action="[% c.uri_for('/HelpDesk/contact/send') %]">
+            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <div class="form-group">
                 <label for="name">Your Name:</label>
                 <input type="text" id="name" name="name" class="form-control" required>

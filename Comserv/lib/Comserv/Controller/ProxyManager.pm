@@ -8,6 +8,7 @@ use Try::Tiny;
 use Config::General;
 use File::Temp qw(tempfile);
 use Path::Tiny qw(path);
+use Comserv::Util::CSRF;
 
 # Try to load IPC::Run3, but make it optional
 BEGIN {
@@ -236,6 +237,7 @@ has 'npm_api' => (
 
 sub auto :Private {
     my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
         "ProxyManager controller auto method called");
 
@@ -948,6 +950,12 @@ sub grant_access :Local :Args(0) {
     
     # Check if this is a form submission
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grant_access',
+                "CSRF token validation failed");
+            $c->stash(error_msg => "Security validation failed. Please try again.");
+            return;
+        }
         my $username = $c->req->params->{username} || '';
         my $user_id = $c->req->params->{user_id} || 0;
         my $duration = $c->req->params->{duration} || 'temporary';
@@ -1027,6 +1035,19 @@ sub request_access :Local :Args(0) {
     
     # Check if this is a form submission
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'request_access',
+                "CSRF token validation failed for user: $username");
+            $c->stash(
+                template => 'CSC/proxy_manager/request_access.tt',
+                error_msg => 'Invalid form submission. Please try again.',
+                username => $username,
+                roles => $roles_debug,
+                demo_mode => ($self->npm_api->{environment} eq 'development') ? 1 : 0
+            );
+            return;
+        }
+        
         my $reason = $c->req->params->{reason} || 'No reason provided';
         my $duration = $c->req->params->{duration} || 'temporary';
         
@@ -1079,6 +1100,18 @@ sub request_access :Local :Args(0) {
 
 sub create_proxy :Local :Args(0) {
     my ($self, $c) = @_;
+    
+    # Validate CSRF token for POST requests
+    if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_proxy',
+                "CSRF token validation failed");
+            $c->stash(error_msg => "Security validation failed. Please try again.");
+            $c->response->redirect($c->uri_for('/proxymanager/index'));
+            return;
+        }
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_proxy',
         "Creating new proxy mapping");
 

@@ -113,6 +113,7 @@ requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
 requires 'Test::Exception';
 requires 'Test::MockObject';
+requires 'Plack::Test';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
 requires 'local::lib';

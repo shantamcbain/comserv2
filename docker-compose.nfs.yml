@@ -1,0 +1,30 @@
+# NFS Volume Override for Production/K8s-ready deployment
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.nfs.yml up -d
+#
+# Set NFS_SERVER to your NFS server IP (e.g. 192.168.1.199 for workstation)
+# Set NFS_WORKSHOP_PATH to the exported NFS path for workshop files
+# Set NFS_LOG_PATH to the exported NFS path for application logs
+#
+# Example .env:
+#   NFS_SERVER=192.168.1.199
+#   NFS_WORKSHOP_PATH=/home/shanta/nfs
+#   NFS_LOG_PATH=/home/shanta/nfs/logs/comserv
+#
+# K8s equivalent: replace these with PersistentVolume + PersistentVolumeClaim
+# backed by the same NFS server/paths.
+
+volumes:
+  comserv-workshop:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=${NFS_SERVER:-192.168.1.175},rw,noatime,nfsvers=3,soft"
+      device: ":${NFS_WORKSHOP_PATH:-/mnt/data/comserv/workshop_files}"
+
+  comserv-logs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=${NFS_SERVER:-192.168.1.175},rw,noatime,nfsvers=3,soft"
+      device: ":${NFS_LOG_PATH:-/mnt/data/comserv/logs}"

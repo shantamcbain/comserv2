@@ -183,6 +183,7 @@
         <form id="dup-batch-form" method="post"
               action="[% c.uri_for('/file/batch_resolve_duplicates') %]"
               style="display:none">
+          <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
           <input type="hidden" name="batch_action" id="dup-batch-action" value="">
           <input type="hidden" name="back_page"      value="[% page %]">
           <input type="hidden" name="back_page_size" value="[% filters.page_size_param %]">
@@ -281,6 +282,7 @@
               [%# Swap %]
               [% IF other_rec %]
               <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <input type="hidden" name="action" value="swap">
                 <input type="hidden" name="target_id" value="[% rec.id | html %]">
                 <input type="hidden" name="back_page" value="[% page %]">
@@ -298,6 +300,7 @@
                       title="Rename this file">&#9998; Rename</button>
               [%# Delete DB only %]
               <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <input type="hidden" name="action" value="delete_db">
                 <input type="hidden" name="target_id" value="[% rec.id | html %]">
                 <input type="hidden" name="back_page" value="[% page %]">
@@ -311,6 +314,7 @@
               [%# Delete disk + DB %]
               [% IF fs_info.fs_exists %]
               <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]" style="display:inline">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <input type="hidden" name="action" value="delete_both">
                 <input type="hidden" name="target_id" value="[% rec.id | html %]">
                 <input type="hidden" name="back_page" value="[% page %]">
@@ -328,6 +332,7 @@
             <div id="dup-rename-[% rec.id | html %]" style="display:none;margin-top:8px">
               <form method="post" action="[% c.uri_for('/file/resolve_duplicate', dup.id) %]"
                     style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <input type="hidden" name="action" value="rename">
                 <input type="hidden" name="target_id" value="[% rec.id | html %]">
                 <input type="hidden" name="back_page" value="[% page %]">

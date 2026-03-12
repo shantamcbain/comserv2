@@ -55,7 +55,6 @@ sub send_error_notification {
 
 sub auto :Private {
     my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
     return 1;
 }
 
@@ -324,6 +323,19 @@ sub do_login :Local {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login', 
             "AUDIT: Login success user_id=" . $user->id . " username='$username' ip=$client_ip");
 
+        # CRITICAL: Also authenticate with Catalyst to set $c->user and $c->user_exists
+        # This prevents session loss and makes $c->user available in all controllers
+        eval {
+            $c->authenticate({ 
+                username => $user->username, 
+                password => $password 
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_login',
+                "Catalyst authentication failed (expected if using manual hashing): $@");
+        }
+
         # Auto-activate pre-existing accounts that lack a status (created before the status column)
         # or accounts stuck in pending_verification that somehow still have a correct password
         my $acct_status = $user->status || '';
@@ -342,6 +354,12 @@ sub do_login :Local {
                     "Could not auto-activate account: $@");
             }
         }
+
+        # Rotate the session ID on successful login to discard any stale/corrupted
+        # pre-login session data and prevent session fixation attacks.
+        eval { $c->change_session_id() };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+            "Session rotated for user '$username'" . ($@ ? " (change_session_id not available: $@)" : ''));
 
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
@@ -388,6 +406,28 @@ sub do_login :Local {
         
         # Assign roles to session (no hard-coded username-based tweaks)
         $c->session->{roles} = $roles;
+
+        # NEW: Check if we need to auto-assign WorkshopLeader role based on return_to
+        if ($return_to && $return_to =~ m{/workshop/add}) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                "Detected workshop add redirect, ensuring workshop_leader role for user '" . ($user->username||'') . "'");
+            
+            my @current_roles = @$roles;
+            unless (grep { $_ eq 'workshop_leader' } @current_roles) {
+                push @current_roles, 'workshop_leader';
+                my $roles_str = join(',', @current_roles);
+                eval {
+                    $user->update({ roles => $roles_str });
+                    $c->session->{roles} = \@current_roles;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+                        "Auto-assigned workshop_leader role to user '" . ($user->username||'') . "'");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_login',
+                        "Failed to auto-assign workshop_leader role: $@");
+                }
+            }
+        }
         
         # Log the final roles
         $roles_debug = ref($roles) eq 'ARRAY' ? join(', ', @$roles) : $roles;
@@ -516,14 +556,26 @@ sub hash_password {
 sub _validate_csrf {
     my ($self, $c, $action_name, $redirect_to, $template) = @_;
     $redirect_to //= '/user/login';
-    unless (Comserv::Util::CSRF::validate_token($c)) {
+    my ($valid, $reason) = Comserv::Util::CSRF::validate_token($c);
+    unless ($valid) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $action_name // '_validate_csrf',
-            'CSRF token validation failed');
+            "CSRF token validation failed: $reason");
+
+        my $msg;
+        if ($reason eq 'session_expired') {
+            $msg = 'Your session has expired. Please log in again.';
+            Comserv::Util::CSRF::ensure_token($c);
+        } elsif ($reason eq 'token_missing') {
+            $msg = 'Form submission is missing a security token. Please reload the page and try again.';
+        } else {
+            $msg = 'Security token mismatch. Please reload the page and try again.';
+        }
+
         if ($template) {
-            $c->stash(error_msg => 'Invalid form submission. Please try again.', template => $template);
+            $c->stash(error_msg => $msg, template => $template);
             $c->forward($c->view('TT'));
         } else {
-            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->flash->{error_msg} = $msg;
             $c->response->redirect($c->uri_for($redirect_to));
         }
         return 0;
@@ -1244,18 +1296,27 @@ sub complete_profile :Local {
         my $hashed_password = sha256_hex($password);
         
         eval {
+            my $roles_to_assign = 'normal';
+            my $session_return_to = $c->session->{return_to};
+            
+            if ($session_return_to && $session_return_to =~ m{/workshop/add}) {
+                $roles_to_assign = 'normal,workshop_leader';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
+                    "Auto-assigning workshop_leader role due to return_to: $session_return_to");
+            }
+
             $user->update({
                 first_name        => $first_name,
                 last_name         => $last_name,
                 password          => $hashed_password,
                 status            => 'active',
-                roles             => 'normal',
+                roles             => $roles_to_assign,
                 email_verified_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S'),
             });
             
             my $profile_ip = $c->req->address || 'unknown';
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'complete_profile',
-                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active");
+                "AUDIT: Profile completed user_id=$user_id ip=$profile_ip status=active roles=$roles_to_assign");
         };
         
         if ($@) {
@@ -1282,8 +1343,11 @@ sub complete_profile :Local {
                 "Failed to send welcome email: $@");
         }
 
+        my $final_redirect = $c->session->{return_to} || $c->uri_for('/user/login');
+        delete $c->session->{return_to};
+        
         $c->flash->{success_msg} = "Registration complete! You can now log in.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($final_redirect);
     } else {
         $c->stash(template => 'user/CompleteProfile.tt');
     }
@@ -2372,6 +2436,13 @@ sub register :Local {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
         'Displaying registration form (Step 1)');
+    
+    my $return_to = $c->req->param('return_to');
+    if ($return_to) {
+        $c->session->{return_to} = $return_to;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'register',
+            "Stored return_to in session: $return_to");
+    }
     
     $c->stash(template => 'user/register.tt');
 }
