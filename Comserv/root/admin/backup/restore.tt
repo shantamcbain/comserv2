@@ -50,7 +50,8 @@
                 </div>
                 <div class="card-body">
                     [% IF available_backups.size > 0 %]
-                    <form method="post" action="[% c.uri_for('/admin/backup_restore') %]">
+                    <form method="post" action="[% c.uri_for('/admin/backup/restore_backup') %]">
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">

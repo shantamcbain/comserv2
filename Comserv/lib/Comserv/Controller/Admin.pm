@@ -19,6 +19,7 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -34,6 +35,7 @@ sub begin : Private {
     
     # Add detailed logging
     my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
+    Comserv::Util::CSRF::ensure_token($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
      # Initialize debug_msg array if it doesn't exist and debug mode is enabled
@@ -561,6 +563,13 @@ sub create_user :Path('/admin/create_user') :Args(0) {
     my $schema = $c->model('DBEncy');
 
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_user',
+                "CSRF token validation failed for admin_create_user");
+            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        }
         my $first_name = $c->req->param('first_name');
         my $last_name = $c->req->param('last_name');
         my $email = $c->req->param('email');
