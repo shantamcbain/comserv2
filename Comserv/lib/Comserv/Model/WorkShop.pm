@@ -1,6 +1,7 @@
 package Comserv::Model::WorkShop;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use Comserv::Util::AdminAuth;
 
 extends 'Catalyst::Model';
@@ -23,8 +24,8 @@ sub get_active_workshops {
             ]
         };
 
-        # Admins see all non-draft upcoming workshops; everyone else sees only published
-        $filter->{'me.status'} = $is_admin ? { '!=' => 'draft' } : 'published';
+        # EVERYONE sees all non-draft upcoming workshops
+        $filter->{'me.status'} = { '!=' => 'draft' };
 
         @workshops = $rs->search(
             $filter,
@@ -49,8 +50,6 @@ sub get_past_workshops {
     my @workshops;
     my $error;
     eval {
-        # Past workshops are always visible to everyone — they already happened.
-        # Status filtering is only relevant for upcoming workshops.
         @workshops = $rs->search(
             { 'me.date' => { '<' => DateTime->today->ymd } },
             { order_by => { -desc => 'me.date' }, prefetch => 'creator' }

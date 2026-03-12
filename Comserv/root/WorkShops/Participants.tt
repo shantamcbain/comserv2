@@ -82,7 +82,7 @@
                                     <span class="badge badge-success">Registered</span>
                                 </td>
                                 <td class="action-cell">
-                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST">
                                         <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
                                     </form>
                                 </td>
@@ -133,7 +133,7 @@
                                     <span class="badge badge-warning">Waitlist</span>
                                 </td>
                                 <td class="action-cell">
-                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST" style="display:inline;">
+                                    <form action="/workshop/remove_participant/[% participant.id %]" method="POST">
                                         <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to remove this participant?');">Remove</button>
                                     </form>
                                 </td>
