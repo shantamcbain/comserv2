@@ -8,6 +8,7 @@ use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
 use Comserv::Util::Logging;
+use Comserv::Util::HealthLogger;
 extends 'Catalyst::Model';
 
 has 'logging' => (
@@ -100,11 +101,29 @@ sub send_email {
         $smtp->quit() or die "QUIT failed: " . $smtp->message();
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
             "Email sent successfully to $to");
+        Comserv::Util::HealthLogger->log_email($c,
+            success => 1,
+            to      => $to,
+            message => "Email sent successfully to $to (subject: $subject)",
+            file    => __FILE__,
+            line    => __LINE__,
+            sub     => 'send_email',
+        );
         return 1;
     } catch {
+        my $err = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
-            "Failed to send email to $to: $_");
-        $c->stash->{debug_msg} = "Email sending failed: $_";
+            "Failed to send email to $to: $err");
+        Comserv::Util::HealthLogger->log_email($c,
+            success => 0,
+            to      => $to,
+            message => "Email send failed to $to (subject: $subject): $err",
+            details => "smtp_host=" . ($smtp_config->{host} // 'unknown') . " error=$err",
+            file    => __FILE__,
+            line    => __LINE__,
+            sub     => 'send_email',
+        );
+        $c->stash->{debug_msg} = "Email sending failed: $err";
         return;
     };
 }

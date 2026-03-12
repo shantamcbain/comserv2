@@ -35,5 +35,7 @@ __PACKAGE__->register_class('WorkshopRole', 'Comserv::Model::Schema::Ency::Resul
 __PACKAGE__->register_class('SiteWorkshop', 'Comserv::Model::Schema::Ency::Result::SiteWorkshop');
 __PACKAGE__->register_class('WorkshopResource', 'Comserv::Model::Schema::Ency::Result::WorkshopResource');
 
+__PACKAGE__->register_class('ApplicationLog', 'Comserv::Model::Schema::Ency::Result::ApplicationLog');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

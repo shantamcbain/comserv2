@@ -8,6 +8,7 @@ use Time::Piece;
 use URI::Escape;
 use Digest::SHA ();
 use Comserv::Util::Logging;
+use Comserv::Util::HealthLogger;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -774,6 +775,15 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
         if ($upload_err) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'upload_file',
                 "Upload failed nfs_dir_id=$nfs_dir_id filename=" . $upload->filename . ": $upload_err");
+            Comserv::Util::HealthLogger->log_file_upload($c,
+                success  => 0,
+                filename => $upload->filename,
+                message  => "Upload failed for '" . $upload->filename . "': $upload_err",
+                details  => "nfs_dir_id=$nfs_dir_id error=$upload_err",
+                file     => __FILE__,
+                line     => __LINE__,
+                sub      => 'upload_file',
+            );
             $c->stash(
                 allocated_dirs => $allocated_dirs,
                 is_csc         => $is_csc,
@@ -787,6 +797,15 @@ sub upload_file :Path('/file/upload_file') :Args(0) {
         my $dup_msg = $file_row->is_duplicate ? ' (detected as duplicate)' : '';
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'upload_file',
             "File uploaded id=" . $file_row->id . " name=" . $file_row->file_name . $dup_msg);
+        Comserv::Util::HealthLogger->log_file_upload($c,
+            success  => 1,
+            filename => $file_row->file_name,
+            message  => "File uploaded: '" . $file_row->file_name . "'" . $dup_msg,
+            details  => "id=" . $file_row->id . " nfs_dir_id=$nfs_dir_id" . $dup_msg,
+            file     => __FILE__,
+            line     => __LINE__,
+            sub      => 'upload_file',
+        );
         $c->flash->{success_msg} = "File '" . $file_row->file_name . "' uploaded successfully.$dup_msg";
         $c->response->redirect($c->uri_for('/file/list'));
         return;
@@ -1014,6 +1033,15 @@ sub download :Path('/file/download') :Args(1) {
         or do {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'download',
                 "Cannot open file id=$id path=$full_path: $!");
+            Comserv::Util::HealthLogger->log_file_download($c,
+                success  => 0,
+                filename => $filename,
+                message  => "File download failed: '$filename' - cannot open: $!",
+                details  => "id=$id path=$full_path error=$!",
+                file     => __FILE__,
+                line     => __LINE__,
+                sub      => 'download',
+            );
             $c->flash->{error_msg} = "Cannot read file: $!";
             $c->response->redirect($c->uri_for('/file/view', $id));
             return;
@@ -1026,6 +1054,16 @@ sub download :Path('/file/download') :Args(1) {
     local $/ = undef;
     my $content = <$fh>;
     close $fh;
+
+    Comserv::Util::HealthLogger->log_file_download($c,
+        success  => 1,
+        filename => $filename,
+        message  => "File downloaded: '$filename'",
+        details  => "id=$id size=" . length($content) . " mime=$mime",
+        file     => __FILE__,
+        line     => __LINE__,
+        sub      => 'download',
+    );
 
     $c->response->body($content);
 }
