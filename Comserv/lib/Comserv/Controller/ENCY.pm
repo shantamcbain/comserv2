@@ -10,6 +10,46 @@ has 'logging' => (
 );
 BEGIN { extends 'Catalyst::Controller'; }
 
+sub _stash_image_files {
+    my ($self, $c) = @_;
+    my @image_files;
+    eval {
+        my $schema   = $c->model('DBEncy');
+        my $sitename = $c->session->{SiteName} // '';
+        my $roles    = $c->session->{roles} || [];
+        my $is_csc   = (grep { $_ eq 'admin' } (ref $roles ? @$roles : split /\s*,\s*/, $roles))
+                       && lc($sitename) eq 'csc';
+        my %where = (
+            file_format => { -like => 'image/%' },
+            file_status => 'active',
+        );
+        $where{sitename} = $sitename unless $is_csc;
+        @image_files = $schema->resultset('File')->search(
+            \%where,
+            { order_by => { -desc => 'upload_date' }, rows => 200 }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_stash_image_files',
+            "Could not fetch image files: $@");
+    }
+    $c->stash(ency_image_files => \@image_files);
+}
+
+sub _resolve_image_value {
+    my ($self, $c, $image_val) = @_;
+    return $image_val unless defined $image_val && length $image_val;
+    return $image_val if $image_val =~ m{^https?://};
+    return $image_val if $image_val =~ m{^/};
+    if ($image_val =~ /^\d+$/) {
+        eval {
+            my $file = $c->model('DBEncy')->resultset('File')->find($image_val);
+            $image_val = $file->nfs_path || $file->file_path || $file->external_url || $image_val if $file;
+        };
+    }
+    return $image_val;
+}
+
 sub index :Path('/ENCY') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Entered index method');
@@ -53,6 +93,21 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
+        # CSRF Protection
+        if (!$self->_verify_csrf_token($c)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
+                "CSRF token mismatch for herb record_id: $record_id");
+            $c->stash(error_msg => "Invalid security token. Please refresh the page and try again.");
+            # Return to edit mode with the herb data
+            $self->_stash_image_files($c);
+            $c->stash(
+                herb      => $herb,
+                edit_mode => 1,
+                template  => 'ENCY/HerbView.tt',
+            );
+            return;
+        }
+
         my $form_data = {
             botanical_name      => $c->request->params->{botanical_name} // '',
             common_names        => $c->request->params->{common_names} // '',
@@ -95,6 +150,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     }
 
     # Render the herb in edit mode when Edit Herb button is clicked
+    $self->_stash_image_files($c);
     $c->stash(
         herb      => $herb,
         edit_mode => 1, # Enable edit mode
@@ -126,6 +182,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     }
     $c->session->{record_id} = $id;  # Store the id in the session
 
+    $self->_stash_image_files($c);
     $c->stash(
         herb => $herb,
         mode => 'view',
@@ -145,6 +202,19 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;
 
     if ($c->request->method eq 'POST') {
+        # CSRF Protection
+        if (!$self->_verify_csrf_token($c)) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_herb',
+                "CSRF token mismatch for add herb");
+            $c->stash(error_msg => "Invalid security token. Please refresh the page and try again.");
+            $self->_stash_image_files($c);
+            $c->stash(
+                template => 'ENCY/add_herb_form.tt',
+                user_role => $c->session->{roles}
+            );
+            return;
+        }
+
         # Handle form submission
         my $form_data = $c->request->body_parameters;
 
@@ -204,6 +274,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         $c->res->redirect($c->uri_for($self->action_for('index')));
     } else {
         # Display the form
+        $self->_stash_image_files($c);
         $c->stash(
             template => 'ENCY/add_herb_form.tt',
             user_role => $c->session->{roles}  # Pass user role to the template
@@ -284,6 +355,17 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
         template => 'ENCY/BeePastureView.tt',
         debug_msg => "Bee Pasture View loaded with " . scalar(@$bee_plants) . " plants"
     );
+}
+
+sub _verify_csrf_token {
+    my ($self, $c) = @_;
+    my $token_from_req = $c->req->param('csrf_token') // '';
+    my $token_from_session = $c->session->{csrf_token} // '';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
+        "CSRF check: req=$token_from_req session=$token_from_session");
+        
+    return (length $token_from_req && $token_from_req eq $token_from_session);
 }
 
 __PACKAGE__->meta->make_immutable;

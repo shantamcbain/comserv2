@@ -19,6 +19,7 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -34,6 +35,7 @@ sub begin : Private {
     
     # Add detailed logging
     my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
+    Comserv::Util::CSRF::ensure_token($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
      # Initialize debug_msg array if it doesn't exist and debug mode is enabled
@@ -134,9 +136,9 @@ sub index :Path :Args(0) {
     else {
         # Check if the user has admin role
         my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
+    
+    # First check if user exists
+    if ($c->user_exists) {
             # Get roles from session
             my $roles = $c->session->{roles};
             
@@ -561,6 +563,13 @@ sub create_user :Path('/admin/create_user') :Args(0) {
     my $schema = $c->model('DBEncy');
 
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_user',
+                "CSRF token validation failed for admin_create_user");
+            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        }
         my $first_name = $c->req->param('first_name');
         my $last_name = $c->req->param('last_name');
         my $email = $c->req->param('email');
@@ -939,6 +948,22 @@ sub settings :Path('/admin/settings') :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
         "Completed settings action");
+}
+
+sub planning :Path('/admin/planning') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Planning page requested by user=" . ($c->session->{user_id} // 'anon'));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'planning')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    $c->stash(template => 'admin/documentation/Planning.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Rendering admin/documentation/Planning.tt");
+    $c->forward($c->view('TT'));
 }
 
 # Admin system information
@@ -1368,18 +1393,11 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Starting schema_compare action");
     
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
-        
-        # First check if user exists
-        if ($c->user_exists) {
+    # Check if the user has admin role
+    my $has_admin_role = 0;
+    
+    # Check via Catalyst auth object OR session-based auth (app uses both)
+    if ($c->user_exists || $c->session->{username}) {
             # Get roles from session
             my $roles = $c->session->{roles};
             
@@ -1419,7 +1437,6 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
             }));
             return;
         }
-    }
     
     # Get database environment info
     my $db_env = Comserv::Util::DatabaseEnv->new;
@@ -1513,27 +1530,9 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_table_schema', 
         "Starting get_table_schema action");
     
-    # Check if the user has admin role - use session-based check
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'get_table_schema')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -3679,27 +3678,9 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role (using session-based check like create_table_from_result)
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'sync_table_to_result')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
@@ -4331,26 +4312,9 @@ sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
         "Starting create_table_from_result action");
     
-    my $has_admin_role = 0;
-    if ($c->session->{username}) {
-        if ($c->session->{username} eq 'Shanta') {
-            $has_admin_role = 1;
-        } else {
-            my $roles = $c->session->{roles};
-            if (ref($roles) eq 'ARRAY') {
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
-                $has_admin_role = 1;
-            }
-        }
-    }
-    
-    unless ($has_admin_role) {
+    # Check if the user has admin role using centralized utility
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'create_table_from_result')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -4736,20 +4700,59 @@ sub generate_result_file_content {
 
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
+
+    # Port restriction: only accessible from port 3001 (host dev server)
+    my $port = $c->req->uri->port || 0;
     
     # Check if we're inside a Docker container
+    my $is_docker = -f '/.dockerenv';
+
+    if ($is_docker) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Attempted Docker management from within container");
+        $c->stash(
+            template => 'admin/docker_containers.tt',
+            docker_available => 0,
+            authenticated => 1,
+            error_msg => "Docker management is not available from within a container. Please use the host development server on port 3001."
+        );
+        return;
+    }
+
+    if ($port == 5000) {
+        $c->response->body('');
+        $c->response->status(403);
+        return;
+    }
+    if ($port && $port != 3001) {
+        my $redirect_uri = $c->req->uri->clone;
+        $redirect_uri->port(3001);
+        $c->response->redirect($redirect_uri);
+        return;
+    }
+
+    # CSC admin only - use AdminAuth (same pattern as all other admin actions)
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Access denied: admin required");
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+
+    # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
-    
-    # Check authentication status (allow page view, but operations will require login)
-    my $authenticated = $c->user_exists ? 1 : 0;
-    
+
     $c->stash(
         template => 'admin/docker_containers.tt',
         docker_available => $docker_available,
-        authenticated => $authenticated
+        authenticated => 1,
     );
 }
 
@@ -4794,6 +4797,75 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     }
     
     $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
+        "Docker volumes list API called");
+
+    my $admin_auth_vol = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_vol->check_admin_access($c, 'docker_volumes')) {
+        $c->response->body('{"success": false, "error": "Authentication required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_out = `docker volume ls -q 2>&1`;
+    my $names_exit = $? >> 8;
+
+    if ($names_exit != 0) {
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my @names = grep { $_ ne '' } split /\n/, $names_out;
+
+    if (!@names) {
+        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_str = join(' ', map { quotemeta($_) } @names);
+    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_exit = $? >> 8;
+
+    my @volumes;
+    eval {
+        my $data = decode_json($inspect_out);
+        foreach my $vol (@$data) {
+            my $opts    = $vol->{Options} || {};
+            my $is_nfs  = (lc($opts->{type} || '') eq 'nfs' || lc($opts->{type} || '') eq 'nfs4');
+            my $nfs_addr = '';
+            if ($is_nfs && $opts->{o}) {
+                ($nfs_addr) = ($opts->{o} =~ /addr=([^,]+)/);
+            }
+            push @volumes, {
+                name       => $vol->{Name}       || '',
+                driver     => $vol->{Driver}     || 'local',
+                mountpoint => $vol->{Mountpoint} || '',
+                labels     => ref($vol->{Labels}) eq 'HASH'
+                    ? join(', ', map { "$_=$vol->{Labels}{$_}" } keys %{$vol->{Labels}})
+                    : ($vol->{Labels} || ''),
+                scope      => $vol->{Scope}      || 'local',
+                is_nfs     => $is_nfs ? \1 : \0,
+                nfs_server => $nfs_addr,
+                nfs_device => $opts->{device} || '',
+            };
+        }
+    };
+
+    $c->response->body(encode_json({ success => 1, volumes => \@volumes }));
     $c->response->content_type('application/json');
 }
 
@@ -5167,6 +5239,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
     my $service = $c->req->params->{service} || 'web-prod';
+    my $recreate_volumes = $c->req->params->{recreate_volumes} || 0;
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -5189,18 +5262,66 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     }
     
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
+    my $log_file = $c->path_to('root', 'log', 'deploy_latest.log');
+    my $pid_file = "$log_file.pid";
     
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
+    # Check if a deployment is already running
+    if (-f $pid_file) {
+        $c->response->body(encode_json({ success => 0, error => "A deployment is already in progress." }));
+        $c->response->content_type('application/json');
+        return;
+    }
     
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        output => $output,
-        exit_code => $exit_code
-    };
+    # Reset log file
+    if (open my $fh, '>', $log_file) {
+        print $fh "--- Deployment Started at " . localtime() . " ---\n";
+        close $fh;
+    }
     
-    $c->response->body(encode_json($result));
+    # Run in background
+    my $safe_password = $ssh_password;
+    $safe_password =~ s/'/'\\''/g; # Escape single quotes for shell
+    
+    my $cmd = "SSHPASS='$safe_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory'";
+    $cmd .= " --recreate-volumes" if $recreate_volumes;
+    $cmd .= " > $log_file 2>&1";
+    
+    my $pid = fork();
+    if ($pid == 0) {
+        # Child process
+        system("echo $$ > $pid_file");
+        system($cmd);
+        unlink($pid_file);
+        exit(0);
+    }
+    
+    $c->response->body(encode_json({ 
+        success => 1, 
+        message => "Deployment started in background",
+        log_file => "$log_file"
+    }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_status :Path('/admin/docker-deploy-status') :Args(0) {
+    my ($self, $c) = @_;
+    
+    my $log_file = $c->path_to('root', 'log', 'deploy_latest.log');
+    my $content = "";
+    
+    if (-f $log_file) {
+        if (open my $fh, '<', $log_file) {
+            local $/;
+            $content = <$fh>;
+            close $fh;
+        }
+    }
+    
+    $c->response->body(encode_json({ 
+        success => 1, 
+        output => $content,
+        is_running => (-f "$log_file.pid" ? 1 : 0)
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5411,6 +5532,11 @@ sub end : Private {
         return;
     }
     
+    # Skip rendering for redirects and no-content responses
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+
     # Normal template rendering for other requests
     $c->forward($c->view('TT')) unless $c->response->body;
 }

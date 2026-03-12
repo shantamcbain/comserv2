@@ -10,6 +10,7 @@ use File::Path qw(make_path);
 use IPC::Run3;
 use DateTime;
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -100,6 +101,12 @@ sub cluster_add :Path('/admin/infrastructure/cluster/add') :Args(0) {
         return;
     }
     
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
     my $params = $c->req->body_parameters;
     my $cluster_name = $params->{name};
     my $host = $params->{host};
@@ -143,6 +150,12 @@ sub deploy_monitoring :Path('/admin/infrastructure/deploy/monitoring') :Args(1) 
     
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, error => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
         $c->forward('View::JSON');
         return;
     }
@@ -239,6 +252,12 @@ sub exec_kubectl :Path('/admin/infrastructure/kubectl') :Args(0) {
     
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, error => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSRF validation failed' };
         $c->forward('View::JSON');
         return;
     }
