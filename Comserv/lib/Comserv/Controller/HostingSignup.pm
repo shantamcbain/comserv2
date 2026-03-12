@@ -2,6 +2,7 @@ package Comserv::Controller::HostingSignup;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 use Try::Tiny;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -16,6 +17,7 @@ __PACKAGE__->config(namespace => 'hosting_signup');
 
 sub auto :Private {
     my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "HostingSignup controller auto method called");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: " . $c->req->uri->path);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request method: " . $c->req->method);
@@ -57,6 +59,19 @@ sub index :Path :Args(0) {
 # Process the signup form submission
 sub process_signup :Path('process') :Args(0) {
     my ($self, $c) = @_;
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process_signup', 
+            "CSRF token validation failed");
+        $c->stash(
+            template => 'hosting/signup_form.tt',
+            title => 'Starter Hosting Signup',
+            form_action => $c->uri_for($self->action_for('process_signup')),
+            errors => ['Invalid form submission (CSRF). Please try again.'],
+            form_data => $c->request->params,
+        );
+        return;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', "Processing hosting signup form");
     push @{$c->stash->{debug_errors}}, "Processing hosting signup form";

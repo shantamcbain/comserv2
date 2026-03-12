@@ -84,9 +84,7 @@ __PACKAGE__->config(
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
-    },
-    'Plugin::Session::Store::File' => {
-        dir => '/tmp/session_data',
+        storage => '/tmp/comserv/session/data',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model

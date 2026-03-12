@@ -179,11 +179,13 @@
                                     [% IF c.user_exists && workshop.status == 'published' && !workshop.is_user_registered %]
                                         [% IF is_full %]
                                         <form action="/workshop/register" method="POST">
+                                            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                                             <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                                             <button type="submit" class="btn btn-sm btn-warning">Join Waitlist</button>
                                         </form>
                                         [% ELSE %]
                                         <form action="/workshop/register" method="POST">
+                                            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                                             <input type="hidden" name="workshop_id" value="[% workshop.id %]">
                                             <button type="submit" class="btn btn-sm btn-primary">Register</button>
                                         </form>
@@ -196,6 +198,7 @@
                                     [% END %]
                                     [% IF is_admin %]
                                     <form action="/workshop/delete" method="POST">
+                                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                                         <input type="hidden" name="id" value="[% workshop.id %]">
                                         <button type="submit" class="btn btn-sm btn-delete">Delete</button>
                                     </form>

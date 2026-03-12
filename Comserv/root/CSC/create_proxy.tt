@@ -18,6 +18,7 @@
                 </div>
                 <div class="card-body">
                     <form method="post" action="[% c.uri_for('/proxymanager/create_proxy') %]" id="createProxyForm">
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="form-group row">
                             <label for="domain" class="col-sm-3 col-form-label">Domain Name:</label>
                             <div class="col-sm-9">

@@ -3,12 +3,19 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
+    return 1;
+}
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
@@ -153,6 +160,14 @@ sub add_mail_config_form :Local {
 
 sub add_mail_config :Local {
     my ($self, $c) = @_;
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config', 
+            "CSRF token validation failed");
+        $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+        $c->res->redirect($c->uri_for('/mail/add_mail_config_form'));
+        return;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
         "add_mail_config action called - Method: " . $c->req->method);
@@ -347,6 +362,13 @@ sub edit_smtp_config :Local {
     
     # If this is a POST request, update the configuration
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'edit_smtp_config', 
+                "CSRF token validation failed");
+            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
+            $c->res->redirect($c->uri_for('/mail/edit_smtp_config', { site_id => $site_id }));
+            return;
+        }
         my $params = $c->req->params;
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
