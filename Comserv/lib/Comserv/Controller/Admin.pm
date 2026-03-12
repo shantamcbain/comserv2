@@ -1396,8 +1396,8 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     # Check if the user has admin role
     my $has_admin_role = 0;
     
-    # First check if user exists
-    if ($c->user_exists) {
+    # Check via Catalyst auth object OR session-based auth (app uses both)
+    if ($c->user_exists || $c->session->{username}) {
             # Get roles from session
             my $roles = $c->session->{roles};
             
