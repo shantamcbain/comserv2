@@ -5518,6 +5518,11 @@ sub end : Private {
         return;
     }
     
+    # Skip rendering for redirects and no-content responses
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+
     # Normal template rendering for other requests
     $c->forward($c->view('TT')) unless $c->response->body;
 }
