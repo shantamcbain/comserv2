@@ -93,28 +93,31 @@ sub recent_errors :Local :Args(0) {
         my $cutoff = strftime('%Y-%m-%d %H:%M:%S',
             localtime(time() - $minutes * 60));
 
-        my $rs = $c->model('DBEncy')->resultset('ApplicationLog')->search({
-            log_level  => { -in => ['ERROR', 'CRITICAL', 'WARN'] },
-            created_at => { '>=' => $cutoff },
-            pruned     => 0,
+        my $rs = $c->model('DBEncy')->resultset('SystemLog')->search({
+            message   => { -like => '[HEALTH]%' },
+            level     => { -in   => ['ERROR', 'CRITICAL', 'WARN'] },
+            timestamp => { '>='  => $cutoff },
         }, {
-            order_by => { -desc => ['evaluation_score', 'created_at'] },
+            order_by => { -desc => 'id' },
             rows     => $limit,
         });
 
         while (my $rec = $rs->next) {
+            my ($cat, $inst) = ('GENERAL', 'unknown');
+            if ($rec->message =~ /^\[HEALTH\]\[([^\]]+)\]\[([^\]]+)\]/) {
+                $cat  = $1;
+                $inst = $2;
+            }
             push @rows, {
-                id               => $rec->id,
-                app_instance     => $rec->app_instance,
-                log_level        => $rec->log_level,
-                category         => $rec->category,
-                event_type       => $rec->event_type // '',
-                message          => $rec->message,
-                hostname         => $rec->hostname // '',
-                pid              => $rec->pid,
-                created_at       => $rec->created_at . '',
-                evaluation_score => $rec->evaluation_score // 0,
-                occurrence_count => $rec->occurrence_count,
+                id           => $rec->id,
+                app_instance => $inst,
+                log_level    => $rec->level,
+                category     => $cat,
+                message      => $rec->message,
+                sitename     => $rec->sitename // '',
+                username     => $rec->username // '',
+                timestamp    => $rec->timestamp . '',
+                subroutine   => $rec->subroutine // '',
             };
         }
     };
