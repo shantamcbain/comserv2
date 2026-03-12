@@ -32,8 +32,8 @@
             [% END %]
             
             <div class="form-actions">
-                [% IF can_access_dashboard %]
                 <a href="/workshop/add" class="btn btn-primary">Add Workshop</a>
+                [% IF can_access_dashboard %]
                 <a href="/workshop/dashboard" class="btn btn-secondary">My Dashboard</a>
                 [% END %]
             </div>
