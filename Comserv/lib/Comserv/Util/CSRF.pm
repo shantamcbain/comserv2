@@ -27,6 +27,7 @@ sub validate_token {
     my ($c) = @_;
     my $submitted = $c->req->body_parameters->{csrf_token}
                  || $c->req->param('csrf_token')
+                 || $c->req->header('X-CSRF-Token')
                  || '';
     my $expected  = $c->session->{csrf_token} || '';
 

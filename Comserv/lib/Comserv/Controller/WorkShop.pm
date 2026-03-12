@@ -8,8 +8,15 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::NfsPath;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
+    return 1;
+}
 
 has 'logging' => (
     is => 'ro',
@@ -1283,6 +1290,14 @@ sub add_participant :Local :Args(1) {
             workshop => $workshop,
             template => 'WorkShops/AddParticipant.tt',
         );
+        return;
+    }
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_participant',
+            "CSRF validation failed for add_participant POST");
+        $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
+        $c->response->redirect($c->uri_for($self->action_for('add_participant'), [$id]));
         return;
     }
     

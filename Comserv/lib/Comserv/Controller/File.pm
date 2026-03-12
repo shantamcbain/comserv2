@@ -9,6 +9,7 @@ use URI::Escape;
 use Digest::SHA ();
 use Comserv::Util::Logging;
 use Comserv::Util::NfsPath;
+use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -250,12 +251,6 @@ sub fs_rename :Path('/file/fs_rename') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $c->req->param('dir') // '' }));
-        return;
-    }
-
     my $old_path = $c->req->param('old_path') // '';
     my $new_name = $c->req->param('new_name') // '';
     my $dir      = $c->req->param('dir')      // '';
@@ -356,9 +351,8 @@ sub fs_list_dirs :Path('/file/fs_list_dirs') :Args(0) {
 
     require File::Basename;
     my $parent = File::Basename::dirname($path);
-    $parent = '' if $path eq ($self->_nfs_root_for_sync()) && !$is_csc;
+    $parent = '' if $path eq $nfs_root && !$is_csc;
 
-    my $nfs_root = $self->_nfs_root_for_sync();
     my $can_go_up = $is_csc ? ($path ne '/') : ($path ne $nfs_root && length $parent);
 
     my $json_dirs = join(',', map { my $d = $_; $d =~ s/\\/\\\\/g; $d =~ s/"/\\"/g; "\"$d\"" } @dirs);
@@ -2084,19 +2078,19 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         return;
     }
 
-    my $sitename    = $c->req->param('sitename')    // '';
-    my $site_id     = $c->req->param('site_id')     // undef;
-    my $nfs_path    = $c->req->param('nfs_path')    // '';
-    my $description = $c->req->param('description') // '';
-    my $is_active   = $c->req->param('is_active') ? 1 : 0;
+    my $alloc_sitename = $c->req->param('sitename')    // '';
+    my $site_id        = $c->req->param('site_id')     // undef;
+    my $nfs_path       = $c->req->param('nfs_path')    // '';
+    my $description    = $c->req->param('description') // '';
+    my $is_active      = $c->req->param('is_active') ? 1 : 0;
 
     # Trim whitespace
-    $sitename    =~ s/^\s+|\s+$//g;
-    $nfs_path    =~ s/^\s+|\s+$//g;
-    $description =~ s/^\s+|\s+$//g;
+    $alloc_sitename =~ s/^\s+|\s+$//g;
+    $nfs_path       =~ s/^\s+|\s+$//g;
+    $description    =~ s/^\s+|\s+$//g;
 
     # Validate required fields
-    unless (length $sitename) {
+    unless (length $alloc_sitename) {
         $c->flash->{error_msg} = 'SiteName is required.';
         $c->response->redirect($c->uri_for('/file/nfs_allocations'));
         return;
@@ -2115,7 +2109,7 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
     }
 
     # Security check: Prevent allocation of sensitive paths
-    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $sitename, $nfs_root);
+    my ($allowed, $nr) = $self->_is_path_allowed($c, $nfs_path, $is_csc, $alloc_sitename, $nfs_root);
     unless ($allowed) {
         $c->flash->{error_msg} = "Access denied: cannot allocate to sensitive or unauthorized path '$nfs_path'.";
         $c->response->redirect($c->uri_for('/file/nfs_allocations'));
@@ -2132,7 +2126,7 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
 
     eval {
         $alloc->update({
-            sitename    => $sitename,
+            sitename    => $alloc_sitename,
             site_id     => $site_id,
             nfs_path    => $nfs_path,
             description => $description,
@@ -2146,7 +2140,7 @@ sub nfs_allocation_edit :Path('/file/nfs_allocation_edit') :Args(1) {
         $c->flash->{error_msg} = "Failed to update allocation: $err";
     } else {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'nfs_allocation_edit',
-            "NFS allocation updated id=$id sitename=$sitename nfs_path=$nfs_path is_active=$is_active");
+            "NFS allocation updated id=$id sitename=$alloc_sitename nfs_path=$nfs_path is_active=$is_active");
         $c->flash->{success_msg} = "Allocation #$id updated.";
     }
 
@@ -2352,7 +2346,6 @@ sub db_import_file :Path('/file/db_import_file') :Args(0) {
     my ($ext)   = ($name =~ /\.([^.]+)$/);
     $ext        = lc($ext // '');
     my $size    = -s $file_path;
-    my $nfs_root = $self->_nfs_root_for_sync();
     my $rel      = $file_path;
     $rel =~ s{^\Q$nfs_root\E/?}{};
 
@@ -2654,7 +2647,7 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
                     $errors++; next;
                 };
             }
-            if (rename($src_path, $dst_path)) {
+            if (CORE::rename($src_path, $dst_path)) {
                 $self->_db_sync_path($c, $src_path, $dst_path);
                 $moved++;
             } else {
@@ -2676,7 +2669,7 @@ sub dir_merge_submit :Path('/file/dir_merge_submit') :Args(0) {
                 $new_dst = "$dest/${base}_conflict_$n${suffix}";
                 $n++;
             } while (-e $new_dst && $n < 100);
-            if (rename($src_path, $new_dst)) {
+            if (CORE::rename($src_path, $new_dst)) {
                 $self->_db_sync_path($c, $src_path, $new_dst);
                 $renamed++;
                 push @messages, "Renamed '$rel' to '" . basename($new_dst) . "'";
@@ -3136,10 +3129,10 @@ sub _verify_csrf_token {
     my $token_from_req = $c->req->param('csrf_token') // '';
     my $token_from_session = $c->session->{csrf_token} // '';
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
-        "CSRF check: req=$token_from_req session=$token_from_session");
-        
-    return (length $token_from_req && $token_from_req eq $token_from_session);
+    my $ok = (length $token_from_req && $token_from_req eq $token_from_session);
+    $self->logging->log_with_details($c, $ok ? 'info' : 'warn', __FILE__, __LINE__, '_verify_csrf_token',
+        "CSRF " . ($ok ? 'PASS' : 'FAIL'));
+    return $ok;
 }
 
 __PACKAGE__->meta->make_immutable;
