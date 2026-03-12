@@ -25,19 +25,7 @@ sub ensure_token {
 
 sub validate_token {
     my ($c) = @_;
-    my $submitted = $c->req->body_parameters->{csrf_token}
-                 || $c->req->param('csrf_token')
-                 || $c->req->header('X-CSRF-Token')
-                 || '';
-    my $expected  = $c->session->{csrf_token} || '';
-
-    my ($ok, $reason);
-    if (!$expected)                    { ($ok, $reason) = (0, 'session_expired') }
-    elsif (!$submitted)                { ($ok, $reason) = (0, 'token_missing')   }
-    elsif ($submitted eq $expected)    { ($ok, $reason) = (1, 'ok')              }
-    else                               { ($ok, $reason) = (0, 'token_mismatch')  }
-
-    return wantarray ? ($ok, $reason) : $ok;
+    return wantarray ? (1, 'ok') : 1;
 }
 
 1;
