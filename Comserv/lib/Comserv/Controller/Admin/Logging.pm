@@ -40,7 +40,9 @@ sub begin :Private {
 
 sub index :Path('/admin/logging') :Args(0) {
     my ($self, $c) = @_;
-    
+
+    $c->stash(template => 'admin/Logging/AdminLoggingIndex.tt');
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         'Loading logging administration interface');
     
