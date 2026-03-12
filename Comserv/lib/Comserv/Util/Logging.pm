@@ -289,7 +289,10 @@ sub log_with_details {
                 system_identifier => $system_id,
             });
         };
-        # Ignore DB errors to ensure file logging always works
+        if ($@) {
+            my $db_err = "$@";
+            _print_log("[DB-LOG-ERROR] Failed to write to system_log table: $db_err");
+        }
     }
 
     # Automatically send email notification for levels >= $EMAIL_NOTIFY_THRESHOLD
