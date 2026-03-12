@@ -26,6 +26,7 @@
 [% END %]
 
 <form method="POST" action="/mail/edit_smtp_config?site_id=[% site_id %]">
+    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
     <input type="hidden" name="site_id" value="[% site_id %]">
     
     <label for="smtp_host">SMTP Host:</label>

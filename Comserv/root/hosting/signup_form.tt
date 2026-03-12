@@ -35,6 +35,7 @@
                     <p class="lead">Complete the form below to sign up for our Starter Hosting package.</p>
                     
                     <form method="POST" action="[% form_action %]" class="needs-validation" novalidate>
+                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <h3 class="mb-3">Account Information</h3>
                         
                         <div class="form-group row mb-3">
