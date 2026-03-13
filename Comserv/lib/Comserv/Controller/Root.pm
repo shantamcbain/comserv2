@@ -475,6 +475,9 @@ sub auto :Private {
         # Get application directory name to distinguish between workflows
         my $app_workflow = Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
         $c->stash->{app_workflow} = $app_workflow;
+
+        # Expose the friendly system identifier (workstation / production) to all templates
+        $c->stash->{system_identifier} = Comserv::Util::Logging->get_system_identifier();
         
         # Validate system_info returned valid data, add defaults if needed
         if (!$system_info || !ref($system_info)) {
