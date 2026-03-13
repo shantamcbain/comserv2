@@ -283,35 +283,65 @@ sub prune_old_records {
     my $deleted = 0;
     eval {
         my $dbh = $schema->storage->dbh;
-        $dbh->do('SET SESSION innodb_lock_wait_timeout = 2');
+        # 5-second timeout for admin prune operations
+        $dbh->do('SET SESSION innodb_lock_wait_timeout = 5');
 
         for my $level (keys %retention_days) {
             my $cutoff = strftime('%Y-%m-%d %H:%M:%S',
                 localtime(time() - $retention_days{$level} * 86400));
-            # Use small batches (500) to avoid long lock holds
-            my $n = eval {
-                $dbh->do(
-                    "DELETE FROM system_log WHERE level = ? AND timestamp < ? LIMIT 500",
-                    undef, $level, $cutoff
-                ) || 0;
-            } // 0;
-            $deleted += ($n == 0+$n) ? $n : 0;
+
+            # Two-phase approach: SELECT ids first (non-locking), then DELETE by PK.
+            # Deleting by primary key is fast and holds minimal row locks.
+            eval {
+                my $sel = $dbh->prepare(
+                    "SELECT id FROM system_log
+                     WHERE LOWER(level) = LOWER(?) AND timestamp < ?
+                     ORDER BY id ASC LIMIT 500"
+                );
+                $sel->execute($level, $cutoff);
+                my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref };
+                if (@ids) {
+                    my $placeholders = join(',', ('?') x scalar @ids);
+                    my $n = $dbh->do(
+                        "DELETE FROM system_log WHERE id IN ($placeholders)",
+                        undef, @ids
+                    ) || 0;
+                    $deleted += ($n == 0+$n) ? $n : 0;
+                }
+            };
+            if ($@) {
+                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                    'prune_old_records', "prune skipped level=$level: $@");
+            }
         }
 
+        # Cap total rows: delete oldest first
         my ($total) = $dbh->selectrow_array(
             "SELECT TABLE_ROWS FROM information_schema.TABLES
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
         );
         if (($total // 0) > $max_records) {
-            my $to_delete = $total - $max_records;
-            $to_delete = 500 if $to_delete > 500;  # cap per cycle
-            my $n = eval {
-                $dbh->do(
-                    "DELETE FROM system_log ORDER BY id ASC LIMIT ?",
-                    undef, $to_delete
-                ) || 0;
-            } // 0;
-            $deleted += ($n == 0+$n) ? $n : 0;
+            eval {
+                my $to_delete = $total - $max_records;
+                $to_delete = 500 if $to_delete > 500;
+                my $sel = $dbh->prepare(
+                    "SELECT id FROM system_log ORDER BY id ASC LIMIT ?"
+                );
+                $sel->execute($to_delete);
+                my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref };
+                if (@ids) {
+                    my $placeholders = join(',', ('?') x scalar @ids);
+                    my $n = $dbh->do(
+                        "DELETE FROM system_log WHERE id IN ($placeholders)",
+                        undef, @ids
+                    ) || 0;
+                    $deleted += ($n == 0+$n) ? $n : 0;
+                }
+            };
+            if ($@) {
+                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                    'prune_old_records', "prune max_records cap failed: $@");
+            }
         }
     };
     if ($@) {
