@@ -47,6 +47,12 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
+    system_identifier => {
+        data_type      => 'varchar',
+        size           => 255,
+        is_nullable    => 1,
+        default_value  => undef,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
