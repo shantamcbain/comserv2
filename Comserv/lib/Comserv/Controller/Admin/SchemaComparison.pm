@@ -78,11 +78,18 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    unless ($self->admin_auth->check_admin_access($c, 'sync_table_to_result')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_table_to_result');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
+        }
     }
     
     my $json_data;
@@ -512,11 +519,18 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    unless ($self->admin_auth->check_admin_access($c, 'sync_result_to_table')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_result_to_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
+        }
     }
     
     my $json_data;
@@ -601,11 +615,18 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    unless ($self->admin_auth->check_admin_access($c, 'create_result_from_table')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'create_result_from_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
+        }
     }
     
     my $json_data;
@@ -699,11 +720,30 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
         "Starting create_table_from_result action");
     
-    unless ($self->admin_auth->check_admin_access($c, 'create_table_from_result')) {
+    my $is_auth = $self->admin_auth->check_admin_access($c, 'create_table_from_result');
+    if (!$is_auth) {
+        my $roles = $c->session->{roles} || [];
+        $is_auth = 1 if ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles;
+        $is_auth = 1 if !ref($roles) && $roles =~ /\badmin\b/i;
+        $is_auth = 1 if $c->session->{is_admin};
+    }
+    unless ($is_auth) {
+        my $roles     = $c->session->{roles} || [];
+        my $roles_str = ref($roles) eq 'ARRAY' ? join(',', @$roles) : ($roles // '');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result',
-            "Access denied for create_table_from_result");
+            "Access denied: username=" . ($c->session->{username} // 'UNSET')
+            . " roles=$roles_str is_admin=" . ($c->session->{is_admin} // 'UNSET'));
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
+        $c->stash(json => {
+            success  => 0,
+            error    => 'Access denied - admin role required',
+            debug    => {
+                username  => $c->session->{username} // 'UNSET',
+                roles     => $roles_str,
+                is_admin  => $c->session->{is_admin} // 'UNSET',
+                sitename  => $c->session->{SiteName} // 'UNSET',
+            },
+        });
         $c->forward('View::JSON');
         return;
     }
