@@ -61,7 +61,7 @@
                                 <td>[% ev.cat | html %]</td>
                                 <td>[% ev.count | html %]</td>
                                 <td>[% ev.score | html %]</td>
-                                <td><small>[% ev.rec.system_identifier | html %]</small></td>
+                                <td><small>[% ev.inst | html %]</small></td>
                                 <td><small>[% ev.rec.message | html | truncate(80) %]</small></td>
                             </tr>
                         [% END %]
@@ -136,7 +136,7 @@
                                 [% END %]
                             [% ELSE %]
                                 <tr>
-                                    <td colspan="6" class="empty-state">No logs found matching criteria.</td>
+                                    <td colspan="7" class="empty-state">No logs found matching criteria.</td>
                                 </tr>
                             [% END %]
                         </tbody>
