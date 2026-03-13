@@ -149,13 +149,20 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
 (function() {
     var hours = [% hours | html %];
     var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours;
-    fetch(url, { credentials: 'same-origin' })
+    fetch(url, { credentials: 'same-origin', redirect: 'manual' })
         .then(function(r) {
+            if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+                document.getElementById('audit-stats-container').innerHTML =
+                    '<div class="error">Session expired — please <a href="/user/login?destination=[% c.req.uri | uri | html %]">log in again</a> to view audit statistics.</div>';
+                return;
+            }
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.text();
         })
         .then(function(html) {
-            document.getElementById('audit-stats-container').innerHTML = html;
+            if (html !== undefined) {
+                document.getElementById('audit-stats-container').innerHTML = html;
+            }
         })
         .catch(function(err) {
             document.getElementById('audit-stats-container').innerHTML =
