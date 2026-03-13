@@ -39,6 +39,11 @@ our %LEVEL_PRIORITY = (
 );
 our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 
+# Minimum level to write to the DB system_log table.
+# DEBUG and INFO go only to the file log; WARN/ERROR/CRITICAL go to DB.
+# This prevents millions of low-value rows from filling the table.
+our $DB_LOG_MIN_LEVEL = 'WARN';
+
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
     my ($msg) = @_;
@@ -274,11 +279,16 @@ sub log_with_details {
     log_to_file($log_message, undef, $level);
     _print_log($log_message);
 
-    # Log to database
-    if ($c && ref($c) && $c->can('model')) {
+    # Log to database — only WARN and above to keep the table manageable.
+    # DEBUG/INFO messages go to file log only.
+    my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
+    my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
+    if ($c && ref($c) && $c->can('model') && $level_prio >= $db_min_prio) {
         my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
         my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
         eval {
+            my $dbh = $c->model('DBEncy')->storage->dbh;
+            $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
             $c->model('DBEncy')->resultset('SystemLog')->create({
                 timestamp         => $timestamp,
                 level             => $level,
@@ -294,6 +304,8 @@ sub log_with_details {
         if ($@) {
             # Retry without system_identifier in case the column hasn't been added yet
             eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
                 $c->model('DBEncy')->resultset('SystemLog')->create({
                     timestamp  => $timestamp,
                     level      => $level,

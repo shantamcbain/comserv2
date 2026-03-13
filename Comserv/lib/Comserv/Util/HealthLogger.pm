@@ -282,22 +282,29 @@ sub prune_old_records {
 
     my $deleted = 0;
     eval {
+        my $dbh = $schema->storage->dbh;
+
         for my $level (keys %retention_days) {
             my $cutoff = strftime('%Y-%m-%d %H:%M:%S',
                 localtime(time() - $retention_days{$level} * 86400));
-            $deleted += $schema->resultset('SystemLog')->search({
-                level     => $level,
-                timestamp => { '<' => $cutoff },
-            })->delete;
+            my $n = $dbh->do(
+                "DELETE FROM system_log WHERE level = ? AND timestamp < ? LIMIT 5000",
+                undef, $level, $cutoff
+            ) || 0;
+            $deleted += ($n == 0+$n) ? $n : 0;
         }
 
-        my $total = $schema->resultset('SystemLog')->count;
-        if ($total > $max_records) {
+        my ($total) = $dbh->selectrow_array(
+            "SELECT TABLE_ROWS FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+        );
+        if (($total // 0) > $max_records) {
             my $to_delete = $total - $max_records;
-            $deleted += $schema->resultset('SystemLog')->search(
-                {},
-                { order_by => 'id', rows => $to_delete }
-            )->delete;
+            my $n = $dbh->do(
+                "DELETE FROM system_log ORDER BY id ASC LIMIT ?",
+                undef, $to_delete
+            ) || 0;
+            $deleted += ($n == 0+$n) ? $n : 0;
         }
     };
     if ($@) {
@@ -364,102 +371,103 @@ sub audit_stats {
         localtime(time() - $hours * 3600));
 
     my %stats;
-    eval {
-        # Total count
-        $stats{total}    = $schema->resultset('SystemLog')->count;
-        $stats{recent}   = $schema->resultset('SystemLog')->search({ timestamp => { '>=' => $cutoff } })->count;
-        $stats{hours}    = $hours;
+    $stats{hours} = $hours;
 
-        # Counts by level
+    eval {
+        my $dbh = $schema->storage->dbh;
+
+        # --- 1. Total (fast estimate) + recent count ---
+        my ($total) = $dbh->selectrow_array(
+            "SELECT TABLE_ROWS FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+        );
+        $stats{total} = $total // 0;
+
+        my ($recent) = $dbh->selectrow_array(
+            "SELECT COUNT(*) FROM system_log WHERE timestamp >= ?",
+            undef, $cutoff
+        );
+        $stats{recent} = $recent // 0;
+
+        # --- 2. Counts by level (total + recent) in one query ---
+        my %retention = (DEBUG => 1, INFO => 2, WARN => 7, ERROR => 30, CRITICAL => 90);
+        my $now = time();
+        my %prune_est;
+
+        my $level_sth = $dbh->prepare(
+            "SELECT level, COUNT(*) as total, SUM(timestamp >= ?) as recent FROM system_log GROUP BY level"
+        );
+        $level_sth->execute($cutoff);
+        my %level_map;
+        while (my $row = $level_sth->fetchrow_hashref) {
+            $level_map{ uc($row->{level}) } = {
+                level  => uc($row->{level}),
+                total  => $row->{total}  // 0,
+                recent => $row->{recent} // 0,
+            };
+        }
         my @level_rows;
         for my $lvl (qw(DEBUG INFO WARN ERROR CRITICAL)) {
-            my $n = $schema->resultset('SystemLog')->search({ level => $lvl })->count;
-            my $n_recent = $schema->resultset('SystemLog')->search({ level => $lvl, timestamp => { '>=' => $cutoff } })->count;
-            push @level_rows, { level => $lvl, total => $n, recent => $n_recent };
+            push @level_rows, $level_map{$lvl} // { level => $lvl, total => 0, recent => 0 };
         }
         $stats{by_level} = \@level_rows;
 
-        # Top subroutines generating records (last $hours hours)
-        my @sub_rows;
-        {
-            my $rs = $schema->resultset('SystemLog')->search(
-                { timestamp => { '>=' => $cutoff } },
-                {
-                    select   => [ 'subroutine', 'level', { count => 'id', -as => 'cnt' } ],
-                    as       => [ 'subroutine', 'level', 'cnt' ],
-                    group_by => [ 'subroutine', 'level' ],
-                    order_by => { -desc => 'cnt' },
-                    rows     => $limit,
-                }
+        # --- 3. Pruning estimates: rows older than retention per level ---
+        for my $lvl (keys %retention) {
+            my $cutoff_lvl = strftime('%Y-%m-%d %H:%M:%S',
+                localtime($now - $retention{$lvl} * 86400));
+            my ($n) = $dbh->selectrow_array(
+                "SELECT COUNT(*) FROM system_log WHERE level = ? AND timestamp < ?",
+                undef, $lvl, $cutoff_lvl
             );
-            while (my $r = $rs->next) {
-                push @sub_rows, {
-                    subroutine => $r->get_column('subroutine'),
-                    level      => $r->get_column('level'),
-                    count      => $r->get_column('cnt'),
-                };
-            }
+            $prune_est{$lvl} = $n // 0;
+        }
+        $stats{prune_estimates} = \%prune_est;
+        $stats{prune_total}     = 0;
+        $stats{prune_total}    += $_ for values %prune_est;
+
+        # --- 4. Top subroutines (last $hours hours) ---
+        my $sub_sth = $dbh->prepare(
+            "SELECT subroutine, level, COUNT(*) as cnt FROM system_log
+             WHERE timestamp >= ? GROUP BY subroutine, level ORDER BY cnt DESC LIMIT ?"
+        );
+        $sub_sth->execute($cutoff, $limit);
+        my @sub_rows;
+        while (my $row = $sub_sth->fetchrow_hashref) {
+            push @sub_rows, {
+                subroutine => $row->{subroutine},
+                level      => $row->{level},
+                count      => $row->{cnt},
+            };
         }
         $stats{top_subroutines} = \@sub_rows;
 
-        # Top source files generating records (last $hours hours)
+        # --- 5. Top source files (last $hours hours) ---
+        my $file_sth = $dbh->prepare(
+            "SELECT file, COUNT(*) as cnt FROM system_log
+             WHERE timestamp >= ? GROUP BY file ORDER BY cnt DESC LIMIT ?"
+        );
+        $file_sth->execute($cutoff, $limit);
         my @file_rows;
-        {
-            my $rs = $schema->resultset('SystemLog')->search(
-                { timestamp => { '>=' => $cutoff } },
-                {
-                    select   => [ 'file', { count => 'id', -as => 'cnt' } ],
-                    as       => [ 'file', 'cnt' ],
-                    group_by => ['file'],
-                    order_by => { -desc => 'cnt' },
-                    rows     => $limit,
-                }
-            );
-            while (my $r = $rs->next) {
-                push @file_rows, {
-                    file  => $r->get_column('file'),
-                    count => $r->get_column('cnt'),
-                };
-            }
+        while (my $row = $file_sth->fetchrow_hashref) {
+            push @file_rows, { file => $row->{file}, count => $row->{cnt} };
         }
         $stats{top_files} = \@file_rows;
 
-        # Top system_identifiers (which server/container is logging the most)
+        # --- 6. Top system_identifiers ---
         my @inst_rows;
         eval {
-            my $rs = $schema->resultset('SystemLog')->search(
-                { timestamp => { '>=' => $cutoff } },
-                {
-                    select   => [ 'system_identifier', { count => 'id', -as => 'cnt' } ],
-                    as       => [ 'system_identifier', 'cnt' ],
-                    group_by => ['system_identifier'],
-                    order_by => { -desc => 'cnt' },
-                    rows     => 10,
-                }
+            my $inst_sth = $dbh->prepare(
+                "SELECT COALESCE(system_identifier, '(unknown)') as inst,
+                        COUNT(*) as cnt FROM system_log
+                 WHERE timestamp >= ? GROUP BY system_identifier ORDER BY cnt DESC LIMIT 10"
             );
-            while (my $r = $rs->next) {
-                push @inst_rows, {
-                    instance => $r->get_column('system_identifier') // '(unknown)',
-                    count    => $r->get_column('cnt'),
-                };
+            $inst_sth->execute($cutoff);
+            while (my $row = $inst_sth->fetchrow_hashref) {
+                push @inst_rows, { instance => $row->{inst}, count => $row->{cnt} };
             }
         };
         $stats{top_instances} = \@inst_rows;
-
-        # Pruning estimates: how many rows would be removed per level
-        my %prune_est;
-        my %retention = (DEBUG => 1, INFO => 2, WARN => 7, ERROR => 30, CRITICAL => 90);
-        for my $lvl (keys %retention) {
-            my $cutoff_lvl = strftime('%Y-%m-%d %H:%M:%S',
-                localtime(time() - $retention{$lvl} * 86400));
-            $prune_est{$lvl} = $schema->resultset('SystemLog')->search({
-                level     => $lvl,
-                timestamp => { '<' => $cutoff_lvl },
-            })->count;
-        }
-        $stats{prune_estimates} = \%prune_est;
-        $stats{prune_total} = 0;
-        $stats{prune_total} += $_ for values %prune_est;
     };
     if ($@) {
         $stats{error} = "$@";
