@@ -629,7 +629,7 @@
                 }
 
                 containersData = data.containers;
-                displayContainers(data.containers);
+                displayContainers(data.containers, data.host);
                 updateServiceDropdown(data.containers);
             })
             .catch(error => {
@@ -701,17 +701,24 @@
         volumesList.innerHTML = html;
     }
 
-    function displayContainers(containers) {
+    function displayContainers(containers, host) {
         if (!containers || containers.length === 0) {
             containersList.innerHTML = '<p style="color: #666; text-align: center;">No containers found</p>';
             return;
         }
 
-        let html = '';
+        const hostLabel = host ? `<div style="margin-bottom:10px;padding:6px 10px;background:#e9ecef;border-radius:4px;font-size:13px;"><strong>Server:</strong> ${host}</div>` : '';
+        let html = hostLabel;
         containers.forEach(container => {
             const stateColor = getStateColor(container.state);
             const stateIcon = getStateIcon(container.state);
-            const isRunning = ['running', 'up'].includes(container.state.toLowerCase());
+            const isRunning = ['running', 'up'].includes((container.state||'').toLowerCase());
+            const displayName = container.name || container.id || '(unnamed)';
+            const healthBadge = container.status && container.status.includes('healthy') && !container.status.includes('unhealthy')
+                ? '<span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">healthy</span>'
+                : container.status && container.status.includes('unhealthy')
+                ? '<span style="background:#dc3545;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">unhealthy</span>'
+                : '';
 
             html += `
                 <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: #fff;">
@@ -719,31 +726,20 @@
                         <div style="flex: 1;">
                             <h4 style="margin: 0 0 5px 0; color: #333;">
                                 <span style="color: ${stateColor}; margin-right: 8px;">${stateIcon}</span>
-                                ${container.service}
+                                ${displayName}${healthBadge}
                             </h4>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                <strong>Container:</strong> ${container.name}
+                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                                <strong>Image:</strong> ${container.image || ''}
                             </div>
-                            ${container.description ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Description:</strong> ${container.description}
-                                </div>
-                            ` : ''}
-                            ${container.image ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Image:</strong> ${container.image}
-                                </div>
-                            ` : ''}
-                            ${container.ports && container.ports.length > 0 ? `
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                                    <strong>Ports:</strong> ${container.ports.join(', ')}
-                                </div>
-                            ` : ''}
+                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                                <strong>ID:</strong> <code>${container.id || ''}</code>
+                                &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
+                            </div>
+                            ${container.ports ? `<div style="font-size:12px;color:#666;margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
                             <div style="font-size: 12px;">
                                 <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
-                                    ${container.state.toUpperCase()}
+                                    ${(container.state||'unknown').toUpperCase()}
                                 </span>
-                                <span style="color: #666; margin-left: 10px;">${container.status}</span>
                             </div>
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
