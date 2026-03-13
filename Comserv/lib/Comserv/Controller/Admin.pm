@@ -4748,24 +4748,40 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    # Parse JSON output (one JSON object per line)
+    # Identify this host for display
+    my $host_id = $ENV{SYSTEM_IDENTIFIER} || do {
+        my $h = '';
+        eval { require Sys::Hostname; $h = Sys::Hostname::hostname() };
+        $h || 'unknown';
+    };
+
+    # Parse JSON output — one JSON object per line from docker ps --format '{{json .}}'
     my @containers;
     foreach my $line (split /\n/, $output) {
         next unless $line =~ /^\{/;
         eval {
-            my $container = decode_json($line);
+            my $ct = decode_json($line);
+            my $image  = $ct->{Image} || '';
+            my $name   = $ct->{Names} || $ct->{Name} || '';
+
+            # Skip Kubernetes pause/infrastructure containers — they are noise
+            next if $image =~ m{registry\.k8s\.io|k8s\.gcr\.io|pause:|gcr\.io/pause};
+            # Skip anonymous intermediate image IDs with no useful name
+            next if !$name && $image =~ /^[0-9a-f]{12}$/;
+
             push @containers, {
-                name => $container->{Name} || '',
-                service => $container->{Service} || '',
-                state => $container->{State} || 'unknown',
-                status => $container->{Status} || '',
-                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
-                image => $container->{Image} || ''
+                name   => $name,
+                image  => $image,
+                id     => substr($ct->{ID} || '', 0, 12),
+                state  => $ct->{State}  || 'unknown',
+                status => $ct->{Status} || '',
+                ports  => $ct->{Ports}  || '',
+                host   => $host_id,
             };
         };
     }
-    
-    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+
+    $c->response->body(encode_json({ success => 1, containers => \@containers, host => $host_id }));
     $c->response->content_type('application/json');
 }
 
