@@ -130,7 +130,7 @@ header h1 {
     <div style="text-align: right;">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
-        Server: <strong>[% app_workflow %] ([% c.forward('/get_server_ip') %])</strong> |
+        Server: <strong>[% system_identifier || app_workflow %]</strong> | Branch: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
         [% IF c.session.debug_mode == 1 %] | [% END %] |

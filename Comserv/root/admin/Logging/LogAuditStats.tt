@@ -36,7 +36,7 @@
             </tr>
         </thead>
         <tbody>
-        [% SET retention = { DEBUG => '1 day', INFO => '2 days', WARN => '7 days', ERROR => '30 days', CRITICAL => '90 days' } %]
+        [% SET retention = { 'DEBUG' => '1 day', 'INFO' => '2 days', 'WARN' => '7 days', 'ERROR' => '30 days', 'CRITICAL' => '90 days' } %]
         [% FOR row IN audit.by_level %]
             [% SET prune_n = audit.prune_estimates.${row.level} || 0 %]
             <tr class="level-[% row.level | lower %]">
