@@ -324,8 +324,12 @@ sub _start_health_evaluator {
                     if (time() - $last_prune >= $prune_interval_sec) {
                         my $deleted = Comserv::Util::HealthLogger->prune_old_records(
                             $schema,
-                            prune_days  => $ENV{HEALTH_PRUNE_DAYS}    // 7,
-                            max_records => $ENV{HEALTH_MAX_RECORDS}    // 10000,
+                            debug_days    => $ENV{HEALTH_DEBUG_DAYS}    // 1,
+                            info_days     => $ENV{HEALTH_INFO_DAYS}     // 2,
+                            warn_days     => $ENV{HEALTH_WARN_DAYS}     // 7,
+                            error_days    => $ENV{HEALTH_ERROR_DAYS}    // 30,
+                            critical_days => $ENV{HEALTH_CRITICAL_DAYS} // 90,
+                            max_records   => $ENV{HEALTH_MAX_RECORDS}   // 10000,
                         );
                         $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
                             'health_prune',

@@ -141,6 +141,10 @@ sub prune :Path('/admin/logging/audit/prune') :Args(0) {
 
     if ($error) {
         $c->flash->{error_msg}   = "Prune failed: $error";
+    } elsif ($deleted == 0) {
+        $c->flash->{info_msg} = "Prune ran but deleted 0 records. "
+            . "Either all records are within retention, or the table is already under max_records. "
+            . "Check the application log (prune_old_records) for details.";
     } else {
         $c->flash->{success_msg} = "Pruned $deleted records from system_log.";
     }
