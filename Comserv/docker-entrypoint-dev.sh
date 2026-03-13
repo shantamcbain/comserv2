@@ -120,6 +120,24 @@ fi
 # Generate supervisor config with dynamic port
 bash ${CATALYST_HOME}/create-supervisor-config.sh
 
+# Create workshop files directory on shared volume
+if [ "${SKIP_NFS_SETUP}" != "1" ]; then
+  WORKSHOP_DIR="/data/nfs/workshop_files"
+  if [ -d "/data/nfs" ]; then
+    echo "✓ Using existing NFS mount at /data/nfs"
+    if [ ! -d "$WORKSHOP_DIR" ]; then
+        echo "Creating workshop files directory: $WORKSHOP_DIR"
+        mkdir -p "$WORKSHOP_DIR"
+        chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
+        chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
+    fi
+  else
+    echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
+  fi
+else
+  echo "✓ Skipping NFS setup (SKIP_NFS_SETUP=1) - using existing NFS mount"
+fi
+
 # Log the port configuration
 PORT=${WEB_PORT:-3000}
 echo "Starting Comserv with WEB_PORT=$PORT, CATALYST_ENV=${CATALYST_ENV:-production}, DEBUG=${CATALYST_DEBUG:-0}"

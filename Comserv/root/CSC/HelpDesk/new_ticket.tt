@@ -11,6 +11,7 @@
     
     <div class="ticket-form">
         <form method="post" action="[% c.uri_for('/HelpDesk/ticket/submit') %]">
+            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <div class="form-group">
                 <label for="subject">Subject:</label>
                 <input type="text" id="subject" name="subject" class="form-control" required>

@@ -1,7 +1,7 @@
 /* Theme: apis */
 :root {
-  --accent-color: #FF9900;
-  --background-color: #f9f06b;
+  --accent-color: #000000;
+  --background-color: rgba(249, 240, 107, 0.4);
   --body-font: Arial, sans-serif;
   --border-color: #e5a50a;
   --button-bg: #e5a50a;
@@ -14,12 +14,14 @@
   --font-size-xlarge: 28px;
   --header-color: #000000;
   --header-font: Arial, sans-serif;
-  --link-color: #f9f06b;
-  --link-decoration: none;
-  --link-hover-color: #f8e45c;
+  --link-color: #000000;
+  --link-decoration: underline;
+  --link-hover-color: #444444;
   --nav-bg: #ff9900;
   --nav-hover-bg: #f6d32d;
   --nav-text: #000000;
+  --nav-link-color: #000000;
+  --dropdown-bg: rgba(249, 240, 107, 0.9);
   --primary-color: #ccffff;
   --secondary-color: #4A4A4A;
   --site-name-color: #000000;
@@ -27,11 +29,16 @@
   --site-name-size: 24px;
   --site-name-weight: normal;
   --success-color: #4CAF50;
-  --table-header-bg: #f2f2f2;
+  --table-header-bg: rgba(242, 242, 242, 0.6);
   --text-color: #000000;
-  --warning-color: red;
+  --warning-color: #cc0000;
+  --background-image: url('/static/images/BMaster/honey2.jpg');
 }
 
-body {
-  background-image: url(../images/BMaster/honey2.jpg);
+body.theme-apis {
+  background-image: var(--background-image) !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+  background-color: #f9f06b !important;
 }
+

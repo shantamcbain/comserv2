@@ -6,6 +6,7 @@ use DBI;
 use Try::Tiny;
 use File::Path qw(make_path);
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -17,6 +18,8 @@ has 'logging' => (
 # Check if setup is needed and bypass for setup actions
 sub auto :Private {
     my ($self, $c) = @_;
+    
+    Comserv::Util::CSRF::ensure_token($c);
     
     # Skip setup check if we're already in setup or if it's a static asset
     return 1 if $c->action->name eq 'setup';
@@ -101,6 +104,12 @@ sub setup :Path('/setup') :Args(0) {
         "Setup page accessed - " . $c->req->method . " request");
     
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup',
+                "CSRF validation failed for setup POST");
+            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
+            return;
+        }
         my $params = $c->req->params;
         
         my $config = {
@@ -200,74 +209,80 @@ sub k8s_secrets :Path('/setup/k8s-secrets') :Args(0) {
     
     # Handle POST request (create K8s secrets)
     if ($c->req->method eq 'POST') {
-        my $params = $c->req->params;
-        my $action = $params->{action} || '';
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
-            "POST request received with action: $action");
-        
-        if ($action eq 'create_from_json') {
-            eval {
-                my $config = decode_json($db_config_content);
-                $self->_create_k8s_secrets($c, $config);
-                
-                my $test_results = $self->_test_all_connections($c, $config);
-                $c->stash(
-                    success_msg => 'K8s secrets created successfully from db_config.json',
-                    test_results => $test_results
-                );
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
-                    "K8s secrets created from db_config.json - testing connections...");
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
-                    "Failed to create K8s secrets from JSON: $@");
-                $c->stash(error_msg => "Failed to create K8s secrets: $@");
-            }
-        } elsif ($action eq 'create_from_form') {
-            eval {
-                my $config = {
-                    'production_server' => {
-                        db_type => $params->{db_type} || 'mariadb',
-                        host => $params->{host},
-                        port => $params->{port} || 3306,
-                        username => $params->{username},
-                        password => $params->{password},
-                        database => $params->{database},
-                        description => 'Production Server Configuration',
-                        priority => 1
-                    }
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'k8s_secrets',
+                "CSRF validation failed for k8s_secrets POST");
+            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
+        } else {
+            my $params = $c->req->params;
+            my $action = $params->{action} || '';
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
+                "POST request received with action: $action");
+            
+            if ($action eq 'create_from_json') {
+                eval {
+                    my $config = decode_json($db_config_content);
+                    $self->_create_k8s_secrets($c, $config);
+                    
+                    my $test_results = $self->_test_all_connections($c, $config);
+                    $c->stash(
+                        success_msg => 'K8s secrets created successfully from db_config.json',
+                        test_results => $test_results
+                    );
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
+                        "K8s secrets created from db_config.json - testing connections...");
                 };
-                
-                $self->_create_k8s_secrets($c, $config);
-                
-                my $test_results = $self->_test_all_connections($c, $config);
-                $c->stash(
-                    success_msg => 'K8s secrets created successfully from form input',
-                    test_results => $test_results
-                );
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
-                    "K8s secrets created from form input (connection: production_server) - testing connection...");
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
-                    "Failed to create K8s secrets from form: $@");
-                $c->stash(error_msg => "Failed to create K8s secrets: $@");
-            }
-        } elsif ($action eq 'create_env_file') {
-            eval {
-                $self->_create_env_file($c, $params);
-                $c->stash(success_msg => '.env file created successfully - remember to source it before running the app');
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
-                    ".env file created at .env.local");
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
-                    "Failed to create .env file: $@");
-                $c->stash(error_msg => "Failed to create .env file: $@");
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
+                        "Failed to create K8s secrets from JSON: $@");
+                    $c->stash(error_msg => "Failed to create K8s secrets: $@");
+                }
+            } elsif ($action eq 'create_from_form') {
+                eval {
+                    my $config = {
+                        'production_server' => {
+                            db_type => $params->{db_type} || 'mariadb',
+                            host => $params->{host},
+                            port => $params->{port} || 3306,
+                            username => $params->{username},
+                            password => $params->{password},
+                            database => $params->{database},
+                            description => 'Production Server Configuration',
+                            priority => 1
+                        }
+                    };
+                    
+                    $self->_create_k8s_secrets($c, $config);
+                    
+                    my $test_results = $self->_test_all_connections($c, $config);
+                    $c->stash(
+                        success_msg => 'K8s secrets created successfully from form input',
+                        test_results => $test_results
+                    );
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
+                        "K8s secrets created from form input (connection: production_server) - testing connection...");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
+                        "Failed to create K8s secrets from form: $@");
+                    $c->stash(error_msg => "Failed to create K8s secrets: $@");
+                }
+            } elsif ($action eq 'create_env_file') {
+                eval {
+                    $self->_create_env_file($c, $params);
+                    $c->stash(success_msg => '.env file created successfully - remember to source it before running the app');
+                    
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'k8s_secrets',
+                        ".env file created at .env.local");
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'k8s_secrets',
+                        "Failed to create .env file: $@");
+                    $c->stash(error_msg => "Failed to create .env file: $@");
+                }
             }
         }
     }

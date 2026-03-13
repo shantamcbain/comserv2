@@ -23,6 +23,7 @@
         </div>
         <div class="card-body">
             <form method="post" action="[% c.uri_for('/CSC/email_test') %]">
+                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <div class="form-group">
                     <label for="to">Recipient Email:</label>
                     <input type="email" id="to" name="to" class="form-control" required>

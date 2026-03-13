@@ -200,11 +200,17 @@
                 </div>
                 <div class="key-actions">
                     <a href="[% c.uri_for('/ai/edit_api_key', key.id) %]" class="btn btn-secondary">Edit Key</a>
+                    <button type="button" class="btn btn-primary sync-models-btn" 
+                            data-service="[% key.service %]"
+                            title="Fetch latest available models from [% key.service %] API">
+                        🔄 Sync Models
+                    </button>
                     <form method="POST" action="[% c.uri_for('/ai/delete_api_key', key.id) %]" style="display: inline;" 
                           onsubmit="return confirm('Are you sure you want to delete the API key for [% key.service %]?');">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
+                <div class="sync-result-[% key.service %]" style="margin-top:10px;display:none;"></div>
             </div>
             [% END %]
         [% ELSE %]
@@ -218,3 +224,42 @@
         [% END %]
     </div>
 </div>
+
+<script>
+document.querySelectorAll('.sync-models-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const service = this.dataset.service;
+        const resultDiv = document.querySelector('.sync-result-' + service);
+        btn.disabled = true;
+        btn.textContent = '⏳ Syncing...';
+        if (resultDiv) { resultDiv.style.display = 'none'; }
+
+        fetch('/ai/sync_models?service=' + encodeURIComponent(service), {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '🔄 Sync Models';
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                if (data.success) {
+                    const names = data.models.map(function(m){ return m.id; }).join(', ');
+                    resultDiv.innerHTML = '<span style="color:green;">✅ Synced ' + data.count + ' models: <small>' + names + '</small></span>';
+                } else {
+                    resultDiv.innerHTML = '<span style="color:red;">❌ ' + (data.error || 'Sync failed') + '</span>';
+                }
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '🔄 Sync Models';
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<span style="color:red;">❌ Network error: ' + err.message + '</span>';
+            }
+        });
+    });
+});
+</script>

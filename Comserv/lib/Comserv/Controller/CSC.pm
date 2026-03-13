@@ -2,6 +2,7 @@ package Comserv::Controller::CSC;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -15,6 +16,7 @@ has 'logging' => (
 
 sub auto :Private {
     my ($self, $c) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "CSC controller auto method called");
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: " . $c->req->uri->path);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request method: " . $c->req->method);
@@ -98,6 +100,13 @@ sub email_test :Local :Args(0) {
     
     # If this is a form submission, process it
     if ($c->req->method eq 'POST') {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'email_test',
+                "CSRF validation failed for email_test POST");
+            $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
+            $c->response->redirect($c->uri_for('/CSC/email_test'));
+            return;
+        }
         my $to = $c->req->params->{to};
         my $subject = $c->req->params->{subject} || 'Test Email from Comserv';
         my $message = $c->req->params->{message} || 'This is a test email from the Comserv system.';

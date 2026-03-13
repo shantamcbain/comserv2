@@ -163,8 +163,9 @@ if ($ENV{CATALYST_DEBUG}) {
 sub _apply_safe_restart_defaults {
     my @args = @_;
 
-    my $has_restart = 0;
+    my $has_restart       = 0;
     my $has_restart_regex = 0;
+    my $has_fork          = 0;
 
     for (my $i = 0; $i < @args; $i++) {
         my $arg = $args[$i];
@@ -182,12 +183,27 @@ sub _apply_safe_restart_defaults {
         if ($arg =~ /^-rr=/ || $arg =~ /^--restart_regex=/) {
             $has_restart_regex = 1;
         }
+
+        if ($arg eq '-f' || $arg eq '--fork') {
+            $has_fork = 1;
+        }
     }
 
     if ($has_restart && !$has_restart_regex) {
         my $safe_restart_regex =
             '^(?!.*(?:^|[\\/])logs?(?:[\\/]|$)).*\\.(?:pm|pl|psgi|tt|tt2|tmpl|yml|yaml|conf|css|js)$';
         push @args, ('--restart_regex', $safe_restart_regex);
+    }
+
+    # --fork caused session race-conditions: the pre-login session cookie would
+    # persist after login because concurrent forked child processes (e.g. the
+    # AI AJAX poll) could overwrite the newly-created login session file before
+    # the redirect response reached the browser.
+    # --fork is therefore NO LONGER added automatically.  Pass -f/--fork on the
+    # command line if you explicitly need it (e.g. for AI/Ollama testing), or
+    # set CATALYST_FORCE_FORK=1 in the environment.
+    if (!$has_fork && $ENV{CATALYST_FORCE_FORK}) {
+        push @args, '--fork';
     }
 
     return @args;

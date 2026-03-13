@@ -415,6 +415,7 @@ document.getElementById('add-cluster-form').addEventListener('submit', function(
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRF-Token': '[% csrf_token %]',
         },
         body: new URLSearchParams(data)
     })
@@ -460,7 +461,10 @@ function deployMonitoring(clusterName) {
     logDiv.innerHTML = '<strong>Starting deployment...</strong><br>';
     
     fetch('/admin/infrastructure/deploy/monitoring/' + clusterName, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'X-CSRF-Token': '[% csrf_token %]'
+        }
     })
     .then(response => response.json())
     .then(result => {
@@ -505,6 +509,7 @@ function openKubectlConsole(clusterName) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRF-Token': '[% csrf_token %]',
         },
         body: new URLSearchParams({
             cluster: clusterName,
@@ -570,7 +575,12 @@ function refreshContainers() {
 function dockerAction(action, service) {
     if (!confirm(`Are you sure you want to ${action} ${service}?`)) return;
     
-    fetch(`/admin/docker/${action}/${service}`, { method: 'POST' })
+    fetch(`/admin/docker/${action}/${service}`, { 
+        method: 'POST',
+        headers: {
+            'X-CSRF-Token': '[% csrf_token %]'
+        }
+    })
     .then(response => response.json())
     .then(result => {
         if (result.success) {
