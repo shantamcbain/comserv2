@@ -281,73 +281,95 @@ sub prune_old_records {
     );
 
     my $deleted = 0;
+    my @detail_msgs;
+
     eval {
         my $dbh = $schema->storage->dbh;
-        # 5-second timeout for admin prune operations
-        $dbh->do('SET SESSION innodb_lock_wait_timeout = 5');
+        $dbh->do('SET SESSION innodb_lock_wait_timeout = 10');
 
-        for my $level (keys %retention_days) {
-            my $cutoff = strftime('%Y-%m-%d %H:%M:%S',
-                localtime(time() - $retention_days{$level} * 86400));
-
-            # Two-phase approach: SELECT ids first (non-locking), then DELETE by PK.
-            # Deleting by primary key is fast and holds minimal row locks.
-            eval {
-                my $sel = $dbh->prepare(
-                    "SELECT id FROM system_log
-                     WHERE LOWER(level) = LOWER(?) AND timestamp < ?
-                     ORDER BY id ASC LIMIT 500"
-                );
-                $sel->execute($level, $cutoff);
-                my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref };
-                if (@ids) {
-                    my $placeholders = join(',', ('?') x scalar @ids);
-                    my $n = $dbh->do(
-                        "DELETE FROM system_log WHERE id IN ($placeholders)",
-                        undef, @ids
-                    ) || 0;
-                    $deleted += ($n == 0+$n) ? $n : 0;
-                }
-            };
-            if ($@) {
-                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
-                    'prune_old_records', "prune skipped level=$level: $@");
-            }
+        # --- Phase 1: retention-based pruning ---
+        # Scan oldest 2000 rows by PK (fast — uses PK index, no full-table scan).
+        # For each row, if its level's retention period has expired, mark for deletion.
+        # This avoids slow full-table scans caused by non-indexed (level, timestamp) lookups.
+        my $now = time();
+        my %cutoffs;
+        for my $lvl (keys %retention_days) {
+            $cutoffs{lc $lvl} = strftime('%Y-%m-%d %H:%M:%S',
+                localtime($now - $retention_days{$lvl} * 86400));
         }
 
-        # Cap total rows: delete oldest first
-        my ($total) = $dbh->selectrow_array(
-            "SELECT TABLE_ROWS FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
-        );
-        if (($total // 0) > $max_records) {
-            eval {
+        eval {
+            my $sel = $dbh->prepare(
+                "SELECT id, level, timestamp FROM system_log ORDER BY id ASC LIMIT 2000"
+            );
+            $sel->execute;
+            my @to_delete;
+            while (my ($id, $level, $ts) = $sel->fetchrow_array) {
+                my $cutoff = $cutoffs{lc($level // '')} // $cutoffs{debug};
+                push @to_delete, $id if defined $cutoff && ($ts // '') lt $cutoff;
+                last if @to_delete >= 500;
+            }
+            if (@to_delete) {
+                my $ph = join(',', ('?') x scalar @to_delete);
+                my $n  = $dbh->do("DELETE FROM system_log WHERE id IN ($ph)",
+                                   undef, @to_delete) // 0;
+                $n = 0 unless $n =~ /^\d+$/;
+                $deleted += $n;
+                push @detail_msgs, "retention_prune: found=" . scalar(@to_delete) . " deleted=$n";
+            } else {
+                push @detail_msgs, "retention_prune: no eligible rows in oldest 2000";
+            }
+        };
+        if ($@) {
+            my $e = $@;
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                'prune_old_records', "retention prune failed: $e");
+            push @detail_msgs, "retention_prune error: $e";
+        }
+
+        # --- Phase 2: max-records cap ---
+        # Use information_schema estimate (fast) to decide whether culling is needed.
+        # Exact COUNT(*) on a 3M-row InnoDB table under active writes can take 10-20s.
+        eval {
+            my ($total) = $dbh->selectrow_array(
+                "SELECT TABLE_ROWS FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+            );
+            push @detail_msgs, "total_count=$total max_records=$max_records";
+            if (($total // 0) > $max_records) {
                 my $to_delete = $total - $max_records;
                 $to_delete = 500 if $to_delete > 500;
                 my $sel = $dbh->prepare(
                     "SELECT id FROM system_log ORDER BY id ASC LIMIT ?"
                 );
                 $sel->execute($to_delete);
-                my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref };
+                my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref // [] };
                 if (@ids) {
-                    my $placeholders = join(',', ('?') x scalar @ids);
-                    my $n = $dbh->do(
-                        "DELETE FROM system_log WHERE id IN ($placeholders)",
-                        undef, @ids
-                    ) || 0;
-                    $deleted += ($n == 0+$n) ? $n : 0;
+                    my $ph = join(',', ('?') x scalar @ids);
+                    my $n  = $dbh->do("DELETE FROM system_log WHERE id IN ($ph)",
+                                       undef, @ids) // 0;
+                    $n = 0 unless $n =~ /^\d+$/;
+                    $deleted += $n;
+                    push @detail_msgs, "cap_prune: cap=$to_delete deleted=$n";
                 }
-            };
-            if ($@) {
-                $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
-                    'prune_old_records', "prune max_records cap failed: $@");
             }
+        };
+        if ($@) {
+            my $e = $@;
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                'prune_old_records', "cap prune failed: $e");
+            push @detail_msgs, "cap_prune error: $e";
         }
     };
     if ($@) {
         $logging->log_with_details(undef, 'error', __FILE__, __LINE__,
-            'prune_old_records', "prune_old_records failed: $@");
+            'prune_old_records', "prune_old_records outer failed: $@");
     }
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__,
+        'prune_old_records',
+        "prune complete: deleted=$deleted | " . join(' | ', @detail_msgs));
+
     return $deleted;
 }
 
@@ -420,13 +442,7 @@ sub audit_stats {
         );
         $stats{total} = $total // 0;
 
-        my ($recent) = $dbh->selectrow_array(
-            "SELECT COUNT(*) FROM system_log WHERE timestamp >= ?",
-            undef, $cutoff
-        );
-        $stats{recent} = $recent // 0;
-
-        # --- 2. Counts by level (total + recent) in one query ---
+        # --- 2. Counts by level (total + recent) in one query; derive recent total from results ---
         my %retention = (DEBUG => 1, INFO => 2, WARN => 7, ERROR => 30, CRITICAL => 90);
         my $now = time();
         my %prune_est;
@@ -436,28 +452,48 @@ sub audit_stats {
         );
         $level_sth->execute($cutoff);
         my %level_map;
+        my $recent_total = 0;
         while (my $row = $level_sth->fetchrow_hashref) {
+            my $rec = $row->{recent} // 0;
+            $recent_total += $rec;
             $level_map{ uc($row->{level}) } = {
                 level  => uc($row->{level}),
                 total  => $row->{total}  // 0,
-                recent => $row->{recent} // 0,
+                recent => $rec,
             };
         }
+        $stats{recent} = $recent_total;
         my @level_rows;
         for my $lvl (qw(DEBUG INFO WARN ERROR CRITICAL)) {
             push @level_rows, $level_map{$lvl} // { level => $lvl, total => 0, recent => 0 };
         }
         $stats{by_level} = \@level_rows;
 
-        # --- 3. Pruning estimates: rows older than retention per level ---
+        # --- 3. Pruning estimates: one combined scan instead of 5 separate COUNT queries ---
+        my %cutoffs_for_est;
         for my $lvl (keys %retention) {
-            my $cutoff_lvl = strftime('%Y-%m-%d %H:%M:%S',
+            $cutoffs_for_est{$lvl} = strftime('%Y-%m-%d %H:%M:%S',
                 localtime($now - $retention{$lvl} * 86400));
-            my ($n) = $dbh->selectrow_array(
-                "SELECT COUNT(*) FROM system_log WHERE level = ? AND timestamp < ?",
-                undef, $lvl, $cutoff_lvl
-            );
-            $prune_est{$lvl} = $n // 0;
+        }
+        my $prune_sql = "SELECT level,
+            SUM(CASE
+                WHEN UPPER(level)='DEBUG'    AND timestamp < ? THEN 1
+                WHEN UPPER(level)='INFO'     AND timestamp < ? THEN 1
+                WHEN UPPER(level)='WARN'     AND timestamp < ? THEN 1
+                WHEN UPPER(level)='ERROR'    AND timestamp < ? THEN 1
+                WHEN UPPER(level)='CRITICAL' AND timestamp < ? THEN 1
+                ELSE 0 END) AS prune_cnt
+            FROM system_log GROUP BY level";
+        my $prune_sth = $dbh->prepare($prune_sql);
+        $prune_sth->execute(
+            $cutoffs_for_est{DEBUG},
+            $cutoffs_for_est{INFO},
+            $cutoffs_for_est{WARN},
+            $cutoffs_for_est{ERROR},
+            $cutoffs_for_est{CRITICAL},
+        );
+        while (my $row = $prune_sth->fetchrow_hashref) {
+            $prune_est{ uc($row->{level}) } = $row->{prune_cnt} // 0;
         }
         $stats{prune_estimates} = \%prune_est;
         $stats{prune_total}     = 0;
@@ -651,11 +687,11 @@ sub get_docker_health {
     my ($class) = @_;
     my @containers;
     eval {
-        # docker ps — one line per container, tab-separated
+        # docker ps — one line per container, tab-separated; timeout prevents hangs
         my @ps_lines;
         {
             local $SIG{CHLD} = 'DEFAULT';
-            open(my $fh, '-|', qw(docker ps --all --no-trunc
+            open(my $fh, '-|', qw(timeout 8 docker ps --all --no-trunc
                 --format), '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}')
                 or die "docker ps: $!";
             @ps_lines = <$fh>;
@@ -684,7 +720,7 @@ sub get_docker_health {
             if ($health eq 'unhealthy' || $health eq 'starting') {
                 eval {
                     local $SIG{CHLD} = 'DEFAULT';
-                    open(my $ifh, '-|', 'docker', 'inspect',
+                    open(my $ifh, '-|', 'timeout', '5', 'docker', 'inspect',
                         '--format', '{{range .State.Health.Log}}{{.ExitCode}}:{{.Output}}|{{end}}',
                         $name) or die;
                     my $raw = do { local $/; <$ifh> };

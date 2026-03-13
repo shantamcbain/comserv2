@@ -60,6 +60,7 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
 
     [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
     [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.info_msg %]<div class="info" style="padding:8px;background:#d1ecf1;border:1px solid #bee5eb;border-radius:4px;margin-bottom:10px">[% c.flash.info_msg | html %]</div>[% END %]
     [% IF page_error %]
     <div class="error"><strong>Notice:</strong> [% page_error | html %]
         Some sections below may be incomplete. The system administrator has been notified.</div>
