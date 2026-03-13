@@ -82,13 +82,17 @@ sub _db_ping {
 
 sub check_health {
     # 1. Database Health — use direct DBI connect with Catalyst's env vars
+    my $sys_id  = $ENV{SYSTEM_IDENTIFIER} || $logger->get_system_identifier();
+    my $db_host = $ENV{DB_HOST} || '192.168.1.198';
+    my $db_name = $ENV{DB_NAME} || 'ency';
     my $db_ok = _db_ping();
     if (!$db_ok) {
         $logger->log_with_details(undef, 'critical', __FILE__, __LINE__, 'check_health',
-            "Primary Database (MySQL: ency) is DOWN or unreachable!");
+            "[$sys_id] Primary Database ($db_name @ $db_host) is DOWN or unreachable! "
+            . "Check network connectivity from this container to $db_host.");
     } else {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'check_health',
-            "Primary Database (MySQL: ency) is UP");
+            "[$sys_id] Primary Database ($db_name @ $db_host) is UP");
     }
 
     # 2. Disk Space Health
