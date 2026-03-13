@@ -109,15 +109,14 @@ sub log_event {
     eval {
         my $schema = $c->model('DBEncy');
         $schema->resultset('SystemLog')->create({
-            timestamp         => $now,
-            level             => $level,
-            file              => $src_file,
-            line              => $src_line,
-            subroutine        => $sub_name,
-            message           => $full_message,
-            sitename          => $sitename || undef,
-            username          => $username || undef,
-            system_identifier => _get_app_instance(),
+            timestamp  => $now,
+            level      => $level,
+            file       => $src_file,
+            line       => $src_line,
+            subroutine => $sub_name,
+            message    => $full_message,
+            sitename   => $sitename || undef,
+            username   => $username || undef,
         });
     };
     if ($@) {
@@ -232,7 +231,7 @@ sub evaluate_records {
             my $key   = "$lvl|$cat";
             my $score = ($LEVEL_SCORE{$lvl} || 2) * ($CATEGORY_SCORE{$cat} || 1);
 
-            $buckets{$key} //= { count => 0, score => 0, rec => $rec, cat => $cat, lvl => $lvl };
+            $buckets{$key} //= { count => 0, score => 0, rec => $rec, cat => $cat, lvl => $lvl, inst => $inst };
             $buckets{$key}{count}++;
             $buckets{$key}{score} += $score;
         }

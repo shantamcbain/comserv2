@@ -103,6 +103,10 @@ sub index :Path('/admin/logging') :Args(0) {
             { order_by => { -desc => 'id' }, rows => 100 }
         );
         while (my $log = $logs_rs->next) {
+            my $instance = '';
+            if (($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
+                $instance = $1;
+            }
             push @db_logs, {
                 timestamp         => $log->timestamp,
                 level             => $log->level,
@@ -112,7 +116,7 @@ sub index :Path('/admin/logging') :Args(0) {
                 line              => $log->line,
                 username          => $log->username,
                 sitename          => $log->sitename,
-                system_identifier => $log->system_identifier,
+                system_identifier => $instance,
             };
         }
     };

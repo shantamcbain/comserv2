@@ -347,9 +347,10 @@ sub _send_health_alert {
     for my $ev (@{ $summary // [] }) {
         last if ++$n > 10;
         $top_events .= sprintf(
-            "  [%s] %s x%d (score=%d)\n",
-            $ev->{rec}->category // '',
-            $ev->{rec}->message  // '',
+            "  [%s][%s] %s x%d (score=%d)\n",
+            $ev->{lvl} // '',
+            $ev->{cat} // '',
+            $ev->{rec}->message // '',
             $ev->{count},
             $ev->{score},
         );
