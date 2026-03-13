@@ -537,17 +537,12 @@
 </div>
 
 <script>
-// Helper: handle 401/403 auth failures from AJAX calls
+// Helper: handle 401/403 auth failures from AJAX calls — auto-redirect to login
 function handleFetchResponse(response) {
     if (response.status === 401 || response.status === 403) {
         const loginUrl = '[% c.uri_for("/user/login") %]?destination=' + encodeURIComponent(window.location.href);
-        const msg = response.status === 401
-            ? 'You are not logged in. Redirecting to login page...'
-            : 'Access denied - admin role required. Please log in as an admin.';
-        if (confirm(msg + '\n\nClick OK to go to the login page.')) {
-            window.location.href = loginUrl;
-        }
-        return Promise.reject(new Error(msg));
+        window.location.href = loginUrl;
+        return Promise.reject(new Error('auth'));
     }
     return response.json();
 }
