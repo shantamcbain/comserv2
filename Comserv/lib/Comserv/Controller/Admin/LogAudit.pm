@@ -35,16 +35,34 @@ sub begin :Private {
 }
 
 # GET /admin/logging/audit
-# Main audit dashboard: what's being recorded, top noise sources, pruning estimates
+# Main audit dashboard — renders instantly; heavy stats loaded async via /audit/stats
 sub index :Path('/admin/logging/audit') :Args(0) {
     my ($self, $c) = @_;
 
     my $hours = int($c->req->param('hours') || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
 
-    my $audit       = {};
-    my $alerts      = [];
-    my $page_error  = '';
+    my $docker_health = [];
+    eval { $docker_health = Comserv::Util::HealthLogger->get_docker_health() };
+
+    $c->stash(
+        template      => 'admin/Logging/LogAudit.tt',
+        docker_health => $docker_health,
+        hours         => $hours,
+    );
+}
+
+# GET /admin/logging/audit/stats?hours=N
+# Returns heavy audit statistics as a JSON fragment — called async by the dashboard
+sub stats :Path('/admin/logging/audit/stats') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $hours = int($c->req->param('hours') || 24);
+    $hours = 24 unless $hours > 0 && $hours <= 720;
+
+    my $audit      = {};
+    my $alerts     = [];
+    my $page_error = '';
 
     eval {
         my $schema = $c->model('DBEncy');
@@ -53,7 +71,7 @@ sub index :Path('/admin/logging/audit') :Args(0) {
     if ($@) {
         my $err = "$@";
         $page_error = "Audit statistics unavailable: $err";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'stats',
             "audit_stats failed: $err");
         $audit = { error => $page_error };
     }
@@ -71,13 +89,11 @@ sub index :Path('/admin/logging/audit') :Args(0) {
     if ($@) {
         my $err = "$@";
         $page_error ||= "Health alerts unavailable: $err";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-            "HealthAlert fetch failed: $err");
         $alerts = [];
     }
 
     $c->stash(
-        template   => 'admin/Logging/LogAudit.tt',
+        template   => 'admin/Logging/LogAuditStats.tt',
         audit      => $audit,
         alerts     => $alerts,
         hours      => $hours,

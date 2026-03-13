@@ -37,6 +37,19 @@ tr.level-error        { background:#fdecea; }
 tr.level-critical     { background:#f8d7da; font-weight:bold; }
 .btn-sm               { padding:2px 8px; font-size:0.85em; }
 .btn-danger           { background:#dc3545; color:#fff; border-color:#dc3545; }
+.docker-grid          { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
+.docker-card          { border:1px solid #ccc; border-radius:6px; padding:12px 16px; min-width:200px; flex:1; }
+.docker-healthy       { border-color:#28a745; background:#f0fff4; }
+.docker-unhealthy     { border-color:#dc3545; background:#fff5f5; }
+.docker-none          { border-color:#6c757d; background:#f8f9fa; }
+.docker-name          { font-weight:bold; font-size:1.05em; }
+.docker-badge         { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.8em; font-weight:bold; }
+.badge-healthy        { background:#28a745; color:#fff; }
+.badge-unhealthy      { background:#dc3545; color:#fff; }
+.badge-none           { background:#6c757d; color:#fff; }
+.docker-detail        { font-size:0.85em; color:#555; margin-top:4px; }
+.docker-lastcheck     { font-size:0.78em; color:#888; margin-top:4px; font-style:italic; word-break:break-all; }
+.stats-loading        { color:#888; font-style:italic; padding:20px 0; }
 </style>
 
 <div class="app-container">
@@ -52,223 +65,81 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
         Some sections below may be incomplete. The system administrator has been notified.</div>
     [% END %]
 
-    <div class="content-container">
-        <div class="content-primary">
-
-            <!-- ============================================================
-                 SECTION 1: What is currently being recorded
-                 ============================================================ -->
-            <div class="content-section">
-                <h2>What Is Being Recorded</h2>
-
-                <form method="get" action="[% c.uri_for('/admin/logging/audit') %]" class="lookback-form">
-                    <label><strong>Look-back window:</strong></label>
-                    <select name="hours" onchange="this.form.submit()">
-                        [% FOR h IN [1, 6, 12, 24, 48, 168] %]
-                            <option value="[% h %]" [% IF h == hours %]selected[% END %]>
-                                [% IF h < 24 %][% h %] hour[% IF h > 1 %]s[% END %]
-                                [% ELSIF h == 24 %]24 h (1 day)
-                                [% ELSIF h == 48 %]48 h (2 days)
-                                [% ELSE %]7 days
-                                [% END %]
-                            </option>
-                        [% END %]
-                    </select>
-                </form>
-
-                [% IF audit.error %]
-                    <div class="error"><strong>Audit error:</strong> [% audit.error | html %]</div>
-                [% END %]
-
-                <div class="data-container stats-row">
-                    <div>
-                        <h3>Total Records in system_log</h3>
-                        <p class="stat-large">[% audit.total | html %]</p>
-                        <p>Recorded in last [% audit.hours | html %]h: <strong>[% audit.recent | html %]</strong></p>
-                    </div>
+    <!-- ================================================================
+         DOCKER CONTAINER HEALTH  (rendered first — no DB dependency)
+         ================================================================ -->
+    <div class="content-section">
+        <h2>Docker Container Health</h2>
+        [% IF docker_health && docker_health.size %]
+        <div class="docker-grid">
+            [% FOR c IN docker_health %]
+            [% SET hclass = (c.health == 'healthy') ? 'docker-healthy'
+                          : (c.health == 'unhealthy') ? 'docker-unhealthy'
+                          : 'docker-none' %]
+            [% SET bclass = (c.health == 'healthy') ? 'badge-healthy'
+                          : (c.health == 'unhealthy') ? 'badge-unhealthy'
+                          : 'badge-none' %]
+            <div class="docker-card [% hclass %]">
+                <div class="docker-name">[% c.name | html %]
+                    <span class="docker-badge [% bclass %]">[% c.health | html %]</span>
                 </div>
-
-                <h3>Records by Level</h3>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Level</th>
-                            <th>Total (all time)</th>
-                            <th>Last [% audit.hours | html %]h</th>
-                            <th>Retention Policy</th>
-                            <th>Would Prune Now</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    [% SET retention = { DEBUG => '1 day', INFO => '2 days', WARN => '7 days', ERROR => '30 days', CRITICAL => '90 days' } %]
-                    [% FOR row IN audit.by_level %]
-                        [% SET prune_n = audit.prune_estimates.${row.level} || 0 %]
-                        <tr class="level-[% row.level | lower %]">
-                            <td><strong>[% row.level | html %]</strong></td>
-                            <td>[% row.total | html %]</td>
-                            <td>[% row.recent | html %]</td>
-                            <td>[% retention.${row.level} || '?' %]</td>
-                            <td>[% IF prune_n > 0 %]<span class="prune-eligible">[% prune_n | html %]</span>[% ELSE %]0[% END %]</td>
-                        </tr>
-                    [% END %]
-                    </tbody>
-                    <tfoot>
-                        <tr class="table-foot-bold">
-                            <td colspan="4">Total prunable with current policy:</td>
-                            <td><span class="prune-total-val">[% audit.prune_total | html %]</span></td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                <h3>Top Subroutines Generating Records (last [% audit.hours | html %]h)</h3>
-                <table class="data-table">
-                    <thead><tr><th>Subroutine</th><th>Level</th><th>Count</th></tr></thead>
-                    <tbody>
-                    [% FOR row IN audit.top_subroutines %]
-                        <tr class="level-[% row.level | lower %]">
-                            <td><code>[% row.subroutine | html %]</code></td>
-                            <td>[% row.level | html %]</td>
-                            <td>[% row.count | html %]</td>
-                        </tr>
-                    [% END %]
-                    [% IF !audit.top_subroutines.size %]
-                        <tr><td colspan="3" class="empty-state">No data for this period.</td></tr>
-                    [% END %]
-                    </tbody>
-                </table>
-
-                <h3>Top Source Files (last [% audit.hours | html %]h)</h3>
-                <table class="data-table">
-                    <thead><tr><th>File</th><th>Count</th></tr></thead>
-                    <tbody>
-                    [% FOR row IN audit.top_files %]
-                        <tr>
-                            <td><small>[% row.file | html %]</small></td>
-                            <td>[% row.count | html %]</td>
-                        </tr>
-                    [% END %]
-                    [% IF !audit.top_files.size %]
-                        <tr><td colspan="2" class="empty-state">No data for this period.</td></tr>
-                    [% END %]
-                    </tbody>
-                </table>
-
-                [% IF audit.top_instances.size %]
-                <h3>By Server / Container Instance (last [% audit.hours | html %]h)</h3>
-                <table class="data-table">
-                    <thead><tr><th>Instance (system_identifier)</th><th>Records</th></tr></thead>
-                    <tbody>
-                    [% FOR row IN audit.top_instances %]
-                        <tr>
-                            <td><code>[% row.instance | html %]</code></td>
-                            <td>[% row.count | html %]</td>
-                        </tr>
-                    [% END %]
-                    </tbody>
-                </table>
+                <div class="docker-detail">
+                    Image: [% c.image | html %]<br>
+                    Status: [% c.status_str | html %]
+                </div>
+                [% IF c.last_output %]
+                <div class="docker-lastcheck">Last check: [% c.last_output | html %]</div>
                 [% END %]
             </div>
-
-            <!-- ============================================================
-                 SECTION 2: What is not working (health_alert table)
-                 ============================================================ -->
-            <div class="content-section">
-                <h2>What Is Not Working — Open Health Alerts</h2>
-                [% IF alerts.size > 0 %]
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Urgency</th>
-                            <th>Category</th>
-                            <th>Occurrences</th>
-                            <th>First Seen</th>
-                            <th>Last Seen</th>
-                            <th>Instance</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    [% FOR alert IN alerts %]
-                        <tr>
-                            <td>[% alert.id | html %]</td>
-                            <td><strong class="urgency-[% alert.level | lower %]">[% alert.level | html %]</strong></td>
-                            <td>[% alert.category | html %]</td>
-                            <td>[% alert.occurrence_count | html %]</td>
-                            <td class="nowrap"><small>[% alert.first_seen | html %]</small></td>
-                            <td class="nowrap"><small>[% alert.last_seen | html %]</small></td>
-                            <td><small>[% alert.system_identifier | html %]</small></td>
-                            <td>[% alert.description | html | truncate(100) %]</td>
-                            <td>[% alert.status | html %]</td>
-                            <td>
-                                <form method="post" action="[% c.uri_for('/admin/logging/audit/alert_action') %]" class="form-inline">
-                                    <input type="hidden" name="alert_id" value="[% alert.id | html %]">
-                                    [% IF alert.status == 'OPEN' %]
-                                        <button type="submit" name="action" value="acknowledge" class="btn btn-warning btn-sm">Ack</button>
-                                    [% END %]
-                                    <button type="submit" name="action" value="resolve" class="btn btn-success btn-sm"
-                                        onclick="return confirm('Mark alert #[% alert.id %] as RESOLVED?')">Resolve</button>
-                                </form>
-                            </td>
-                        </tr>
-                    [% END %]
-                    </tbody>
-                </table>
-                [% ELSE %]
-                <div class="data-container">
-                    <p class="empty-state">No open health alerts.
-                    [% IF !alerts.defined %]
-                        <em>(The <code>health_alert</code> table may not exist yet — ask CSC admin to add it via schema compare.)</em>
-                    [% END %]
-                    </p>
-                </div>
-                [% END %]
-            </div>
-
-            <!-- ============================================================
-                 SECTION 3: Prune old records
-                 ============================================================ -->
-            <div class="content-section">
-                <h2>Prune Old Records</h2>
-                <p>Remove records from <code>system_log</code> older than the retention period for each level.
-                   Records will also be capped at <em>max total rows</em> by deleting the oldest first.</p>
-
-                [% IF audit.prune_total > 0 %]
-                <div class="alert-warning-box">
-                    <strong>&#9888; [% audit.prune_total | html %] records</strong> are eligible for pruning with the default policy.
-                </div>
-                [% END %]
-
-                <form method="post" action="[% c.uri_for('/admin/logging/audit/prune') %]" class="app-form"
-                      onsubmit="return confirm('This will permanently delete old log records. Continue?')">
-                    <div class="prune-form-row">
-                        [% SET fields = [
-                            { name='debug_days',    label='DEBUG keep (days)',    default=1  },
-                            { name='info_days',     label='INFO keep (days)',     default=2  },
-                            { name='warn_days',     label='WARN keep (days)',     default=7  },
-                            { name='error_days',    label='ERROR keep (days)',    default=30 },
-                            { name='critical_days', label='CRITICAL keep (days)', default=90 },
-                            { name='max_records',   label='Max total rows',       default=10000 },
-                        ] %]
-                        [% FOR f IN fields %]
-                        <div class="form-field">
-                            <label for="[% f.name %]">[% f.label %]:</label>
-                            <input type="number" id="[% f.name %]" name="[% f.name %]"
-                                   value="[% f.default %]" min="0" class="form-input prune-input">
-                        </div>
-                        [% END %]
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-danger">Prune Now</button>
-                        <small class="prune-note">This action cannot be undone.</small>
-                    </div>
-                </form>
-            </div>
-
+            [% END %]
         </div>
+        [% ELSE %]
+        <p class="docker-detail">No comserv containers found or Docker not accessible from this host.</p>
+        [% END %]
     </div>
+
+    <!-- Look-back window selector -->
+    <div class="content-section">
+        <form method="get" action="[% c.uri_for('/admin/logging/audit') %]" class="lookback-form">
+            <label><strong>Look-back window:</strong></label>
+            <select name="hours" onchange="this.form.submit()">
+                [% FOR h IN [1, 6, 12, 24, 48, 168] %]
+                    <option value="[% h %]" [% IF h == hours %]selected[% END %]>
+                        [% IF h < 24 %][% h %] hour[% IF h > 1 %]s[% END %]
+                        [% ELSIF h == 24 %]24 h (1 day)
+                        [% ELSIF h == 48 %]48 h (2 days)
+                        [% ELSE %]7 days
+                        [% END %]
+                    </option>
+                [% END %]
+            </select>
+        </form>
+    </div>
+
+    <!-- Async-loaded audit statistics and health alerts -->
+    <div id="audit-stats-container">
+        <p class="stats-loading">&#8987; Loading audit statistics&hellip;</p>
+    </div>
+
 </div>
+
+<script>
+(function() {
+    var hours = [% hours | html %];
+    var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours;
+    fetch(url, { credentials: 'same-origin' })
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        })
+        .then(function(html) {
+            document.getElementById('audit-stats-container').innerHTML = html;
+        })
+        .catch(function(err) {
+            document.getElementById('audit-stats-container').innerHTML =
+                '<div class="error">Could not load audit statistics: ' + err + '</div>';
+        });
+})();
+</script>
 
 
