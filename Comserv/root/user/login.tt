@@ -40,6 +40,7 @@
                 <form method="POST" action="/user/do_login" class="app-form" id="login-form">
                     <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     <input type="hidden" name="form_source" value="login_form">
+                    <input type="hidden" name="return_to" value="[% return_to | html %]">
 
                     <div class="form-section">
                         <div class="form-row">

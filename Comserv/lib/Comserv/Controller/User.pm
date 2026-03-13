@@ -64,15 +64,13 @@ sub login :Local {
     # Log login page access
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 'Accessing login page');
 
-    # Store the referer URL if it hasn't been stored already
-    my $referer = $c->req->referer || $c->uri_for('/');
-    
-    # Get the return_to parameter if it exists (for explicit redirects)
-    my $return_to = $c->req->param('return_to');
-    if ($return_to) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Found return_to parameter: $return_to");
-        $referer = $return_to;
-    }
+    # Determine the page to return to after login.
+    # Priority: return_to param > destination param (used by Admin.pm) > HTTP Referer
+    my $return_to = $c->req->param('return_to')
+                 || $c->req->param('destination')
+                 || $c->req->referer
+                 || $c->uri_for('/');
+    my $referer = $return_to;
 
     # Don't store the login or registration pages as the referer
     if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login} &&
