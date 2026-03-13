@@ -25,6 +25,10 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
+my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
+my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
+
 my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
 my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
 my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
@@ -300,41 +304,30 @@ sub log_with_details {
     my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
     my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
     if ($c && ref($c) && $c->can('model') && $level_prio >= $db_min_prio) {
-        my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
-        my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
-        eval {
-            my $dbh = $c->model('DBEncy')->storage->dbh;
-            $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
-            $c->model('DBEncy')->resultset('SystemLog')->create({
-                timestamp         => $timestamp,
-                level             => $level,
-                file              => $file,
-                line              => $line,
-                subroutine        => ($subroutine // 'unknown'),
-                message           => $message,
-                sitename          => $sitename,
-                username          => $username,
-                system_identifier => $system_id,
-            });
-        };
-        if ($@) {
-            # Retry without system_identifier in case the column hasn't been added yet
+        my $now = time();
+        if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
+            _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");
+        } else {
+            my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
             eval {
                 my $dbh = $c->model('DBEncy')->storage->dbh;
                 $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
                 $c->model('DBEncy')->resultset('SystemLog')->create({
-                    timestamp  => $timestamp,
-                    level      => $level,
-                    file       => $file,
-                    line       => $line,
-                    subroutine => ($subroutine // 'unknown'),
-                    message    => $message,
-                    sitename   => $sitename,
-                    username   => $username,
+                    timestamp         => $timestamp,
+                    level             => $level,
+                    file              => $file,
+                    line              => $line,
+                    subroutine        => ($subroutine // 'unknown'),
+                    message           => $message,
+                    sitename          => $sitename,
+                    username          => $username,
+                    system_identifier => $system_id,
                 });
             };
             if ($@) {
-                _print_log("[DB-LOG-ERROR] Failed to write to system_log table: $@");
+                $_db_log_failed_at = time();
+                _print_log("[DB-LOG-ERROR] DB write failed (circuit breaker set for ${_db_log_backoff_s}s): $@");
             }
         }
     }
