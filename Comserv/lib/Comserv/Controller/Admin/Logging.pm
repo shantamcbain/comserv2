@@ -95,19 +95,21 @@ sub index :Path('/admin/logging') :Args(0) {
 
     my $db_error = '';
     my $total_count = 0;
-    eval {
-        my $schema = $c->model('DBEncy');
-        $total_count = $schema->resultset('SystemLog')->search($search_params)->count;
-        my $logs_rs = $schema->resultset('SystemLog')->search(
-            $search_params,
-            { order_by => { -desc => 'id' }, rows => 100 }
-        );
-        while (my $log = $logs_rs->next) {
+    my @base_cols = qw(id timestamp level file line subroutine message sitename username);
+    my @all_cols  = (@base_cols, 'system_identifier');
+
+    my $fetch_logs = sub {
+        my ($schema, $cols) = @_;
+        my %opts = ( order_by => { -desc => 'id' }, rows => 100 );
+        $opts{columns} = $cols if $cols;
+        my $rs = $schema->resultset('SystemLog')->search($search_params, \%opts);
+        my @rows;
+        while (my $log = $rs->next) {
             my $instance = eval { $log->system_identifier } // '';
             if (!$instance && ($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
                 $instance = $1;
             }
-            push @db_logs, {
+            push @rows, {
                 timestamp         => $log->timestamp,
                 level             => $log->level,
                 subroutine        => $log->subroutine,
@@ -119,11 +121,32 @@ sub index :Path('/admin/logging') :Args(0) {
                 system_identifier => $instance,
             };
         }
+        return @rows;
+    };
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        # Try count with all columns first
+        eval { $total_count = $schema->resultset('SystemLog')->search($search_params)->count };
+        if ($@) {
+            # system_identifier missing — count without it
+            $total_count = $schema->resultset('SystemLog')->search(
+                $search_params, { columns => \@base_cols }
+            )->count;
+        }
+        @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
     };
     if ($@) {
-        $db_error = "$@";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-            "Failed to fetch system_log records: $db_error");
+        # Retry selecting only the base columns (system_identifier not yet in DB)
+        eval {
+            my $schema = $c->model('DBEncy');
+            @db_logs = $fetch_logs->($schema, \@base_cols);
+        };
+        if ($@) {
+            $db_error = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "Failed to fetch system_log records: $db_error");
+        }
     }
 
     # Health evaluation status from HealthLogger
