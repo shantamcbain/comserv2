@@ -80,14 +80,33 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
         $alerts = [];
     }
 
-    $c->stash(
-        template   => 'admin/Logging/LogAuditStats.tt',
-        wrapper    => '',
-        audit      => $audit,
-        alerts     => $alerts,
-        hours      => $hours,
-        page_error => $page_error,
-    );
+    # Render the fragment directly via TT with WRAPPER disabled —
+    # [% META wrapper = '' %] alone does not override the configured WRAPPER.
+    my $body = '';
+    eval {
+        my $vars = {
+            %{ $c->stash },
+            c          => $c,
+            audit      => $audit,
+            alerts     => $alerts,
+            hours      => $hours,
+            page_error => $page_error,
+        };
+        $c->view('TT')->template->process(
+            'admin/Logging/LogAuditStats.tt',
+            $vars,
+            \$body,
+            WRAPPER => '',
+        ) or die $c->view('TT')->template->error;
+    };
+    if ($@) {
+        my $err = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'stats',
+            "stats render failed: $err");
+        $body = '<div class="error">Error rendering audit stats: ' . $err . '</div>';
+    }
+    $c->res->content_type('text/html; charset=UTF-8');
+    $c->res->body($body);
 }
 
 # POST /admin/logging/audit/prune

@@ -283,14 +283,18 @@ sub prune_old_records {
     my $deleted = 0;
     eval {
         my $dbh = $schema->storage->dbh;
+        $dbh->do('SET SESSION innodb_lock_wait_timeout = 2');
 
         for my $level (keys %retention_days) {
             my $cutoff = strftime('%Y-%m-%d %H:%M:%S',
                 localtime(time() - $retention_days{$level} * 86400));
-            my $n = $dbh->do(
-                "DELETE FROM system_log WHERE level = ? AND timestamp < ? LIMIT 5000",
-                undef, $level, $cutoff
-            ) || 0;
+            # Use small batches (500) to avoid long lock holds
+            my $n = eval {
+                $dbh->do(
+                    "DELETE FROM system_log WHERE level = ? AND timestamp < ? LIMIT 500",
+                    undef, $level, $cutoff
+                ) || 0;
+            } // 0;
             $deleted += ($n == 0+$n) ? $n : 0;
         }
 
@@ -300,10 +304,13 @@ sub prune_old_records {
         );
         if (($total // 0) > $max_records) {
             my $to_delete = $total - $max_records;
-            my $n = $dbh->do(
-                "DELETE FROM system_log ORDER BY id ASC LIMIT ?",
-                undef, $to_delete
-            ) || 0;
+            $to_delete = 500 if $to_delete > 500;  # cap per cycle
+            my $n = eval {
+                $dbh->do(
+                    "DELETE FROM system_log ORDER BY id ASC LIMIT ?",
+                    undef, $to_delete
+                ) || 0;
+            } // 0;
             $deleted += ($n == 0+$n) ? $n : 0;
         }
     };
@@ -468,6 +475,34 @@ sub audit_stats {
             }
         };
         $stats{top_instances} = \@inst_rows;
+
+        # --- 7. Top errors by severity (CRITICAL first, then ERROR, then WARN) ---
+        my @error_rows;
+        eval {
+            my $err_sth = $dbh->prepare(
+                "SELECT level, subroutine, LEFT(message,200) as msg,
+                        COALESCE(system_identifier,'(unknown)') as sys,
+                        COUNT(*) as cnt
+                 FROM system_log
+                 WHERE level IN ('CRITICAL','ERROR','WARN') AND timestamp >= ?
+                 GROUP BY level, subroutine, LEFT(message,200), system_identifier
+                 ORDER BY
+                     FIELD(level,'CRITICAL','ERROR','WARN'),
+                     cnt DESC
+                 LIMIT 30"
+            );
+            $err_sth->execute($cutoff);
+            while (my $row = $err_sth->fetchrow_hashref) {
+                push @error_rows, {
+                    level      => $row->{level},
+                    subroutine => $row->{subroutine},
+                    message    => $row->{msg},
+                    system     => $row->{sys},
+                    count      => $row->{cnt},
+                };
+            }
+        };
+        $stats{top_errors} = \@error_rows;
     };
     if ($@) {
         $stats{error} = "$@";
