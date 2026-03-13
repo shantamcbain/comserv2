@@ -2,6 +2,7 @@ package Comserv::Controller::Admin::Docker;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -46,6 +47,12 @@ sub restart :Path('/admin/docker/restart') :Args(1) {
         return;
     }
     
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, stderr => 'CSRF validation failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart', "Restarting service: $service");
     my $result = $c->model('Docker')->restart_containers(services => [$service]);
     
@@ -58,6 +65,12 @@ sub stop :Path('/admin/docker/stop') :Args(1) {
     
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, stderr => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, stderr => 'CSRF validation failed' };
         $c->forward('View::JSON');
         return;
     }
@@ -78,6 +91,12 @@ sub down :Path('/admin/docker/down') :Args(1) {
         return;
     }
     
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, stderr => 'CSRF validation failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'down', "Downing service: $service");
     my $result = $c->model('Docker')->down_container($service);
     
@@ -94,6 +113,12 @@ sub start :Path('/admin/docker/start') :Args(1) {
         return;
     }
     
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, stderr => 'CSRF validation failed' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start', "Starting service: $service");
     my $result = $c->model('Docker')->start_container($service);
     
@@ -106,6 +131,12 @@ sub up :Path('/admin/docker/up') :Args(1) {
     
     unless ($c->req->method eq 'POST') {
         $c->stash->{json} = { success => 0, stderr => 'POST required' };
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    unless (Comserv::Util::CSRF::validate_token($c)) {
+        $c->stash->{json} = { success => 0, stderr => 'CSRF validation failed' };
         $c->forward('View::JSON');
         return;
     }

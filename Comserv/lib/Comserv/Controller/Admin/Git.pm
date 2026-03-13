@@ -12,8 +12,15 @@ use File::Path qw(make_path);
 use Archive::Tar;
 use POSIX qw(strftime);
 use JSON;
+use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
+
+sub auto : Private {
+    my ( $self, $c ) = @_;
+    Comserv::Util::CSRF::ensure_token($c);
+    return 1;
+}
 
 =head1 NAME
 
@@ -88,6 +95,12 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     
     # Check if this is a POST request (user confirmed the git pull)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull',
+                "CSRF validation failed for git_pull POST");
+            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
+            return;
+        }
         my $selected_branch = $c->req->param('branch') || 'main';
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
@@ -340,6 +353,12 @@ sub safe_git_pull :Path('/admin/safe_git_pull') :Args(0) {
     
     # Check if this is a POST request (user confirmed the operation)
     if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
+        unless (Comserv::Util::CSRF::validate_token($c)) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'safe_git_pull',
+                "CSRF validation failed for safe_git_pull POST");
+            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
+            return;
+        }
         my $selected_branch = $c->req->param('branch') || 'main';
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'safe_git_pull', 

@@ -1,11 +1,12 @@
 package Comserv::Model::Schema::Ency::Result::SystemLog;
+use strict;
+use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('system_log');
 __PACKAGE__->add_columns(
     id => {
-        data_type         => 'int',
-        size              => 11,
+        data_type         => 'integer',
         is_auto_increment => 1,
         is_nullable       => 0,
     },
@@ -24,8 +25,7 @@ __PACKAGE__->add_columns(
         is_nullable => 0,
     },
     line => {
-        data_type   => 'int',
-        size        => 11,
+        data_type   => 'integer',
         is_nullable => 0,
     },
     subroutine => {
@@ -43,6 +43,11 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
     },
     username => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
+    system_identifier => {
         data_type   => 'varchar',
         size        => 255,
         is_nullable => 1,

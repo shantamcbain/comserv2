@@ -136,6 +136,7 @@
     </div>
 
     <form method="post" action="[% c.uri_for('/file/dir_sync_submit') %]" id="ds-form">
+      <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
       <input type="hidden" name="dir_path" value="[% dir_path | html %]">
 
       <div style="overflow-x:auto">

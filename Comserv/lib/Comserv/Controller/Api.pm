@@ -625,9 +625,8 @@ sub api_create_chat_message :Path('chat/message') :Args(0) {
     try {
         my $user_check = $c->model('DBEncy::User')->find($api_user_id);
         unless ($user_check) {
-            # Fallback to Shanta (found with ID 178) or first available user
-            my $fallback_user = $c->model('DBEncy::User')->find({ username => 'Shanta' })
-                             || $c->model('DBEncy::User')->first();
+            # Fallback to first available user
+            my $fallback_user = $c->model('DBEncy::User')->first();
             $api_user_id = $fallback_user ? $fallback_user->id : 1;
         }
     } catch {
