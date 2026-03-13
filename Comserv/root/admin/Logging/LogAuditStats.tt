@@ -105,6 +105,32 @@
     [% END %]
 </div>
 
+<!-- SECTION 1b: Most Common Errors by Severity -->
+[% IF audit.top_errors.size %]
+<div class="content-section">
+    <h2>Most Common Errors &amp; Warnings (last [% audit.hours | html %]h) — by Severity</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Severity</th><th>Count</th><th>Subroutine</th>
+                <th>Server</th><th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOR row IN audit.top_errors %]
+            <tr class="level-[% row.level | lower %]">
+                <td><strong class="urgency-[% row.level | lower %]">[% row.level | html %]</strong></td>
+                <td>[% row.count | html %]</td>
+                <td><code>[% row.subroutine | html %]</code></td>
+                <td><small>[% row.system | html %]</small></td>
+                <td><small>[% row.message | html %]</small></td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
 <!-- SECTION 2: Open Health Alerts -->
 <div class="content-section">
     <h2>What Is Not Working — Open Health Alerts</h2>
