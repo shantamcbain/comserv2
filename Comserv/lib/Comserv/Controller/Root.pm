@@ -319,12 +319,20 @@ sub auto :Private {
             $user_logged_in = 1;
             $username = $user->username if $user->can('username');
             $user_id = $user->id if $user->can('id');
-            $user_roles = $user->roles if $user->can('roles');
+            my $raw_roles = $user->can('roles') ? $user->roles : undef;
+            # Parse roles to always be an array ref (DB may return a comma-separated string)
+            if (defined $raw_roles && !ref $raw_roles) {
+                $user_roles = [ map { s/^\s+|\s+$//gr } split /,/, $raw_roles ];
+            } elsif (ref $raw_roles eq 'ARRAY') {
+                $user_roles = $raw_roles;
+            } else {
+                $user_roles = $c->session->{roles} || [];
+            }
             
             # Also check session for backward compatibility
             $c->session->{username} = $username if $username;
             $c->session->{user_id} = $user_id if $user_id;
-            $c->session->{roles} = $user_roles if $user_roles;
+            $c->session->{roles} = $user_roles if @$user_roles;
             
         } elsif ($self->user_exists($c)) {
             # Using session-based authentication (backward compatibility)
