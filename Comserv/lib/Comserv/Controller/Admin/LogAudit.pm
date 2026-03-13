@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
+use Template;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -80,10 +81,17 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
         $alerts = [];
     }
 
-    # Render the fragment directly via TT with WRAPPER disabled —
-    # [% META wrapper = '' %] alone does not override the configured WRAPPER.
+    # Render as a bare HTML fragment using a fresh TT instance with NO WRAPPER.
+    # We cannot use the Catalyst view (it has WRAPPER='layout.tt' compiled in),
+    # and WRAPPER=>'' passed to process() does not override a compiled-in WRAPPER.
     my $body = '';
     eval {
+        my $root = $c->config->{home} . '/root';
+        my $tt   = Template->new({
+            INCLUDE_PATH => $root,
+            ENCODING     => 'UTF-8',
+        }) or die Template->error;
+
         my $vars = {
             %{ $c->stash },
             c          => $c,
@@ -92,18 +100,14 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
             hours      => $hours,
             page_error => $page_error,
         };
-        $c->view('TT')->template->process(
-            'admin/Logging/LogAuditStats.tt',
-            $vars,
-            \$body,
-            WRAPPER => '',
-        ) or die $c->view('TT')->template->error;
+        $tt->process('admin/Logging/LogAuditStats.tt', $vars, \$body)
+            or die $tt->error;
     };
     if ($@) {
         my $err = "$@";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'stats',
             "stats render failed: $err");
-        $body = '<div class="error">Error rendering audit stats: ' . $err . '</div>';
+        $body = '<div class="error">Error loading audit statistics: ' . $err . '</div>';
     }
     $c->res->content_type('text/html; charset=UTF-8');
     $c->res->body($body);
