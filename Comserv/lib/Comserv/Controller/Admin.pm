@@ -205,11 +205,6 @@ sub index :Path :Args(0) {
         "Completed Admin index action");
 }
 
-sub docker_containers :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->res->redirect($c->uri_for('/admin/infrastructure'));
-}
-
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
@@ -4717,29 +4712,7 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
         return;
     }
 
-    if ($port == 5000) {
-        $c->response->body('');
-        $c->response->status(403);
-        return;
-    }
-    if ($port && $port != 3001) {
-        my $redirect_uri = $c->req->uri->clone;
-        $redirect_uri->port(3001);
-        $c->response->redirect($redirect_uri);
-        return;
-    }
-
-    # CSC admin only - use AdminAuth (same pattern as all other admin actions)
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
-            "Access denied: admin required");
-        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
-    }
+    # Auth is enforced by Admin.pm::auto for all /admin/* routes
 
     # Check if we're inside a Docker container
     my $docker_available = ! -f '/.dockerenv';
