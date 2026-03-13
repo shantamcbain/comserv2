@@ -14,6 +14,7 @@ services:
       TZ: UTC
       ENABLE_MONITORING: 1
       ENABLE_LOGGING: 1
+      SYSTEM_IDENTIFIER: "${HOSTNAME:-unknown}-prod"
       # Set in .env file: CATALYST_SERVER_IP=192.168.1.126  (host LAN IP, shown in admin bar)
       CATALYST_SERVER_IP: "${CATALYST_SERVER_IP}"
       # NFS resource library path inside container (NFS root mounted at /data/nfs)
