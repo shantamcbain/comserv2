@@ -66,40 +66,20 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
         return 1;
     }
     
-    # Check if the user has admin role
+    # Check if the user has admin role — check session directly regardless of Catalyst auth state
     my $has_admin_role = 0;
-    
-    # First check if user exists
-    if ($c->user_exists) {
-        # Get roles from session
-        my $roles = $c->session->{roles};
-        
-        # Log the roles for debugging
-        my $roles_debug = 'none';
-        if (defined $roles) {
-            if (ref($roles) eq 'ARRAY') {
-                $roles_debug = join(', ', @$roles);
-                
-                # Check if 'admin' is in the roles array
-                foreach my $role (@$roles) {
-                    if (lc($role) eq 'admin') {
-                        $has_admin_role = 1;
-                        last;
-                    }
-                }
-            } elsif (!ref($roles)) {
-                $roles_debug = $roles;
-                # Check if roles string contains 'admin'
-                if ($roles =~ /\badmin\b/i) {
-                    $has_admin_role = 1;
-                }
-            }
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-            "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+    my $roles = $c->session->{roles} || [];
+    my $roles_debug = 'none';
+    if (ref($roles) eq 'ARRAY') {
+        $roles_debug = join(', ', @$roles);
+        $has_admin_role = 1 if grep { lc($_) eq 'admin' } @$roles;
+    } elsif ($roles) {
+        $roles_debug = $roles;
+        $has_admin_role = 1 if $roles =~ /\badmin\b/i;
     }
-    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base',
+        "Admin access check - User: " . ($c->session->{username} // 'none') . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+
     unless ($has_admin_role) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
             "Access denied: User does not have admin role");
