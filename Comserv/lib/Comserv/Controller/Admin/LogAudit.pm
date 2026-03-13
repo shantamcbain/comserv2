@@ -111,6 +111,7 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
     }
     $c->res->content_type('text/html; charset=UTF-8');
     $c->res->body($body);
+    $c->detach;
 }
 
 # POST /admin/logging/audit/prune

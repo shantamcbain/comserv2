@@ -4766,6 +4766,7 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
 
             # Skip Kubernetes pause/infrastructure containers — they are noise
             next if $image =~ m{registry\.k8s\.io|k8s\.gcr\.io|pause:|gcr\.io/pause};
+            next if $name =~ /^k8s_/;
             # Skip anonymous intermediate image IDs with no useful name
             next if !$name && $image =~ /^[0-9a-f]{12}$/;
 
