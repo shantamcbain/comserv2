@@ -4737,12 +4737,13 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    # Run docker compose ps to get container status
-    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    # Run docker compose ps with a timeout to prevent hanging Starman workers
+    my $output = `timeout 8 docker ps --format '{{json .}}' 2>&1`;
     my $exit_code = $? >> 8;
-    
+
     if ($exit_code != 0) {
-        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        my $err = ($exit_code == 124) ? "docker ps timed out (8s)" : "docker ps failed (exit $exit_code)";
+        $c->response->body(encode_json({ success => 0, error => $err }));
         $c->response->content_type('application/json');
         return;
     }
