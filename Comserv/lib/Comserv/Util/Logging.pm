@@ -276,22 +276,38 @@ sub log_with_details {
 
     # Log to database
     if ($c && ref($c) && $c->can('model')) {
+        my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+        my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
         eval {
             $c->model('DBEncy')->resultset('SystemLog')->create({
-                timestamp => $timestamp,
-                level => $level,
-                file => $file,
-                line => $line,
-                subroutine => ($subroutine // 'unknown'),
-                message => $message,
-                sitename => ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC',
-                username => ($c->can('session') && $c->session) ? $c->session->{username} : undef,
+                timestamp         => $timestamp,
+                level             => $level,
+                file              => $file,
+                line              => $line,
+                subroutine        => ($subroutine // 'unknown'),
+                message           => $message,
+                sitename          => $sitename,
+                username          => $username,
                 system_identifier => $system_id,
             });
         };
         if ($@) {
-            my $db_err = "$@";
-            _print_log("[DB-LOG-ERROR] Failed to write to system_log table: $db_err");
+            # Retry without system_identifier in case the column hasn't been added yet
+            eval {
+                $c->model('DBEncy')->resultset('SystemLog')->create({
+                    timestamp  => $timestamp,
+                    level      => $level,
+                    file       => $file,
+                    line       => $line,
+                    subroutine => ($subroutine // 'unknown'),
+                    message    => $message,
+                    sitename   => $sitename,
+                    username   => $username,
+                });
+            };
+            if ($@) {
+                _print_log("[DB-LOG-ERROR] Failed to write to system_log table: $@");
+            }
         }
     }
 

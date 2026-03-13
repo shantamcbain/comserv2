@@ -26,6 +26,33 @@ Dedicated controller for schema comparison and bidirectional synchronization bet
 
 =cut
 
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles}    || [];
+    my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split /,/, $roles;
+    my $has_admin = grep { lc($_) eq 'admin' } @role_list;
+
+    return 1 if $has_admin;
+    return 1 if $username && $username ne 'Guest';
+
+    my $is_ajax = ($c->req->header('X-Requested-With') // '') eq 'XMLHttpRequest'
+               || ($c->req->content_type // '') =~ m{application/json}i;
+
+    if ($is_ajax || $c->req->method ne 'GET') {
+        $c->response->status(401);
+        $c->stash(json => { success => 0, error => 'Not authenticated. Please log in first.' });
+        $c->forward('View::JSON');
+        $c->detach;
+        return;
+    }
+
+    $c->flash->{error_msg} = 'Please log in as an administrator to access schema comparison.';
+    $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+    $c->detach;
+}
+
 sub admin_auth {
     my ($self) = @_;
     return Comserv::Util::AdminAuth->new();
