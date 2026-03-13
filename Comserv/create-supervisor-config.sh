@@ -45,7 +45,9 @@ if env | grep -qE '^(COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_)'; then
   done
 fi
 
-# Create supervisor program configuration with comprehensive logging
+# Create supervisor program configuration.
+# stdout/stderr go to BOTH a log file (mounted volume) AND /proc/1/fd/1 (container stdout)
+# so that "docker logs" shows app output on the production server.
 cat > /etc/supervisor/conf.d/comserv.conf << EOFCONF
 [program:comserv-server]
 command=$START_CMD
@@ -55,12 +57,10 @@ autostart=true
 autorestart=unexpected
 startsecs=10
 stopasgroup=true
-stdout_logfile=${CATALYST_HOME}/root/log/catalyst.log
+stdout_logfile=/proc/1/fd/1
 stdout_logfile_maxbytes=0
-stdout_capture_maxbytes=0
-stderr_logfile=${CATALYST_HOME}/root/log/catalyst_error.log
+stderr_logfile=/proc/1/fd/2
 stderr_logfile_maxbytes=0
-stderr_capture_maxbytes=0
 environment=$ENV_VARS
 priority=999
 
@@ -71,20 +71,17 @@ user=comserv
 autostart=true
 autorestart=true
 startsecs=5
-stdout_logfile=${CATALYST_HOME}/root/log/health_monitor.log
-stdout_logfile_maxbytes=1MB
-stdout_logfile_backups=5
-stderr_logfile=${CATALYST_HOME}/root/log/health_monitor_error.log
-stderr_logfile_maxbytes=1MB
-stderr_logfile_backups=5
+stdout_logfile=/proc/1/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/proc/1/fd/2
+stderr_logfile_maxbytes=0
 environment=$ENV_VARS
 priority=1000
 EOFCONF
 
 echo "[supervisor-config] Generated supervisor config:"
 echo "[supervisor-config] Command: $START_CMD"
-echo "[supervisor-config] Log file: ${CATALYST_HOME}/root/log/catalyst.log"
-echo "[supervisor-config] Error log: ${CATALYST_HOME}/root/log/catalyst_error.log"
+echo "[supervisor-config] Logs: container stdout/stderr (visible via 'docker logs')"
 
 # Write config to supervisord log so we can see it in docker logs
 echo "[supervisor-config] ===== Supervisor config generated =====" >> /var/log/supervisor/supervisord.log 2>&1 || true
