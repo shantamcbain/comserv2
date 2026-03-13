@@ -12,28 +12,6 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-sub begin :Private {
-    my ($self, $c) = @_;
-
-    my $roles = $c->session->{roles} || [];
-    if (!ref $roles) {
-        $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
-        $c->session->{roles} = $roles;
-    }
-
-    my $username = $c->session->{username} // '';
-    my $has_admin = grep { lc($_) eq 'admin' } @$roles;
-
-    unless ($has_admin) {
-        if (!$username || $username eq 'Guest') {
-            $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
-        } else {
-            $c->res->redirect($c->uri_for('/'));
-        }
-        $c->detach;
-    }
-}
-
 # GET /admin/logging/audit
 # Main audit dashboard — renders instantly; heavy stats loaded async via /audit/stats
 sub index :Path('/admin/logging/audit') :Args(0) {
@@ -42,13 +20,23 @@ sub index :Path('/admin/logging/audit') :Args(0) {
     my $hours = int($c->req->param('hours') || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
 
+    # Local Docker containers (fast — direct docker ps)
     my $docker_health = [];
     eval { $docker_health = Comserv::Util::HealthLogger->get_docker_health() };
 
+    # All-server Docker health from shared system_log DB (includes production)
+    my $docker_health_db = [];
+    eval {
+        $docker_health_db = Comserv::Util::HealthLogger->get_docker_health_from_db(
+            $c->model('DBEncy')
+        );
+    };
+
     $c->stash(
-        template      => 'admin/Logging/LogAudit.tt',
-        docker_health => $docker_health,
-        hours         => $hours,
+        template         => 'admin/Logging/LogAudit.tt',
+        docker_health    => $docker_health,
+        docker_health_db => $docker_health_db,
+        hours            => $hours,
     );
 }
 
@@ -94,6 +82,7 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
 
     $c->stash(
         template   => 'admin/Logging/LogAuditStats.tt',
+        wrapper    => '',
         audit      => $audit,
         alerts     => $alerts,
         hours      => $hours,

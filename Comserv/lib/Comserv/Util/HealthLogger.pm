@@ -534,6 +534,54 @@ sub compute_health_score {
 # Return health status of all Docker containers whose name starts with 'comserv'.
 # Each entry: { name, image, status, health, uptime, last_check, last_output }
 # Returns [] if Docker is not available or no comserv containers found.
+# Read the most recent [HEALTH][DOCKER_STATUS] entries from system_log for every
+# system_identifier. Used by the admin dashboard so workstation can see production
+# container health without needing direct Docker/SSH access.
+# Returns [ { system_identifier, containers => [ {name,health,status_str,last_output,timestamp} ] } ]
+sub get_docker_health_from_db {
+    my ($class, $schema) = @_;
+    my @results;
+    eval {
+        my $dbh = $schema->storage->dbh;
+        # Get the latest DOCKER_STATUS entry per (system_identifier, container name)
+        # Container name is embedded in message as "container=NAME "
+        my $sth = $dbh->prepare(
+            "SELECT system_identifier, message, timestamp
+             FROM system_log
+             WHERE message LIKE '[HEALTH][DOCKER_STATUS]%'
+               AND timestamp >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+             ORDER BY timestamp DESC
+             LIMIT 500"
+        );
+        $sth->execute();
+        my %seen; # system_identifier -> container_name -> row
+        while (my $row = $sth->fetchrow_hashref) {
+            my $sys  = $row->{system_identifier} // '(unknown)';
+            my $msg  = $row->{message} // '';
+            my ($cname)  = $msg =~ /container=(\S+)/;
+            my ($health) = $msg =~ /health=(\S+)/;
+            my ($status) = $msg =~ /status=([^ ]+(?:\s+\([^)]+\))?)/;
+            my ($lcheck) = $msg =~ /last_check=(.+)$/;
+            next unless $cname;
+            next if exists $seen{$sys}{$cname}; # keep latest only
+            $seen{$sys}{$cname} = {
+                name        => $cname,
+                health      => $health // 'unknown',
+                status_str  => $status  // '',
+                last_output => $lcheck  // '',
+                timestamp   => $row->{timestamp},
+            };
+        }
+        for my $sys (sort keys %seen) {
+            push @results, {
+                system_identifier => $sys,
+                containers        => [ sort { $a->{name} cmp $b->{name} } values %{$seen{$sys}} ],
+            };
+        }
+    };
+    return \@results;
+}
+
 sub get_docker_health {
     my ($class) = @_;
     my @containers;
