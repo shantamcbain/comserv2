@@ -754,25 +754,13 @@ sub auto :Private {
 sub health :Path('/health') :Args(0) {
     my ($self, $c) = @_;
     
-    # Simple health check endpoint - returns 200 OK without database queries
-    # Used by Docker health checks and monitoring systems
-    
-    my $db_ok = 0;
-    eval {
-        $db_ok = $c->model('DBEncy')->storage->dbh->ping;
-    };
-
-    my $status = $db_ok ? 'ok' : 'error';
-    my $http_status = $db_ok ? 200 : 503;
-
+    # Lightweight liveness check — no DB query, no session, no logging.
+    # Purpose: tell Docker the web process is alive and accepting connections.
+    # DB health is monitored separately by ContainerHealthMonitor.pl.
     $c->response->content_type('application/json');
-    $c->response->status($http_status);
-    $c->response->body(encode_json({
-        status => $status,
-        database => $db_ok ? 'up' : 'down',
-        timestamp => time(),
-        system => $self->logging->get_system_identifier(),
-    }));
+    $c->response->status(200);
+    $c->response->body('{"status":"ok"}');
+    $c->detach;
     return;
 }
 
