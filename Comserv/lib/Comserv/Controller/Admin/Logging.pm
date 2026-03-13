@@ -103,8 +103,8 @@ sub index :Path('/admin/logging') :Args(0) {
             { order_by => { -desc => 'id' }, rows => 100 }
         );
         while (my $log = $logs_rs->next) {
-            my $instance = '';
-            if (($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
+            my $instance = eval { $log->system_identifier } // '';
+            if (!$instance && ($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
                 $instance = $1;
             }
             push @db_logs, {
