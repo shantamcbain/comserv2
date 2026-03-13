@@ -531,4 +531,65 @@ sub compute_health_score {
     return { score => $score, status => $status, summary => \@issues };
 }
 
+# Return health status of all Docker containers whose name starts with 'comserv'.
+# Each entry: { name, image, status, health, uptime, last_check, last_output }
+# Returns [] if Docker is not available or no comserv containers found.
+sub get_docker_health {
+    my ($class) = @_;
+    my @containers;
+    eval {
+        # docker ps — one line per container, tab-separated
+        my @ps_lines;
+        {
+            local $SIG{CHLD} = 'DEFAULT';
+            open(my $fh, '-|', qw(docker ps --all --no-trunc
+                --format), '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}')
+                or die "docker ps: $!";
+            @ps_lines = <$fh>;
+            close $fh;
+        }
+
+        for my $line (@ps_lines) {
+            chomp $line;
+            my ($name, $image, $status_str, $running_for) = split /\t/, $line;
+            next unless $name && $name =~ /^comserv/i;
+
+            # Parse health from status string: "Up 2 hours (unhealthy)" / "(healthy)"
+            my $health = 'none';
+            $health = $1 if $status_str =~ /\((\w+)\)/;
+
+            my $container = {
+                name        => $name,
+                image       => $image,
+                status_str  => $status_str,
+                uptime      => $running_for,
+                health      => $health,
+                last_output => '',
+            };
+
+            # Get last healthcheck output for unhealthy/starting containers
+            if ($health eq 'unhealthy' || $health eq 'starting') {
+                eval {
+                    local $SIG{CHLD} = 'DEFAULT';
+                    open(my $ifh, '-|', 'docker', 'inspect',
+                        '--format', '{{range .State.Health.Log}}{{.ExitCode}}:{{.Output}}|{{end}}',
+                        $name) or die;
+                    my $raw = do { local $/; <$ifh> };
+                    close $ifh;
+                    # Take only the most recent check (first segment before |)
+                    if ($raw && $raw =~ /^(-?\d+):(.+?)\|/s) {
+                        my ($exit, $out) = ($1, $2);
+                        $out =~ s/\s+/ /g;
+                        $out = substr($out, 0, 200);
+                        $container->{last_output} = "exit=$exit: $out";
+                    }
+                };
+            }
+
+            push @containers, $container;
+        }
+    };
+    return \@containers;
+}
+
 1;
