@@ -133,13 +133,18 @@ sub index :Path('/admin/logging') :Args(0) {
 
     eval {
         my $schema = $c->model('DBEncy');
-        # Try count with all columns first
-        eval { $total_count = $schema->resultset('SystemLog')->search($search_params)->count };
-        if ($@) {
-            # system_identifier missing — count without it
-            $total_count = $schema->resultset('SystemLog')->search(
-                $search_params, { columns => \@base_cols }
-            )->count;
+        my $dbh    = $schema->storage->dbh;
+        if (%$search_params) {
+            # Filtered count — still needs WHERE clause
+            eval { $total_count = $schema->resultset('SystemLog')->search($search_params)->count };
+            $total_count //= 0;
+        } else {
+            # Unfiltered: use table row-count estimate from information_schema (instant)
+            ($total_count) = $dbh->selectrow_array(
+                "SELECT TABLE_ROWS FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+            );
+            $total_count //= 0;
         }
         @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
     };
