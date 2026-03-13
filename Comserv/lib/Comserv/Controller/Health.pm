@@ -109,15 +109,16 @@ sub recent_errors :Local :Args(0) {
                 $inst = $2;
             }
             push @rows, {
-                id           => $rec->id,
-                app_instance => $inst,
-                log_level    => $rec->level,
-                category     => $cat,
-                message      => $rec->message,
-                sitename     => $rec->sitename // '',
-                username     => $rec->username // '',
-                timestamp    => $rec->timestamp . '',
-                subroutine   => $rec->subroutine // '',
+                id                => $rec->id,
+                app_instance      => $rec->system_identifier // $inst,
+                log_level         => $rec->level,
+                category          => $cat,
+                message           => $rec->message,
+                sitename          => $rec->sitename // '',
+                username          => $rec->username // '',
+                timestamp         => $rec->timestamp . '',
+                subroutine        => $rec->subroutine // '',
+                system_identifier => $rec->system_identifier // '',
             };
         }
     };

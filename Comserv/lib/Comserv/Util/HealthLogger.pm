@@ -109,14 +109,15 @@ sub log_event {
     eval {
         my $schema = $c->model('DBEncy');
         $schema->resultset('SystemLog')->create({
-            timestamp  => $now,
-            level      => $level,
-            file       => $src_file,
-            line       => $src_line,
-            subroutine => $sub_name,
-            message    => $full_message,
-            sitename   => $sitename || undef,
-            username   => $username || undef,
+            timestamp         => $now,
+            level             => $level,
+            file              => $src_file,
+            line              => $src_line,
+            subroutine        => $sub_name,
+            message           => $full_message,
+            sitename          => $sitename || undef,
+            username          => $username || undef,
+            system_identifier => _get_app_instance(),
         });
     };
     if ($@) {
