@@ -20,20 +20,27 @@ sub begin :Private {
         "User accessing logging admin: " . $c->req->uri);
     
     my $roles = $c->session->{roles} || [];
-    
-    if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', 
-            "Invalid or undefined roles in session");
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
+    # Normalise to array ref if stored as a comma-separated string
+    if (!ref $roles) {
+        $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
+        $c->session->{roles} = $roles;
     }
-    
-    unless (grep { $_ eq 'admin' } @$roles) {
+
+    my $has_admin = grep { lc($_) eq 'admin' } @$roles;
+    # Also accept the special bypass username used during dev
+    my $username = $c->session->{username} // '';
+    $has_admin ||= ($username eq 'Shanta');
+
+    unless ($has_admin) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-            "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $c->res->redirect($c->uri_for('/'));
+            "Unauthorized access attempt by user: " . ($username || 'Guest') . " roles: " . join(',', @$roles));
+        if (!$username || $username eq 'Guest') {
+            $c->stash->{error_msg} = "Please log in to access the logging administration.";
+            $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        } else {
+            $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
+            $c->res->redirect($c->uri_for('/'));
+        }
         $c->detach;
     }
 }
