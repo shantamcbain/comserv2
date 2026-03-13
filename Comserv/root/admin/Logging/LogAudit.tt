@@ -1,0 +1,249 @@
+[%
+   title = "Log Audit & Health Dashboard"
+   description = "Audit system_log table, view health alerts, and prune old records"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-12"
+%]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Log Audit &amp; Health Dashboard</h1>
+        <div style="float:right;">
+            <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">&larr; Back to Logging</a>
+        </div>
+    </div>
+
+    [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <!-- ============================================================
+                 SECTION 1: What is currently being recorded
+                 ============================================================ -->
+            <div class="content-section">
+                <h2>What Is Being Recorded</h2>
+
+                <form method="get" action="[% c.uri_for('/admin/logging/audit') %]" style="margin-bottom:10px;">
+                    <label><strong>Look-back window:</strong></label>
+                    <select name="hours" onchange="this.form.submit()">
+                        [% FOR h IN [1, 6, 12, 24, 48, 168] %]
+                            <option value="[% h %]" [% IF h == hours %]selected[% END %]>
+                                [% IF h < 24 %][% h %] hour[% IF h > 1 %]s[% END %]
+                                [% ELSIF h == 24 %]24 h (1 day)
+                                [% ELSIF h == 48 %]48 h (2 days)
+                                [% ELSE %]7 days
+                                [% END %]
+                            </option>
+                        [% END %]
+                    </select>
+                </form>
+
+                [% IF audit.error %]
+                    <div class="error"><strong>Audit error:</strong> [% audit.error | html %]</div>
+                [% END %]
+
+                <div class="data-container" style="display:flex;gap:30px;flex-wrap:wrap;">
+                    <div>
+                        <h3>Total Records in system_log</h3>
+                        <p style="font-size:2em;font-weight:bold;">[% audit.total | html %]</p>
+                        <p>Recorded in last [% audit.hours | html %]h: <strong>[% audit.recent | html %]</strong></p>
+                    </div>
+                </div>
+
+                <h3>Records by Level</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Level</th>
+                            <th>Total (all time)</th>
+                            <th>Last [% audit.hours | html %]h</th>
+                            <th>Retention Policy</th>
+                            <th>Would Prune Now</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    [% SET retention = { DEBUG => '1 day', INFO => '2 days', WARN => '7 days', ERROR => '30 days', CRITICAL => '90 days' } %]
+                    [% FOR row IN audit.by_level %]
+                        [% SET prune_n = audit.prune_estimates.${row.level} || 0 %]
+                        <tr class="level-[% row.level | lower %]">
+                            <td><strong>[% row.level | html %]</strong></td>
+                            <td>[% row.total | html %]</td>
+                            <td>[% row.recent | html %]</td>
+                            <td>[% retention.${row.level} || '?' %]</td>
+                            <td>[% IF prune_n > 0 %]<span style="color:orange;">[% prune_n | html %]</span>[% ELSE %]0[% END %]</td>
+                        </tr>
+                    [% END %]
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:bold;">
+                            <td colspan="4">Total prunable with current policy:</td>
+                            <td><span style="color:red;">[% audit.prune_total | html %]</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <h3>Top Subroutines Generating Records (last [% audit.hours | html %]h)</h3>
+                <table class="data-table">
+                    <thead><tr><th>Subroutine</th><th>Level</th><th>Count</th></tr></thead>
+                    <tbody>
+                    [% FOR row IN audit.top_subroutines %]
+                        <tr class="level-[% row.level | lower %]">
+                            <td><code>[% row.subroutine | html %]</code></td>
+                            <td>[% row.level | html %]</td>
+                            <td>[% row.count | html %]</td>
+                        </tr>
+                    [% END %]
+                    [% IF !audit.top_subroutines.size %]
+                        <tr><td colspan="3" class="empty-state">No data for this period.</td></tr>
+                    [% END %]
+                    </tbody>
+                </table>
+
+                <h3>Top Source Files (last [% audit.hours | html %]h)</h3>
+                <table class="data-table">
+                    <thead><tr><th>File</th><th>Count</th></tr></thead>
+                    <tbody>
+                    [% FOR row IN audit.top_files %]
+                        <tr>
+                            <td><small>[% row.file | html %]</small></td>
+                            <td>[% row.count | html %]</td>
+                        </tr>
+                    [% END %]
+                    [% IF !audit.top_files.size %]
+                        <tr><td colspan="2" class="empty-state">No data for this period.</td></tr>
+                    [% END %]
+                    </tbody>
+                </table>
+
+                [% IF audit.top_instances.size %]
+                <h3>By Server / Container Instance (last [% audit.hours | html %]h)</h3>
+                <table class="data-table">
+                    <thead><tr><th>Instance (system_identifier)</th><th>Records</th></tr></thead>
+                    <tbody>
+                    [% FOR row IN audit.top_instances %]
+                        <tr>
+                            <td><code>[% row.instance | html %]</code></td>
+                            <td>[% row.count | html %]</td>
+                        </tr>
+                    [% END %]
+                    </tbody>
+                </table>
+                [% END %]
+            </div>
+
+            <!-- ============================================================
+                 SECTION 2: What is not working (health_alert table)
+                 ============================================================ -->
+            <div class="content-section">
+                <h2>What Is Not Working — Open Health Alerts</h2>
+                [% IF alerts.size > 0 %]
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Urgency</th>
+                            <th>Category</th>
+                            <th>Occurrences</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                            <th>Instance</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    [% FOR alert IN alerts %]
+                        [% SET urgency_color = alert.level == 'CRITICAL' ? 'red' :
+                                               alert.level == 'HIGH'     ? 'orange' :
+                                               alert.level == 'MEDIUM'   ? 'goldenrod' : 'inherit' %]
+                        <tr>
+                            <td>[% alert.id | html %]</td>
+                            <td><strong style="color:[% urgency_color %];">[% alert.level | html %]</strong></td>
+                            <td>[% alert.category | html %]</td>
+                            <td>[% alert.occurrence_count | html %]</td>
+                            <td style="white-space:nowrap;"><small>[% alert.first_seen | html %]</small></td>
+                            <td style="white-space:nowrap;"><small>[% alert.last_seen | html %]</small></td>
+                            <td><small>[% alert.system_identifier | html %]</small></td>
+                            <td>[% alert.description | html | truncate(100) %]</td>
+                            <td>[% alert.status | html %]</td>
+                            <td>
+                                <form method="post" action="[% c.uri_for('/admin/logging/audit/alert_action') %]" style="display:inline;">
+                                    <input type="hidden" name="alert_id" value="[% alert.id | html %]">
+                                    [% IF alert.status == 'OPEN' %]
+                                        <button type="submit" name="action" value="acknowledge" class="btn btn-warning btn-sm">Ack</button>
+                                    [% END %]
+                                    <button type="submit" name="action" value="resolve" class="btn btn-success btn-sm"
+                                        onclick="return confirm('Mark alert #[% alert.id %] as RESOLVED?')">Resolve</button>
+                                </form>
+                            </td>
+                        </tr>
+                    [% END %]
+                    </tbody>
+                </table>
+                [% ELSE %]
+                <div class="data-container">
+                    <p class="empty-state">No open health alerts.
+                    [% IF !alerts.defined %]
+                        <em>(The <code>health_alert</code> table may not exist yet — ask CSC admin to add it via schema compare.)</em>
+                    [% END %]
+                    </p>
+                </div>
+                [% END %]
+            </div>
+
+            <!-- ============================================================
+                 SECTION 3: Prune old records
+                 ============================================================ -->
+            <div class="content-section">
+                <h2>Prune Old Records</h2>
+                <p>Remove records from <code>system_log</code> older than the retention period for each level.
+                   Records will also be capped at <em>max total rows</em> by deleting the oldest first.</p>
+
+                [% IF audit.prune_total > 0 %]
+                <div class="alert alert-warning" style="padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;margin-bottom:15px;">
+                    <strong>&#9888; [% audit.prune_total | html %] records</strong> are eligible for pruning with the default policy.
+                </div>
+                [% END %]
+
+                <form method="post" action="[% c.uri_for('/admin/logging/audit/prune') %]"
+                      onsubmit="return confirm('This will permanently delete old log records. Continue?')">
+                    <div style="display:flex;flex-wrap:wrap;gap:15px;margin-bottom:15px;">
+                        [% SET fields = [
+                            { name='debug_days',    label='DEBUG keep (days)',    default=1  },
+                            { name='info_days',     label='INFO keep (days)',     default=2  },
+                            { name='warn_days',     label='WARN keep (days)',     default=7  },
+                            { name='error_days',    label='ERROR keep (days)',    default=30 },
+                            { name='critical_days', label='CRITICAL keep (days)', default=90 },
+                            { name='max_records',   label='Max total rows',       default=10000 },
+                        ] %]
+                        [% FOR f IN fields %]
+                        <div class="form-group">
+                            <label for="[% f.name %]">[% f.label %]:</label><br>
+                            <input type="number" id="[% f.name %]" name="[% f.name %]"
+                                   value="[% f.default %]" min="0" style="width:100px;" class="form-control">
+                        </div>
+                        [% END %]
+                    </div>
+                    <button type="submit" class="btn btn-danger">Prune Now</button>
+                    <small style="margin-left:10px;color:#666;">This action cannot be undone.</small>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+tr.level-debug  { color: #888; }
+tr.level-info   { color: #000; }
+tr.level-warn   { background: #fff8e1; }
+tr.level-error  { background: #fdecea; }
+tr.level-critical { background: #f8d7da; font-weight: bold; }
+.btn-sm { padding: 2px 8px; font-size: 0.85em; }
+</style>
