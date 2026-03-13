@@ -235,6 +235,7 @@ sub evaluate_records {
             timestamp  => { '>='  => $cutoff },
         }, {
             order_by => { -desc => 'id' },
+            columns  => [qw(id timestamp level file line subroutine message sitename username)],
         });
 
         my %buckets;
