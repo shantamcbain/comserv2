@@ -16,13 +16,20 @@ sub begin :Private {
     my ($self, $c) = @_;
 
     my $roles = $c->session->{roles} || [];
-    if (ref $roles ne 'ARRAY') {
-        $c->stash->{error_msg} = "Session expired. Please log in again.";
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
+    if (!ref $roles) {
+        $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
+        $c->session->{roles} = $roles;
     }
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->res->redirect($c->uri_for('/'));
+
+    my $username = $c->session->{username} // '';
+    my $has_admin = grep { lc($_) eq 'admin' } @$roles;
+
+    unless ($has_admin) {
+        if (!$username || $username eq 'Guest') {
+            $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        } else {
+            $c->res->redirect($c->uri_for('/'));
+        }
         $c->detach;
     }
 }
@@ -35,11 +42,24 @@ sub index :Path('/admin/logging/audit') :Args(0) {
     my $hours = int($c->req->param('hours') || 24);
     $hours = 24 unless $hours > 0 && $hours <= 720;
 
-    my $audit = {};
-    my $alerts = [];
+    my $audit       = {};
+    my $alerts      = [];
+    my $page_error  = '';
+
     eval {
         my $schema = $c->model('DBEncy');
-        $audit  = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours);
+        $audit = Comserv::Util::HealthLogger->audit_stats($schema, hours => $hours);
+    };
+    if ($@) {
+        my $err = "$@";
+        $page_error = "Audit statistics unavailable: $err";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "audit_stats failed: $err");
+        $audit = { error => $page_error };
+    }
+
+    eval {
+        my $schema = $c->model('DBEncy');
         $alerts = [ $schema->resultset('HealthAlert')->search(
             { status => { -in => ['OPEN', 'ACKNOWLEDGED'] } },
             { order_by => [
@@ -48,12 +68,20 @@ sub index :Path('/admin/logging/audit') :Args(0) {
             ]}
         )->all ];
     };
+    if ($@) {
+        my $err = "$@";
+        $page_error ||= "Health alerts unavailable: $err";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "HealthAlert fetch failed: $err");
+        $alerts = [];
+    }
 
     $c->stash(
-        template => 'admin/Logging/LogAudit.tt',
-        audit    => $audit,
-        alerts   => $alerts,
-        hours    => $hours,
+        template   => 'admin/Logging/LogAudit.tt',
+        audit      => $audit,
+        alerts     => $alerts,
+        hours      => $hours,
+        page_error => $page_error,
     );
 }
 
