@@ -28,24 +28,40 @@ sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->instance();
 }
-# adding code to force restart
-# Begin method to check if the user has admin role
+# auto :Private — runs before EVERY action in Admin and all Admin::* sub-controllers.
+# This is the single authoritative admin role gate for all /admin/* routes.
+sub auto :Private {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} // 'Guest';
+    my $roles    = $c->session->{roles} || [];
+
+    # Normalise roles to array ref
+    unless (ref $roles) {
+        $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
+        $c->session->{roles} = $roles;
+    }
+
+    my $has_admin = grep { lc($_) eq 'admin' } @$roles;
+
+    unless ($has_admin) {
+        if (!$username || $username eq 'Guest') {
+            $c->response->redirect($c->uri_for('/user/login',
+                { destination => $c->req->uri }));
+        } else {
+            $c->flash->{error_msg} = 'Administrator access required.';
+            $c->response->redirect($c->uri_for('/'));
+        }
+        return 0;
+    }
+
+    return 1;
+}
+
+# Legacy begin — kept as no-op so existing sub-controller begin actions still work
 sub begin : Private {
     my ($self, $c) = @_;
-    
-    # Add detailed logging
-    my $username = $c->session->{username} || 'Guest';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
-        "Admin controller begin method called by user: $username");
-     # Initialize debug_msg array if it doesn't exist and debug mode is enabled
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        
-        # Add the debug message to the array
-        push @{$c->stash->{debug_msg}}, "Admin controller loaded successfully";
-    }
-    
-    return 1; # Allow the request to proceed
+    return 1;
 }
 
 # Base method for chained actions
