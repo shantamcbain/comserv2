@@ -1806,16 +1806,16 @@ sub begin :Private {
 sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
 
-    # Intercept any unhandled Catalyst errors and render a friendly error page
-    # instead of the raw Catalyst 500 debug page.
-    if ($c->error && !$c->response->body) {
+    # Intercept unhandled Catalyst errors and render a friendly error page —
+    # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
+    # show its full error page so developers can see the real stack trace.
+    if ($c->error && !$c->response->body && !$c->debug) {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', @errors);
 
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 
-        # Optionally email alert
         eval {
             require Comserv::Util::HealthLogger;
             Comserv::Util::HealthLogger->log_health_event(
@@ -1827,16 +1827,12 @@ sub end : ActionClass('RenderView') {
 
         $c->clear_errors;
         $c->response->status(500);
-
-        my $debug_mode = $c->session->{debug_mode} || $c->config->{debug} || 0;
         $c->stash(
             template    => 'error.tt',
             error_title => 'Temporary Service Issue',
             error_msg   => 'We encountered an error processing your request. '
                          . 'The system administrator has been notified. '
                          . 'Please try again in a few minutes, or use the Back button.',
-            admin_msg   => $debug_mode ? "Technical detail (debug): $err_text" : undef,
-            debug_errors => $debug_mode ? \@errors : [],
         );
     }
 
