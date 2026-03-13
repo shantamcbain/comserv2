@@ -155,22 +155,23 @@ sub get_system_identifier {
     my $identifier = $ENV{SYSTEM_IDENTIFIER};
     return $identifier if $identifier && $identifier ne '';
 
-    # 2. Map known IP addresses to friendly names
+    # 2. Map known IP addresses to friendly names.
+    # Use a UDP connect (no packets sent) to find which local IP the OS would
+    # use when routing outbound — the most reliable way to get the primary LAN IP.
     my %IP_NAMES = (
         '192.168.1.126' => 'production',
         '192.168.1.199' => 'workstation',
     );
     eval {
         require Socket;
-        my $hostname = Sys::Hostname::hostname();
-        my @addrs = gethostbyname($hostname);
-        for my $packed (splice @addrs, 4) {
-            my $ip = Socket::inet_ntoa($packed);
-            if (exists $IP_NAMES{$ip}) {
-                $identifier = $IP_NAMES{$ip};
-                last;
-            }
-        }
+        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
+            or die "socket: $!";
+        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
+            or die "connect: $!";
+        my $local = getsockname($sock);
+        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+        my $ip = Socket::inet_ntoa($local_ip_packed);
+        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
     };
 
     # 3. Fall back to plain hostname
