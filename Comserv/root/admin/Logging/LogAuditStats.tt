@@ -1,8 +1,14 @@
-[%# LogAuditStats.tt — HTML fragment loaded async by LogAudit.tt
-    Rendered by /admin/logging/audit/stats?hours=N
-    No wrapper/layout — injected directly into #audit-stats-container
--%]
-[% META wrapper = '' -%]
+[%
+   title = "Log Audit Stats Fragment"
+   description = "Async stats fragment for /admin/logging/audit — no layout wrapper"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.03"
+   last_updated = "2026-03-13"
+%]
+[% PageVersion = 'admin/Logging/LogAuditStats.tt,v 0.03 2026/03/13 Zencoder Exp Zencoder' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
 [% IF page_error %]
 <div class="error"><strong>Notice:</strong> [% page_error | html %]
     Some sections below may be incomplete.</div>
