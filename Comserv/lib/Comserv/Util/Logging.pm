@@ -150,20 +150,35 @@ sub _get_timestamp {
 # Helper function to get the system identifier (Production, Workstation2, etc.)
 sub get_system_identifier {
     my ($class) = @_;
-    my $identifier = $ENV{'SYSTEM_IDENTIFIER'};
-    
-    # Try hostname first if no env var
-    if (!$identifier || $identifier eq '') {
-        eval {
-            require Sys::Hostname;
-            $identifier = Sys::Hostname::hostname();
-        };
-        $identifier //= 'Unknown-System';
+
+    # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
+    my $identifier = $ENV{SYSTEM_IDENTIFIER};
+    return $identifier if $identifier && $identifier ne '';
+
+    # 2. Map known IP addresses to friendly names
+    my %IP_NAMES = (
+        '192.168.1.126' => 'production',
+        '192.168.1.199' => 'workstation',
+    );
+    eval {
+        require Socket;
+        my $hostname = Sys::Hostname::hostname();
+        my @addrs = gethostbyname($hostname);
+        for my $packed (splice @addrs, 4) {
+            my $ip = Socket::inet_ntoa($packed);
+            if (exists $IP_NAMES{$ip}) {
+                $identifier = $IP_NAMES{$ip};
+                last;
+            }
+        }
+    };
+
+    # 3. Fall back to plain hostname
+    unless ($identifier && $identifier ne '') {
+        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
+        $identifier //= 'unknown';
     }
 
-    # If it's still 'Unknown-System', try to use the workstation2/3/laptop hints from context if possible
-    # In docker, hostname usually matches the container ID or what's set in compose.
-    
     return $identifier;
 }
 
