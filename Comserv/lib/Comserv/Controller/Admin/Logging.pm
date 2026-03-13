@@ -93,23 +93,43 @@ sub index :Path('/admin/logging') :Args(0) {
     $search_params->{username} = $filter_username if $filter_username;
     $search_params->{message} = { -like => "%$search_text%" } if $search_text;
 
+    my $db_error = '';
+    my $total_count = 0;
     eval {
-        my $logs_rs = $c->model('DBEncy')->resultset('SystemLog')->search(
+        my $schema = $c->model('DBEncy');
+        $total_count = $schema->resultset('SystemLog')->search($search_params)->count;
+        my $logs_rs = $schema->resultset('SystemLog')->search(
             $search_params,
-            { order_by => { -desc => 'timestamp' }, rows => 100 }
+            { order_by => { -desc => 'id' }, rows => 100 }
         );
         while (my $log = $logs_rs->next) {
             push @db_logs, {
-                timestamp => $log->timestamp,
-                level => $log->level,
-                subroutine => $log->subroutine,
-                message => $log->message,
-                file => basename($log->file),
-                line => $log->line,
-                username => $log->username,
-                sitename => $log->sitename
+                timestamp         => $log->timestamp,
+                level             => $log->level,
+                subroutine        => $log->subroutine,
+                message           => $log->message,
+                file              => basename($log->file),
+                line              => $log->line,
+                username          => $log->username,
+                sitename          => $log->sitename,
+                system_identifier => $log->system_identifier,
             };
         }
+    };
+    if ($@) {
+        $db_error = "$@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+            "Failed to fetch system_log records: $db_error");
+    }
+
+    # Health evaluation status from HealthLogger
+    my $health_status = {};
+    eval {
+        require Comserv::Util::HealthLogger;
+        my $schema = $c->model('DBEncy');
+        $health_status = Comserv::Util::HealthLogger->compute_health_score($schema, 30);
+        my $eval_summary = Comserv::Util::HealthLogger->evaluate_records($schema, 30);
+        $health_status->{eval_summary} = $eval_summary;
     };
 
     # Get available levels for filter
@@ -121,16 +141,19 @@ sub index :Path('/admin/logging') :Args(0) {
             size => $log_file && -e $log_file ? sprintf("%.2f KB", (-s $log_file) / 1024) : '0 KB',
             exists => $log_file && -e $log_file ? 1 : 0
         },
-        archived_logs => \@archived_logs,
-        db_logs => \@db_logs,
-        levels => \@levels,
-        filter_level => $filter_level,
+        archived_logs   => \@archived_logs,
+        db_logs         => \@db_logs,
+        db_error        => $db_error,
+        total_count     => $total_count,
+        health_status   => $health_status,
+        levels          => \@levels,
+        filter_level    => $filter_level,
         filter_sitename => $filter_sitename,
         filter_username => $filter_username,
-        search_text => $search_text,
+        search_text     => $search_text,
         email_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
-        nfs_dir => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
-        template => 'admin/Logging/AdminLoggingIndex.tt'
+        nfs_dir         => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
+        template        => 'admin/Logging/AdminLoggingIndex.tt'
     );
 }
 

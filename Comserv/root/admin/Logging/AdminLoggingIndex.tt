@@ -38,9 +38,44 @@
                 </div>
             </div>
 
+            [% IF health_status.score.defined %]
             <div class="content-section">
-                <h3>Database Logs (Recent 100)</h3>
-                
+                <h3>Server Health Evaluation (last 30 min)</h3>
+                <div class="data-container">
+                    [% SET hs_color = health_status.status == 'OK' ? 'green' : (health_status.status == 'WARN' ? 'orange' : 'red') %]
+                    <p><strong>Status:</strong> <span style="color:[% hs_color %];font-weight:bold;">[% health_status.status | html %]</span>
+                       &nbsp; <strong>Score:</strong> [% health_status.score | html %] / 100</p>
+                    [% IF health_status.summary.size %]
+                    <ul>
+                        [% FOR item IN health_status.summary %]<li>[% item | html %]</li>[% END %]
+                    </ul>
+                    [% END %]
+                    [% IF health_status.eval_summary.size %]
+                    <h4>Top Event Groups (by severity score)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>Level</th><th>Category</th><th>Count</th><th>Score</th><th>Instance</th><th>Sample Message</th></tr></thead>
+                        <tbody>
+                        [% FOR ev IN health_status.eval_summary %]
+                            <tr>
+                                <td><strong>[% ev.lvl | html %]</strong></td>
+                                <td>[% ev.cat | html %]</td>
+                                <td>[% ev.count | html %]</td>
+                                <td>[% ev.score | html %]</td>
+                                <td><small>[% ev.rec.system_identifier | html %]</small></td>
+                                <td><small>[% ev.rec.message | html | truncate(80) %]</small></td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    [% END %]
+                </div>
+            </div>
+            [% END %]
+
+            <div class="content-section">
+                <h3>Database Logs — showing last 100 of [% total_count | html %] total records</h3>
+                [% IF db_error %]<div class="error"><strong>DB Error:</strong> [% db_error | html %]</div>[% END %]
+
                 <div class="filter-container" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
                     <form method="get" action="[% c.uri_for('/admin/logging') %]" class="form-inline">
                         <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
@@ -78,6 +113,7 @@
                         <thead>
                             <tr>
                                 <th>Timestamp</th>
+                                <th>Instance</th>
                                 <th>Site</th>
                                 <th>Level</th>
                                 <th>User</th>
@@ -90,6 +126,7 @@
                                 [% FOR log IN db_logs %]
                                     <tr class="level-[% log.level | lower %]">
                                         <td style="white-space: nowrap;">[% log.timestamp | html %]</td>
+                                        <td><small>[% log.system_identifier | html %]</small></td>
                                         <td>[% log.sitename | html %]</td>
                                         <td><strong>[% log.level | html %]</strong></td>
                                         <td>[% log.username | html %]</td>
