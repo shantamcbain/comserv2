@@ -105,7 +105,7 @@ RUN chmod 644 /etc/logrotate.d/catalyst && \
 
 # Health check - will check dynamic port using /health endpoint
 # /health endpoint bypasses database queries and returns immediately
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
     CMD curl -f http://localhost:${WEB_PORT:-3000}/health || exit 1
 
 EXPOSE 3000 5000
