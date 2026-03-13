@@ -13,38 +13,6 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-sub begin :Private {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
-        "User accessing logging admin: " . $c->req->uri);
-    
-    my $roles = $c->session->{roles} || [];
-    # Normalise to array ref if stored as a comma-separated string
-    if (!ref $roles) {
-        $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
-        $c->session->{roles} = $roles;
-    }
-
-    my $has_admin = grep { lc($_) eq 'admin' } @$roles;
-    # Also accept the special bypass username used during dev
-    my $username = $c->session->{username} // '';
-    $has_admin ||= ($username eq 'Shanta');
-
-    unless ($has_admin) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
-            "Unauthorized access attempt by user: " . ($username || 'Guest') . " roles: " . join(',', @$roles));
-        if (!$username || $username eq 'Guest') {
-            $c->stash->{error_msg} = "Please log in to access the logging administration.";
-            $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
-        } else {
-            $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-            $c->res->redirect($c->uri_for('/'));
-        }
-        $c->detach;
-    }
-}
-
 sub index :Path('/admin/logging') :Args(0) {
     my ($self, $c) = @_;
 
