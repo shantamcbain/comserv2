@@ -69,9 +69,9 @@ my $_app_instance;
 
 sub _get_app_instance {
     return $_app_instance if defined $_app_instance;
-    my $hostname = eval { hostname() } || 'unknown';
+    my $name = Comserv::Util::Logging->get_system_identifier();
     my $port = $ENV{WEB_PORT} || $ENV{CATALYST_PORT} || '3000';
-    $_app_instance = "$hostname:$port(PID:$$)";
+    $_app_instance = "$name:$port";
     return $_app_instance;
 }
 
