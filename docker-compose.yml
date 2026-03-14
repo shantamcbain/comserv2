@@ -140,6 +140,7 @@ services:
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - workshop_files_nfs:/data/nfs:rw
       - comserv-logs:/opt/comserv/root/log:rw
+      - comserv-sessions:/tmp/comserv/session:rw
       - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
     depends_on:
       redis:
@@ -163,6 +164,8 @@ volumes:
   redis_data:
     driver: local
   comserv-logs:
+    driver: local
+  comserv-sessions:
     driver: local
   workshop_files_nfs:
     driver: local
