@@ -760,37 +760,29 @@
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                             ${container.state === 'not_created' ? `
-                                <button onclick="createContainerDirect('${container.service}')"
+                                <button onclick="createContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     🚀 Create & Start
                                 </button>
                             ` : isRunning ? `
-                                <button onclick="stopContainerDirect('${container.service}')"
+                                <button onclick="stopContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ■ Stop
                                 </button>
-                                <button onclick="restartContainerDirect('${container.service}')"
+                                <button onclick="restartContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ↻ Restart
                                 </button>
-                                <button onclick="rebuildContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    🔨 Rebuild
-                                </button>
-                                <button onclick="viewLogsDirect('${container.service}')"
+                                <button onclick="viewLogsDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
                             ` : `
-                                <button onclick="startContainerDirect('${container.service}')"
+                                <button onclick="startContainerDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ▶ Start
                                 </button>
-                                <button onclick="rebuildContainerDirect('${container.service}')"
-                                    style="padding: 6px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    🔨 Rebuild
-                                </button>
-                                <button onclick="viewLogsDirect('${container.service}')"
+                                <button onclick="viewLogsDirect('${container.name}')"
                                     style="padding: 6px 12px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     📋 Logs
                                 </button>
@@ -813,8 +805,8 @@
 
         containers.forEach(container => {
             const option = document.createElement('option');
-            option.value = container.service;
-            option.textContent = container.service;
+            option.value = container.name;
+            option.textContent = container.name;
             select.appendChild(option);
         });
     }
