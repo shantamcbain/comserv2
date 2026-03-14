@@ -185,8 +185,8 @@ sub get_smtp_config {
                     "Mail system is incorrectly connecting to localhost instead of production database server (192.168.1.198). " .
                     "Full error: $error_msg");
             } else {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                    "Database error accessing smtp_$key for site_id $site_id: $error_msg");
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+                    "Database error accessing smtp_$key for site_id $site_id: $error_msg — using PMG fallback");
             }
             
             return $self->_get_fallback_smtp_config($c, $site_id);
@@ -197,8 +197,8 @@ sub get_smtp_config {
         
         # Return fallback if any required config is missing
         unless ($config) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "Missing SMTP config key: smtp_$key for site_id $site_id");
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_smtp_config',
+                "Missing SMTP config key: smtp_$key for site_id $site_id — using PMG fallback");
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
         
