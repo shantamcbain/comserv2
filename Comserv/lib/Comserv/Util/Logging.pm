@@ -44,9 +44,10 @@ our %LEVEL_PRIORITY = (
 our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 
 # Minimum level to write to the DB system_log table.
-# DEBUG and INFO go only to the file log; WARN/ERROR/CRITICAL go to DB.
+# Default: WARN (DEBUG and INFO go only to file log; WARN/ERROR/CRITICAL go to DB).
+# Override via environment variable DB_LOG_MIN_LEVEL=INFO (or DEBUG for full capture).
 # This prevents millions of low-value rows from filling the table.
-our $DB_LOG_MIN_LEVEL = 'WARN';
+our $DB_LOG_MIN_LEVEL = $ENV{DB_LOG_MIN_LEVEL} || 'WARN';
 
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {

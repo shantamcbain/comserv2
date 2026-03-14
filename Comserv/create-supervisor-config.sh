@@ -36,12 +36,14 @@ ENV_VARS="$ENV_VARS,PERL5LIB=/opt/comserv/lib:/opt/comserv/local/lib/perl5"
 ENV_VARS="$ENV_VARS,CATALYST_ENV=$CATALYST_ENV"
 ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
+ENV_VARS="$ENV_VARS,STARMAN_WORKERS=$WORKERS"
 ENV_VARS="$ENV_VARS,COMSERV_LOG_DIR=/opt/comserv"
 
-# Pass through DB_, COMSERV_DB_, WORKSHOP_, SYSTEM_IDENTIFIER and HEALTH_ environment variables.
+# Pass through DB_, COMSERV_DB_, WORKSHOP_, SYSTEM_IDENTIFIER, HEALTH_, STARMAN_,
+# ACTIVE_DB_, and DB_LOG_ environment variables.
 # DB_HOST/DB_USER/DB_PASSWORD must reach ContainerHealthMonitor.pl so it can authenticate.
-if env | grep -qE '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|CATALYST_ENV|CATALYST_DEBUG)'; then
-  for var in $(env | grep -E '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|CATALYST_ENV|CATALYST_DEBUG)' | cut -d= -f1); do
+if env | grep -qE '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|STARMAN_|DB_LOG_)'; then
+  for var in $(env | grep -E '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|STARMAN_|DB_LOG_)' | cut -d= -f1); do
     val="${!var}"
     val="${val//,/__COMMA__}"
     ENV_VARS="$ENV_VARS,$var=$val"
