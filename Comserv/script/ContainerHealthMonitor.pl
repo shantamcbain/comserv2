@@ -82,7 +82,7 @@ sub _db_ping {
     my $dbh = eval {
         DBI->connect($dsn, $user, $pass, {
             RaiseError => 1, PrintError => 0, AutoCommit => 1,
-            mysql_connect_timeout => 5,
+            mariadb_connect_timeout => 5,
         });
     };
     return 0 unless $dbh;
