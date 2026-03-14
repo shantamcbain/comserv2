@@ -33,6 +33,10 @@ sub logging {
 sub auto :Private {
     my ($self, $c) = @_;
 
+    # Never let browsers cache admin pages — stale JS causes confusing errors after session expiry
+    $c->response->header('Cache-Control' => 'no-store, no-cache, must-revalidate');
+    $c->response->header('Pragma'        => 'no-cache');
+
     my $username = $c->session->{username} // '';
     my $roles    = $c->session->{roles} || [];
 
