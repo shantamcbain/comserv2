@@ -61,12 +61,12 @@ sub send_email {
             "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} . 
             ", SSL: " . ($smtp_config->{ssl} // 'none'));
         
-        # Connect to the SMTP server with debug enabled
+        # Connect to the SMTP server
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
-            Port => $smtp_config->{port},
-            Debug => 1,
-            Timeout => 30
+            Port    => $smtp_config->{port},
+            Debug   => 0,
+            Timeout => 15
         );
         
         unless ($smtp) {
@@ -204,11 +204,26 @@ sub get_smtp_config {
         
         $smtp_config{$key} = $config->config_value;
         
-        # If host is mail1.ht.home, replace it with the mail server IP address
-        if ($key eq 'host' && $smtp_config{$key} eq 'mail1.ht.home') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-                "Replacing mail1.ht.home with mail server IP 192.168.1.129");
-            $smtp_config{$key} = '192.168.1.129';
+        # Route all outbound mail through the PMG relay (192.168.1.128)
+        # rather than connecting directly to external SMTP servers
+        if ($key eq 'host') {
+            my $original_host = $smtp_config{$key};
+            if ($original_host eq 'mail1.ht.home') {
+                $smtp_config{$key} = '192.168.1.128';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+                    "Redirecting mail1.ht.home through PMG relay 192.168.1.128");
+            } elsif ($original_host ne '192.168.1.128' && $original_host ne '192.168.1.129') {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+                    "Redirecting external SMTP host '$original_host' through PMG relay 192.168.1.128");
+                $smtp_config{$key} = '192.168.1.128';
+            }
+        }
+        # PMG relay uses port 25, no SSL, no auth — override port and ssl from DB config
+        if ($key eq 'port') {
+            $smtp_config{$key} = 25;
+        }
+        if ($key eq 'ssl') {
+            $smtp_config{$key} = '';
         }
     }
 
@@ -225,14 +240,14 @@ sub _get_fallback_smtp_config {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
         "Using fallback SMTP config for site_id $site_id");
     
-    # Provide default mail server configuration
+    # Provide default mail server configuration - relay through PMG
     my $fallback_config = {
-        host => '192.168.1.129',  # Mail server IP
-        port => 587,
-        username => '',  # Will need to be configured
-        password => '',  # Will need to be configured  
-        from => "noreply\@comserv.local",
-        ssl => 'starttls'
+        host => '192.168.1.128',  # PMG (Proxmox Mail Gateway) relay
+        port => 25,
+        username => '',
+        password => '',
+        from => "noreply\@computersystemconsulting.ca",
+        ssl => ''
     };
     
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 

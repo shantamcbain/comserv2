@@ -62,6 +62,8 @@ services:
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
     ports:
       - "3000:3000"
     networks:
@@ -125,6 +127,8 @@ services:
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
     ports:
       - "5000:5000"
     networks:
