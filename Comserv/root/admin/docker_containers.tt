@@ -573,6 +573,20 @@
         outputBox.scrollTop = outputBox.scrollHeight;
     }
 
+    // Wrapper for all admin AJAX calls. Detects session expiry (redirect to login)
+    // and shows a clear message instead of a confusing JSON parse error.
+    function safeFetch(url, options) {
+        const opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
+        return fetch(url, opts).then(function(response) {
+            if (response.type === 'opaqueredirect' || response.status === 0 ||
+                (response.status >= 300 && response.status < 400)) {
+                appendOutput('✗ Session expired — please reload the page and log in again.');
+                return Promise.reject(new Error('session-expired'));
+            }
+            return response;
+        });
+    }
+
     function clearOutput() {
         outputBox.textContent = 'Ready for commands...\n';
     }
@@ -814,7 +828,7 @@
     function createContainerDirect(service) {
         appendOutput(`Creating and starting ${service}...`);
 
-        fetch(`/admin/docker-up/${service}`)
+        safeFetch(`/admin/docker-up/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -832,7 +846,7 @@
     function startContainerDirect(service) {
         appendOutput(`Starting ${service}...`);
 
-        fetch(`/admin/docker-start/${service}`)
+        safeFetch(`/admin/docker-start/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -854,7 +868,7 @@
 
         appendOutput(`Stopping ${service}...`);
 
-        fetch(`/admin/docker-stop/${service}`)
+        safeFetch(`/admin/docker-stop/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -876,7 +890,7 @@
 
         appendOutput(`Restarting ${service}...`);
 
-        fetch(`/admin/docker-restart/${service}?force=0`)
+        safeFetch(`/admin/docker-restart/${service}?force=0`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -897,7 +911,7 @@
 
         appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
 
-        fetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
+        safeFetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
@@ -924,7 +938,7 @@
         // Disable rebuild buttons during rebuild
         disableRebuildButtons();
 
-        fetch(`/admin/docker-rebuild/${service}`)
+        safeFetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -936,7 +950,7 @@
                     appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
                     appendOutput(`⏳ Starting ${service}...\n`);
                     // Auto-start after rebuild
-                    return fetch(`/admin/docker-up/${service}`);
+                    return safeFetch(`/admin/docker-up/${service}`);
                 } else {
                     appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
                     appendOutput(`✗ Failed to rebuild ${service}:\n`);
@@ -993,7 +1007,7 @@
         
         disableRebuildButtons();
 
-        fetch(`/admin/docker-rebuild/${service}`)
+        safeFetch(`/admin/docker-rebuild/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1026,7 +1040,7 @@
 
         appendOutput(`⏳ Cleaning up Docker system...\n`);
 
-        fetch('/admin/docker-prune')
+        safeFetch('/admin/docker-prune')
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1045,7 +1059,7 @@
     function showDiskUsage() {
         appendOutput(`⏳ Fetching Docker disk usage...\n`);
 
-        fetch('/admin/docker-system-df')
+        safeFetch('/admin/docker-system-df')
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1070,7 +1084,7 @@
 
         const url = service === 'all' ? '/admin/docker-status/all' : `/admin/docker-status/${service}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
@@ -1098,7 +1112,7 @@
 
         const url = `/admin/docker-restart/${service}?force=${force ? 1 : 0}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1124,7 +1138,7 @@
 
         const url = `/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`;
 
-        fetch(url)
+        safeFetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
@@ -1149,7 +1163,7 @@
 
         appendOutput(`⏳ Saving Docker image: ${service}...\n`);
 
-        fetch(`/admin/docker-save-image/${service}`)
+        safeFetch(`/admin/docker-save-image/${service}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -1252,7 +1266,7 @@
         formData.append('ssh_password', sshPassword);
         formData.append('save_credentials', 'yes');
 
-        fetch('/admin/docker-test-ssh', {
+        safeFetch('/admin/docker-test-ssh', {
             method: 'POST',
             body: new URLSearchParams(formData)
         })
@@ -1613,7 +1627,7 @@
             formData.append('recreate_volumes', '1');
         }
 
-        fetch('/admin/docker-deploy-to-production', {
+        safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             body: new URLSearchParams(formData)
         })
@@ -1647,7 +1661,7 @@
         lastLogContent = '';
         
         deploymentPollingInterval = setInterval(() => {
-            fetch('/admin/docker-deploy-status')
+            safeFetch('/admin/docker-deploy-status')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
