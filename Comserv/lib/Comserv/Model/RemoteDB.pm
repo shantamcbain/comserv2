@@ -314,20 +314,26 @@ sub test_connection {
     }
     
     try {
-        my $dbh = DBI->connect($dsn, $username, $password, {
+        my %connect_attrs = (
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
-        });
+        );
+        # Add a short connect timeout so unreachable hosts fail fast instead of
+        # blocking for 20-30s on OS TCP timeout
+        if ($db_type ne 'sqlite') {
+            $connect_attrs{mysql_connect_timeout} = 3;
+        }
+        my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
         
         $dbh->disconnect();
         
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
             "Connection test successful for '$conn_name'");
         
         return 1;
     } catch {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
             "Connection test failed for '$conn_name': $_");
         return 0;
     };
@@ -350,12 +356,12 @@ sub select_connection {
         ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
     } @matching_connections;
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
         "RemoteDB Connection Selection for '$database_name' - Testing in priority order:");
     foreach my $conn_name (@matching_connections) {
         my $priority = $config->{$conn_name}{priority} // 999;
         my $desc = $config->{$conn_name}{description} || 'No description';
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
             "  Priority $priority: $conn_name - $desc");
     }
 
@@ -389,7 +395,7 @@ sub select_connection {
             next;
         }
 
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
             "Attempting Priority " . ($conn->{priority} // 999) . " ($conn_name): $host:$port");
         
         if ($self->test_connection($conn_name)) {
