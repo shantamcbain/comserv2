@@ -573,15 +573,19 @@
         outputBox.scrollTop = outputBox.scrollHeight;
     }
 
-    // Wrapper for all admin AJAX calls. Detects session expiry (redirect to login)
-    // and shows a clear message instead of a confusing JSON parse error.
+    // Wrapper for all admin AJAX calls.
+    // Handles: session expiry (302 → login page HTML), server errors (5xx HTML), network errors.
     function safeFetch(url, options) {
         const opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
         return fetch(url, opts).then(function(response) {
             if (response.type === 'opaqueredirect' || response.status === 0 ||
                 (response.status >= 300 && response.status < 400)) {
-                appendOutput('✗ Session expired — please reload the page and log in again.');
+                appendOutput('✗ Session expired — reload the page (Ctrl+Shift+R) and log in again.');
                 return Promise.reject(new Error('session-expired'));
+            }
+            if (!response.ok) {
+                appendOutput(`✗ Server error (HTTP ${response.status}) — check server logs.`);
+                return Promise.reject(new Error(`HTTP ${response.status}`));
             }
             return response;
         });
