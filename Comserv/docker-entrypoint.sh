@@ -93,9 +93,9 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
-# Ensure Catalyst session store directory exists and is writable (FastMmap stores a single file)
-SESSION_MMAP="${COMSERV_SESSION_DIR:-/tmp/comserv/session/comserv_sessions.mmap}"
-SESSION_DIR=$(dirname "$SESSION_MMAP")
+# Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
+# COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
+SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
 mkdir -p "$SESSION_DIR"
 chmod 700 "$SESSION_DIR"
 chown comserv:comserv "$SESSION_DIR" 2>/dev/null || true
