@@ -1707,9 +1707,9 @@ sub end : ActionClass('RenderView') {
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
     # show its full error page so developers can see the real stack trace.
-    if ($c->error && !$c->response->body && !$c->debug) {
+    if (@{$c->error || []} && !$c->response->body && !$c->debug) {
         my @errors   = @{$c->error};
-        my $err_text = join(' | ', @errors);
+        my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
 
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
