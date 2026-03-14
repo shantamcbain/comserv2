@@ -33,10 +33,9 @@ sub logging {
 sub auto :Private {
     my ($self, $c) = @_;
 
-    my $username = $c->session->{username} // 'Guest';
+    my $username = $c->session->{username} // '';
     my $roles    = $c->session->{roles} || [];
 
-    # Normalise roles to array ref
     unless (ref $roles) {
         $roles = [ map { s/^\s+|\s+$//gr } split /,/, $roles ];
         $c->session->{roles} = $roles;
@@ -44,10 +43,26 @@ sub auto :Private {
 
     my $has_admin = grep { lc($_) eq 'admin' } @$roles;
 
+    if (!$has_admin && $username && $username ne 'Guest') {
+        eval {
+            my $user = $c->model('DBEncy')->resultset('Member')
+                          ->find({ username => $username });
+            if ($user) {
+                my $db_roles = $user->roles // '';
+                my @role_arr = map { s/^\s+|\s+$//gr }
+                               split /[,\s]+/, $db_roles;
+                $c->session->{roles}    = \@role_arr;
+                $c->session->{is_admin} = grep { lc($_) eq 'admin' } @role_arr;
+                $roles     = \@role_arr;
+                $has_admin = $c->session->{is_admin};
+            }
+        };
+    }
+
     unless ($has_admin) {
         if (!$username || $username eq 'Guest') {
             $c->response->redirect($c->uri_for('/user/login',
-                { destination => $c->req->uri }));
+                { destination => $c->req->uri->as_string }));
         } else {
             $c->flash->{error_msg} = 'Administrator access required.';
             $c->response->redirect($c->uri_for('/'));
@@ -64,120 +79,17 @@ sub begin : Private {
     return 1;
 }
 
-# Base method for chained actions
+# Base method for chained actions — auth is already handled by auto :Private above
 sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-        "Starting Admin base action");
-    
-    # Common setup for all admin pages
     $c->stash(section => 'admin');
-    
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-            "Admin access granted to user Shanta (bypass role check)");
-        return 1;
-    }
-    
-    # Check if the user has admin role — check session directly regardless of Catalyst auth state
-    my $has_admin_role = 0;
-    my $roles = $c->session->{roles} || [];
-    my $roles_debug = 'none';
-    if (ref($roles) eq 'ARRAY') {
-        $roles_debug = join(', ', @$roles);
-        $has_admin_role = 1 if grep { lc($_) eq 'admin' } @$roles;
-    } elsif ($roles) {
-        $roles_debug = $roles;
-        $has_admin_role = 1 if $roles =~ /\badmin\b/i;
-    }
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base',
-        "Admin access check - User: " . ($c->session->{username} // 'none') . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-
-    unless ($has_admin_role) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return 0;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
-        "Completed Admin base action");
-    
     return 1;
 }
 
 # Admin dashboard
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Starting Admin index action");
-    
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-            "Admin access granted to user Shanta (bypass role check)");
-        # Continue with the admin page
-    }
-    else {
-        # Check if the user has admin role
-        my $has_admin_role = 0;
-    
-    # First check if user exists
-    if ($c->user_exists) {
-            # Get roles from session
-            my $roles = $c->session->{roles};
-            
-            # Log the roles for debugging
-            my $roles_debug = 'none';
-            if (defined $roles) {
-                if (ref($roles) eq 'ARRAY') {
-                    $roles_debug = join(', ', @$roles);
-                    
-                    # Check if 'admin' is in the roles array
-                    foreach my $role (@$roles) {
-                        if (lc($role) eq 'admin') {
-                            $has_admin_role = 1;
-                            last;
-                        }
-                    }
-                } elsif (!ref($roles)) {
-                    $roles_debug = $roles;
-                    # Check if roles string contains 'admin'
-                    if ($roles =~ /\badmin\b/i) {
-                        $has_admin_role = 1;
-                    }
-                }
-            }
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
-        }
-        
-        unless ($has_admin_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-                "Access denied: User does not have admin role");
-            
-            # Set error message in flash
-            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-            
-            # Redirect to login page with destination parameter
-            $c->response->redirect($c->uri_for('/user/login', {
-                destination => $c->req->uri
-            }));
-            return;
-        }
-    }
-    
+
     # Get system stats
     my $stats = $self->get_system_stats($c);
     
