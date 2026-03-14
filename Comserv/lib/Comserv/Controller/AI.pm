@@ -3590,21 +3590,15 @@ sub get_user_providers :Local :Args(0) {
                 my $meta   = $key->get_metadata() || {};
                 my $models = $meta->{available_models} || [];
 
-                # Auto-sync if no models stored
-                if (!@$models) {
-                    my $grok_model   = $c->model('Grok');
-                    my $decrypted_key = $key->decrypt_api_key();
-                    if ($grok_model && $decrypted_key && $key->service eq 'grok') {
-                        $grok_model->api_key($decrypted_key);
-                        my $api_models = $grok_model->list_models();
-                        if ($api_models && ref($api_models) eq 'ARRAY' && @$api_models) {
-                            $models = [ map { { id => $_->{id} } } @$api_models ];
-                            $meta->{available_models} = $models;
-                            $meta->{last_sync} = time();
-                            $key->set_metadata($meta);
-                            $key->update();
-                        }
-                    }
+                # Fallback to hardcoded Grok models if none stored in metadata
+                if (!@$models && $key->service eq 'grok') {
+                    $models = [
+                        { id => 'grok-3-mini' },
+                        { id => 'grok-3' },
+                        { id => 'grok-4-0709' },
+                        { id => 'grok-4-fast-non-reasoning' },
+                        { id => 'grok-code-fast-1' },
+                    ];
                 }
 
                 # Filter image/video models for non-admins
