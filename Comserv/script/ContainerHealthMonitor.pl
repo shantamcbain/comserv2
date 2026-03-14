@@ -73,22 +73,24 @@ sub _db_credentials {
 }
 
 sub _db_ping {
-    # Returns: 1=up, 0=down, undef=no credentials (skip check silently)
+    # Returns: 1=up, 0=down
+    # Uses TCP connect check — avoids credential/grant issues when the app
+    # itself connects successfully via its own K8s secret credentials.
     my $port = $ENV{DB_PORT} || 3306;
-    my ($user, $pass) = _db_credentials();
-    return undef unless $user;   # no credentials available — skip silently
-
-    my $dsn = "dbi:MariaDB:database=$db_name;host=$db_host;port=$port";
-    my $dbh = eval {
-        DBI->connect($dsn, $user, $pass, {
-            RaiseError => 1, PrintError => 0, AutoCommit => 1,
-            mariadb_connect_timeout => 5,
-        });
+    use IO::Socket::INET;
+    my $sock = eval {
+        IO::Socket::INET->new(
+            PeerAddr => $db_host,
+            PeerPort => $port,
+            Proto    => 'tcp',
+            Timeout  => 5,
+        );
     };
-    return 0 unless $dbh;
-    my $ok = eval { $dbh->ping };
-    eval { $dbh->disconnect };
-    return $ok ? 1 : 0;
+    if ($sock) {
+        close $sock;
+        return 1;
+    }
+    return 0;
 }
 
 sub check_health {
