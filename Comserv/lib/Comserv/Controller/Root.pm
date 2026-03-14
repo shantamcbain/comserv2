@@ -674,6 +674,77 @@ sub health :Path('/health') :Args(0) {
     return;
 }
 
+sub health_detail :Path('/health/detail') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my %info;
+    my $ok = 1;
+
+    # 1. Process info
+    $info{pid}     = $$;
+    $info{uptime}  = time() - $^T;
+
+    # 2. Memory (Linux /proc/self/status)
+    eval {
+        open my $fh, '<', '/proc/self/status' or die;
+        while (<$fh>) {
+            if (/^VmRSS:\s+(\d+)\s+kB/) { $info{mem_rss_kb} = $1 + 0; last }
+        }
+        close $fh;
+    };
+
+    # 3. Starman sibling workers (how many Perl processes share same parent)
+    eval {
+        my $ppid = getppid();
+        my @siblings = split /\n/, `ps --no-headers -o pid --ppid $ppid 2>/dev/null` // '';
+        $info{worker_siblings} = scalar(grep { /\d/ } @siblings);
+    };
+
+    # 4. Session dir writable
+    eval {
+        my $sess_dir = $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session';
+        $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
+        $ok = 0 unless $info{session_dir_ok};
+    };
+
+    # 5. Quick DB ping (non-blocking, 2s timeout)
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm(2);
+        my $schema = $c->model('DBEncy');
+        $schema->storage->dbh->ping;
+        alarm(0);
+        $info{db_ok} = 1;
+    };
+    if ($@) {
+        alarm(0);
+        $info{db_ok}    = 0;
+        $info{db_error} = "$@";
+        $ok = 0;
+    }
+
+    my $status = $ok ? 'ok' : 'degraded';
+    $info{status} = $status;
+
+    # Log to system_log if degraded so admin/logging shows the reason
+    if (!$ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'health_detail',
+            "[HEALTH_DETAIL] status=$status db_ok=" . ($info{db_ok}//0) .
+            " mem_rss_kb=" . ($info{mem_rss_kb}//'?') .
+            " workers=" . ($info{worker_siblings}//'?') .
+            " session_ok=" . ($info{session_dir_ok}//'?') .
+            " db_error=" . ($info{db_error}//'none'));
+    }
+
+    require JSON;
+    $c->response->status($ok ? 200 : 503);
+    $c->response->body(JSON::encode_json(\%info));
+    $c->detach;
+    return;
+}
+
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
