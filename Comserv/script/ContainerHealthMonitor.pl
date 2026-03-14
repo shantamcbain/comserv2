@@ -73,9 +73,10 @@ sub _db_credentials {
 }
 
 sub _db_ping {
+    # Returns: 1=up, 0=down, undef=no credentials (skip check silently)
     my $port = $ENV{DB_PORT} || 3306;
     my ($user, $pass) = _db_credentials();
-    return 0 unless $user;   # no credentials — skip rather than false-alarm
+    return undef unless $user;   # no credentials available — skip silently
 
     my $dsn = "dbi:MariaDB:database=$db_name;host=$db_host;port=$port";
     my $dbh = eval {
@@ -97,7 +98,10 @@ sub check_health {
     if ($now >= $db_backoff_next) {
         my $db_ok = _db_ping();
 
-        if (!$db_ok) {
+        if (!defined $db_ok) {
+            # No credentials available — cannot check DB, reset backoff and stay quiet
+            $db_backoff_next = $now + $check_interval;
+        } elsif (!$db_ok) {
             if (!$db_was_down) {
                 $db_was_down  = 1;
                 $db_down_since = $now;
