@@ -55,6 +55,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
+      DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
       # External Database Configuration (192.168.1.198) - via db_config.json
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
@@ -119,6 +120,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
       STARMAN_WORKERS: ${STARMAN_WORKERS:-5}
+      DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
       # External Database Configuration (192.168.1.198) - via db_config.json
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
