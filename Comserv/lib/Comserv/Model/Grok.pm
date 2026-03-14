@@ -184,8 +184,8 @@ sub _load_api_key {
         return $ENV{GROK_API_KEY};
     }
     
-    my $error = "Grok API key not found in K8s secret or GROK_API_KEY env var";
-    $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_load_api_key', $error);
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_api_key',
+        "Grok API key not found in K8s secret or GROK_API_KEY env var (expected when key is DB-managed)");
     return '';
 }
 
