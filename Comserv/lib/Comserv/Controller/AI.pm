@@ -3527,88 +3527,130 @@ Get list of user's configured AI providers for chat widget
 
 sub get_user_providers :Local :Args(0) {
     my ($self, $c) = @_;
-    
-    $c->response->content_type('application/json');
-    
-    my $user_id = $c->session->{user_id};
-    my @providers;
-    
-    # Map service names to display names
-    my %service_display = (
-        grok => 'Grok (xAI)',
-        openai => 'OpenAI',
-        claude => 'Claude',
-        gemini => 'Gemini',
-        anthropic => 'Anthropic',
-        cohere => 'Cohere'
-    );
-    
-    my $user_roles_prov = $c->session->{roles} || [];
-    if (!ref($user_roles_prov)) {
-        $user_roles_prov = [split(/\s*,\s*/, $user_roles_prov)] if $user_roles_prov;
-    }
-    my $is_admin = ref($user_roles_prov) eq 'ARRAY'
-        ? grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_prov
-        : 0;
 
-    if ($user_id) {
+    $c->response->content_type('application/json');
+
+    my $username    = $c->session->{username} || '';
+    my $user_id     = $c->session->{user_id};
+    my $user_roles  = $c->session->{roles} || [];
+    if (!ref($user_roles)) {
+        $user_roles = [split(/\s*,\s*/, $user_roles)] if $user_roles;
+    }
+
+    my $can_select_model = ref($user_roles) eq 'ARRAY'
+        ? (grep { /^(admin|developer|editor)$/i } @$user_roles) ? 1 : 0
+        : 0;
+    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    my $is_admin     = $can_select_model || $is_csc_admin;
+    my $is_guest     = (!$user_id || $user_id == 199) ? 1 : 0;
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+        'get_user_providers',
+        "User $username (id=" . ($user_id||'none') . ") can_select=$can_select_model is_admin=$is_admin is_guest=$is_guest");
+
+    my @providers;
+
+    # 1. Ollama (Local) — always present, include installed models
+    try {
+        my $ollama_cfg   = $c->config->{Ollama} || {};
+        my $primary_host = $ollama_cfg->{host}          || '192.168.1.199';
+        my $cfg_port     = $ollama_cfg->{port}          || 11434;
+        my $ollama       = $c->model('Ollama');
+        if ($ollama) {
+            $ollama->host($primary_host);
+            $ollama->port($cfg_port);
+            my $installed = $ollama->list_models() || [];
+            push @providers, {
+                service  => 'ollama',
+                name     => 'Ollama (Local)',
+                is_local => JSON::true,
+                models   => [ map { { id => $_->{name} } } @$installed ],
+            };
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'get_user_providers', "Ollama list failed: $_");
+        push @providers, { service => 'ollama', name => 'Ollama (Local)', is_local => JSON::true, models => [] };
+    };
+
+    # 2. External API keys — authenticated users only
+    if ($user_id && !$is_guest) {
         try {
             my $schema = $c->model('DBEncy')->schema;
-            my %seen_services;
+            my %seen;
 
-            my %synced_models_by_service;
-
-            # User's own keys
+            # User's own keys first
             my $own_keys = $schema->resultset('UserApiKeys')->search(
                 { user_id => $user_id, is_active => '1' },
                 { order_by => { -asc => 'service' } }
             );
             foreach my $key ($own_keys->all) {
-                next if $seen_services{$key->service}++;
-                my $meta = $key->get_metadata() || {};
-                if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
-                    $synced_models_by_service{$key->service} = $meta->{available_models};
+                next if $seen{$key->service}++;
+                my $meta   = $key->get_metadata() || {};
+                my $models = $meta->{available_models} || [];
+
+                # Auto-sync if no models stored
+                if (!@$models) {
+                    my $grok_model   = $c->model('Grok');
+                    my $decrypted_key = $key->decrypt_api_key();
+                    if ($grok_model && $decrypted_key && $key->service eq 'grok') {
+                        $grok_model->api_key($decrypted_key);
+                        my $api_models = $grok_model->list_models();
+                        if ($api_models && ref($api_models) eq 'ARRAY' && @$api_models) {
+                            $models = [ map { { id => $_->{id} } } @$api_models ];
+                            $meta->{available_models} = $models;
+                            $meta->{last_sync} = time();
+                            $key->set_metadata($meta);
+                            $key->update();
+                        }
+                    }
                 }
+
+                # Filter image/video models for non-admins
+                my @filtered = grep {
+                    $is_admin || !$_->{id} || $_->{id} !~ /imagine|video/i
+                } @$models;
+
                 push @providers, {
-                    service      => $key->service,
-                    display_name => $service_display{$key->service} || ucfirst($key->service),
-                    models       => $synced_models_by_service{$key->service} || undef
+                    service  => $key->service,
+                    name     => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
+                    models   => \@filtered,
                 };
             }
 
-            # Admins: also pick up any active keys not owned by this user
+            # Admins: fall back to any active key not owned by this user
             if ($is_admin) {
                 my $any_keys = $schema->resultset('UserApiKeys')->search(
                     { is_active => '1' },
                     { order_by => { -asc => 'service' } }
                 );
                 foreach my $key ($any_keys->all) {
-                    next if $seen_services{$key->service}++;
-                    my $meta = $key->get_metadata() || {};
-                    if ($meta->{available_models} && ref($meta->{available_models}) eq 'ARRAY') {
-                        $synced_models_by_service{$key->service} = $meta->{available_models};
-                    }
+                    next if $seen{$key->service}++;
+                    my $meta   = $key->get_metadata() || {};
+                    my $models = $meta->{available_models} || [];
                     push @providers, {
-                        service      => $key->service,
-                        display_name => $service_display{$key->service} || ucfirst($key->service),
-                        models       => $synced_models_by_service{$key->service} || undef
+                        service => $key->service,
+                        name    => $key->service eq 'grok' ? 'xAI (Grok)' : ucfirst($key->service),
+                        models  => $models,
                     };
                 }
             }
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                'get_user_providers', "Found " . scalar(@providers) . " providers for user $user_id (is_admin: $is_admin)");
+
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                'get_user_providers', "Total providers for user $username: " . scalar(@providers));
         } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
-                'get_user_providers', "Failed to fetch providers: $_");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'get_user_providers', "Failed to fetch external providers: $_");
         };
     }
-    
+
     $c->response->body(encode_json({
-        success  => JSON::true,
-        providers => \@providers,
-        username  => $c->session->{username} || 'You',
-        user_id   => $user_id || 0,
+        success           => JSON::true,
+        providers         => \@providers,
+        username          => $username || 'You',
+        user_id           => $user_id  || 0,
+        is_guest          => $is_guest  ? JSON::true : JSON::false,
+        can_access_history => $is_admin ? JSON::true : JSON::false,
     }));
 }
 

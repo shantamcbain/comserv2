@@ -604,7 +604,7 @@
         });
     }
     
-    // Load user's available AI providers
+    // Load user's available AI providers and populate model dropdown
     function loadUserProviders() {
         fetch('/ai/get_user_providers', {
             method: 'GET',
@@ -612,22 +612,81 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success && data.providers) {
-                const providerSelect = document.getElementById('ai-provider');
-                
-                // Clear existing options except Ollama
-                providerSelect.innerHTML = '<option value="ollama">Ollama (Local)</option>';
-                
-                // Add user's configured providers
-                data.providers.forEach(provider => {
-                    const option = document.createElement('option');
-                    option.value = provider.service;
-                    option.textContent = provider.display_name;
-                    providerSelect.appendChild(option);
-                });
-                
-                console.debug('Loaded', data.providers.length, 'user providers');
+            if (!data.success) return;
+
+            if (data.username) state.username = data.username;
+
+            // Hide provider selector for guests / non-admins
+            if (data.is_guest || !data.can_access_history) {
+                const selectorBar = document.querySelector('.provider-selector');
+                if (selectorBar) selectorBar.style.display = 'none';
+                const histBtn = document.getElementById('toggle-history-btn');
+                if (histBtn) histBtn.style.display = 'none';
+                return;
             }
+
+            if (!data.providers || !data.providers.length) return;
+
+            const providerSelect = document.getElementById('ai-provider');
+            if (!providerSelect) return;
+            providerSelect.innerHTML = '';
+
+            data.providers.forEach(function(p) {
+                if (p.service === 'ollama') {
+                    const grp = document.createElement('optgroup');
+                    grp.label = 'Ollama (Local)';
+                    if (p.models && p.models.length > 0) {
+                        p.models.forEach(function(m) {
+                            const opt = document.createElement('option');
+                            opt.value = 'ollama|' + m.id;
+                            opt.textContent = m.id;
+                            grp.appendChild(opt);
+                        });
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = 'ollama';
+                        opt.textContent = 'Ollama (default)';
+                        grp.appendChild(opt);
+                    }
+                    providerSelect.appendChild(grp);
+                } else if (p.service === 'grok') {
+                    const grp = document.createElement('optgroup');
+                    grp.label = 'xAI (Grok)';
+                    const grokModels = (p.models && p.models.length > 0)
+                        ? p.models
+                            .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                            .map(function(m) {
+                                const label = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+                                return { val: 'grok|' + m.id, label: label + ' (xAI)' };
+                            })
+                        : [
+                            { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
+                            { val: 'grok|grok-3',                    label: 'Grok 3' },
+                            { val: 'grok|grok-4-0709',               label: 'Grok 4' },
+                            { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
+                            { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                        ];
+                    grokModels.forEach(function(m) {
+                        const opt = document.createElement('option');
+                        opt.value = m.val;
+                        opt.textContent = m.label;
+                        grp.appendChild(opt);
+                    });
+                    providerSelect.appendChild(grp);
+                } else {
+                    const opt = document.createElement('option');
+                    opt.value = p.service;
+                    opt.textContent = p.name || p.display_name || p.service;
+                    providerSelect.appendChild(opt);
+                }
+            });
+
+            // Show web-search toggle only when a Grok option is selected
+            const curVal = providerSelect.value || '';
+            const wst = document.getElementById('web-search-toggle');
+            if (wst) wst.style.display = curVal.startsWith('grok') ? 'inline' : 'none';
+
+            console.debug('Loaded', data.providers.length, 'providers');
         })
         .catch(error => {
             console.error('Failed to load user providers:', error);
