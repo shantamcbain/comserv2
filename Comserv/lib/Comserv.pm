@@ -81,8 +81,32 @@ __PACKAGE__->config(
     },
     'Plugin::Session' => {
         expires => 86400,
-        storage => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session',
-        cookie_name => 'comserv_session',
+        storage => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
+        },
+        cookie_name => do {
+            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+                my $p = '3001';
+                for my $i (0 .. $#ARGV) {
+                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
+                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
+                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+                }
+                $p;
+            };
+            $ENV{COMSERV_SESSION_COOKIE} || "comserv_session_$port";
+        },
         cookie_secure => 0,
         cookie_httponly => 1,
     },
