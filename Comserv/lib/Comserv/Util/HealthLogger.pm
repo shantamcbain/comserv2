@@ -258,8 +258,14 @@ sub evaluate_records {
         @results = sort { $b->{score} <=> $a->{score} } values %buckets;
     };
     if ($@) {
-        $logging->log_with_details(undef, 'error', __FILE__, __LINE__,
-            'evaluate_records', "evaluate_records failed: $@");
+        my $err = "$@";
+        if ($err =~ /no such table|table.*doesn.t exist/i) {
+            $logging->log_with_details(undef, 'debug', __FILE__, __LINE__,
+                'evaluate_records', "evaluate_records skipped: system_log table not in this DB (SQLite fallback active)");
+        } else {
+            $logging->log_with_details(undef, 'warn', __FILE__, __LINE__,
+                'evaluate_records', "evaluate_records failed: $err");
+        }
     }
     return \@results;
 }
@@ -571,7 +577,12 @@ sub audit_stats {
         $stats{top_errors} = \@error_rows;
     };
     if ($@) {
-        $stats{error} = "$@";
+        my $err = "$@";
+        if ($err =~ /no such table|table.*doesn.t exist|information_schema/i) {
+            $stats{error} = "SQLite fallback active — audit stats unavailable";
+        } else {
+            $stats{error} = $err;
+        }
     }
     return \%stats;
 }
