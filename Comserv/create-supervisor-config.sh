@@ -38,10 +38,13 @@ ENV_VARS="$ENV_VARS,CATALYST_DEBUG=$CATALYST_DEBUG"
 ENV_VARS="$ENV_VARS,WEB_PORT=$PORT"
 ENV_VARS="$ENV_VARS,COMSERV_LOG_DIR=/opt/comserv"
 
-# Pass through all COMSERV_DB_, WORKSHOP_, SYSTEM_IDENTIFIER and HEALTH_ environment variables from container env
-if env | grep -qE '^(COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_)'; then
-  for var in $(env | grep -E '^(COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_)' | cut -d= -f1); do
-    ENV_VARS="$ENV_VARS,$var=${!var}"
+# Pass through DB_, COMSERV_DB_, WORKSHOP_, SYSTEM_IDENTIFIER and HEALTH_ environment variables.
+# DB_HOST/DB_USER/DB_PASSWORD must reach ContainerHealthMonitor.pl so it can authenticate.
+if env | grep -qE '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|CATALYST_ENV|CATALYST_DEBUG)'; then
+  for var in $(env | grep -E '^(DB_|COMSERV_DB_|WORKSHOP_|SYSTEM_IDENTIFIER|HEALTH_|ACTIVE_DB_|CATALYST_ENV|CATALYST_DEBUG)' | cut -d= -f1); do
+    val="${!var}"
+    val="${val//,/__COMMA__}"
+    ENV_VARS="$ENV_VARS,$var=$val"
   done
 fi
 

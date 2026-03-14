@@ -48,7 +48,7 @@ services:
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
-      SYSTEM_IDENTIFIER: "${HOSTNAME:-unknown}-dev"
+      SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-workstation-dev}"
       WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
       SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
@@ -111,7 +111,7 @@ services:
       CATALYST_DEBUG: 0
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
-      SYSTEM_IDENTIFIER: "${HOSTNAME:-unknown}-prod"
+      SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-production-prod}"
       WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
       SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
