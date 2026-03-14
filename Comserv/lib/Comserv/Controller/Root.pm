@@ -9,7 +9,6 @@ use URI;
 use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
-use Comserv::Util::CSRF;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -117,9 +116,6 @@ sub auto :Private {
     if ($c->req->path =~ m{^/health(?:/|$)}) {
         return 1;
     }
-
-    Comserv::Util::CSRF::ensure_token($c);
-
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
     eval {
         # Skip setup redirect for setup pages themselves and static assets

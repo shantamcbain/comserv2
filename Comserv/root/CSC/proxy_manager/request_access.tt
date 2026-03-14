@@ -18,7 +18,6 @@
                     <p>Current roles: <span class="badge bg-secondary">[% roles %]</span></p>
                     
                     <form method="POST" action="[% c.uri_for('/proxy_manager/request_access') %]">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="mb-3">
                             <label for="reason" class="form-label">Reason for Access Request:</label>
                             <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>

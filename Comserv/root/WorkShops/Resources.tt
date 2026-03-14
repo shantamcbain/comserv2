@@ -161,7 +161,6 @@
     <details class="upload-panel">
         <summary>⬆️ Upload File</summary>
         <form method="POST" action="/workshop/resource_upload" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <div class="upload-row">
                 <div class="form-group" style="flex:2; min-width:220px;">
                     <label>File</label>
@@ -269,7 +268,6 @@
                     [% IF is_csc || (r.id && r.uploaded_by == cur_uid) %]
                     <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                           onsubmit="return confirm('Remove this link?');">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <button type="submit" class="btn btn-sm btn-danger" title="Remove">🗑️</button>
                     </form>
                     [% END %]
@@ -281,7 +279,6 @@
                         <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;">✏️ Edit</summary>
                         <div style="position:absolute;right:0;top:100%;z-index:210;background:var(--background-color, #fff);border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/file_update">
-                                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                                 <input type="hidden" name="file_id" value="[% r.file_id %]">
                                 <div style="margin-bottom:7px;">
                                     <label style="font-size:0.82em;font-weight:bold;display:block;margin-bottom:2px;">Display Name</label>
@@ -333,7 +330,6 @@
                     [% IF is_csc || r.uploaded_by == cur_uid %]
                     <form method="POST" action="/workshop/resource_delete/[% r.id %]" style="display:inline;"
                           onsubmit="return confirm('Delete [% r.file_name | html %]?');">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <button type="submit" class="btn btn-sm btn-danger" title="Delete">🗑️</button>
                     </form>
                     [% END %]
@@ -371,7 +367,6 @@
             <summary>🔗 Add External Link to Resource Library</summary>
             <p style="font-size:0.85em;color:var(--text-muted-color);margin:10px 0 6px;">Add a link to an off-site resource (book, PDF, video, article) without storing a local copy.</p>
             <form method="POST" action="/workshop/resource_add_url">
-                <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                 <div class="upload-row">
                     <div class="form-group" style="flex:3;min-width:260px;">
                         <label>URL</label>

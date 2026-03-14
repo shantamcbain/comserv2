@@ -8,13 +8,11 @@ use Comserv::Util::AdminAuth;
 use Comserv::Util::Logging;
 use Comserv::Util::EmailNotification;
 use Comserv::Util::NfsPath;
-use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
 sub auto :Private {
     my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
     return 1;
 }
 
@@ -309,17 +307,12 @@ sub add :Local {
 
     # Set the TT template to use
     $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
-    $c->stash->{csrf_token} = $c->session->{csrf_token};
     $c->forward($c->view('TT'));
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->stash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
-        return;
-    }
+    
 
     # Retrieve the form data from the request
     my $params = $c->request->parameters;
@@ -659,7 +652,6 @@ sub edit :Path('/workshop/edit') :Args(1) {
         $c->stash(
             workshop => $workshop,
             formatted_date => $formatted_date,
-            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/Edit.tt'
         );
         $c->forward($c->view('TT'));
@@ -668,11 +660,7 @@ sub edit :Path('/workshop/edit') :Args(1) {
 
     # Handle POST request for updates
     if ($c->request->method eq 'POST') {
-        unless ($self->_verify_csrf_token($c)) {
-            $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-            $c->response->redirect($c->uri_for($self->action_for('edit'), [$id]));
-            return;
-        }
+        
         my $params = $c->request->body_parameters;
         my $old_share = $workshop->share;
         my $new_share = $params->{share};
@@ -1293,13 +1281,7 @@ sub add_participant :Local :Args(1) {
         return;
     }
     
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_participant',
-            "CSRF validation failed for add_participant POST");
-        $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('add_participant'), [$id]));
-        return;
-    }
+    
     
     my $params = $c->request->body_parameters;
     my $name = $params->{name};
@@ -2223,11 +2205,7 @@ sub resource_upload :Path('/workshop/resource_upload') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resources')));
-        return;
-    }
+    
 
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
@@ -2324,11 +2302,7 @@ sub resource_add_url :Path('/workshop/resource_add_url') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resources')));
-        return;
-    }
+    
 
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
@@ -2684,11 +2658,7 @@ sub resource_fs_delete :Path('/workshop/resource_fs_delete') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resources')));
-        return;
-    }
+    
 
     unless ($admin_type eq 'csc' || $admin_type eq 'special') {
         $c->flash->{error_msg} = 'Only CSC admins can delete NFS files directly.';
@@ -2827,7 +2797,6 @@ sub resource_sync :Path('/workshop/resource_sync') :Args(0) {
         sitenames     => \@sitenames,
         files_columns => $files_columns,
         wr_columns    => $wr_columns,
-        csrf_token    => $c->session->{csrf_token},
         template      => 'WorkShops/Sync.tt',
     );
 }
@@ -2852,11 +2821,7 @@ sub resource_scan_nfs :Path('/workshop/resource_scan_nfs') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resource_sync')));
-        return;
-    }
+    
 
     my $nfs_root = $self->_nfs_root();
     unless (-d $nfs_root) {
@@ -3142,11 +3107,7 @@ sub resource_attach :Path('/workshop/resource_attach') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resources')));
-        return;
-    }
+    
 
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied. Workshop leader or admin access required.';
@@ -3231,11 +3192,7 @@ sub file_update :Path('/workshop/file_update') :Args(0) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('resources')));
-        return;
-    }
+    
 
     unless ($self->_can_access_resources($c)) {
         $c->flash->{error_msg} = 'Access denied.';
@@ -3415,18 +3372,13 @@ sub add_content :Local :Args(1) {
     if ($c->request->method eq 'GET') {
         $c->stash(
             workshop => $workshop,
-            csrf_token => $c->session->{csrf_token},
             template => 'WorkShops/AddContent.tt',
         );
         $c->forward($c->view('TT'));
         return;
     }
     
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('add_content'), [$id]));
-        return;
-    }
+    
     
     my $params = $c->request->body_parameters;
     my $title = $params->{title};
@@ -3637,7 +3589,6 @@ sub compose_email :Local :Args(1) {
     $c->stash(
         workshop => $workshop,
         recipient_count => $registered_count,
-        csrf_token => $c->session->{csrf_token},
         template => 'WorkShops/ComposeEmail.tt',
     );
 }
@@ -3659,11 +3610,7 @@ sub send_email :Local :Args(1) {
         return;
     }
 
-    unless ($self->_verify_csrf_token($c)) {
-        $c->flash->{error_msg} = 'Invalid session (CSRF token mismatch). Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('compose_email'), [$id]));
-        return;
-    }
+    
     
     my $params = $c->request->body_parameters;
     my $subject = $params->{subject};
@@ -3897,16 +3844,6 @@ sub email_history :Local :Args(1) {
     );
 }
 
-sub _verify_csrf_token {
-    my ($self, $c) = @_;
-    my $token_from_req = $c->req->param('csrf_token') // '';
-    my $token_from_session = $c->session->{csrf_token} // '';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_verify_csrf_token',
-        "CSRF check: req=$token_from_req session=$token_from_session");
-        
-    return (length $token_from_req && $token_from_req eq $token_from_session);
-}
 
 __PACKAGE__->meta->make_immutable;
 
