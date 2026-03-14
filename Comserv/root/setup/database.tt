@@ -10,7 +10,6 @@
     [% END %]
     
     <form method="POST" action="[% c.uri_for('/setup') %]">
-        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
         <div class="form-group">
             <label for="db_type">Database Type:</label>
             <select name="db_type" id="db_type">

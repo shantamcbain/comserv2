@@ -23,7 +23,6 @@
                     <p>You are granting proxy management access as administrator <strong>[% admin_username %]</strong>.</p>
                     
                     <form method="POST" action="[% c.uri_for('/proxy_manager/grant_access') %]">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="mb-3">
                             <label for="username" class="form-label">Username:</label>
                             <input type="text" class="form-control" id="username" name="username" required>

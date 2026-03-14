@@ -6,7 +6,6 @@ use DBI;
 use Try::Tiny;
 use File::Path qw(make_path);
 use Comserv::Util::Logging;
-use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -18,9 +17,6 @@ has 'logging' => (
 # Check if setup is needed and bypass for setup actions
 sub auto :Private {
     my ($self, $c) = @_;
-    
-    Comserv::Util::CSRF::ensure_token($c);
-    
     # Skip setup check if we're already in setup or if it's a static asset
     return 1 if $c->action->name eq 'setup';
     return 1 if $c->action->name eq 'setup_form';
@@ -104,12 +100,7 @@ sub setup :Path('/setup') :Args(0) {
         "Setup page accessed - " . $c->req->method . " request");
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup',
-                "CSRF validation failed for setup POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-            return;
-        }
+        
         my $params = $c->req->params;
         
         my $config = {
@@ -209,11 +200,7 @@ sub k8s_secrets :Path('/setup/k8s-secrets') :Args(0) {
     
     # Handle POST request (create K8s secrets)
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'k8s_secrets',
-                "CSRF validation failed for k8s_secrets POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-        } else {
+         else {
             my $params = $c->req->params;
             my $action = $params->{action} || '';
             

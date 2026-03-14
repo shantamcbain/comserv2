@@ -10,7 +10,6 @@ use POSIX;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::BackupManager;
 use Comserv::Util::Logging;
-use Comserv::Util::CSRF;
 
 =head1 NAME
 
@@ -50,9 +49,6 @@ Auto method for admin authentication
 
 sub auto :Private {
     my ($self, $c) = @_;
-    
-    Comserv::Util::CSRF::ensure_token($c);
-    
     unless ($self->admin_auth->check_admin_access($c, 'backup_management')) {
         $c->response->redirect($c->uri_for('/login'));
         return 0;
@@ -111,16 +107,7 @@ sub create_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'create_backup');
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_backup',
-                "CSRF validation failed for create_backup POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-            $c->stash(
-                template => 'admin/backup/create.tt',
-                protected_files => $self->backup_manager($c)->protected_files
-            );
-            return;
-        }
+        
         my $backup_type = $c->req->param('backup_type') || 'manual';
         my $description = $c->req->param('description') || 'Manual backup';
         my $username = $c->session->{username} || 'unknown';
@@ -167,16 +154,7 @@ sub restore_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'restore_backup');
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restore_backup',
-                "CSRF validation failed for restore_backup POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-            $c->stash(
-                template => 'admin/backup/restore.tt',
-                available_backups => $self->backup_manager($c)->get_available_backups()
-            );
-            return;
-        }
+        
         my $backup_path = $c->req->param('backup_path');
         my $target_file = $c->req->param('target_file');
         
@@ -248,16 +226,7 @@ sub delete_backup :Local :Args(1) {
     return unless $self->admin_auth->require_admin_access($c, 'delete_backup');
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_backup',
-                "CSRF validation failed for delete_backup POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-            $c->stash(
-                template => 'admin/backup/delete.tt',
-                backup_filename => $backup_filename
-            );
-            return;
-        }
+        
         my $confirm = $c->req->param('confirm');
         
         if ($confirm eq 'yes') {
@@ -327,18 +296,7 @@ sub create_database_backup :Local :Args(0) {
     return unless $self->admin_auth->require_admin_access($c, 'create_database_backup');
     
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                "CSRF validation failed for create_database_backup POST");
-            $c->stash(error_msg => 'Invalid form submission (CSRF). Please try again.');
-            # Test database connections for the form
-            my $db_test_result = $self->backup_manager($c)->test_database_connection($c);
-            $c->stash(
-                template => 'admin/backup/create_database.tt',
-                available_databases => $db_test_result->{available_databases} || []
-            );
-            return;
-        }
+        
         my $backup_type = $c->req->param('database_type') || 'all';  # 'all', 'ency', 'forager'
         my $compress = $c->req->param('compress') ? 1 : 0;
         my $username = $c->session->{username} || 'system';

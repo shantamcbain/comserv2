@@ -63,7 +63,6 @@
     <div class="admin-section">
         <h2><i class="fas fa-download"></i> Execute Safe Git Pull</h2>
         <form method="POST" action="[% c.uri_for('/admin/safe_git_pull') %]" class="git-pull-form">
-            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <div class="form-group">
                 <label for="branch">Select Branch:</label>
                 <select name="branch" id="branch" class="form-control">

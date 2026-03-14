@@ -26,7 +26,6 @@
     [% END %]
     
     <form method="post" action="[% c.uri_for('/ApiCredentials/update') %]" class="api-credentials-form">
-        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
         [% FOREACH service_name IN credentials.keys.sort %]
             <div class="service-section">
                 <h2>[% service_name | ucfirst %]</h2>

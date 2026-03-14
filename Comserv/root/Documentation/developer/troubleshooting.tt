@@ -461,18 +461,14 @@ sub display_form :Local {
     my ($self, $c) = @_;
     
     # Generate a CSRF token
-    my $csrf_token = $self->generate_csrf_token($c);
-    $c->session->{csrf_token} = $csrf_token;
     
     $c->stash(
-        csrf_token => $csrf_token,
         template => 'form.tt'
     );
 }
 
 # In the form template
 <form method="post" action="[% c.uri_for('/submit_form') %]">
-    <input type="hidden" name="csrf_token" value="[% csrf_token %]">
     <!-- Form fields -->
     <button type="submit">Submit</button>
 </form>
@@ -482,8 +478,6 @@ sub submit_form :Local {
     my ($self, $c) = @_;
     
     # Verify CSRF token
-    my $submitted_token = $c->req->params->{csrf_token};
-    my $stored_token = $c->session->{csrf_token};
     
     unless ($submitted_token && $stored_token && $submitted_token eq $stored_token) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'security', 
@@ -494,7 +488,6 @@ sub submit_form :Local {
     }
     
     # Clear the token to prevent reuse
-    $c->session->{csrf_token} = undef;
     
     # Process the form
     # ...

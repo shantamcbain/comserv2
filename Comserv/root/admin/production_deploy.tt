@@ -67,7 +67,6 @@
         [% END %]
 
         <form method="POST" action="[% c.uri_for('/admin/production_deploy') %]" class="deployment-form">
-            <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
             <input type="hidden" name="action" value="deploy">
             
             <div class="form-group">

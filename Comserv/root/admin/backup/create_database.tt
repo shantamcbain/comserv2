@@ -101,7 +101,6 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="[% c.uri_for('/admin/backup/create_database_backup') %]">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="mb-3">
                             <label for="database_type" class="form-label">Database Selection</label>
                             <select id="database_type" name="database_type" class="form-select" required>
