@@ -23,6 +23,12 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+# Cache the RemoteDB config status so we don't hit the filesystem on every request.
+# Refreshes every 5 minutes. Each Starman worker has its own copy (that's fine).
+my $_remotedb_status       = undef;   # 'ok', 'missing', 'error', 'fallback'
+my $_remotedb_last_checked = 0;
+my $_REMOTEDB_TTL          = 300;     # seconds between re-checks
+
 
 # Add user_exists method
 sub user_exists {
@@ -193,15 +199,6 @@ sub auto :Private {
         return 1;
     }
 
-    # Detailed session logging for troubleshooting logouts
-    my $session_id = $c->sessionid // 'no-session';
-    my $user_id = $c->session->{user_id} // 'no-user';
-    my $path = $c->req->path;
-    my $method = $c->req->method;
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
-        "Request Start: $method $path (Session: $session_id, User: $user_id)");
-
     Comserv::Util::CSRF::ensure_token($c);
 
     # LAYER 1: Auto Method Protection - wrap entire method in error handling
@@ -209,49 +206,47 @@ sub auto :Private {
         # Skip setup redirect for setup pages themselves and static assets
         # Note: $c->req->path returns path WITHOUT leading slash (e.g., "setup/k8s-secrets")
         unless ($c->req->path =~ m{^/?setup(?:/|$)} || $c->req->path =~ m{^/?static/}) {
-            # Check RemoteDB configuration status for K8s secrets migration
-            eval {
-                # Get RemoteDB instance - force instantiation with new()
-                my $remotedb_class = $c->model('RemoteDB');
-                my $remotedb;
-
-                # If we got a class name string, instantiate it
-                if (!ref($remotedb_class)) {
-                    eval {
+            # Check RemoteDB configuration status — cached per worker to avoid hitting
+            # the filesystem (K8s secrets, db_config.json) on every single request.
+            my $now = time();
+            if (!defined $_remotedb_status || ($now - $_remotedb_last_checked) > $_REMOTEDB_TTL) {
+                eval {
+                    my $remotedb_class = $c->model('RemoteDB');
+                    my $remotedb;
+                    if (!ref($remotedb_class)) {
                         require Comserv::Model::RemoteDB;
                         $remotedb = Comserv::Model::RemoteDB->new();
                         $remotedb->_load_config();
-                    };
-                } else {
-                    $remotedb = $remotedb_class;
-                }
-
-                if ($remotedb && ref($remotedb) && $remotedb->{configuration_status}) {
-                    if ($remotedb->{configuration_status} =~ /^(MISSING|ERROR|FALLBACK)$/) {
-                        my $error_msg = $remotedb->{configuration_error} || "Unknown configuration error";
-
-                        # In dev mode, redirect to K8s setup wizard
-                        if ($c->config->{debug} || $ENV{COMSERV_DEV_MODE}) {
-                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
-                                "Dev mode: redirecting to K8s secrets setup (status: " . $remotedb->{configuration_status} . ")");
-                            $c->response->redirect($c->uri_for('/setup/k8s-secrets'));
-                            $c->detach();
-                            return 0;
-                        } elsif ($remotedb->{configuration_status} ne 'FALLBACK') {
-                            # In production, only block for MISSING/ERROR, not FALLBACK
-                            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
-                                "Production mode: returning 503 - database configuration required");
-                            $c->response->status(503);
-                            $c->response->body('Service Unavailable: Database configuration required. Contact administrator.');
-                            $c->detach();
-                            return 0;
-                        }
+                    } else {
+                        $remotedb = $remotedb_class;
                     }
+                    $_remotedb_status = ($remotedb && ref($remotedb))
+                        ? ($remotedb->{configuration_status} // 'ok')
+                        : 'ok';
+                };
+                if ($@) {
+                    $_remotedb_status = 'ok';
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                        "Error checking RemoteDB configuration status: $@");
                 }
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
-                    "Error checking RemoteDB configuration status: $@");
+                $_remotedb_last_checked = $now;
+            }
+
+            if ($_remotedb_status =~ /^(MISSING|ERROR)$/) {
+                if ($c->config->{debug} || $ENV{COMSERV_DEV_MODE}) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                        "Dev mode: redirecting to K8s secrets setup (status: $_remotedb_status)");
+                    $c->response->redirect($c->uri_for('/setup/k8s-secrets'));
+                    $c->detach();
+                    return 0;
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "Production mode: returning 503 - database configuration required (status: $_remotedb_status)");
+                    $c->response->status(503);
+                    $c->response->body('Service Unavailable: Database configuration required. Contact administrator.');
+                    $c->detach();
+                    return 0;
+                }
             }
         }
 
