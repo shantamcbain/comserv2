@@ -160,9 +160,25 @@ sub _get_timestamp {
 sub get_system_identifier {
     my ($class) = @_;
 
+    # Determine listening port from env or ARGV (same logic as Comserv.pm session isolation)
+    my $port = $ENV{WEB_PORT} || $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+        my $p = '';
+        for my $i (0 .. $#ARGV) {
+            if    ($ARGV[$i] =~ /^-p(\d+)$/)                                    { $p = $1; last }
+            elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+            elsif ($ARGV[$i] =~ /^--port=(\d+)$/)                               { $p = $1; last }
+            elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+        }
+        $p;
+    };
+
     # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
     my $identifier = $ENV{SYSTEM_IDENTIFIER};
-    return $identifier if $identifier && $identifier ne '';
+    if ($identifier && $identifier ne '') {
+        # Append port when it adds useful info (i.e. not already encoded in the name)
+        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
+        return $identifier;
+    }
 
     # 2. Map known IP addresses to friendly names.
     # Use a UDP connect (no packets sent) to find which local IP the OS would
@@ -188,6 +204,9 @@ sub get_system_identifier {
         eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
         $identifier //= 'unknown';
     }
+
+    # Append port to disambiguate multiple dev servers on the same host
+    $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;
 }
