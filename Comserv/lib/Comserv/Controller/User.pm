@@ -393,7 +393,8 @@ sub do_login :Local {
         );
         
         # Assign roles to session (no hard-coded username-based tweaks)
-        $c->session->{roles} = $roles;
+        $c->session->{roles}    = $roles;
+        $c->session->{is_admin} = (grep { lc($_) eq 'admin' } @$roles) ? 1 : 0;
 
         # NEW: Check if we need to auto-assign WorkshopLeader role based on return_to
         if ($return_to && $return_to =~ m{/workshop/add}) {

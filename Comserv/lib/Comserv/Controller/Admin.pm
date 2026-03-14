@@ -46,10 +46,16 @@ sub auto :Private {
 
     my $has_admin = grep { lc($_) eq 'admin' } @$roles;
 
+    # Also accept is_admin flag already set in session (avoids DB lookup on every request)
+    $has_admin ||= $c->session->{is_admin};
+
     if (!$has_admin && $username && $username ne 'Guest') {
         eval {
+            local $SIG{ALRM} = sub { die "DB lookup timeout\n" };
+            alarm(4);
             my $user = $c->model('DBEncy')->resultset('Member')
                           ->find({ username => $username });
+            alarm(0);
             if ($user) {
                 my $db_roles = $user->roles // '';
                 my @role_arr = map { s/^\s+|\s+$//gr }
@@ -60,6 +66,7 @@ sub auto :Private {
                 $has_admin = $c->session->{is_admin};
             }
         };
+        alarm(0);
     }
 
     unless ($has_admin) {
