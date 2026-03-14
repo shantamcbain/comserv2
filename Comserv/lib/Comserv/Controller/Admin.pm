@@ -4867,19 +4867,25 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
         return;
     }
     
-    my $cmd = $service eq 'all' 
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
+    my $safe_service = $service;
+    $safe_service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $output;
+    my $exit_code;
+    if ($service eq 'all') {
+        $output = `timeout 30 docker restart \$(docker ps -q) 2>&1`;
+        $exit_code = $? >> 8;
+    } else {
+        $output = `timeout 30 docker restart \Q$safe_service\E 2>&1`;
+        $exit_code = $? >> 8;
+    }
+
     my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
+        success    => $exit_code == 0 ? \1 : \0,
+        stdout     => $output,
+        exit_code  => $exit_code
     };
-    
+
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
 }
@@ -4896,48 +4902,46 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
         return;
     }
     
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
-    
-    my $output = `$cmd`;
+    my $safe_service = $service;
+    $safe_service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $output = `timeout 30 docker start \Q$safe_service\E 2>&1`;
     my $exit_code = $? >> 8;
-    
+
     my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
         exit_code => $exit_code
     };
-    
+
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
 }
 
 sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     my ($self, $c, $service) = @_;
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
         "Docker stop requested for service: $service");
-    
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
-    
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
-    
-    my $output = `$cmd`;
+
+    my $safe_service = $service;
+    $safe_service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $output = `timeout 30 docker stop \Q$safe_service\E 2>&1`;
     my $exit_code = $? >> 8;
-    
+
     my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
         exit_code => $exit_code
     };
-    
+
     $c->response->body(encode_json($result));
     $c->response->content_type('application/json');
 }
