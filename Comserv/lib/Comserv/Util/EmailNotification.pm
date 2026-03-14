@@ -525,7 +525,7 @@ sub _direct_smtp_send {
         port => $port,
         sasl_username => $smtp_config->{smtp_username},
         sasl_password => $smtp_config->{smtp_password},
-        timeout => 30,
+        timeout => 5,
     );
     
     eval {

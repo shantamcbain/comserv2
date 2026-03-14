@@ -29,6 +29,10 @@ my $LOG_FILE; # Global log file path
 my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
 my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
 
+# Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
+my $_email_failed_at = 0;  # epoch time of last email send failure
+my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+
 my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
 my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
 my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
@@ -400,6 +404,12 @@ sub send_error_notification {
     return if $self->{_sending_email};
     local $self->{_sending_email} = 1;
 
+    # Email circuit breaker: skip email if SMTP failed recently (prevents blocking workers)
+    if (time() - $_email_failed_at < $_email_backoff_s) {
+        _print_log("[EMAIL-SKIP] email circuit breaker open, skipping notification: $subject");
+        return;
+    }
+
     # Always notify CSC Admin for all errors
     my $csc_admin_email = 'helpdesk@computersystemconsulting.ca';
     my $site_admin_email;
@@ -430,7 +440,8 @@ sub send_error_notification {
         }
     };
     if ($@) {
-        _print_log("CRITICAL: Failed to send error email: $@");
+        $_email_failed_at = time();
+        _print_log("CRITICAL: Failed to send error email (circuit breaker set for ${_email_backoff_s}s): $@");
     }
 }
 
