@@ -56,14 +56,12 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
       DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
-      # External Database Configuration (192.168.1.198) - via db_config.json
+      # External Database Configuration (192.168.1.198) - credentials via K8s secrets (~/.comserv/secrets)
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
-      DB_USER: ${DB_USER:-comserv}
-      DB_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3000:3000"
     networks:
@@ -121,14 +119,12 @@ services:
       TZ: ${TZ:-UTC}
       STARMAN_WORKERS: ${STARMAN_WORKERS:-5}
       DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
-      # External Database Configuration (192.168.1.198) - via db_config.json
+      # External Database Configuration (192.168.1.198) - credentials via K8s secrets (~/.comserv/secrets)
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
-      DB_USER: ${DB_USER:-comserv}
-      DB_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5000:5000"
     networks:
