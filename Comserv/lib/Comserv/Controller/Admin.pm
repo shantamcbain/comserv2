@@ -19,7 +19,6 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
-use Comserv::Util::CSRF;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -469,13 +468,7 @@ sub create_user :Path('/admin/create_user') :Args(0) {
     my $schema = $c->model('DBEncy');
 
     if ($c->req->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_user',
-                "CSRF token validation failed for admin_create_user");
-            $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
-            $c->response->redirect($c->uri_for('/admin/users'));
-            return;
-        }
+        
         my $first_name = $c->req->param('first_name');
         my $last_name = $c->req->param('last_name');
         my $email = $c->req->param('email');

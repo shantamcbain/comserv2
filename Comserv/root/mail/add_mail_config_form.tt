@@ -31,7 +31,6 @@
 </p>
 
 <form method="POST" action="[% c.uri_for('/mail/add_mail_config') %]">
-    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
     <label for="site_id">Site Name:</label>
     [% IF is_csc %]
         <select id="site_id" name="site_id" required>

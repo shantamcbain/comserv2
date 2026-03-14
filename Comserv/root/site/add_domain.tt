@@ -12,7 +12,6 @@
 <h1>Add Domain</h1>
 
 <form method="POST" action="[% c.uri_for('/site/add_domain_post') %]">
-    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
     <label for="site_id">Site:</label>
     <select name="site_id" id="site_id">
         [% FOREACH site IN sites %]

@@ -47,7 +47,6 @@
             
             <div class="form-container">
                 <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form">
-                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <div class="form-row">

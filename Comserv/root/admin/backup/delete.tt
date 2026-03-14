@@ -65,7 +65,6 @@
                     </div>
 
                     <form method="post" action="[% c.uri_for('/admin/backup/delete_backup', backup_filename) %]">
-                        <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                         <div class="mb-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="confirm_delete" required>
