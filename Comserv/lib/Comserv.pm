@@ -84,7 +84,7 @@ __PACKAGE__->config(
         cookie_name => 'comserv_session',
         cookie_secure => 0,
         cookie_httponly => 1,
-        cookie_expires => 86400,
+        cookie_expires => '+1d',
         storage => $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session',
     },
     'Model::ThemeConfig' => {
