@@ -200,7 +200,6 @@ sub k8s_secrets :Path('/setup/k8s-secrets') :Args(0) {
     
     # Handle POST request (create K8s secrets)
     if ($c->req->method eq 'POST') {
-         else {
             my $params = $c->req->params;
             my $action = $params->{action} || '';
             
@@ -271,7 +270,6 @@ sub k8s_secrets :Path('/setup/k8s-secrets') :Args(0) {
                     $c->stash(error_msg => "Failed to create .env file: $@");
                 }
             }
-        }
     }
     
     $c->stash(
