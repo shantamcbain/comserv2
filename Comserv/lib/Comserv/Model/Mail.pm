@@ -66,7 +66,7 @@ sub send_email {
             $smtp_config->{host},
             Port => $smtp_config->{port},
             Debug => 1,
-            Timeout => 30
+            Timeout => 5
         );
         
         unless ($smtp) {
