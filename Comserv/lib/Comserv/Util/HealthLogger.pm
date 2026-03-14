@@ -542,7 +542,7 @@ sub audit_stats {
         };
         $stats{top_instances} = \@inst_rows;
 
-        # --- 7. Top errors by severity (CRITICAL first, then ERROR, then WARN) ---
+        # --- 7. Top messages by severity (all levels) ---
         my @error_rows;
         eval {
             my $err_sth = $dbh->prepare(
@@ -550,12 +550,12 @@ sub audit_stats {
                         COALESCE(system_identifier,'(unknown)') as sys,
                         COUNT(*) as cnt
                  FROM system_log
-                 WHERE level IN ('CRITICAL','ERROR','WARN') AND timestamp >= ?
+                 WHERE timestamp >= ?
                  GROUP BY level, subroutine, LEFT(message,200), system_identifier
                  ORDER BY
-                     FIELD(level,'CRITICAL','ERROR','WARN'),
+                     FIELD(level,'CRITICAL','ERROR','WARN','INFO','DEBUG'),
                      cnt DESC
-                 LIMIT 30"
+                 LIMIT 50"
             );
             $err_sth->execute($cutoff);
             while (my $row = $err_sth->fetchrow_hashref) {
