@@ -620,9 +620,17 @@
     function refreshContainers() {
         containersList.innerHTML = '<p style="color: #666; text-align: center;">Loading container information...</p>';
 
-        fetch('/admin/docker-list')
-            .then(response => response.json())
+        fetch('/admin/docker-list', { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    containersList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
             .then(data => {
+                if (!data) return;
                 if (!data.success) {
                     containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
                     return;
@@ -641,9 +649,17 @@
         const volumesList = document.getElementById('volumes-list');
         volumesList.innerHTML = '<p style="color: #666; text-align: center;">Loading volume information...</p>';
 
-        fetch('/admin/docker-volumes')
-            .then(response => response.json())
+        fetch('/admin/docker-volumes', { credentials: 'same-origin', redirect: 'manual' })
+            .then(function(response) {
+                if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
+                    volumesList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
+                    return null;
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
             .then(data => {
+                if (!data) return;
                 if (!data.success) {
                     volumesList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error: ${data.error}</p>`;
                     return;
