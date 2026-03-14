@@ -25,6 +25,7 @@ use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
 use Comserv::Util::SystemInfo;
+use Comserv::Util::AdminAuth;
 
 BEGIN { extends 'Catalyst::Controller' }
 
@@ -3540,7 +3541,7 @@ sub get_user_providers :Local :Args(0) {
     my $can_select_model = ref($user_roles) eq 'ARRAY'
         ? (grep { /^(admin|developer|editor)$/i } @$user_roles) ? 1 : 0
         : 0;
-    my $is_csc_admin = $self->admin_auth->is_csc_admin($c);
+    my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
     my $is_admin     = $can_select_model || $is_csc_admin;
     my $is_guest     = (!$user_id || $user_id == 199) ? 1 : 0;
 
