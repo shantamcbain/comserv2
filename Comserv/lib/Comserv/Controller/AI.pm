@@ -179,13 +179,18 @@ sub generate :Local :Args(0) {
     $c->response->content_type('application/json');
     
     # Determine if user is authenticated or guest
-    my $username = $c->session->{username};
-    my $user_id = $c->session->{user_id};
+    my $username = $c->session->{username} || '';
+    my $user_id  = $c->session->{user_id}  || 0;
     my $is_guest = 0;
     my $guest_session_id = $c->session->{guest_session_id};
-    
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'generate', "SESSION STATE: username='" . ($username||'EMPTY') . "' user_id=" . ($user_id||'0') .
+        " SiteName=" . ($c->session->{SiteName}||'?') . " session_id=" . ($c->sessionid||'?'));
+
     # If not logged in, create guest session
-    if (!$username) {
+    # Use user_id as primary auth check (consistent with get_user_providers)
+    if (!$username && (!$user_id || $user_id == 199)) {
         $is_guest = 1;
         
         # Create a unique guest session ID if not already present
@@ -202,6 +207,19 @@ sub generate :Local :Args(0) {
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
             'generate', "Guest user session created: $username (session: $guest_session_id)");
+    } elsif (!$username && $user_id && $user_id != 199) {
+        # user_id is set but username is missing — recover username from DB
+        eval {
+            my $user_rec = $c->model('DBEncy::User')->find($user_id);
+            if ($user_rec && $user_rec->username) {
+                $username = $user_rec->username;
+                $c->session->{username} = $username;
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                    'generate', "Recovered missing username='$username' from DB for user_id=$user_id");
+            }
+        };
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+            'generate', "Authenticated user (recovered): username='$username' user_id=$user_id");
     } else {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
             'generate', "Authenticated user: $username");
