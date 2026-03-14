@@ -320,9 +320,10 @@ sub test_connection {
             AutoCommit => 1,
         );
         # Add a short connect timeout so unreachable hosts fail fast instead of
-        # blocking for 20-30s on OS TCP timeout
+        # blocking for 20-30s on OS TCP timeout.
+        # DBD::MariaDB uses mariadb_connect_timeout (not mysql_connect_timeout)
         if ($db_type ne 'sqlite') {
-            $connect_attrs{mysql_connect_timeout} = 3;
+            $connect_attrs{mariadb_connect_timeout} = 3;
         }
         my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
         
