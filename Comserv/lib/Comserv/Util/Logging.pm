@@ -427,21 +427,23 @@ sub send_error_notification {
     }
 
     # Use the existing email system
+    my $email_ok = 0;
     eval {
         require Comserv::Util::EmailNotification;
         my $notifier = Comserv::Util::EmailNotification->new(logging => $self);
         
         # 1. Notify CSC Admin
-        $notifier->send_error_notification($c, $csc_admin_email, $subject, $error_details);
+        my $r = $notifier->send_error_notification($c, $csc_admin_email, $subject, $error_details);
+        $email_ok = $r ? 1 : 0;
         
         # 2. Notify Site-specific Admin if different
         if ($site_admin_email && $site_admin_email ne $csc_admin_email) {
             $notifier->send_error_notification($c, $site_admin_email, $subject, $error_details);
         }
     };
-    if ($@) {
+    if ($@ || !$email_ok) {
         $_email_failed_at = time();
-        _print_log("CRITICAL: Failed to send error email (circuit breaker set for ${_email_backoff_s}s): $@");
+        _print_log("[EMAIL-CB] email failed, circuit breaker set for ${_email_backoff_s}s: " . ($@ || 'send returned false'));
     }
 }
 
