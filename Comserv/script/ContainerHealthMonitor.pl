@@ -15,12 +15,15 @@ my $check_interval = $ENV{HEALTH_CHECK_INTERVAL} || 60;
 my $disk_threshold = $ENV{HEALTH_DISK_THRESHOLD} || 90;
 my $mem_threshold  = $ENV{HEALTH_MEM_THRESHOLD}  || 95;
 
-my $sys_id  = $ENV{SYSTEM_IDENTIFIER} || $logger->get_system_identifier();
-my $db_host = $ENV{DB_HOST} || '192.168.1.198';
-my $db_name = $ENV{DB_NAME} || 'ency';
+my $sys_id   = $ENV{SYSTEM_IDENTIFIER} || $logger->get_system_identifier();
+my $hostname = eval { Sys::Hostname::hostname() } || 'unknown-host';
+my $db_host  = $ENV{DB_HOST} || '192.168.1.198';
+my $db_name  = $ENV{DB_NAME} || 'ency';
+
+my $id_str = "[$sys_id\@$hostname]";
 
 $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'main',
-    "[$sys_id] Container Health Monitor started. "
+    "$id_str Container Health Monitor started. "
     . "Interval: ${check_interval}s, Disk: ${disk_threshold}%, Mem: ${mem_threshold}%");
 
 # DB backoff state — when DB is down, increase retry interval to avoid
@@ -109,21 +112,21 @@ sub check_health {
                 $db_down_since = $now;
                 $db_backoff_s  = $check_interval;
                 $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'check_health',
-                    "[$sys_id] Primary Database ($db_name \@ $db_host) is DOWN or unreachable. "
+                    "$id_str Primary Database ($db_name \@ $db_host) is DOWN or unreachable. "
                     . "Will retry in ${db_backoff_s}s.");
             } else {
                 my $down_min = int(($now - $db_down_since) / 60);
                 # Double backoff each time, cap at 10 minutes
                 $db_backoff_s = ($db_backoff_s * 2 > 600) ? 600 : $db_backoff_s * 2;
                 $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'check_health',
-                    "[$sys_id] Database still DOWN ($down_min min). Next check in ${db_backoff_s}s.");
+                    "$id_str Database still DOWN ($down_min min). Next check in ${db_backoff_s}s.");
             }
             $db_backoff_next = $now + $db_backoff_s;
         } else {
             if ($db_was_down) {
                 my $down_min = int(($now - $db_down_since) / 60);
                 $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'check_health',
-                    "[$sys_id] Database RECOVERED after ${down_min} min.");
+                    "$id_str Database RECOVERED after ${down_min} min.");
             }
             $db_was_down     = 0;
             $db_down_since   = 0;
@@ -149,7 +152,7 @@ sub check_disk_space {
         my $usage = $1;
         if ($usage >= $disk_threshold) {
             $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'check_disk_space',
-                "[$sys_id] Disk usage alert on $path: ${usage}% (threshold: ${disk_threshold}%)");
+                "$id_str Disk usage alert on $path: ${usage}% (threshold: ${disk_threshold}%)");
         }
     }
 }
@@ -163,7 +166,7 @@ sub check_memory {
         my $used_pct = 100 - ($available / $total * 100);
         if ($used_pct >= $mem_threshold) {
             $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'check_memory',
-                "[$sys_id] Memory high: " . sprintf("%.1f", $used_pct) . "% (threshold: ${mem_threshold}%)");
+                "$id_str Memory high: " . sprintf("%.1f", $used_pct) . "% (threshold: ${mem_threshold}%)");
         }
     }
 }
