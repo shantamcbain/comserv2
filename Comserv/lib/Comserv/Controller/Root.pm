@@ -39,117 +39,36 @@ sub user_exists {
 # Add check_user_roles method
 sub check_user_roles {
     my ($self, $c, $role) = @_;
-    
-    # First check if the user exists
+
     return 0 unless $self->user_exists($c);
-    
-    # Get roles from session
-    my $roles = $c->session->{roles};
-    
-    # Log the role check for debugging
-    my $roles_debug = 'none';
-    if (defined $roles) {
-        if (ref($roles) eq 'ARRAY') {
-            $roles_debug = join(', ', @$roles);
-        } else {
-            $roles_debug = $roles;
-        }
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Checking if user has role: $role, User roles: $roles_debug");
-    
-    # Add detailed debugging for session data
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Session data: username=" . ($c->session->{username} || 'undefined') . 
-        ", user_id=" . ($c->session->{user_id} || 'undefined') .
-        ", roles=" . (defined $roles ? (ref($roles) ? ref($roles) : $roles) : 'undefined'));
-    
-    # Check if the user has the admin role in the session
+
+    my $roles       = $c->session->{roles};
+    my $user_groups = $c->session->{user_groups};
+
     if ($role eq 'admin') {
-        # For admin role, check if user is in the admin group or has admin privileges
-        if ($c->session->{is_admin}) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "User has is_admin flag set in session");
-            return 1;
-        }
-        
-        # Check roles array
+        return 1 if $c->session->{is_admin};
+
         if (ref($roles) eq 'ARRAY') {
-            foreach my $user_role (@$roles) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Checking array role: '$user_role' against 'admin'");
-                if (lc($user_role) eq 'admin') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                        "Found admin role in array");
-                    return 1;
-                }
-            }
+            return 1 if grep { lc($_) eq 'admin' } @$roles;
+        } elsif (defined $roles && !ref($roles)) {
+            return 1 if $roles =~ /\badmin\b/i;
         }
-        # Check roles string
-        elsif (defined $roles && !ref($roles)) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking string role: '$roles' for 'admin'");
-            if ($roles =~ /\badmin\b/i) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found admin in roles string");
-                return 1;
-            }
-        }
-        
-        # Check user_groups
-        my $user_groups = $c->session->{user_groups};
+
         if (ref($user_groups) eq 'ARRAY') {
-            foreach my $group (@$user_groups) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Checking user group: '$group' against 'admin'");
-                if (lc($group) eq 'admin') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                        "Found admin in user_groups array");
-                    return 1;
-                }
-            }
+            return 1 if grep { lc($_) eq 'admin' } @$user_groups;
+        } elsif (defined $user_groups && !ref($user_groups)) {
+            return 1 if $user_groups =~ /\badmin\b/i;
         }
-        elsif (defined $user_groups && !ref($user_groups)) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking user_groups string: '$user_groups' for 'admin'");
-            if ($user_groups =~ /\badmin\b/i) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found admin in user_groups string");
-                return 1;
-            }
-        }
-        
-        # If we get here, user doesn't have admin role
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-            "User does not have admin role");
+
+        return 0;
     }
-    
-    # For other roles, check if the role is in the user's roles
+
     if (ref($roles) eq 'ARRAY') {
-        foreach my $user_role (@$roles) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking array role: '$user_role' against '$role'");
-            if (lc($user_role) eq lc($role)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found matching role in array");
-                return 1;
-            }
-        }
+        return 1 if grep { lc($_) eq lc($role) } @$roles;
+    } elsif (defined $roles && !ref($roles)) {
+        return 1 if $roles =~ /\b\Q$role\E\b/i;
     }
-    elsif (defined $roles && !ref($roles)) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-            "Checking string role: '$roles' for '$role'");
-        if ($roles =~ /\b$role\b/i) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Found matching role in string");
-            return 1;
-        }
-    }
-    
-    # Role not found
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Role '$role' not found for user");
+
     return 0;
 }
 
