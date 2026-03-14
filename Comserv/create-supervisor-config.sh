@@ -15,7 +15,7 @@ if [ "$CATALYST_ENV" = "development" ]; then
 fi
 
 # Number of workers based on environment
-WORKERS=${STARMAN_WORKERS:-2}
+WORKERS=${STARMAN_WORKERS:-5}
 if [ "$CATALYST_ENV" = "development" ]; then
     WORKERS=1
 fi
