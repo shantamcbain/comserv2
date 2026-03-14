@@ -16,16 +16,18 @@ my $recreate_volumes = 0;
 my $nfs_server = $ENV{NFS_SERVER} || '192.168.1.175';
 my $nfs_log_path = $ENV{NFS_LOG_PATH} || '/mnt/data/comserv/logs';
 my $nfs_workshop_path = $ENV{NFS_WORKSHOP_PATH} || '/';
+my $ssh_keyfile = $ENV{SSH_KEYFILE} || "$ENV{HOME}/.ssh/id_rsa";
 
 GetOptions(
-    'host=s'      => \$production_host,
-    'service=s'   => \$service,
-    'user=s'      => \$ssh_user,
-    'port=i'      => \$ssh_port,
-    'directory=s' => \$production_directory,
-    'no-rollback' => sub { $rollback_on_failure = 0 },
+    'host=s'       => \$production_host,
+    'service=s'    => \$service,
+    'user=s'       => \$ssh_user,
+    'port=i'       => \$ssh_port,
+    'directory=s'  => \$production_directory,
+    'keyfile=s'    => \$ssh_keyfile,
+    'no-rollback'  => sub { $rollback_on_failure = 0 },
     'recreate-volumes' => \$recreate_volumes,
-) or die "Usage: $0 [--host=PRODUCTION_HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--no-rollback] [--recreate-volumes]\n";
+) or die "Usage: $0 [--host=PRODUCTION_HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--keyfile=SSH_KEY] [--no-rollback] [--recreate-volumes]\n";
 
 die "ERROR: Production host required (--host=HOSTNAME)\n" unless $production_host;
 
@@ -86,11 +88,13 @@ sub run_remote {
     }
     
     my $ssh_cmd;
-    
+    my $ssh_opts = "-p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o IdentitiesOnly=yes";
+    $ssh_opts .= " -i $ssh_keyfile" if !$ssh_password && -f $ssh_keyfile;
+
     if ($ssh_password) {
-        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh $ssh_opts $ssh_user\@$production_host "$cmd");
     } else {
-        $ssh_cmd = qq(ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+        $ssh_cmd = qq(ssh $ssh_opts $ssh_user\@$production_host "$cmd");
     }
     
     print "CMD: $cmd\n";
@@ -116,9 +120,9 @@ sub ssh_exec {
     my $ssh_cmd;
     
     if ($ssh_password) {
-        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+        $ssh_cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o IdentitiesOnly=yes $ssh_user\@$production_host "$cmd");
     } else {
-        $ssh_cmd = qq(ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no $ssh_user\@$production_host "$cmd");
+        $ssh_cmd = qq(ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o IdentitiesOnly=yes $ssh_user\@$production_host "$cmd");
     }
     
     return `$ssh_cmd 2>&1`;
@@ -190,7 +194,7 @@ eval {
     if ($ssh_password) {
         my $safe_password = $ssh_password;
         $safe_password =~ s/'/'\\''/g;
-        $pipe_cmd = "docker save ${image_name}:latest | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no $ssh_user\@$production_host \"echo '$safe_password' | sudo -S docker load\"";
+        $pipe_cmd = "docker save ${image_name}:latest | sshpass -p '$ssh_password' ssh -p $ssh_port -o StrictHostKeyChecking=no -o IdentitiesOnly=yes $ssh_user\@$production_host \"echo '$safe_password' | sudo -S docker load\"";
     } else {
         $pipe_cmd = "docker save ${image_name}:latest | ssh -p $ssh_port $ssh_user\@$production_host 'sudo docker load'";
     }
@@ -275,6 +279,10 @@ eval {
     my $port_map = $service eq 'web-prod' ? '5000:3000' : '3000:3000';
     my $start_cmd = "sudo docker run -d --name $container_name --restart unless-stopped"
         . " -p $port_map"
+        . " --log-opt max-size=50m --log-opt max-file=5"
+        . " -e WORKSHOP_RESOURCES_PATH=/data/nfs"
+        . " -e COMSERV_SESSION_DIR=/tmp/comserv/session"
+        . " -e COMSERV_SESSION_COOKIE=comserv_session"
         . " -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro"
         . " -v comserv2_comserv-logs:/opt/comserv/root/log"
         . " -v comserv2_workshop_files_nfs:/data/nfs"
