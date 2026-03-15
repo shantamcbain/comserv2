@@ -90,15 +90,25 @@ sub rotate_log {
     # For very large files, we'll split them into chunks
     if ($file_size > $MAX_LOG_SIZE * 2) {
         _print_log("Log file is very large ($file_size bytes). Splitting into chunks of $MAX_LOG_SIZE bytes.");
-        $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE);
+        eval { $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE); };
+        if ($@) {
+            _print_log("Log split failed (non-fatal): $@");
+            $archived_log = undef;
+        }
     } else {
         # For smaller files, just move the whole file
-        File::Copy::move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
+        unless (File::Copy::move($LOG_FILE, $archived_log)) {
+            _print_log("Could not rotate log (non-fatal): $!");
+            sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644);
+            return;
+        }
     }
 
     # Reopen log file
-    sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)
-        or die "Cannot reopen log file after rotation: $!";
+    unless (sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
+        _print_log("Cannot reopen log file after rotation (non-fatal): $!");
+        return;
+    }
 
     # Clean up old log files if we have too many
     _cleanup_old_logs($archive_dir, $filename);
@@ -503,7 +513,8 @@ sub log_to_file {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
             _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
-            rotate_log();
+            eval { rotate_log() };
+            _print_log("Log rotation failed (non-fatal): $@") if $@;
         }
     }
 
@@ -656,7 +667,12 @@ sub _split_large_log {
     close $new_log_fh;
 
     # Replace the original log file with the empty new one
-    rename $temp_log, $log_file or die "Cannot replace log file: $!";
+    unless (rename $temp_log, $log_file) {
+        my $err = $!;
+        _print_log("Cannot replace log file (non-fatal): $err — removing temp file");
+        unlink $temp_log;
+        return $first_chunk_file;
+    }
 
     return $first_chunk_file;
 }
