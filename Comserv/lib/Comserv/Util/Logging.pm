@@ -33,9 +33,9 @@ my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
 my $_email_failed_at = 0;  # epoch time of last email send failure
 my $_email_backoff_s = 300; # seconds to pause email sending after a failure
 
-my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
-my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
-my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
+my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
+my $ROTATION_THRESHOLD = 40 * 1024 * 1024; # Rotate at 40 MB
+my $MAX_LOG_FILES = 10; # Maximum number of archived log files to keep
 
 # Level threshold for sending email notifications
 our %LEVEL_PRIORITY = (
