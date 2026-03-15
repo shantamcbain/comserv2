@@ -358,13 +358,8 @@ sub select_connection {
     } @matching_connections;
     
     $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
-        "RemoteDB Connection Selection for '$database_name' - Testing in priority order:");
-    foreach my $conn_name (@matching_connections) {
-        my $priority = $config->{$conn_name}{priority} // 999;
-        my $desc = $config->{$conn_name}{description} || 'No description';
-        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
-            "  Priority $priority: $conn_name - $desc");
-    }
+        "RemoteDB Connection Selection for '$database_name' - candidates: " .
+        join(', ', map { "$_ (p" . ($config->{$_}{priority}//999) . ")" } @matching_connections));
 
     my @failed_attempts;
     
