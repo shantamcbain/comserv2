@@ -10,6 +10,7 @@ use Try::Tiny;
 use Data::Dumper;
 use JSON;
 use IO::Socket::INET;
+use POSIX qw(WNOHANG);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -328,33 +329,58 @@ sub test_connection {
         $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
     }
     
-    try {
-        my %connect_attrs = (
-            RaiseError => 1,
-            PrintError => 0,
-            AutoCommit => 1,
-        );
-        if ($db_type ne 'sqlite') {
-            $connect_attrs{mariadb_connect_timeout} = 2;
+    # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
+    # alarm() cannot interrupt C-level DBI blocking calls; fork+kill can.
+    my $timeout = 3;
+    my $pid = fork();
+    unless (defined $pid) {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
+            "fork() failed for '$conn_name': $! — skipping connection test");
+        return 0;
+    }
+
+    if ($pid == 0) {
+        # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
+        eval {
+            my %connect_attrs = (
+                RaiseError => 1,
+                PrintError => 0,
+                AutoCommit => 1,
+                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 2) : ()),
+            );
+            my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+            $dbh->disconnect() if $dbh;
+        };
+        exit($@ ? 1 : 0);
+    }
+
+    # Parent: wait up to $timeout seconds, then kill the child.
+    my $start = time();
+    my $result = 0;
+    while (1) {
+        my $kid = waitpid($pid, POSIX::WNOHANG());
+        if ($kid == $pid) {
+            $result = ($? == 0) ? 1 : 0;
+            last;
         }
-        my $dbh;
-        local $SIG{ALRM} = sub { die "DBI connect timeout\n" };
-        alarm(3);
-        eval { $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs) };
-        alarm(0);
-        die $@ if $@;
-        
-        $dbh->disconnect() if $dbh;
-        
+        if (time() - $start >= $timeout) {
+            kill 'KILL', $pid;
+            waitpid($pid, 0);
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+                "Connection test timed out after ${timeout}s for '$conn_name'");
+            last;
+        }
+        select(undef, undef, undef, 0.1);
+    }
+
+    if ($result) {
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
             "Connection test successful for '$conn_name'");
-        
-        return 1;
-    } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
-            "Connection test failed for '$conn_name': $_");
-        return 0;
-    };
+    } else {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+            "Connection test failed for '$conn_name'");
+    }
+    return $result;
 }
 
 sub select_connection {
