@@ -259,7 +259,7 @@ sub evaluate_records {
     };
     if ($@) {
         my $err = "$@";
-        if ($err =~ /no such table|table.*doesn.t exist/i) {
+        if ($err =~ /no such table|table.*doesn.?t exist|SQLite|offline/i) {
             $logging->log_with_details(undef, 'debug', __FILE__, __LINE__,
                 'evaluate_records', "evaluate_records skipped: system_log table not in this DB (SQLite fallback active)");
         } else {
