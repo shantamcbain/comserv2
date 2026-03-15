@@ -325,7 +325,7 @@ sub test_connection {
         }
         $sock->close();
 
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
     }
     
     try {
@@ -337,9 +337,14 @@ sub test_connection {
         if ($db_type ne 'sqlite') {
             $connect_attrs{mariadb_connect_timeout} = 2;
         }
-        my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+        my $dbh;
+        local $SIG{ALRM} = sub { die "DBI connect timeout\n" };
+        alarm(3);
+        eval { $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs) };
+        alarm(0);
+        die $@ if $@;
         
-        $dbh->disconnect();
+        $dbh->disconnect() if $dbh;
         
         $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
             "Connection test successful for '$conn_name'");
