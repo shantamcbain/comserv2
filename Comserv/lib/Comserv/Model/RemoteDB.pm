@@ -9,6 +9,7 @@ use DBI;
 use Try::Tiny;
 use Data::Dumper;
 use JSON;
+use IO::Socket::INET;
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -309,7 +310,21 @@ sub test_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        # Use MariaDB driver (compatible with MySQL)
+
+        # Fast TCP pre-flight: fail in 1s if host is unreachable, before attempting DBI connect.
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => $host,
+            PeerPort => $port,
+            Proto    => 'tcp',
+            Timeout  => 1,
+        );
+        unless ($sock) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+                "TCP pre-flight failed for '$conn_name' ($host:$port): $!");
+            return 0;
+        }
+        $sock->close();
+
         $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
     }
     
@@ -319,11 +334,8 @@ sub test_connection {
             PrintError => 0,
             AutoCommit => 1,
         );
-        # Add a short connect timeout so unreachable hosts fail fast instead of
-        # blocking for 20-30s on OS TCP timeout.
-        # DBD::MariaDB uses mariadb_connect_timeout (not mysql_connect_timeout)
         if ($db_type ne 'sqlite') {
-            $connect_attrs{mariadb_connect_timeout} = 3;
+            $connect_attrs{mariadb_connect_timeout} = 2;
         }
         my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
         
