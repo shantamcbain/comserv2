@@ -2,12 +2,18 @@ package Comserv::Controller::Admin::HardwareMonitor;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use JSON ();
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
 has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
+);
+
+my @GRAPH_METRICS = qw(
+    cpu_load_pct mem_used_pct swap_used_pct
+    ipmi_power_consumption ipmi_inlet_temp
 );
 
 sub index :Path('/admin/hardware_monitor') :Args(0) {
@@ -24,6 +30,7 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
     my @metrics;
     my @hosts;
     my @metric_names;
+    my %chart_data;
     my $db_error = '';
 
     eval {
@@ -38,9 +45,9 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
 
         my @rows = $rs->search(
             \%search,
-            { order_by => { -desc => 'timestamp' }, rows => 500 }
+            { order_by => { -asc => 'timestamp' }, rows => 2000 }
         );
-        @metrics = map { {
+        @metrics = reverse map { {
             id                => $_->id,
             timestamp         => $_->timestamp,
             system_identifier => $_->system_identifier,
@@ -53,24 +60,29 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
             message           => $_->message,
         } } @rows;
 
+        # Build chart data: { metric_name => { hostname => [ [ts, val], ... ] } }
+        for my $m (@metrics) {
+            my $mn = $m->{metric_name};
+            next unless defined $m->{metric_value};
+            next unless grep { $_ eq $mn } @GRAPH_METRICS;
+            push @{ $chart_data{$mn}{ $m->{hostname} } },
+                [ $m->{timestamp}, $m->{metric_value} + 0 ];
+        }
+
         my @host_rs = $rs->search(
             {},
-            { columns  => ['hostname'],
-              distinct => 1,
-              order_by => 'hostname' }
+            { columns => ['hostname'], distinct => 1, order_by => 'hostname' }
         );
         @hosts = map { $_->hostname } @host_rs;
 
         my @name_rs = $rs->search(
             {},
-            { columns  => ['metric_name'],
-              distinct => 1,
-              order_by => 'metric_name' }
+            { columns => ['metric_name'], distinct => 1, order_by => 'metric_name' }
         );
         @metric_names = map { $_->metric_name } @name_rs;
     };
     if ($@) {
-        $db_error = $@;
+        $db_error = "$@";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
             "hardware_metrics query failed: $db_error");
     }
@@ -82,16 +94,18 @@ sub index :Path('/admin/hardware_monitor') :Args(0) {
     }
 
     $c->stash(
-        template      => 'admin/HardwareMonitor/index.tt',
-        metrics       => \@metrics,
-        latest        => [ map { $latest{$_} } sort keys %latest ],
-        hosts         => \@hosts,
-        metric_names  => \@metric_names,
-        filter_host   => $filter_host,
-        filter_metric => $filter_metric,
-        filter_level  => $filter_level,
-        filter_hours  => $filter_hours,
-        db_error      => $db_error,
+        template        => 'admin/HardwareMonitor/index.tt',
+        metrics         => \@metrics,
+        latest          => [ map { $latest{$_} } sort keys %latest ],
+        hosts           => \@hosts,
+        metric_names    => \@metric_names,
+        graph_metrics   => \@GRAPH_METRICS,
+        chart_data_json => JSON::encode_json(\%chart_data),
+        filter_host     => $filter_host,
+        filter_metric   => $filter_metric,
+        filter_level    => $filter_level,
+        filter_hours    => $filter_hours,
+        db_error        => $db_error,
     );
 }
 

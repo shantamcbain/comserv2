@@ -5,13 +5,22 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../local/lib/perl5";
 
-use POSIX       qw(strftime);
+use POSIX        qw(strftime);
 use File::Spec;
-use JSON::XS    ();
-use DBI         ();
-use Net::SMTP   ();
+use DBI          ();
+use Net::SMTP    ();
 use Sys::Hostname qw(hostname);
-use Scalar::Util qw(looks_like_number);
+use Scalar::Util  qw(looks_like_number);
+
+my $json_decode;
+BEGIN {
+    if (eval { require JSON::XS; 1 }) {
+        $json_decode = sub { JSON::XS::decode_json($_[0]) };
+    } else {
+        require JSON::PP;
+        $json_decode = sub { JSON::PP::decode_json($_[0]) };
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Configuration — alert thresholds and notification address
@@ -59,7 +68,7 @@ sub _load_connection {
         open my $fh, '<', $file or next;
         my $raw = do { local $/; <$fh> };
         close $fh;
-        my $cfg = eval { JSON::XS::decode_json($raw) } or next;
+        my $cfg = eval { $json_decode->($raw) } or next;
         my $conn = ref($cfg) eq 'ARRAY' ? $cfg->[0] : $cfg;
         next unless $conn->{host} && $conn->{database};
 
