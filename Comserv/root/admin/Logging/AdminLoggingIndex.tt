@@ -31,10 +31,17 @@ tr.level-critical    { background:#f8d7da; font-weight:bold; }
 <div class="app-container">
     <div class="page-header page-header-actions">
         <h1>Logging Administration</h1>
-        <a href="[% c.uri_for('/admin/logging/audit') %]" class="btn btn-primary">
-            &#128202; Log Audit &amp; Health Dashboard
-        </a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="[% c.uri_for('/admin/logging/audit') %]" class="btn btn-primary">
+                &#128202; Log Audit &amp; Health Dashboard
+            </a>
+            <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="btn btn-secondary">
+                &#128268; Hardware Monitor
+            </a>
+        </div>
     </div>
+
+    [% INCLUDE 'admin/HardwareMonitor/HealthDash.tt' %]
 
     [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
     [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
