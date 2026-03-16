@@ -222,9 +222,18 @@ around 'finalize_error' => sub {
             my $session_id = $c->sessionid // 'no-session';
             my $user_id = $c->session->{user_id} // 'no-user';
             my $path = $c->req->path;
-            
+
+            my %req = Comserv::Util::Logging::extract_request_info($c);
+            my $ip       = $req{ip_address}    // '-';
+            my $req_type = $req{request_type}  // '-';
+            my $method   = $req{request_method}// '-';
+            my $ua       = substr($req{user_agent} // '-', 0, 120);
+            my $referer  = $req{referer}        // '-';
+
             $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-                "[GLOBAL ERROR] Unhandled exception: $error_msg (Session: $session_id, User: $user_id, Path: $path)");
+                "[GLOBAL ERROR] Unhandled exception: $error_msg"
+                . " (Session: $session_id, User: $user_id, Path: $path,"
+                . " IP: $ip, Type: $req_type, Method: $method, Referer: $referer, UA: $ua)");
         }
     };
 
