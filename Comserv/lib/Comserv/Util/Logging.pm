@@ -391,7 +391,6 @@ sub log_with_details {
         } else {
             my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
             my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
-            my %req_info = extract_request_info($c);
             eval {
                 my $dbh = $c->model('DBEncy')->storage->dbh;
                 $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
@@ -405,11 +404,6 @@ sub log_with_details {
                     sitename          => $sitename,
                     username          => $username,
                     system_identifier => $system_id,
-                    ip_address        => $req_info{ip_address},
-                    user_agent        => $req_info{user_agent},
-                    referer           => $req_info{referer},
-                    request_method    => $req_info{request_method},
-                    request_type      => $req_info{request_type},
                 });
             };
             if ($@) {
@@ -775,6 +769,42 @@ sub refresh_settings {
             }
         }
     };
+}
+
+sub log_access {
+    my ($self, $c, $status_code) = @_;
+    return unless $c && ref($c) && $c->can('model');
+
+    my $now = time();
+    if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
+        return;
+    }
+
+    my %req  = extract_request_info($c);
+    my $sys  = __PACKAGE__->get_system_identifier();
+
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+        $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
+        $c->model('DBEncy')->resultset('AccessLog')->create({
+            timestamp          => _get_timestamp(),
+            sitename           => ($c->stash ? ($c->stash->{SiteName} || 'CSC') : 'CSC'),
+            path               => substr($c->req->path // '', 0, 512),
+            request_method     => $req{request_method},
+            status_code        => $status_code,
+            ip_address         => $req{ip_address},
+            user_agent         => $req{user_agent},
+            referer            => $req{referer},
+            request_type       => $req{request_type},
+            username           => ($c->session ? $c->session->{username} : undef),
+            session_id         => eval { $c->sessionid } // undef,
+            system_identifier  => $sys,
+        });
+    };
+    if ($@) {
+        $_db_log_failed_at = time();
+        _print_log("[ACCESS-LOG-ERROR] DB write failed: $@");
+    }
 }
 
 sub _classify_request {

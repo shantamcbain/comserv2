@@ -234,6 +234,8 @@ around 'finalize_error' => sub {
                 "[GLOBAL ERROR] Unhandled exception: $error_msg"
                 . " (Session: $session_id, User: $user_id, Path: $path,"
                 . " IP: $ip, Type: $req_type, Method: $method, Referer: $referer, UA: $ua)");
+
+            $logger->log_access($c, 500);
         }
     };
 
