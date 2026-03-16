@@ -1876,8 +1876,9 @@ sub default :Path {
     if ($is_admin_path && !$is_admin_user) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
             "Stealth-404 for admin path '$requested_path' — "
-            . "IP:$ip Type:$req_type Method:$method UA:$ua Referer:$referer");
+            . "IP:$ip Type:$req_type Method:$method Referer:$referer");
         $c->response->status(404);
+        $self->logging->log_access($c, 404);
         $c->stash(
             template    => 'error.tt',
             error_title => 'Page Not Found',
@@ -1892,9 +1893,10 @@ sub default :Path {
 
     $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'default',
         "404 Not Found: '$requested_path' — "
-        . "IP:$ip Type:$req_type Method:$method UA:$ua Referer:$referer");
+        . "IP:$ip Type:$req_type Method:$method Referer:$referer");
 
     $c->response->status(404);
+    $self->logging->log_access($c, 404);
     $c->stash(
         template          => 'error.tt',
         error_title       => 'Page Not Found',

@@ -47,31 +47,6 @@ __PACKAGE__->add_columns(
         size        => 255,
         is_nullable => 1,
     },
-    ip_address => {
-        data_type   => 'varchar',
-        size        => 45,
-        is_nullable => 1,
-    },
-    user_agent => {
-        data_type   => 'varchar',
-        size        => 512,
-        is_nullable => 1,
-    },
-    referer => {
-        data_type   => 'varchar',
-        size        => 512,
-        is_nullable => 1,
-    },
-    request_method => {
-        data_type   => 'varchar',
-        size        => 10,
-        is_nullable => 1,
-    },
-    request_type => {
-        data_type   => 'varchar',
-        size        => 20,
-        is_nullable => 1,
-    },
     system_identifier => {
         data_type      => 'varchar',
         size           => 255,
