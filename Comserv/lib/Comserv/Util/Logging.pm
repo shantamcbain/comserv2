@@ -784,8 +784,6 @@ sub log_access {
     my $sys  = __PACKAGE__->get_system_identifier();
 
     eval {
-        my $dbh = $c->model('DBEncy')->storage->dbh;
-        $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
         $c->model('DBEncy')->resultset('AccessLog')->create({
             timestamp          => _get_timestamp(),
             sitename           => ($c->stash ? ($c->stash->{SiteName} || 'CSC') : 'CSC'),
