@@ -1,0 +1,148 @@
+[% META
+   title       = "Hardware Monitor"
+   description = "System hardware metrics and alerts"
+   roles       = "admin"
+   TemplateType = "Application"
+   category    = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-16"
+%]
+
+<style>
+.hw-filter-row   { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:16px; }
+.hw-filter-row label { font-size:.85em; font-weight:bold; display:block; margin-bottom:2px; }
+.hw-summary-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; margin-bottom:20px; }
+.hw-card         { border:1px solid #ddd; border-radius:6px; padding:12px 16px; background:#fff; }
+.hw-card h4      { margin:0 0 4px; font-size:.95em; color:#555; }
+.hw-card .value  { font-size:1.4em; font-weight:bold; }
+.hw-card .meta   { font-size:.8em; color:#888; }
+.level-info     { border-left:4px solid #4caf50; }
+.level-warn     { border-left:4px solid #ff9800; background:#fff8e1; }
+.level-error    { border-left:4px solid #f44336; background:#fdecea; }
+.level-critical { border-left:4px solid #b71c1c; background:#f8d7da; font-weight:bold; }
+.level-debug    { border-left:4px solid #9e9e9e; }
+.badge-info     { background:#e8f5e9; color:#2e7d32; padding:2px 6px; border-radius:3px; font-size:.8em; }
+.badge-warn     { background:#fff3e0; color:#e65100; padding:2px 6px; border-radius:3px; font-size:.8em; }
+.badge-error    { background:#fdecea; color:#c62828; padding:2px 6px; border-radius:3px; font-size:.8em; }
+.badge-critical { background:#b71c1c; color:#fff;    padding:2px 6px; border-radius:3px; font-size:.8em; }
+.log-scroll     { max-height:420px; overflow-y:auto; }
+</style>
+
+<div class="app-container">
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h1>&#128268; Hardware Monitor</h1>
+        <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">&#128203; System Logs</a>
+    </div>
+
+    [% IF db_error %]
+    <div class="error">
+        <strong>Database error:</strong> [% db_error | html %]
+        <p>Run the migration to create the table:
+        <code>mysql -h 192.168.1.198 -u &lt;user&gt; -p ency &lt; db/migrations/20260316_create_hardware_metrics.sql</code></p>
+    </div>
+    [% END %]
+
+    <form method="get" action="[% c.uri_for('/admin/hardware_monitor') %]">
+        <div class="hw-filter-row">
+            <div>
+                <label>Host</label>
+                <select name="filter_host">
+                    <option value="">All hosts</option>
+                    [% FOR h IN hosts %]
+                    <option value="[% h | html %]" [% IF filter_host == h %]selected[% END %]>[% h | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            <div>
+                <label>Metric</label>
+                <select name="filter_metric">
+                    <option value="">All metrics</option>
+                    [% FOR n IN metric_names %]
+                    <option value="[% n | html %]" [% IF filter_metric == n %]selected[% END %]>[% n | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            <div>
+                <label>Level</label>
+                <select name="filter_level">
+                    <option value="">All levels</option>
+                    [% FOR lv IN ['critical','error','warn','info','debug'] %]
+                    <option value="[% lv %]" [% IF filter_level == lv %]selected[% END %]>[% lv %]</option>
+                    [% END %]
+                </select>
+            </div>
+            <div>
+                <label>Last</label>
+                <select name="filter_hours">
+                    [% FOR h IN [1,6,12,24,48,168] %]
+                    <option value="[% h %]" [% IF filter_hours == h %]selected[% END %]>
+                        [% IF h < 24 %][% h %]h[% ELSIF h == 24 %]24h[% ELSIF h == 48 %]2 days[% ELSE %]7 days[% END %]
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+            <div style="padding-bottom:2px">
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </div>
+        </div>
+    </form>
+
+    [% IF latest.size %]
+    <h3>Latest Reading Per Metric</h3>
+    <div class="hw-summary-grid">
+        [% FOR m IN latest %]
+        <div class="hw-card level-[% m.level %]">
+            <h4>[% m.hostname | html %] — [% m.metric_name | html %]</h4>
+            <div class="value">
+                [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
+                [% ELSIF m.metric_text %][% m.metric_text | html %]
+                [% ELSE %]—[% END %]
+            </div>
+            <div class="meta">
+                <span class="badge-[% m.level %]">[% m.level | upper %]</span>
+                [% m.timestamp | html %]
+            </div>
+            [% IF m.message && m.message != '' %]
+            <div class="meta" style="margin-top:4px">[% m.message | html %]</div>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+
+    <h3>History ([% metrics.size %] records)</h3>
+    [% IF metrics.size %]
+    <div class="log-scroll">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Host</th>
+                <th>Metric</th>
+                <th>Value</th>
+                <th>Level</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOR m IN metrics %]
+            <tr class="level-[% m.level %]">
+                <td class="nowrap">[% m.timestamp | html %]</td>
+                <td>[% m.hostname | html %]</td>
+                <td>[% m.metric_name | html %]</td>
+                <td>
+                    [% IF m.metric_value.defined %][% m.metric_value %][% IF m.unit %] [% m.unit | html %][% END %]
+                    [% ELSIF m.metric_text %][% m.metric_text | html %]
+                    [% ELSE %]—[% END %]
+                </td>
+                <td><span class="badge-[% m.level %]">[% m.level | upper %]</span></td>
+                <td>[% m.message | html %]</td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    </div>
+    [% ELSE %]
+    <p class="muted">No records found. Run <code>script/hardware_monitor.pl</code> or check that the migration has been applied.</p>
+    [% END %]
+</div>
