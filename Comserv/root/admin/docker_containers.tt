@@ -182,7 +182,12 @@
                     </h4>
                     <p style="margin: 0; color: #856404;">
                         This will export the Docker container, copy it to production server via SSH, stop the running container,
-                        load the new image, and start it. Automatic rollback on failure.
+                        load the new image, and start it. Always verify the image ID matches the local :latest tag before restart.
+                        Automatic rollback on failure.
+                    </p>
+                    <p style="margin: 8px 0 0 0; color: #856404;">
+                        Reminder: On production, always <strong>cd /opt/comserv/Comserv</strong> before running any
+                        <code>docker compose</code> commands so the correct compose file and mounts are used.
                     </p>
                 </div>
 
@@ -244,7 +249,7 @@
                         <label for="production-directory" style="display: block; margin-bottom: 8px; font-weight: bold;">
                             Production Directory:
                         </label>
-                        <input type="text" id="production-directory" value="~/PycharmProjects/comserv2" 
+                        <input type="text" id="production-directory" value="/opt/comserv/Comserv" 
                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                         <small style="color: #666;">Path where docker-compose.yml is located on production server</small>
                     </div>
@@ -296,6 +301,11 @@
                     </h5>
                     <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
 
+                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 0: On Production - Use Correct Directory</div>
+                        <div style="margin-left: 15px; margin-bottom: 8px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /opt/comserv/Comserv')" title="Click to copy">
+                            cd /opt/comserv/Comserv
+                        </div>
+
                         <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Step 1: On Production - Check Disk Space</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
                             df -h /
@@ -324,30 +334,43 @@
                             ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
-                            docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Verify Local Image Tag + Capture Image ID (Run from Workstation Terminal)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker image inspect comserv2-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
+                            docker image inspect comserv2-web-prod:latest --format "{{.Id}}"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ✅ Keep this image ID to compare on the production server after docker load.
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
+                            docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 "docker load"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
                             ⚠ Run from WORKSTATION terminal — not on production server. No sudo needed for docker load.
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Backup Current Container (Creates Rollback Tag)</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: On Production - Verify Image ID Matches Local</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image inspect comserv2-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
+                            sudo docker image inspect comserv2-web-prod:latest --format "{{.Id}}"
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Backup Current Container (Creates Rollback Tag)</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)')" title="Click to copy">
                             sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 5: Rename Old Container</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7: Rename Old Container</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rename comserv2-web-prod comserv2-web-prod-old')" title="Click to copy">
                             sudo docker rename comserv2-web-prod comserv2-web-prod-old
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6: Stop Old Container</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Stop Old Container</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod-old')" title="Click to copy">
                             sudo docker stop comserv2-web-prod-old
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 6b: Test NFS Reachability (Optional)</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8b: Test NFS Reachability (Optional)</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo &quot;NFS OK&quot; || echo &quot;NFS NOT REACHABLE - use local bind mount instead&quot;')" title="Click to copy">
                             showmount -e 192.168.1.175 2>/dev/null &amp;&amp; echo "NFS OK" || echo "NFS NOT REACHABLE - use local bind mount instead"
                         </div>
@@ -355,7 +378,7 @@
                             If NFS OK → use Step 7a. If NFS NOT REACHABLE → use Step 7b.
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7a: Start New Container WITH NFS Volumes</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9a: Start New Container WITH NFS Volumes</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv2_comserv-logs 2>/dev/null || true')" title="Click to copy">
                             sudo docker volume create --driver local --opt type=nfs --opt o=addr=192.168.1.175,rw,nfsvers=3,soft --opt device=:/mnt/data/comserv/logs comserv2_comserv-logs 2>/dev/null || true
                         </div>
@@ -366,7 +389,7 @@
                             sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 --log-opt max-size=50m --log-opt max-file=5 -e WORKSHOP_RESOURCES_PATH=/data/nfs -e COMSERV_SESSION_DIR=/tmp/comserv/session -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v comserv2_comserv-logs:/opt/comserv/root/log -v comserv2_workshop_files_nfs:/data/nfs comserv2-web-prod:latest
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 7b: Start New Container WITHOUT NFS (Local Bind Mount Fallback)</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9b: Start New Container WITHOUT NFS (Local Bind Mount Fallback)</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop')" title="Click to copy">
                             mkdir -p /home/ubuntu/comserv-logs /home/ubuntu/comserv-workshop
                         </div>
@@ -377,7 +400,7 @@
                             ⚠ --log-opt limits Docker's own log files. Logs also written to bind-mounted /home/ubuntu/comserv-logs/
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 8: Verify New Container is Healthy</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 10: Verify New Container is Healthy</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
                             sudo docker ps
                         </div>
@@ -388,7 +411,7 @@
                             curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
                         </div>
 
-                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 9: If Successful - Remove Old Container &amp; Cleanup</div>
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 11: If Successful - Remove Old Container &amp; Cleanup</div>
                         <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm comserv2-web-prod-old 2>/dev/null || echo &quot;No old container to remove&quot;')" title="Click to copy">
                             sudo docker rm comserv2-web-prod-old 2>/dev/null || echo "No old container to remove"
                         </div>
@@ -1500,17 +1523,18 @@
         appendOutput(`OPTION 1: Direct Copy via SSH Pipe (Recommended - No temp files)\n`);
         appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Step 1: Verify image exists locally\n`);
+        appendOutput(`# Step 1: Verify local image tag + capture image ID\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
         appendOutput(`docker images | grep ${imageName}\n\n`);
 
-        appendOutput(`# Step 2: Transfer image directly via SSH pipe\n`);
-        appendOutput(`docker save ${imageName} | ssh ${sshTarget} "docker load"\n\n`);
+        appendOutput(`# Step 2: Transfer image directly via SSH pipe (latest tag)\n`);
+        appendOutput(`docker save ${imageName}:latest | ssh ${sshTarget} "docker load"\n\n`);
 
-        appendOutput(`# Step 3: SSH to production and run container\n`);
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
         appendOutput(`ssh ${sshTarget}\n\n`);
-
         appendOutput(`# On production server:\n`);
-        appendOutput(`cd ~/PycharmProjects/comserv2\n\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n\n`);
 
         appendOutput(`# Stop old container\n`);
         appendOutput(`docker compose stop ${service}\n\n`);
@@ -1526,18 +1550,18 @@
         appendOutput(`OPTION 2: File Transfer Method (If SSH pipe fails)\n`);
         appendOutput(`═══════════════════════════════════════════════════════════════════\n\n`);
 
-        appendOutput(`# Step 1: Save image to tar file\n`);
-        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}\n\n`);
+        appendOutput(`# Step 1: Save image to tar file (latest tag)\n`);
+        appendOutput(`docker save -o /tmp/${imageName}.tar ${imageName}:latest\n\n`);
 
         appendOutput(`# Step 2: Copy to production server\n`);
         appendOutput(`scp /tmp/${imageName}.tar ${sshTarget}:/tmp/\n\n`);
 
-        appendOutput(`# Step 3: SSH to production\n`);
+        appendOutput(`# Step 3: SSH to production and verify image ID matches local\n`);
         appendOutput(`ssh ${sshTarget}\n\n`);
-
         appendOutput(`# On production server:\n`);
         appendOutput(`docker load -i /tmp/${imageName}.tar\n`);
-        appendOutput(`cd ~/PycharmProjects/comserv2\n`);
+        appendOutput(`docker image inspect ${imageName}:latest --format '{{.Id}}'\n`);
+        appendOutput(`cd /opt/comserv/Comserv\n`);
         appendOutput(`docker compose stop ${service}\n`);
         appendOutput(`docker compose up -d --force-recreate ${service}\n`);
         appendOutput(`docker compose ps\n\n`);

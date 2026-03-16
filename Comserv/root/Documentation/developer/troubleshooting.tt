@@ -336,8 +336,8 @@ __PACKAGE__->config(
 2. Use the DUMP directive in templates:
 
 ```html
-[% DUMP c.session %]
-[% DUMP user %]
+&#91;% DUMP c.session %&#93;
+&#91;% DUMP user %&#93;
 ```
 
 3. Add debug comments in templates:

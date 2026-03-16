@@ -155,13 +155,13 @@ The changes were made in the `index.tt` template file located at:
 **Before:**
 ```tt
 <!-- Admin Documentation Sections - Only visible to administrators -->
-[% IF display_role == 'Administrator' || user_role == 'admin' %]
+[% IF display_role == 'Administrator' || user_role == 'admin' %][% END %]
 ```
 
 **After:**
 ```tt
 <!-- Admin Documentation Sections - Only visible to administrators -->
-[% IF user_role == 'admin' || c.session.roles.grep('admin').size %]
+[% IF user_role == 'admin' || c.session.roles.grep('admin').size %][% END %]
 ```
 
 ## Benefits
