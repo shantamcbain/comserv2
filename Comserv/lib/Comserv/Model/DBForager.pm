@@ -156,14 +156,14 @@ sub COMPONENT {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "DBForager: Using database driver: $driver (available: $driver_available)");
         
+        my %driver_attrs = $driver eq 'MariaDB'
+            ? (mariadb_enable_utf8 => 1, mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            : (mysql_enable_utf8   => 1, mysql_connect_timeout   => 10, mysql_read_timeout   => 30, mysql_write_timeout   => 30);
         $connect_info = {
             dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
             password => $conn->{password},
-            mysql_enable_utf8 => 1,
-            mysql_connect_timeout => 10,
-            mysql_read_timeout => 30,
-            mysql_write_timeout => 30,
+            %driver_attrs,
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
