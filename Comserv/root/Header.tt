@@ -136,4 +136,6 @@
             }
         }
     </script>
+    <!-- AI utilities - loaded globally so the chat widget works on all pages -->
+    <script src="/static/js/ai-common.js"></script>
 </head>
