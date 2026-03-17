@@ -1169,15 +1169,15 @@ last_updated = '2026/02/08'
                                 </div>
                             </div>
                             
-                            <div class="project-description" style="background: #fff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
-                                <h4 style="margin-top: 0;">Project Description</h4>
-                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
+                            <div class="project-description content-section">
+                                <h4>Project Description</h4>
+                                <div class="code-block" style="white-space: pre-wrap; line-height: 1.6;">
 [% project.description %]
                                 </div>
                             </div>
                             
                             [% IF project.comments %]
-                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
+                            <div class="project-comments alert alert-warning" style="font-size: 0.9em;">
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]
