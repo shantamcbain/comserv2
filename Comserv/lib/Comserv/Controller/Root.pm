@@ -1856,34 +1856,57 @@ sub end : ActionClass('RenderView') {
 # Default action for handling 404 errors
 sub default :Path {
     my ($self, $c) = @_;
-    
-    # Get the requested path
+
     my $requested_path = $c->req->path;
-    my $path = join('/', @{$c->req->args});
-    
-    # Log the 404 error
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
-        "Page not found: /$requested_path");
-    
-    # Set response status to 404
+
+    # Classify the requester for logging context
+    my %req_info = Comserv::Util::Logging::extract_request_info($c);
+    my $req_type    = $req_info{request_type} // 'unknown';
+    my $ip          = $req_info{ip_address}   // '-';
+    my $ua          = $req_info{user_agent}   // '-';
+    my $method      = $req_info{request_method} // '-';
+    my $referer     = $req_info{referer}      // '-';
+
+    # Detect if the request targets a restricted admin path.
+    # For security, a 404 (not a 403) is returned so the path's existence is not revealed.
+    my $is_admin_path = ($requested_path =~ m{^/admin\b}i
+                      || $requested_path =~ m{^/csc/admin\b}i);
+    my $is_admin_user = $self->check_user_roles($c, 'admin');
+
+    if ($is_admin_path && !$is_admin_user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+            "Stealth-404 for admin path '$requested_path' — "
+            . "IP:$ip Type:$req_type Method:$method Referer:$referer");
+        $c->response->status(404);
+        $self->logging->log_access($c, 404);
+        $c->stash(
+            template    => 'error.tt',
+            error_title => 'Page Not Found',
+            error_msg   => 'The page you requested could not be found.',
+        );
+        return;
+    }
+
+    my $log_level = ($req_type eq 'scanner') ? 'error'
+                  : ($req_type eq 'bot')     ? 'info'
+                  :                            'warn';
+
+    $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'default',
+        "404 Not Found: '$requested_path' — "
+        . "IP:$ip Type:$req_type Method:$method Referer:$referer");
+
     $c->response->status(404);
-    
-    # Set up the error page
+    $self->logging->log_access($c, 404);
     $c->stash(
-        template => 'error.tt',
-        error_title => 'Page Not Found',
-        error_msg => "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>",
-        requested_path => $path,
-        debug_msg => "Page not found: /$path",
-        technical_details => "Using Catalyst's built-in proxy configuration. Test URL: " . 
-                         $c->uri_for('/test')
+        template          => 'error.tt',
+        error_title       => 'Page Not Found',
+        error_msg         => "The page you requested could not be found: /$requested_path.",
+        requested_path    => $requested_path,
+        technical_details => '',
     );
-    
-    # Initialize debug_msg array if it doesn't exist
+
     $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-    
-    # Add the debug message to the array
-    push @{$c->stash->{debug_msg}}, "Page not found: /$path";
+    push @{$c->stash->{debug_msg}}, "Page not found: /$requested_path";
 }
 
 __PACKAGE__->meta->make_immutable;

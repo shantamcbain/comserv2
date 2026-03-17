@@ -1,47 +1,94 @@
-[% PageVersion = 'Queens.tt,v 0.01 2023/11/03 shanta Exp shanta ' %]
-<meta charset="utf-8">
+[% META title = "Queen Rearing System" %]
+[% PageVersion = 'BMaster/Queens.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
-   [% PageVersion %]
+    [% PageVersion %]
     [% INCLUDE 'debug.tt' %]
 [% END %]
- <h1>Queen Breeding System</h1>
 
-<form action="/BMaster/add_graft" method="post">
-  <h2>Graft Calendar</h2>
+<div class="app-container">
 
-  <label for="first_graft_date">First Graft Date:</label>
-  <input type="date" id="first_graft_date" name="first_graft_date" value="[% first_graft_date %]" required>
+    <div class="page-header">
+        <h1>Queen Rearing System</h1>
+    </div>
 
-  <label for="days_of_egg_laying">Days of Egg Laying:</label>
-  <input type="number" id="days_of_egg_laying" name="days_of_egg_laying" value="[% days_of_egg_laying %]" required>
+    <div class="content-container">
+        <div class="content-primary">
 
-  <label for="number_of_grafts">Number of Grafts:</label>
-  <input type="number" id="number_of_grafts" name="number_of_grafts" value="[% number_of_grafts %]" required>
+            <div class="app-section">
+                <h2>Graft Calendar</h2>
+                <div class="form-container">
+                    <form action="/BMaster/add_graft" method="post" class="app-form">
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="first_graft_date">First Graft Date:</label>
+                                    <input type="date" id="first_graft_date" name="first_graft_date" value="[% first_graft_date | html %]" class="form-input" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="days_of_egg_laying">Days of Egg Laying:</label>
+                                    <input type="number" id="days_of_egg_laying" name="days_of_egg_laying" value="[% days_of_egg_laying | html %]" class="form-input" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-field">
+                                    <label for="number_of_grafts">Number of Grafts:</label>
+                                    <input type="number" id="number_of_grafts" name="number_of_grafts" value="[% number_of_grafts | html %]" class="form-input" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Calculate Dates</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
-  <input type="submit" value="Submit">
-</form>
+            [% IF dates.size %]
+            <div class="app-section">
+                <h2>Queen Rearing Calendar</h2>
+                <div class="table-container">
+                    <table class="data-table calendar-table">
+                        <thead>
+                            <tr>
+                                <th>Sun</th>
+                                <th>Mon</th>
+                                <th>Tue</th>
+                                <th>Wed</th>
+                                <th>Thu</th>
+                                <th>Fri</th>
+                                <th>Sat</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% SET day_of_week = dates.0.day_of_week %]
+                            [% FOREACH date IN dates %]
+                                [% IF day_of_week == 0 %]<tr>[% END %]
+                                <td[% IF date.day == today.day AND date.month == today.month AND date.year == today.year %] class="calendar-today"[% END %]>
+                                    [% date.day %]
+                                    [% FOREACH graft IN graft_dates %]
+                                        [% IF date.ymd == graft.graft_date.ymd %]
+                                            <div class="event-box">[% graft.event_name | html %]</div>
+                                        [% END %]
+                                    [% END %]
+                                </td>
+                                [% SET day_of_week = (day_of_week + 1) % 7 %]
+                                [% IF day_of_week == 0 OR loop.last %]</tr>[% END %]
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            [% END %]
 
-<table>
-  <tr>
-    <th>Sun</th>
-    <th>Mon</th>
-    <th>Tue</th>
-    <th>Wed</th>
-    <th>Thu</th>
-    <th>Fri</th>
-    <th>Sat</th>
-  </tr>
-  [% SET day_of_week = dates.0.day_of_week %] <!-- Set day_of_week to the day of the week of the first day of the month -->
-  [% FOREACH date IN dates %]
-    [% IF day_of_week == 0 %]<tr>[% END %]
-    <td class="calendar-date" [% IF date.day == today.day AND date.month == today.month AND date.year == today.year %]style="background-color: yellow;"[% END %]>
-      [% date.day %]
-[% FOREACH graft IN graft_dates %]
-  [% IF date.ymd == graft.graft_date.ymd %] <!-- Compare the dates as strings in the format 'yyyy-mm-dd' -->
-    <div class="event-box">[% graft.event_name %]</div> <!-- Display the event name -->
-  [% END %]
-[% END %]    </td>
-    [% SET day_of_week = (day_of_week + 1) % 7 %]
-    [% IF day_of_week == 0 OR loop.last %]</tr>[% END %]
-  [% END %]
-</table>
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

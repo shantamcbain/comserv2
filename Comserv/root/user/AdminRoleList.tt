@@ -65,7 +65,7 @@
                                 <td>[% sr.sitename | html %]</td>
                                 [% END %]
                                 <td><strong>[% sr.role_name | html %]</strong></td>
-                                <td>[% sr.description | html || '<em>No description</em>' %]</td>
+                                <td>[% sr.description || '<em>No description</em>' | html %]</td>
                                 <td>
                                     [% IF sr.is_system_role %]
                                         <span class="badge-warning">System</span>

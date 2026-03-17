@@ -365,7 +365,7 @@ sub test_connection {
         }
         if (time() - $start >= $timeout) {
             kill 'KILL', $pid;
-            waitpid($pid, 0);
+            waitpid($pid, POSIX::WNOHANG());
             $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
                 "Connection test timed out after ${timeout}s for '$conn_name'");
             last;

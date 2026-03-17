@@ -25,6 +25,45 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# Known bot/spider user-agent patterns for request classification
+my @BOT_PATTERNS = (
+    qr/googlebot/i,
+    qr/bingbot/i,
+    qr/baiduspider/i,
+    qr/yandexbot/i,
+    qr/duckduckbot/i,
+    qr/slurp/i,
+    qr/facebookexternalhit/i,
+    qr/twitterbot/i,
+    qr/linkedinbot/i,
+    qr/applebot/i,
+    qr/ia_archiver/i,
+    qr/archive\.org/i,
+    qr/semrushbot/i,
+    qr/ahrefsbot/i,
+    qr/mj12bot/i,
+    qr/dotbot/i,
+    qr/rogerbot/i,
+    qr/crawler/i,
+    qr/spider/i,
+    qr/\bbot\b/i,
+    qr/scrapy/i,
+    qr/wget/i,
+    qr/curl/i,
+    qr/python-requests/i,
+    qr/go-http-client/i,
+    qr/java\//i,
+    qr/nikto/i,
+    qr/sqlmap/i,
+    qr/nmap/i,
+    qr/masscan/i,
+    qr/zgrab/i,
+    qr/dirbuster/i,
+    qr/havij/i,
+    qr/acunetix/i,
+    qr/nessus/i,
+);
+
 # Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
 my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
 my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
@@ -320,7 +359,15 @@ sub log_with_details {
     # Make sure $line is numeric, default to 0 if not
     $line = 0 unless defined $line && $line =~ /^\d+$/;
 
-    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message);
+    my %_req = extract_request_info($c);
+    my $_req_suffix = '';
+    if (%_req && $level =~ /^(warn|error|critical)$/i) {
+        $_req_suffix = sprintf(' [IP:%s Type:%s UA:%s]',
+            $_req{ip_address}   // '-',
+            $_req{request_type} // '-',
+            substr($_req{user_agent} // '-', 0, 80));
+    }
+    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s%s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message, $_req_suffix);
 
     # Add to debug_errors in stash if Catalyst context is available
     # But avoid calling $c->log methods to prevent recursion
@@ -722,6 +769,70 @@ sub refresh_settings {
             }
         }
     };
+}
+
+sub log_access {
+    my ($self, $c, $status_code) = @_;
+    return unless $c && ref($c) && $c->can('model');
+
+    my $now = time();
+    if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
+        return;
+    }
+
+    my %req  = extract_request_info($c);
+    my $sys  = __PACKAGE__->get_system_identifier();
+
+    eval {
+        $c->model('DBEncy')->resultset('AccessLog')->create({
+            timestamp          => _get_timestamp(),
+            sitename           => ($c->stash ? ($c->stash->{SiteName} || 'CSC') : 'CSC'),
+            path               => substr($c->req->path // '', 0, 512),
+            request_method     => $req{request_method},
+            status_code        => $status_code,
+            ip_address         => $req{ip_address},
+            user_agent         => $req{user_agent},
+            referer            => $req{referer},
+            request_type       => $req{request_type},
+            username           => ($c->session ? $c->session->{username} : undef),
+            session_id         => eval { $c->sessionid } // undef,
+            system_identifier  => $sys,
+        });
+    };
+    if ($@) {
+        $_db_log_failed_at = time();
+        _print_log("[ACCESS-LOG-ERROR] DB write failed: $@");
+    }
+}
+
+sub _classify_request {
+    my ($ua) = @_;
+    return 'unknown' unless defined $ua && length $ua;
+
+    my %SCANNER_PATTERNS = map { $_ => 1 } qw(nikto sqlmap nmap masscan zgrab dirbuster havij acunetix nessus);
+    my $ua_lc = lc($ua);
+    for my $kw (keys %SCANNER_PATTERNS) {
+        return 'scanner' if index($ua_lc, $kw) >= 0;
+    }
+    for my $pattern (@BOT_PATTERNS) {
+        return 'bot' if $ua =~ $pattern;
+    }
+    return 'human' if $ua =~ /Mozilla|Chrome|Safari|Firefox|Opera|Edge|MSIE/;
+    return 'script';
+}
+
+sub extract_request_info {
+    my ($c) = @_;
+    my %info;
+    return %info unless $c && ref($c) && $c->can('req');
+    eval {
+        $info{ip_address}     = $c->req->address // '';
+        $info{user_agent}     = substr($c->req->user_agent // '', 0, 512);
+        $info{referer}        = substr($c->req->referer   // '', 0, 512);
+        $info{request_method} = $c->req->method           // '';
+        $info{request_type}   = _classify_request($info{user_agent});
+    };
+    return %info;
 }
 
 1; # Ensure the module returns true
