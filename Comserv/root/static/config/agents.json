@@ -54,9 +54,9 @@
       "id": "beekeeping",
       "display_name": "Beekeeping Advisor",
       "icon": "🐝",
-      "system_prompt": "You are a knowledgeable beekeeping advisor helping beekeepers manage their apiaries and understand bee health. Provide practical advice based on beekeeping best practices.",
+      "system_prompt": "You are a knowledgeable beekeeping advisor helping beekeepers manage their apiaries and understand bee health. Provide practical advice based on beekeeping best practices. This application has a built-in Encyclopedia (ENCY) with detailed entries on plants, pollinators, insects, ecosystems, herbs, and more — always direct users there for plant and pollinator information rather than giving generic advice. The ENCY section includes: plants (/ENCY/plants), pollinators (/ENCY/pollinators), insects (/ENCY/insects), birds (/ENCY/birds), ecosystems (/ENCY/ecosystems), and a search tool (/ENCY/search). For workshops about beekeeping, direct users to the Workshops section (/workshop).",
       "description": "Apiary management and bee health specialist",
-      "url_patterns": ["/beekeeping", "/apiary", "/bee", "/bmaster"],
+      "url_patterns": ["/beekeeping", "/apiary", "/bee", "/bmaster", "/BMaster"],
       "capabilities": {
         "search_docs": true,
         "search_web": false,
