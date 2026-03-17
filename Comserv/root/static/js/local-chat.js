@@ -441,14 +441,16 @@
                                 state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
                             }
                         } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
-                            // Sort by size and assign tiers
-                            const sorted = p.models.slice().sort(function(a, b) {
-                                return modelSizeScore(a.id) - modelSizeScore(b.id);
-                            });
-                            state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                            state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                            const mid = sorted[Math.floor(sorted.length / 2)];
-                            state.modelTiers.medium = 'ollama|' + mid.id;
+                            // Filter to chat-capable models only, then sort by size
+                            const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                            if (chatModels.length > 0) {
+                                const sorted = chatModels.slice().sort(function(a, b) {
+                                    return modelSizeScore(a.id) - modelSizeScore(b.id);
+                                });
+                                state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                                state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                                state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                            }
                         }
                     });
                 }
@@ -762,13 +764,16 @@
                     const grp = document.createElement('optgroup');
                     grp.label = 'Ollama (Local)';
                     if (p.models && p.models.length > 0) {
-                        // Build model tiers from sorted model list
-                        const sorted = p.models.slice().sort(function(a, b) {
-                            return modelSizeScore(a.id) - modelSizeScore(b.id);
-                        });
-                        state.modelTiers.small  = 'ollama|' + sorted[0].id;
-                        state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
-                        state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                        // Build model tiers from chat-capable models only, sorted by size
+                        const chatModels = p.models.filter(function(m) { return isChatModel(m.id); });
+                        if (chatModels.length > 0) {
+                            const sorted = chatModels.slice().sort(function(a, b) {
+                                return modelSizeScore(a.id) - modelSizeScore(b.id);
+                            });
+                            state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                            state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                            state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
+                        }
                         p.models.forEach(function(m) {
                             const opt = document.createElement('option');
                             opt.value = 'ollama|' + m.id;
@@ -1184,6 +1189,13 @@
         });
     }
     
+    // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
+    function isChatModel(id) {
+        const s = id.toLowerCase();
+        if (/embed|rerank|bge|nomic|clip|whisper|tts|vision(?!.*instruct)/.test(s)) return false;
+        return true;
+    }
+
     // Score an Ollama model ID by approximate parameter size (lower = smaller/faster)
     function modelSizeScore(id) {
         const s = id.toLowerCase();
