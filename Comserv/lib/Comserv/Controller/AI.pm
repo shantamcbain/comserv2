@@ -3901,12 +3901,13 @@ sub get_user_providers :Local :Args(0) {
     }
 
     $c->response->body(encode_json({
-        success           => JSON::true,
-        providers         => \@providers,
-        username          => $username || 'You',
-        user_id           => $user_id  || 0,
-        is_guest          => $is_guest  ? JSON::true : JSON::false,
-        can_access_history => $is_admin ? JSON::true : JSON::false,
+        success            => JSON::true,
+        providers          => \@providers,
+        username           => $username || 'You',
+        user_id            => $user_id  || 0,
+        is_guest           => $is_guest  ? JSON::true : JSON::false,
+        is_admin           => $is_admin  ? JSON::true : JSON::false,
+        can_access_history => $is_admin  ? JSON::true : JSON::false,
     }));
 }
 

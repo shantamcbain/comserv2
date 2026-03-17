@@ -25,7 +25,16 @@
         selectedProvider: 'ollama',
         conversationMessages: [],
         username: 'You',
-        activeModel: null
+        activeModel: null,
+        isGuest: true,
+        isAdmin: false,
+        userModelOverride: false,   // true when user manually picks a model
+        modelTiers: {
+            small:  null,   // fastest/smallest Ollama model
+            medium: null,   // mid-size Ollama model
+            large:  null,   // largest Ollama model
+            grok:   null    // Grok model (premium users)
+        }
     };
     
     // Load persisted state from sessionStorage
@@ -396,10 +405,9 @@
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
-                    // Capture username
-                    if (data.username) {
-                        state.username = data.username;
-                    }
+                    if (data.username)  state.username = data.username;
+                    if (data.is_admin)  state.isAdmin  = !!data.is_admin;
+                    if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
@@ -428,6 +436,19 @@
                                 grp.appendChild(opt);
                             });
                             sel.appendChild(grp);
+                            // Cheapest Grok for complex queries (non-guest)
+                            if (!state.isGuest) {
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
+                            }
+                        } else if (p.service === 'ollama' && p.models && p.models.length > 0) {
+                            // Sort by size and assign tiers
+                            const sorted = p.models.slice().sort(function(a, b) {
+                                return modelSizeScore(a.id) - modelSizeScore(b.id);
+                            });
+                            state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                            state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                            const mid = sorted[Math.floor(sorted.length / 2)];
+                            state.modelTiers.medium = 'ollama|' + mid.id;
                         }
                     });
                 }
@@ -560,6 +581,7 @@
         });
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             state.selectedProvider = e.target.value;
+            state.userModelOverride = true;   // user chose manually — disable auto-select
             const parts = state.selectedProvider.split('|');
             let modelDisplay;
             const isGrok = parts[0] === 'grok';
@@ -570,7 +592,7 @@
             }
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
-            statusEl.textContent = '🔵 ' + modelDisplay + ' selected';
+            statusEl.textContent = '🔵 ' + modelDisplay + ' (manual)';
             statusEl.className = 'chat-status connected';
             // Show web search toggle only for Grok (admin users see it; controlled server-side too)
             const wsToggle = document.getElementById('web-search-toggle');
@@ -712,7 +734,9 @@
         .then(data => {
             if (!data.success) return;
 
-            if (data.username) state.username = data.username;
+            if (data.username)              state.username = data.username;
+            if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
+            if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
 
             // Hide provider selector for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
@@ -734,6 +758,13 @@
                     const grp = document.createElement('optgroup');
                     grp.label = 'Ollama (Local)';
                     if (p.models && p.models.length > 0) {
+                        // Build model tiers from sorted model list
+                        const sorted = p.models.slice().sort(function(a, b) {
+                            return modelSizeScore(a.id) - modelSizeScore(b.id);
+                        });
+                        state.modelTiers.small  = 'ollama|' + sorted[0].id;
+                        state.modelTiers.large  = 'ollama|' + sorted[sorted.length - 1].id;
+                        state.modelTiers.medium = 'ollama|' + sorted[Math.floor(sorted.length / 2)].id;
                         p.models.forEach(function(m) {
                             const opt = document.createElement('option');
                             opt.value = 'ollama|' + m.id;
@@ -771,6 +802,10 @@
                         grp.appendChild(opt);
                     });
                     providerSelect.appendChild(grp);
+                    // Set grok tier for complex queries (non-guest users)
+                    if (!state.isGuest && grokModels.length > 0) {
+                        state.modelTiers.grok = grokModels[0].val;
+                    }
                 } else {
                     const opt = document.createElement('option');
                     opt.value = p.service;
@@ -948,10 +983,30 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+        // Auto-select model based on query complexity (unless user manually chose)
+        let effectiveProvider = state.selectedProvider || 'ollama';
+        let autoTier = null;
+        if (!state.userModelOverride) {
+            autoTier = classifyQuery(prompt);
+            effectiveProvider = autoSelectProvider(autoTier);
+            // Reflect auto-selection in the dropdown UI
+            const sel = document.getElementById('ai-provider');
+            if (sel && sel.querySelector('option[value="' + effectiveProvider + '"]')) {
+                sel.value = effectiveProvider;
+            }
+        }
+
         // Parse provider|model format (e.g. "grok|grok-2-latest" or "ollama")
-        const providerParts = (state.selectedProvider || 'ollama').split('|');
+        const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
         const modelName = providerParts[1] || null;
+
+        // Update loading message to show which model/tier is being used
+        if (autoTier) {
+            const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
+            const mName = modelName || providerName;
+            if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + tierLabel + ': ' + mName + ')</small>';
+        }
 
         // Build request payload with page context and agent info
         const requestPayload = {
@@ -1128,6 +1183,55 @@
         });
     }
     
+    // Score an Ollama model ID by approximate parameter size (lower = smaller/faster)
+    function modelSizeScore(id) {
+        const s = id.toLowerCase();
+        if (/tinyllama|1\.1b/.test(s))                        return 1;
+        if (/phi(?!.*\d)|1b|2b|3b/.test(s))                   return 2;
+        if (/7b|8b|mistral(?!.*\d{2})/.test(s))               return 3;
+        if (/13b|14b|llama3\.1(?!.*\d{2})/.test(s))           return 4;
+        if (/30b|34b|70b|405b|mixtral/.test(s))               return 5;
+        return 3;
+    }
+
+    // Classify a user message into a complexity tier
+    // Returns: 'nav' | 'simple' | 'medium' | 'complex'
+    function classifyQuery(msg) {
+        const m = msg.trim();
+        if (NAV_RE.test(m)) return 'nav';                   // navigation command
+
+        const lower = m.toLowerCase();
+        const words = lower.split(/\s+/);
+
+        // Research / analysis / comparison keywords → complex
+        const complexRE = /\b(best|recommend|compar|why|analy|plan|strateg|manag|research|detail|comprehensive|benefit|nutrition|health|optimal|effective|difference|versus|advantage|disadvantage|explain in detail|how should|should i|pros? and cons?)\b/;
+        // Simple factual / lookup → simple
+        const simpleRE  = /^(what is|where is|who is|when is|how do i|can i|is there|do you|list|find me|give me)\b/;
+
+        const hasComplex = complexRE.test(lower);
+        const hasSimple  = simpleRE.test(lower) && words.length < 10;
+
+        if (hasComplex || words.length > 18) return 'complex';
+        if (hasSimple  || words.length < 7)  return 'simple';
+        return 'medium';
+    }
+
+    // Pick the best provider string for a given complexity tier
+    function autoSelectProvider(complexity) {
+        const t = state.modelTiers;
+        if (complexity === 'nav' || complexity === 'simple') {
+            return t.small || t.medium || state.selectedProvider;
+        }
+        if (complexity === 'medium') {
+            return t.medium || t.large || state.selectedProvider;
+        }
+        // complex: use Grok for non-guest users who have it; else largest Ollama
+        if (complexity === 'complex' && t.grok && !state.isGuest) {
+            return t.grok;
+        }
+        return t.large || t.medium || state.selectedProvider;
+    }
+
     // Build a flat {label, url} navigation map from links embedded in the system prompt
     function buildNavigationMap() {
         const map = [];
