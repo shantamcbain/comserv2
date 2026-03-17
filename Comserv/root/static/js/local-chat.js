@@ -155,6 +155,47 @@
         return bodyText.substring(0, 2000);
     }
 
+    // Extract all meaningful links from the current page (quick links, content links)
+    function extractPageLinks() {
+        const seen = new Set();
+        const links = [];
+        const skip = /^(javascript:|mailto:|#|$)/i;
+
+        // Priority: quick-link cards and explicitly labelled link sections first
+        const prioritySelectors = [
+            '.quick-link-card', '.quick-links a', '[class*="quick-link"] a',
+            '.page-links a', '.link-list a', '.resource-links a',
+            '.tabs a', '.tab-links a', '[data-tab] a'
+        ];
+        prioritySelectors.forEach(function(sel) {
+            document.querySelectorAll(sel).forEach(function(a) {
+                const href = a.getAttribute('href');
+                const label = (a.textContent || a.title || '').replace(/\s+/g, ' ').trim();
+                if (!href || skip.test(href) || !label || seen.has(href)) return;
+                seen.add(href);
+                const abs = href.startsWith('http') ? href : (window.location.origin + (href.startsWith('/') ? href : '/' + href));
+                links.push(label + ': ' + abs);
+            });
+        });
+
+        // Then general content-area links (excluding nav/footer/chat widget)
+        const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article'];
+        contentSelectors.forEach(function(sel) {
+            const el = document.querySelector(sel);
+            if (!el) return;
+            el.querySelectorAll('a[href]').forEach(function(a) {
+                const href = a.getAttribute('href');
+                const label = (a.textContent || a.title || '').replace(/\s+/g, ' ').trim();
+                if (!href || skip.test(href) || !label || seen.has(href)) return;
+                seen.add(href);
+                const abs = href.startsWith('http') ? href : (window.location.origin + (href.startsWith('/') ? href : '/' + href));
+                links.push(label + ': ' + abs);
+            });
+        });
+
+        return links.slice(0, 40); // cap at 40 links
+    }
+
     // Detect page context (documentation, helpdesk, project, etc.)
     function detectPageContext() {
         const pathname = window.location.pathname;
@@ -170,9 +211,13 @@
             page_url: window.location.href
         };
         
-        // Extract current page content for context awareness
+        // Extract current page content and links for context awareness
         const pageContent = extractPageContent();
-        
+        const pageLinks = extractPageLinks();
+        const linksSection = pageLinks.length > 0
+            ? '\n\nLinks on this page:\n' + pageLinks.map(function(l) { return '- ' + l; }).join('\n')
+            : '';
+
         if (selectedAgent) {
             context.page_type = selectedAgent.id;
             context.agent_id = selectedAgent.id;
@@ -180,7 +225,8 @@
             context.system_prompt = selectedAgent.system_prompt
                 + '\nDo NOT invent file paths, documentation URLs, or system details not explicitly provided.'
                 + '\nCurrent page: "' + pageTitle + '" at URL: ' + pathname
-                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '')
+                + linksSection;
             context.capabilities = selectedAgent.capabilities;
             context.model_settings = selectedAgent.model_settings;
         } else {
@@ -191,7 +237,8 @@
                 + 'You can only answer based on information explicitly provided to you here. '
                 + 'Do NOT invent file paths, documentation URLs, or system details not shown below.\n\n'
                 + 'Current page: "' + pageTitle + '" at URL: ' + pathname
-                + (pageContent ? '\n\nPage content:\n' + pageContent : '');
+                + (pageContent ? '\n\nPage content:\n' + pageContent : '')
+                + linksSection;
         }
         
         return context;
@@ -1036,7 +1083,11 @@
 
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
-        messageElement.textContent = text;
+        if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
+            messageElement.innerHTML = AIUtils.formatMessageContent(text);
+        } else {
+            messageElement.textContent = text;
+        }
 
         wrapper.appendChild(label);
         wrapper.appendChild(messageElement);
