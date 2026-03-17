@@ -724,9 +724,10 @@
         });
     }
     
-    // Load user's available AI providers and populate model dropdown
+    // Load user's available AI providers and populate model dropdown.
+    // Returns a Promise that resolves when role and tiers are known.
     function loadUserProviders() {
-        fetch('/ai/get_user_providers', {
+        return fetch('/ai/get_user_providers', {
             method: 'GET',
             credentials: 'include'
         })
@@ -738,12 +739,15 @@
             if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
             if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
 
-            // Hide provider selector for guests / non-admins
+            // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
                 const selectorBar = document.querySelector('.provider-selector');
                 if (selectorBar) selectorBar.style.display = 'none';
                 const histBtn = document.getElementById('toggle-history-btn');
                 if (histBtn) histBtn.style.display = 'none';
+                // Clear any stale conversation ID left from a previous login session
+                state.currentConversationId = null;
+                sessionStorage.removeItem('currentConversationId');
                 return;
             }
 
@@ -845,15 +849,10 @@
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
         
-        // Load persisted conversation state
-        loadPersistedState();
-        
-        // Load conversation list for dropdown
-        loadConversationList();
-        
-        // Load user's available providers
-        loadUserProviders();
-        
+        chatPanel.style.display = 'flex';
+        chatButton.style.display = 'none';
+        state.isOpen = true;
+
         // Update chat header with selected agent info
         const chatHeader = document.querySelector('.chat-header h3');
         if (state.pageContext && state.pageContext.agent_name) {
@@ -861,27 +860,29 @@
         } else if (state.currentAgent && state.currentAgent.display_name) {
             chatHeader.textContent = state.currentAgent.display_name;
         }
-        
-        chatPanel.style.display = 'flex';
-        chatButton.style.display = 'none';
-        state.isOpen = true;
-        
-        // Restore messages from previous page navigation (sessionStorage)
-        const chatMessages2 = document.getElementById('chat-messages');
-        const hasMessages2 = chatMessages2 && chatMessages2.querySelectorAll('.msg-wrapper').length > 0;
-        if (!hasMessages2) {
+
+        // Restore messages from sessionStorage immediately (works for all roles)
+        const chatMsgsEl = document.getElementById('chat-messages');
+        const alreadyHasMessages = chatMsgsEl && chatMsgsEl.querySelectorAll('.msg-wrapper').length > 0;
+        if (!alreadyHasMessages) {
             restoreMessages();
         }
 
-        // Auto-reload messages if resuming a conversation (server-side history)
-        if (state.currentConversationId) {
-            const chatMessages = document.getElementById('chat-messages');
-            const hasMessages = chatMessages && chatMessages.querySelectorAll('.msg-wrapper').length > 0;
-            if (!hasMessages) {
-                loadConversation(state.currentConversationId);
+        // Resolve role first, then conditionally load server-side history
+        loadUserProviders().then(function() {
+            if (!state.isGuest) {
+                // Authenticated user: restore conversation ID and load history if needed
+                loadPersistedState();
+                loadConversationList();
+                const stillNoMessages = document.getElementById('chat-messages')
+                    .querySelectorAll('.msg-wrapper').length === 0;
+                if (stillNoMessages && state.currentConversationId) {
+                    loadConversation(state.currentConversationId);
+                }
             }
-        }
-        
+            // Guests: nothing to load from server — sessionStorage messages already restored above
+        }).catch(function() {});
+
         // Focus on the input field
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
