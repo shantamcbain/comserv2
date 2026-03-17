@@ -1,9 +1,10 @@
-[% META title = title || 'Under Development' %]
+[% META title = 'Under Development' %]
+[% SET page_title = title || 'Under Development' %]
 
 <div class="container">
     <div class="row">
         <div class="col-md-12">
-            <h1>[% title %]</h1>
+            <h1>[% page_title %]</h1>
             <div class="alert alert-info">
                 <strong>Note:</strong> [% message %]
             </div>
