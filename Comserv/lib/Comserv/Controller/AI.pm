@@ -2537,7 +2537,9 @@ sub _build_role_system_prompt {
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
     my $is_guest = !@role_list || (grep { /guest/i } @role_list);
 
-    my $page_nav = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $is_admin ? 'admin' : ($is_guest ? 'guest' : 'user'));
+    my $role_tier  = $is_admin ? 'admin' : ($is_guest ? 'guest' : 'user');
+    my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
+    my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
     if ($is_admin) {
         if ($provider eq 'grok') {
@@ -2549,14 +2551,16 @@ sub _build_role_system_prompt {
                  . "- Projects: $base_url/project/list\n"
                  . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
                  . "Do NOT invent data. Web search may be available if the user has enabled it above.\n"
-                 . $page_nav;
+                 . $page_nav
+                 . $nav_guide;
         } else {
             return "You are assisting an admin user. "
                  . "You have NO ability to call external URLs or databases. "
                  . "If the user asks about live data such as workshops, projects, or tasks, "
                  . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
                  . "Never invent or simulate API results."
-                 . $page_nav;
+                 . $page_nav
+                 . $nav_guide;
         }
     }
 
@@ -2571,7 +2575,8 @@ sub _build_role_system_prompt {
              . "Do NOT access private data or APIs. "
              . "If the user needs account-specific help, ask them to log in."
              . $guest_no_internet
-             . $page_nav;
+             . $page_nav
+             . $nav_guide;
     }
 
     my $no_internet = ($provider ne 'grok')
@@ -2584,7 +2589,62 @@ sub _build_role_system_prompt {
          . "Answer based on the page content and documentation provided. "
          . "Do not invent data; if you don't know something, say so."
          . $no_internet
-         . $page_nav;
+         . $page_nav
+         . $nav_guide;
+}
+
+=head2 _build_navigation_command_guide
+
+Build a role-filtered navigation command guide appended to every system prompt.
+When a user says "take me to X" or asks how to navigate to a section, the AI
+uses this map to reply with the correct URL instead of inventing one.
+
+  $base_url - application base URL (no trailing slash)
+  $role     - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_navigation_command_guide {
+    my ($self, $base_url, $role) = @_;
+
+    my @public = (
+        [ 'home / main menu',       "$base_url/"                          ],
+        [ 'AI assistant / chat',    "$base_url/ai"                        ],
+        [ 'documentation',          "$base_url/Documentation"             ],
+        [ 'daily plan',             "$base_url/Documentation/DailyPlan"   ],
+        [ 'encyclopedia / search',  "$base_url/ency/search?q=TERM"        ],
+        [ 'workshops (active)',     "$base_url/workshop/list_active"       ],
+        [ 'helpdesk',               "$base_url/helpdesk"                  ],
+    );
+
+    my @user_extra = (
+        [ 'my tasks / todos',       "$base_url/todo/list"                 ],
+        [ 'projects',               "$base_url/project/list"              ],
+        [ 'API keys',               "$base_url/ai/manage_api_keys"        ],
+    );
+
+    my @admin_extra = (
+        [ 'all workshops',          "$base_url/workshop/list"             ],
+        [ 'project todos (by id)',  "$base_url/todo/list?project_id=ID"   ],
+        [ 'AI models',              "$base_url/ai/models"                 ],
+        [ 'admin panel',            "$base_url/admin"                     ],
+        [ 'site settings',          "$base_url/site"                      ],
+        [ 'user management',        "$base_url/user/list"                 ],
+        [ 'logs',                   "$base_url/log"                       ],
+    );
+
+    my @routes = @public;
+    push @routes, @user_extra  if $role eq 'user' || $role eq 'admin';
+    push @routes, @admin_extra if $role eq 'admin';
+
+    my $list = join('', map { "- $_->[0]: $_->[1]\n" } @routes);
+
+    return "\n\nNavigation guide — when the user asks to go to a page or says "
+         . "'take me to [page]', respond with the matching URL below. "
+         . "Only use these URLs; do not invent others. "
+         . "If no match is found, say: "
+         . "'I don't know that page — please check $base_url for available options.'\n"
+         . $list;
 }
 
 =head2 _build_page_navigation_hint
