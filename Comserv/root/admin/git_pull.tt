@@ -16,9 +16,9 @@
     </a>
 </div>
 
-<div class="container">
-    <div class="row">
-        <div class="col-md-12">
+<div class="app-container">
+    <div class="content-container">
+        <div class="content-primary">
             <h1>Git Pull Confirmation</h1>
             
             [% IF debug_msg || c.session.debug_mode == 1 %]

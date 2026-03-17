@@ -117,31 +117,29 @@
     [% END %]
 
 [%# User-facing sections %]
-[% INCLUDE 'Documentation/user_docs.tt' %]
-[% INCLUDE 'Documentation/tutorials.tt' %]
-[% INCLUDE 'Documentation/site_specific.tt' %]
-[% INCLUDE 'Documentation/developer_guides.tt' %]
+[% TRY %][% INCLUDE 'Documentation/user_docs.tt' %][% CATCH %][% END %]
+[% TRY %][% INCLUDE 'Documentation/tutorials.tt' %][% CATCH %][% END %]
+[% TRY %][% INCLUDE 'Documentation/site_specific.tt' %][% CATCH %][% END %]
+[% TRY %][% INCLUDE 'Documentation/developer_guides.tt' %][% CATCH %][% END %]
 
 [%# Admin-only sections %]
-[% # Use the is_admin flag passed from the controller %]
 [% IF is_admin %]
-    [% # Debug output %]
     [% IF c.session.debug_mode == 1 %]
         <div class="debug-info">
             <p>Admin sections visible: user_role=[% user_role %], session roles=[% c.session.roles.join(',') IF c.session.roles %]</p>
         </div>
     [% END %]
-    [% INCLUDE 'Documentation/admin_guides.tt' %]
-    [% INCLUDE 'Documentation/proxmox.tt' %]
-    [% INCLUDE 'Documentation/controllers.tt' %]
-    [% INCLUDE 'Documentation/models.tt' %]
-    [% INCLUDE 'Documentation/changelog.tt' %]
-    [% INCLUDE 'Documentation/all_docs.tt' %]
+    [% TRY %][% INCLUDE 'Documentation/admin_guides.tt' %][% CATCH %][% END %]
+    [% TRY %][% INCLUDE 'Documentation/proxmox.tt' %][% CATCH %][% END %]
+    [% TRY %][% INCLUDE 'Documentation/controllers.tt' %][% CATCH %][% END %]
+    [% TRY %][% INCLUDE 'Documentation/models.tt' %][% CATCH %][% END %]
+    [% TRY %][% INCLUDE 'Documentation/changelog.tt' %][% CATCH %][% END %]
+    [% TRY %][% INCLUDE 'Documentation/all_docs.tt' %][% CATCH %][% END %]
 [% END %]
 
 [%# Admin/Developer/Debug sections %]
 [% IF display_role == 'Administrator' || display_role == 'Developer' || c.session.debug_mode == 1 %]
-    [% INCLUDE 'Documentation/system_info.tt' %]
+    [% TRY %][% INCLUDE 'Documentation/system_info.tt' %][% CATCH %][% END %]
 [% END %]
 
 [% # Recent Updates Section with direct changelog entries %]
