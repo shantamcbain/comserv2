@@ -2711,12 +2711,16 @@ sub _build_navigation_command_guide {
         }
     }
 
-    return "\n\nNavigation guide — when the user asks to go to a page, says "
-         . "'take me to [page]', or asks what links are available for a section, "
-         . "use the map below. "
-         . "If a section has multiple relevant links, list ALL of them so the user can choose. "
+    return "\n\nApplication sections and navigation guide:\n"
+         . "Use this map for TWO purposes:\n"
+         . "1. Navigation: when the user asks to go to a page or says 'take me to [page]', "
+         . "reply with the matching URL(s). List ALL links in the section when multiple apply.\n"
+         . "2. Content suggestions: when answering a question, proactively mention relevant "
+         . "application sections the user can visit for more information. "
+         . "For example, if asked about plants or pollinators, point to the Encyclopedia (ENCY) section. "
+         . "If asked about workshops, point to the Workshops section.\n"
          . "Only use URLs from this list; do not invent others. "
-         . "If no match exists, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
          . $guide;
 }
 
