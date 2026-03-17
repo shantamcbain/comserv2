@@ -989,7 +989,10 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage) {
-        // Auto-select model based on query complexity (unless user manually chose)
+        // Classify query complexity to decide PROVIDER (ollama vs grok).
+        // For Ollama, we do NOT override the model — the server's _select_model_for_context
+        // already picks the best installed model per agent context.
+        // We only specify a model when the user manually chose one, or for Grok (where model matters).
         let effectiveProvider = state.selectedProvider || 'ollama';
         let autoTier = null;
         if (!state.userModelOverride) {
@@ -1002,16 +1005,20 @@
             }
         }
 
-        // Parse provider|model format (e.g. "grok|grok-2-latest" or "ollama")
+        // Parse provider|model format (e.g. "grok|grok-3-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
-        const modelName = providerParts[1] || null;
+        // Only pass a model name for Grok (client-chosen) or explicit user overrides.
+        // For Ollama without user override, let the server select the best model.
+        const modelName = (state.userModelOverride || providerName === 'grok')
+            ? (providerParts[1] || null)
+            : null;
 
-        // Update loading message to show which model/tier is being used
+        // Update loading message to show which tier is being used
         if (autoTier) {
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
-            const mName = modelName || providerName;
-            if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + tierLabel + ': ' + mName + ')</small>';
+            const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
+            if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
         // Build request payload with page context and agent info
