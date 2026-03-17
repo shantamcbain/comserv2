@@ -1,154 +1,102 @@
-[% META title = 'Bee Health Monitoring System' %]
+[% META title = "Bee Health Monitoring System" %]
+[% PageVersion = 'Apiary/bee_health.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-<div class="container">
-    <div class="row">
-        <div class="col-md-12">
-            <h1>Bee Health Monitoring System</h1>
-            <p class="lead">Welcome to the Bee Health Monitoring System. This system helps beekeepers monitor and maintain the health of their colonies.</p>
-            
-            <div class="alert alert-info">
-                <strong>Note:</strong> This system is currently under development. More features will be added soon.
-            </div>
-        </div>
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Bee Health Monitoring System</h1>
+        <p class="page-subtitle">Monitor and maintain the health of your colonies.</p>
     </div>
-    
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Common Bee Health Issues</h3>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="app-section">
+                <p>Welcome to the Bee Health Monitoring System. This system helps beekeepers identify, prevent, and treat common health threats to their colonies.</p>
+            </div>
+
+            <div class="app-section">
+                <h2>Common Bee Health Issues</h2>
+
+                <div class="content-section">
+                    <h3>Varroa Mites</h3>
+                    <p><strong>Signs:</strong> Deformed wings, reduced bee population, spotty brood pattern, visible mites on bees.</p>
+                    <p><strong>Monitoring:</strong> Sticky boards, alcohol wash, sugar roll, drone brood inspection.</p>
+                    <p><strong>Treatment Options:</strong> Formic acid, oxalic acid, thymol, Apivar, powdered sugar dusting.</p>
                 </div>
-                <div class="card-body">
-                    <div class="accordion" id="healthAccordion">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#varroaCollapse">
-                                        Varroa Mites
-                                    </button>
-                                </h5>
-                            </div>
-                            <div id="varroaCollapse" class="collapse">
-                                <div class="card-body">
-                                    <p><strong>Signs:</strong> Deformed wings, reduced bee population, spotty brood pattern, visible mites on bees</p>
-                                    <p><strong>Monitoring:</strong> Sticky boards, alcohol wash, sugar roll, drone brood inspection</p>
-                                    <p><strong>Treatment Options:</strong> Formic acid, oxalic acid, thymol, apivar, powdered sugar dusting</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#afbCollapse">
-                                        American Foulbrood (AFB)
-                                    </button>
-                                </h5>
-                            </div>
-                            <div id="afbCollapse" class="collapse">
-                                <div class="card-body">
-                                    <p><strong>Signs:</strong> Sunken, perforated cappings, ropey dead brood, foul odor</p>
-                                    <p><strong>Monitoring:</strong> Visual inspection, AFB test kits</p>
-                                    <p><strong>Treatment:</strong> Antibiotics (with veterinary prescription), burning infected equipment</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#nosemaCollapse">
-                                        Nosema
-                                    </button>
-                                </h5>
-                            </div>
-                            <div id="nosemaCollapse" class="collapse">
-                                <div class="card-body">
-                                    <p><strong>Signs:</strong> Dysentery, weak colonies, reduced honey production</p>
-                                    <p><strong>Monitoring:</strong> Microscopic examination, field symptoms</p>
-                                    <p><strong>Treatment:</strong> Fumagilin-B, good ventilation, strong colonies</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#shbCollapse">
-                                        Small Hive Beetle
-                                    </button>
-                                </h5>
-                            </div>
-                            <div id="shbCollapse" class="collapse">
-                                <div class="card-body">
-                                    <p><strong>Signs:</strong> Adult beetles in hive, slimed frames, fermented honey</p>
-                                    <p><strong>Monitoring:</strong> Visual inspection, beetle traps</p>
-                                    <p><strong>Treatment:</strong> Beetle traps, maintaining strong colonies, ground drench for pupae</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
+                <div class="content-section">
+                    <h3>American Foulbrood (AFB)</h3>
+                    <p><strong>Signs:</strong> Sunken, perforated cappings; ropey dead brood; foul odor.</p>
+                    <p><strong>Monitoring:</strong> Visual inspection, AFB test kits.</p>
+                    <p><strong>Treatment:</strong> Report to local authorities immediately. Antibiotics with veterinary prescription; burning infected equipment may be required.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3>Nosema</h3>
+                    <p><strong>Signs:</strong> Dysentery (spotting on hive exterior), weak colonies, reduced honey production.</p>
+                    <p><strong>Monitoring:</strong> Microscopic examination of gut contents; field symptoms.</p>
+                    <p><strong>Treatment:</strong> Fumagilin-B (where available), good ventilation, maintaining strong colonies.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3>Small Hive Beetle</h3>
+                    <p><strong>Signs:</strong> Adult beetles in hive, slimed frames, fermented honey.</p>
+                    <p><strong>Monitoring:</strong> Visual inspection, beetle traps.</p>
+                    <p><strong>Treatment:</strong> Beetle traps, maintaining strong colonies that police the hive, ground drench for pupae.</p>
                 </div>
             </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Preventative Measures</h3>
-                </div>
-                <div class="card-body">
-                    <ul class="list-group">
-                        <li class="list-group-item">Maintain strong colonies</li>
-                        <li class="list-group-item">Regular hive inspections</li>
-                        <li class="list-group-item">Good apiary hygiene</li>
-                        <li class="list-group-item">Regular comb replacement</li>
-                        <li class="list-group-item">Proper nutrition and diverse forage</li>
-                        <li class="list-group-item">Genetic resistance through queen selection</li>
-                        <li class="list-group-item">Integrated Pest Management (IPM)</li>
-                        <li class="list-group-item">Proper ventilation and moisture control</li>
+
+            <div class="app-section">
+                <h2>Preventative Measures</h2>
+                <div class="content-section">
+                    <ul>
+                        <li>Maintain strong, populous colonies</li>
+                        <li>Regular and thorough hive inspections</li>
+                        <li>Good apiary hygiene — clean equipment, replace old comb</li>
+                        <li>Proper nutrition — diverse, abundant forage</li>
+                        <li>Genetic resistance through thoughtful queen selection</li>
+                        <li>Integrated Pest Management (IPM) practices</li>
+                        <li>Proper ventilation and moisture control</li>
                     </ul>
                 </div>
             </div>
-            
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Monitoring Tools</h3>
-                </div>
-                <div class="card-body">
-                    <p>Regular monitoring is essential for maintaining bee health. Use these tools:</p>
+
+            <div class="app-section">
+                <h2>Monitoring Tools</h2>
+                <div class="content-section">
+                    <p>Regular monitoring is essential. Use these tools to stay ahead of health issues:</p>
                     <ul>
-                        <li>Sticky boards for Varroa monitoring</li>
-                        <li>Alcohol wash kit</li>
+                        <li>Sticky boards for Varroa mite drop counts</li>
+                        <li>Alcohol wash kit (most accurate for live mite loads)</li>
                         <li>Sugar roll test equipment</li>
-                        <li>Microscope for Nosema detection</li>
+                        <li>Microscope for Nosema spore detection</li>
                         <li>Hive scale for monitoring weight changes</li>
                         <li>Temperature and humidity sensors</li>
-                        <li>Record keeping system</li>
+                        <li>Consistent record keeping system</li>
                     </ul>
-                    <p><strong>Coming Soon:</strong> Digital health monitoring system</p>
                 </div>
             </div>
-            
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Bee Pasture Resources</h3>
-                </div>
-                <div class="card-body">
-                    <p>Proper nutrition is essential for bee health. Access our database of bee forage plants:</p>
-                    <a href="/ENCY/BeePastureView" class="btn btn-success">View Bee Pasture Plants</a>
+
+            <div class="app-section">
+                <h2>Bee Pasture and Nutrition</h2>
+                <div class="content-section">
+                    <p>Proper nutrition is the foundation of immune health in bees. Access our database of bee forage plants to plan your pasture and fill seasonal gaps.</p>
+                    <p><a href="/BMaster/bee_pasture" class="btn btn-primary">View Bee Pasture Plants</a></p>
                 </div>
             </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/Apiary" class="btn btn-secondary">Back to Apiary Management</a>
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
         </div>
     </div>
-    
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Return to Apiary Management</h3>
-                </div>
-                <div class="card-body">
-                    <a href="/Apiary" class="btn btn-primary">Back to Apiary Management</a>
-                </div>
-            </div>
-        </div>
-    </div>
+
 </div>

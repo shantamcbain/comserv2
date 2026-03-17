@@ -141,7 +141,7 @@
                     </div>
                 </div>
                 
-            [% DEFAULT %]
+            [% CASE %]
                 <div class="faq-message">
                     <p>FAQs for this category are coming soon. Please check back later or contact support if you have specific questions.</p>
                 </div>
