@@ -50,11 +50,15 @@ const AIUtils = {
                 // Markdown link: [label](url)
                 const label = this.escapeHtml(match[1]);
                 const url   = this.escapeHtml(match[2]);
-                result += `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+                const sameOrigin = url.startsWith(window.location.origin + '/') || url.startsWith('/');
+                const target = sameOrigin ? '_self' : '_blank';
+                result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${label}</a>`;
             } else {
                 // Bare URL
                 const url = this.escapeHtml(match[3]);
-                result += `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+                const sameOrigin = url.startsWith(window.location.origin + '/');
+                const target = sameOrigin ? '_self' : '_blank';
+                result += `<a href="${url}" target="${target}" rel="noopener noreferrer">${url}</a>`;
             }
             lastIndex = TOKEN_RE.lastIndex;
         }
