@@ -415,7 +415,7 @@
                         [% category = categories.$category_key %]
                         <option value="[% category_key %]"
                                 [% IF c.req.param('category') == category_key %]selected[% END %]>
-                            [% category.title || category_key | ucfirst %]
+                            [% category.title || category_key.ucfirst %]
                         </option>
                     [% END %]
                 </select>
@@ -598,7 +598,7 @@
                 <div class="container-header" onclick="toggleContainer(this)">
                     <h2>
                         [% IF category.icon %]<i class="[% category.icon %]"></i> [% END %]
-                        [% category.title || category_key | ucfirst %]
+                        [% category.title || category_key.ucfirst %]
                         <span class="badge">[% accessible_pages.size %]</span>
                     </h2>
                     <span class="toggle-icon"></span>

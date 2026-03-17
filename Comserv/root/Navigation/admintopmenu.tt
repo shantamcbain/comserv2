@@ -25,6 +25,7 @@
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
+                <a href="/admin/hardware_monitor"><i class="icon-server"></i>Hardware Monitor</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
                 <a href='/ProxyManager'><i class="icon-proxy"></i>Proxy Manager</a>
                 <a href='/admin/view_log'><i class="icon-view"></i>View Log</a>
@@ -169,6 +170,7 @@
             <div class="submenu">
                 <a href="/admin/logging"><i class="icon-log"></i>Logging Administration</a>
                 <a href="/admin/logging/audit"><i class="icon-status"></i>Log Audit &amp; Health</a>
+                <a href="/admin/hardware_monitor"><i class="icon-server"></i>Hardware Monitor</a>
                 <a href="/log"><i class="icon-history"></i>Activity Logs (Old)</a>
                 <a href="/admin/view_log"><i class="icon-view"></i>View App Log (Old)</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Pull from Git</a>

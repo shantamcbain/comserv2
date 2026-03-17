@@ -35,20 +35,20 @@
 <h2>Theme Variables</h2>
 
 <div class="theme-preview" style="
-    background-color: [% variables.'background-color' %];
-    color: [% variables.'text-color' %];
+    background-color: [% variables.item('background-color') %];
+    color: [% variables.item('text-color') %];
     padding: 20px;
-    border: 1px solid [% variables.'border-color' %];
+    border: 1px solid [% variables.item('border-color') %];
     margin-bottom: 20px;
 ">
-    <h3 style="color: [% variables.'text-color' %];">Theme Preview</h3>
+    <h3 style="color: [% variables.item('text-color') %];">Theme Preview</h3>
     <p>This is a sample text in the theme's colors.</p>
-    <a href="#" style="color: [% variables.'link-color' %];">Sample Link</a>
+    <a href="#" style="color: [% variables.item('link-color') %];">Sample Link</a>
     <div style="margin-top: 10px;">
         <button style="
-            background-color: [% variables.'button-bg' %];
-            color: [% variables.'button-text' %];
-            border: 1px solid [% variables.'button-border' %];
+            background-color: [% variables.item('button-bg') %];
+            color: [% variables.item('button-text') %];
+            border: 1px solid [% variables.item('button-border') %];
             padding: 5px 10px;
         ">Sample Button</button>
     </div>
