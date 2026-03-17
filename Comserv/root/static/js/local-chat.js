@@ -88,7 +88,8 @@
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
             
-            // Check if any URL pattern matches the current pathname
+            // Check if any URL pattern matches the current pathname (case-insensitive)
+            const pathLower = pathname.toLowerCase();
             for (const pattern of agent.url_patterns) {
                 let isMatch = false;
                 
@@ -96,9 +97,9 @@
                     // Wildcard matches everything (use as fallback)
                     isMatch = true;
                 } else {
-                    // Check if pattern matches pathname
-                    // Support both exact match and prefix match
-                    isMatch = pathname === pattern || pathname.startsWith(pattern);
+                    // Exact match or prefix match, case-insensitive
+                    const patLower = pattern.toLowerCase();
+                    isMatch = pathLower === patLower || pathLower.startsWith(patLower);
                 }
                 
                 if (isMatch) {
