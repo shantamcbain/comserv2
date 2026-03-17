@@ -400,7 +400,7 @@ sub generate :Local :Args(0) {
     }
 
     # Role-based capability injection into system prompt
-    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider);
+    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
     if ($role_prompt && $system) {
         $system .= "\n\n" . $role_prompt;
     } elsif ($role_prompt) {
@@ -1174,6 +1174,8 @@ sub chat :Local :Args(0) {
     my $history = $json_data->{history} || [];
     my $conversation_id = $json_data->{conversation_id} || $c->request->params->{conversation_id};
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
+    my $chat_page_path  = $json_data->{page_path}  || $c->request->params->{page_path}  || '';
+    my $chat_page_title = $json_data->{page_title} || $c->request->params->{page_title} || '';
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1231,7 +1233,7 @@ sub chat :Local :Args(0) {
     my $is_grok_model = ($model && $model =~ /^grok/i) ? 1 : 0;
 
     # Role-based capability injection into messages (insert as system message)
-    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama');
+    my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
@@ -2509,19 +2511,24 @@ sub start_server :Local :Args(0) {
 =head2 _build_role_system_prompt
 
 Build a role-aware addition to the system prompt granting or restricting
-capabilities based on the user's session roles.
+capabilities based on the user's session roles and current page context.
 
   admin/developer/editor  → full internal API access (workshop, ency, todo, project)
-  normal user             → general help
-  guest                   → HelpDesk, navigation, documentation only
+                            + page-specific navigation guidance with edit permissions
+  normal user             → general help + page-specific read/interact guidance
+  guest                   → HelpDesk, navigation, documentation only (read-only)
+
+Optional page_path and page_title parameters provide context-aware navigation hints.
 
 =cut
 
 sub _build_role_system_prompt {
-    my ($self, $c, $roles, $provider) = @_;
+    my ($self, $c, $roles, $provider, $page_path, $page_title) = @_;
 
-    $roles   //= [];
-    $provider //= 'ollama';
+    $roles     //= [];
+    $provider  //= 'ollama';
+    $page_path //= '';
+    $page_title //= '';
 
     my $base_url = '';
     eval { $base_url = $c->uri_for('/') . ''; $base_url =~ s{/$}{}; };
@@ -2530,9 +2537,12 @@ sub _build_role_system_prompt {
     my $is_admin = grep { /^(admin|developer|editor)$/i } @role_list;
     my $is_guest = !@role_list || (grep { /guest/i } @role_list);
 
+    my $role_tier  = $is_admin ? 'admin' : ($is_guest ? 'guest' : 'user');
+    my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
+    my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
+
     if ($is_admin) {
         if ($provider eq 'grok') {
-            # Grok can describe what APIs exist; web search may supplement
             return "You are assisting an admin user. "
                  . "The application has these internal data sources (you cannot call them directly, but can tell the user how to access them):\n"
                  . "- Active workshops: $base_url/workshop/list_active\n"
@@ -2540,14 +2550,17 @@ sub _build_role_system_prompt {
                  . "- Project todos: $base_url/todo/list?project_id=ID\n"
                  . "- Projects: $base_url/project/list\n"
                  . "If asked about live application data (workshops, projects, tasks), tell the user to visit those URLs or enable web search. "
-                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n";
+                 . "Do NOT invent data. Web search may be available if the user has enabled it above.\n"
+                 . $page_nav
+                 . $nav_guide;
         } else {
-            # Ollama has NO network access — never pretend to call APIs
             return "You are assisting an admin user. "
                  . "You have NO ability to call external URLs or databases. "
                  . "If the user asks about live data such as workshops, projects, or tasks, "
                  . "tell them: 'I can't look that up directly — please check the application pages or switch to Grok with web search enabled.' "
-                 . "Never invent or simulate API results.";
+                 . "Never invent or simulate API results."
+                 . $page_nav
+                 . $nav_guide;
         }
     }
 
@@ -2561,7 +2574,9 @@ sub _build_role_system_prompt {
              . "and information from public documentation only. "
              . "Do NOT access private data or APIs. "
              . "If the user needs account-specific help, ask them to log in."
-             . $guest_no_internet;
+             . $guest_no_internet
+             . $page_nav
+             . $nav_guide;
     }
 
     my $no_internet = ($provider ne 'grok')
@@ -2573,7 +2588,235 @@ sub _build_role_system_prompt {
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer based on the page content and documentation provided. "
          . "Do not invent data; if you don't know something, say so."
-         . $no_internet;
+         . $no_internet
+         . $page_nav
+         . $nav_guide;
+}
+
+=head2 _build_navigation_command_guide
+
+Build a role-filtered navigation command guide appended to every system prompt.
+When a user says "take me to X" or asks how to navigate to a section, the AI
+uses this map to reply with the correct URL instead of inventing one.
+
+  $base_url - application base URL (no trailing slash)
+  $role     - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_navigation_command_guide {
+    my ($self, $base_url, $role) = @_;
+
+    # Each section: [ section_name, min_role, [ [label, path], ... ] ]
+    # min_role: 'guest' | 'user' | 'admin'
+    my @sections = (
+        [ 'Home', 'guest', [
+            [ 'Main menu / home',           '/'                         ],
+        ]],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
+        ]],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        ]],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
+        ]],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
+            [ 'CSS themes',                 '/Documentation/CssThemes'  ],
+            [ 'User guides',                '/documentation?category=user_guides' ],
+            [ 'Tutorials',                  '/documentation?category=tutorials'   ],
+            [ 'Changelog',                  '/documentation?category=changelog'   ],
+        ]],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Plants',                     '/ENCY/plants'              ],
+            [ 'Animals',                    '/ENCY/animals'             ],
+            [ 'Birds',                      '/ENCY/birds'               ],
+            [ 'Insects',                    '/ENCY/insects'             ],
+            [ 'Fungi',                      '/ENCY/fungi'               ],
+            [ 'Recipes',                    '/ENCY/recipes'             ],
+            [ 'My encyclopedia entries',    '/ENCY/my_entries'          ],
+        ]],
+        [ 'HelpDesk', 'guest', [
+            [ 'HelpDesk home',              '/HelpDesk'                 ],
+            [ 'Submit a ticket',            '/HelpDesk/ticket/new'      ],
+            [ 'Check ticket status',        '/HelpDesk/ticket/status'   ],
+            [ 'Knowledge base',             '/HelpDesk/kb'              ],
+            [ 'Contact',                    '/HelpDesk/contact'         ],
+        ]],
+        [ 'AI Assistant', 'guest', [
+            [ 'AI chat',                    '/ai'                       ],
+            [ 'AI query form',              '/ai/query_form'            ],
+        ]],
+        [ 'AI Assistant (logged in)', 'user', [
+            [ 'Manage API keys',            '/ai/manage_api_keys'       ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+        ]],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
+        ]],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
+        ]],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
+        ]],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
+        ]],
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'View log',                   '/admin/view_log'           ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Infrastructure',             '/admin/infrastructure'     ],
+            [ 'Theme management',           '/admin/theme'              ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'AI configuration',           '/admin/ai/configure'       ],
+            [ 'Network devices',            '/admin/network_devices'    ],
+            [ 'Site settings',              '/site'                     ],
+            [ 'Log',                        '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+    );
+
+    my %role_rank = ( guest => 0, user => 1, admin => 2 );
+    my $user_rank = $role_rank{$role} // 0;
+
+    my $guide = '';
+    for my $section (@sections) {
+        my ($name, $min_role, $links) = @$section;
+        next if ($role_rank{$min_role} // 0) > $user_rank;
+        $guide .= "[$name]\n";
+        for my $link (@$links) {
+            $guide .= "  - $link->[0]: $base_url$link->[1]\n";
+        }
+    }
+
+    return "\n\nApplication sections and navigation guide:\n"
+         . "Use this map for TWO purposes:\n"
+         . "1. Navigation: when the user asks to go to a page or says 'take me to [page]', "
+         . "reply with the matching URL(s). List ALL links in the section when multiple apply.\n"
+         . "2. Content suggestions: when answering a question, proactively mention relevant "
+         . "application sections the user can visit for more information. "
+         . "For example, if asked about plants or pollinators, point to the Encyclopedia (ENCY) section. "
+         . "If asked about workshops, point to the Workshops section.\n"
+         . "Only use URLs from this list; do not invent others. "
+         . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . $guide;
+}
+
+=head2 _build_page_navigation_hint
+
+Build a page-specific navigation hint to append to the system prompt.
+Returns an empty string when no relevant context can be determined.
+
+  $base_url  - application base URL (no trailing slash)
+  $page_path - URL path of the page the user is currently on
+  $page_title - display title of the current page
+  $role      - 'admin', 'user', or 'guest'
+
+=cut
+
+sub _build_page_navigation_hint {
+    my ($self, $base_url, $page_path, $page_title, $role) = @_;
+
+    return '' unless $page_path;
+
+    my $context_label = $page_title ? "\"$page_title\" ($page_path)" : $page_path;
+    my $hint = "\n\nThe user is currently viewing: $context_label.\n";
+
+    if ($page_path =~ m{/Documentation}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Documentation section (admin):\n"
+                   . "- You may edit or create documentation pages.\n"
+                   . "- Related sections: Daily Plans, Master Plan, Architecture docs.\n"
+                   . "- To manage plans: $base_url/Documentation/DailyPlan\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Documentation section:\n"
+                   . "- You can read documentation pages and follow internal links.\n"
+                   . "- To search the encyclopedia: $base_url/ency/search?q=TERM\n"
+                   . "- To view all docs: $base_url/Documentation\n";
+        } else {
+            $hint .= "Navigation context — Documentation section (guest):\n"
+                   . "- Public documentation is available for reading.\n"
+                   . "- Log in for full access and editing capabilities.\n";
+        }
+    } elsif ($page_path =~ m{/workshop}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Workshops (admin):\n"
+                   . "- You can create, edit, and manage workshop entries.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n"
+                   . "- All workshops: $base_url/workshop/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Workshops:\n"
+                   . "- You can view and participate in workshops.\n"
+                   . "- Active workshops: $base_url/workshop/list_active\n";
+        } else {
+            $hint .= "Navigation context — Workshops (guest):\n"
+                   . "- Public workshop information is available for viewing.\n"
+                   . "- Log in to participate or manage workshops.\n";
+        }
+    } elsif ($page_path =~ m{/todo}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Todo / Task Management (admin):\n"
+                   . "- You can view, create, assign, and close tasks across all projects.\n"
+                   . "- All tasks: $base_url/todo/list\n"
+                   . "- Project-specific: $base_url/todo/list?project_id=ID\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Todo / Task Management:\n"
+                   . "- You can view tasks assigned to you and update their status.\n"
+                   . "- Your tasks: $base_url/todo/list\n";
+        } else {
+            $hint .= "Navigation context — Tasks (guest):\n"
+                   . "- Log in to view and manage tasks.\n";
+        }
+    } elsif ($page_path =~ m{/project}i) {
+        if ($role eq 'admin') {
+            $hint .= "Navigation context — Projects (admin):\n"
+                   . "- You can create, edit, and archive projects.\n"
+                   . "- All projects: $base_url/project/list\n";
+        } elsif ($role eq 'user') {
+            $hint .= "Navigation context — Projects:\n"
+                   . "- You can view projects you are a member of.\n"
+                   . "- Projects: $base_url/project/list\n";
+        } else {
+            $hint .= "Navigation context — Projects (guest):\n"
+                   . "- Log in to view project information.\n";
+        }
+    } elsif ($page_path =~ m{/ency}i) {
+        $hint .= "Navigation context — Encyclopedia:\n"
+                . "- Search for information: $base_url/ency/search?q=TERM\n";
+        $hint .= "- As an admin you can add and edit encyclopedia entries.\n" if $role eq 'admin';
+    } elsif ($page_path =~ m{/ai}i) {
+        $hint .= "Navigation context — AI Assistant:\n"
+               . "- You are currently in the AI chat interface.\n";
+        if ($role eq 'admin') {
+            $hint .= "- Admin: manage AI models at $base_url/ai/models\n"
+                   . "- Manage API keys at $base_url/ai/manage_api_keys\n";
+        }
+    }
+
+    return $hint;
 }
 
 =head2 _select_model_for_context
