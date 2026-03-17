@@ -16,14 +16,7 @@
     4. Anything else    - treat as relative static path under /static/
 %]
 
-[% MACRO ency_img_src(val) BLOCK %][%
-    IF val && val.length;
-        IF val.match('^https?://'); val;
-        ELSIF val.match('^/'); c.uri_for('/file/fs_preview', {path => val});
-        ELSE; c.uri_for('/static', [val]);
-        END;
-    END;
-%][% END %]
+[% MACRO ency_img_src(val) BLOCK %][%- IF val && val.length -%][%- IF val.match('^https?://') -%][%- val -%][%- ELSIF val.match('^/') -%][%- c.uri_for('/file/fs_preview', {path => val}) -%][%- ELSE -%][%- c.uri_for('/static', [val]) -%][%- END -%][%- END -%][% END %]
 
 [% MACRO ency_img_tag(val, w, h) BLOCK %]
 [% SET src = ency_img_src(val) %]
