@@ -56,7 +56,7 @@
                             <tr>
                                 <td>
                                     <strong>Botanical Name:</strong> [% link.botanical_name | html %]<br>
-                                    <strong>Common Name:</strong> [% link.common_names | html %]<br>
+                                    <strong>Common Name:</strong> [% link.common_names %]<br>
                                     <strong>Forage:</strong> [% link.apis | html %]<br>
                                     <strong>Nectar:</strong> [% link.nectar | html %]<br>
                                     <strong>Pollen:</strong> [% link.pollen | html %]<br>
