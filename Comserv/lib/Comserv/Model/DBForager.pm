@@ -250,15 +250,13 @@ sub get_herbal_data {
 sub get_bee_forage_plants {
     my ($self) = @_;
 
-    # Search for herbs that have apis, nectar, or pollen information
+    # Only return herbs with a forage category (apis) or non-zero nectar or pollen.
+    # Uses literal SQL to avoid DBIC/SQL::Abstract duplicate-hash-key issues and
+    # to work correctly with both MySQL and SQLite backends.
     my $bee_plants = $self->schema->resultset('Herb')->search(
-        {
-            -or => [
-                'apis' => { '!=' => '', '!=' => undef },
-                'nectar' => { '!=' => '', '!=' => undef },
-                'pollen' => { '!=' => '', '!=' => undef }
-            ]
-        },
+        \[ "( apis IS NOT NULL AND apis <> '' AND apis <> '0' )
+             OR ( nectar IS NOT NULL AND nectar <> '' AND nectar <> '0' AND nectar > 0 )
+             OR ( pollen IS NOT NULL AND pollen <> '' AND pollen <> '0' AND pollen > 0 )" ],
         {
             order_by => 'botanical_name',
             columns => [qw(record_id botanical_name common_names apis nectar pollen image)]
