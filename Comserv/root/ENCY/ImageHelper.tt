@@ -1,19 +1,19 @@
 [%#
-  ENCY/ImageHelper.tt — smart image URL resolution macro + file picker widget.
+  ENCY/ImageHelper.tt - smart image URL resolution macro + file picker widget.
 
   INCLUDE ONCE at the top of any ENCY template that displays or edits herb images:
-    [% INCLUDE 'ENCY/ImageHelper.tt' %]
+    INCLUDE 'ENCY/ImageHelper.tt'   (wrap in TT tags when using)
 
   MACROS PROVIDED:
-    ency_img_src(val)          — returns the display URL for the image column value
-    ency_img_tag(val, w, h)    — renders <img> tag with resolved src
-    ency_img_picker(field, val) — renders edit widget: text field + file picker dropdown
+    ency_img_src(val)           - returns the display URL for the image column value
+    ency_img_tag(val, w, h)     - renders img tag with resolved src
+    ency_img_picker(field, val) - renders edit widget: text field + file picker dropdown
 
   RESOLUTION ORDER for ency_img_src(val):
-    1. Empty/null        → empty string (no image)
-    2. http:// https://  → use directly (external URL)
-    3. Starts with /     → stream via /file/fs_preview (NFS or server filesystem path)
-    4. Anything else     → treat as relative static path under /static/
+    1. Empty/null       - empty string (no image)
+    2. http:// https:// - use directly (external URL)
+    3. Starts with /    - stream via /file/fs_preview (NFS or server filesystem path)
+    4. Anything else    - treat as relative static path under /static/
 %]
 
 [% MACRO ency_img_src(val) BLOCK %]
