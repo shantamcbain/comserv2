@@ -311,15 +311,8 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Entered bee_pasture_view method');
     push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
 
-    # Fetch bee forage plants data
+    # Fetch bee forage plants — only herbs with a forage category or non-zero nectar/pollen
     my $bee_plants = $c->model('DBForager')->get_bee_forage_plants();
-
-    # If no specific bee forage plants method exists, use the general herbal data
-    if (!$bee_plants || !@$bee_plants) {
-        $bee_plants = $c->model('DBForager')->get_herbal_data();
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
-        push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
-    }
 
     # Pass the data to the template
     $c->stash(
