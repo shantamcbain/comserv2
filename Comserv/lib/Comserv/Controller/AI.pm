@@ -2607,44 +2607,117 @@ uses this map to reply with the correct URL instead of inventing one.
 sub _build_navigation_command_guide {
     my ($self, $base_url, $role) = @_;
 
-    my @public = (
-        [ 'home / main menu',       "$base_url/"                          ],
-        [ 'AI assistant / chat',    "$base_url/ai"                        ],
-        [ 'documentation',          "$base_url/Documentation"             ],
-        [ 'daily plan',             "$base_url/Documentation/DailyPlan"   ],
-        [ 'encyclopedia / search',  "$base_url/ency/search?q=TERM"        ],
-        [ 'workshops (active)',     "$base_url/workshop/list_active"       ],
-        [ 'helpdesk',               "$base_url/helpdesk"                  ],
+    # Each section: [ section_name, min_role, [ [label, path], ... ] ]
+    # min_role: 'guest' | 'user' | 'admin'
+    my @sections = (
+        [ 'Home', 'guest', [
+            [ 'Main menu / home',           '/'                         ],
+        ]],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
+        ]],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        ]],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
+        ]],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
+            [ 'CSS themes',                 '/Documentation/CssThemes'  ],
+            [ 'User guides',                '/documentation?category=user_guides' ],
+            [ 'Tutorials',                  '/documentation?category=tutorials'   ],
+            [ 'Changelog',                  '/documentation?category=changelog'   ],
+        ]],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Plants',                     '/ENCY/plants'              ],
+            [ 'Animals',                    '/ENCY/animals'             ],
+            [ 'Birds',                      '/ENCY/birds'               ],
+            [ 'Insects',                    '/ENCY/insects'             ],
+            [ 'Fungi',                      '/ENCY/fungi'               ],
+            [ 'Recipes',                    '/ENCY/recipes'             ],
+            [ 'My encyclopedia entries',    '/ENCY/my_entries'          ],
+        ]],
+        [ 'HelpDesk', 'guest', [
+            [ 'HelpDesk home',              '/HelpDesk'                 ],
+            [ 'Submit a ticket',            '/HelpDesk/ticket/new'      ],
+            [ 'Check ticket status',        '/HelpDesk/ticket/status'   ],
+            [ 'Knowledge base',             '/HelpDesk/kb'              ],
+            [ 'Contact',                    '/HelpDesk/contact'         ],
+        ]],
+        [ 'AI Assistant', 'guest', [
+            [ 'AI chat',                    '/ai'                       ],
+            [ 'AI query form',              '/ai/query_form'            ],
+        ]],
+        [ 'AI Assistant (logged in)', 'user', [
+            [ 'Manage API keys',            '/ai/manage_api_keys'       ],
+        ]],
+        [ 'AI Assistant (admin)', 'admin', [
+            [ 'Manage AI models',           '/ai/models'                ],
+            [ 'AI server status',           '/ai/check_status'          ],
+        ]],
+        [ 'Tasks / Todos', 'user', [
+            [ 'Todo list',                  '/todo'                     ],
+            [ 'Todos by day',               '/todo?filter=day'          ],
+            [ 'Todos by week',              '/todo?filter=week'         ],
+            [ 'Todos by month',             '/todo?filter=month'        ],
+            [ 'Add a todo',                 '/todo/addtodo'             ],
+        ]],
+        [ 'Projects', 'user', [
+            [ 'Projects home',              '/project'                  ],
+            [ 'Add a project',              '/project/addproject'       ],
+        ]],
+        [ 'User account', 'guest', [
+            [ 'Login',                      '/user/login'               ],
+            [ 'Create account',             '/user/create_account'      ],
+            [ 'Forgot password',            '/user/forgot_password'     ],
+        ]],
+        [ 'User account (logged in)', 'user', [
+            [ 'My profile',                 '/user/profile'             ],
+            [ 'Account settings',           '/user/settings'            ],
+            [ 'Logout',                     '/user/logout'              ],
+        ]],
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'View log',                   '/admin/view_log'           ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Infrastructure',             '/admin/infrastructure'     ],
+            [ 'Theme management',           '/admin/theme'              ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'AI configuration',           '/admin/ai/configure'       ],
+            [ 'Network devices',            '/admin/network_devices'    ],
+            [ 'Site settings',              '/site'                     ],
+            [ 'Log',                        '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
     );
 
-    my @user_extra = (
-        [ 'my tasks / todos',       "$base_url/todo/list"                 ],
-        [ 'projects',               "$base_url/project/list"              ],
-        [ 'API keys',               "$base_url/ai/manage_api_keys"        ],
-    );
+    my %role_rank = ( guest => 0, user => 1, admin => 2 );
+    my $user_rank = $role_rank{$role} // 0;
 
-    my @admin_extra = (
-        [ 'all workshops',          "$base_url/workshop/list"             ],
-        [ 'project todos (by id)',  "$base_url/todo/list?project_id=ID"   ],
-        [ 'AI models',              "$base_url/ai/models"                 ],
-        [ 'admin panel',            "$base_url/admin"                     ],
-        [ 'site settings',          "$base_url/site"                      ],
-        [ 'user management',        "$base_url/user/list"                 ],
-        [ 'logs',                   "$base_url/log"                       ],
-    );
+    my $guide = '';
+    for my $section (@sections) {
+        my ($name, $min_role, $links) = @$section;
+        next if ($role_rank{$min_role} // 0) > $user_rank;
+        $guide .= "[$name]\n";
+        for my $link (@$links) {
+            $guide .= "  - $link->[0]: $base_url$link->[1]\n";
+        }
+    }
 
-    my @routes = @public;
-    push @routes, @user_extra  if $role eq 'user' || $role eq 'admin';
-    push @routes, @admin_extra if $role eq 'admin';
-
-    my $list = join('', map { "- $_->[0]: $_->[1]\n" } @routes);
-
-    return "\n\nNavigation guide — when the user asks to go to a page or says "
-         . "'take me to [page]', respond with the matching URL below. "
-         . "Only use these URLs; do not invent others. "
-         . "If no match is found, say: "
-         . "'I don't know that page — please check $base_url for available options.'\n"
-         . $list;
+    return "\n\nNavigation guide — when the user asks to go to a page, says "
+         . "'take me to [page]', or asks what links are available for a section, "
+         . "use the map below. "
+         . "If a section has multiple relevant links, list ALL of them so the user can choose. "
+         . "Only use URLs from this list; do not invent others. "
+         . "If no match exists, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . $guide;
 }
 
 =head2 _build_page_navigation_hint
