@@ -52,6 +52,56 @@
             console.warn('Failed to persist conversation ID:', e);
         }
     }
+
+    // Save last 20 chat messages to sessionStorage so they survive page navigation
+    function persistMessages() {
+        try {
+            const items = [];
+            document.querySelectorAll('#chat-messages .msg-wrapper').forEach(function(w) {
+                const isUser = w.classList.contains('msg-wrapper-user');
+                const el = w.querySelector('.message');
+                const lbl = w.querySelector('.msg-label');
+                if (!el) return;
+                items.push({
+                    role: isUser ? 'user' : 'ai',
+                    html: el.innerHTML,
+                    label: lbl ? lbl.textContent : ''
+                });
+            });
+            sessionStorage.setItem('chatMessages', JSON.stringify(items.slice(-20)));
+        } catch (e) { }
+    }
+
+    // Restore chat messages saved by persistMessages on the previous page
+    function restoreMessages() {
+        try {
+            const saved = sessionStorage.getItem('chatMessages');
+            if (!saved) return;
+            const items = JSON.parse(saved);
+            if (!items || !items.length) return;
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+            chatMessages.innerHTML = '';
+            const sep = document.createElement('div');
+            sep.className = 'message system-message';
+            sep.textContent = '— Previous conversation —';
+            chatMessages.appendChild(sep);
+            items.forEach(function(item) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper ' + (item.role === 'user' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
+                const label = document.createElement('div');
+                label.className = 'msg-label';
+                label.textContent = item.label || (item.role === 'user' ? 'You' : 'AI');
+                const el = document.createElement('div');
+                el.className = 'message ' + (item.role === 'user' ? 'user-message' : 'ai-message');
+                el.innerHTML = item.html;
+                wrapper.appendChild(label);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } catch (e) { }
+    }
     
     // Load agents configuration from JSON file
     function loadAgentsConfig() {
@@ -781,10 +831,17 @@
         chatButton.style.display = 'none';
         state.isOpen = true;
         
-        // Auto-reload messages if resuming a conversation
+        // Restore messages from previous page navigation (sessionStorage)
+        const chatMessages2 = document.getElementById('chat-messages');
+        const hasMessages2 = chatMessages2 && chatMessages2.querySelectorAll('.msg-wrapper').length > 0;
+        if (!hasMessages2) {
+            restoreMessages();
+        }
+
+        // Auto-reload messages if resuming a conversation (server-side history)
         if (state.currentConversationId) {
             const chatMessages = document.getElementById('chat-messages');
-            const hasMessages = chatMessages && chatMessages.children.length > 1;
+            const hasMessages = chatMessages && chatMessages.querySelectorAll('.msg-wrapper').length > 0;
             if (!hasMessages) {
                 loadConversation(state.currentConversationId);
             }
@@ -998,6 +1055,7 @@
                 
                 // Add AI response
                 addMessage(data.response, 'ai-message');
+                persistMessages();
 
                 // Append web search citations if returned
                 if (data.citations && data.citations.length > 0) {
@@ -1028,40 +1086,132 @@
                 addMessage(`Error: ${data.error || 'Failed to get response. Please try again.'}`, 'error-message');
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             clearTimeout(abortTimer);
-            // Remove loading message
             const loading = document.getElementById('ai-loading');
-            if (loading) {
-                loading.remove();
-            }
-            
+            if (loading) loading.remove();
+
             console.error('Error querying AI:', error);
             statusIndicator.textContent = 'AI Error';
             statusIndicator.className = 'chat-status error';
-            
-            const msg = error.name === 'AbortError'
-                ? `Request timed out after ${clientTimeoutMs / 1000}s. ${isOllama ? 'Ollama may be loading a large model — try a smaller model or wait and retry.' : 'The AI server may be busy or unavailable.'}`
-                : `Network error: ${error.message}. Please check console and try again.`;
-            addMessage(msg, 'error-message');
+
+            const isTimeout = error.name === 'AbortError';
+            const msg = isTimeout
+                ? 'Request timed out after ' + (clientTimeoutMs / 1000) + 's.'
+                    + (isOllama ? ' Ollama may be loading a large model.' : ' The AI server may be busy.')
+                : 'Network error: ' + error.message + '. Please try again.';
+
+            // Show error with a Retry button for timeouts
+            const chatMessages = document.getElementById('chat-messages');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg-wrapper msg-wrapper-ai';
+            const label = document.createElement('div');
+            label.className = 'msg-label';
+            label.textContent = 'System';
+            const errEl = document.createElement('div');
+            errEl.className = 'message error-message';
+            errEl.textContent = msg;
+            wrapper.appendChild(label);
+            wrapper.appendChild(errEl);
+            if (isTimeout) {
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'chat-retry-btn';
+                retryBtn.textContent = '↺ Retry';
+                retryBtn.onclick = function() {
+                    wrapper.remove();
+                    queryAI(prompt);
+                };
+                wrapper.appendChild(retryBtn);
+            }
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
     }
     
+    // Build a flat {label, url} navigation map from links embedded in the system prompt
+    function buildNavigationMap() {
+        const map = [];
+        const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
+        const re = /^[ \t]*-[ \t]+(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        let m;
+        while ((m = re.exec(prompt)) !== null) {
+            map.push({ label: m[1].trim().toLowerCase(), url: m[2].trim() });
+        }
+        return map;
+    }
+
+    // Try to resolve a navigation intent query to a list of {label,url} matches
+    function resolveNavIntent(rawQuery) {
+        const q = rawQuery
+            .replace(/^(open|go to|take me to|navigate to|show me|find|visit)\s+/i, '')
+            .replace(/[^\w\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+        if (!q || q.length < 2) return null;
+        const map = buildNavigationMap();
+        const words = q.split(/\s+/);
+        const exact  = map.filter(function(item) { return item.label === q; });
+        if (exact.length) return exact;
+        const starts = map.filter(function(item) { return item.label.startsWith(q) || q.startsWith(item.label); });
+        if (starts.length) return starts;
+        const partial = map.filter(function(item) {
+            return words.every(function(w) { return item.label.includes(w); })
+                || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
+        });
+        return partial.length ? partial : null;
+    }
+
+    // Navigation command regex
+    const NAV_RE = /^(open|go to|take me to|navigate to|show me|find|visit)\s+(.+)/i;
+
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
-        
-        if (message) {
-            // Add user message to chat immediately
-            addMessage(message, 'user-message');
-            
-            // Clear input
-            messageInput.value = '';
-            
-            // Query AI for response
-            queryAI(message);
+        if (!message) return;
+
+        // Ensure page context is ready so navigation map is populated
+        if (!state.pageContext) {
+            const ensureAgents = state.agentsConfig
+                ? Promise.resolve(state.agentsConfig)
+                : loadAgentsConfig();
+            ensureAgents.then(function() {
+                state.pageContext = detectPageContext();
+                sendMessage();
+            });
+            return;
         }
+
+        // Client-side navigation interception — no AI round-trip needed
+        const navMatch = message.match(NAV_RE);
+        if (navMatch) {
+            const matches = resolveNavIntent(message);
+            if (matches && matches.length === 1) {
+                addMessage(message, 'user-message');
+                messageInput.value = '';
+                persistMessages();
+                addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
+                persistMessages();
+                setTimeout(function() { window.location.href = matches[0].url; }, 600);
+                return;
+            } else if (matches && matches.length > 1) {
+                addMessage(message, 'user-message');
+                messageInput.value = '';
+                persistMessages();
+                const listMsg = 'Multiple pages match — which one did you mean?\n'
+                    + matches.slice(0, 8).map(function(m) { return '- [' + m.label + '](' + m.url + ')'; }).join('\n');
+                addMessage(listMsg, 'ai-message');
+                persistMessages();
+                return;
+            }
+            // No local match — fall through to AI
+        }
+
+        addMessage(message, 'user-message');
+        messageInput.value = '';
+        persistMessages();
+        queryAI(message);
     }
     
     // Function to add a message to the chat with sender label
@@ -1424,6 +1574,20 @@
                 z-index: 10;
             }
             .chat-resize-handle:hover { opacity: 1; }
+
+            .chat-retry-btn {
+                display: block;
+                margin-top: 6px;
+                padding: 4px 12px;
+                border: 1px solid var(--border-color);
+                border-radius: 4px;
+                background: var(--secondary-color);
+                color: var(--text-color);
+                cursor: pointer;
+                font-size: 0.85em;
+                font-family: inherit;
+            }
+            .chat-retry-btn:hover { opacity: 0.8; }
         `;
         document.head.appendChild(style);
     }
