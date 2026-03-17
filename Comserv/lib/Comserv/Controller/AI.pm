@@ -2836,11 +2836,18 @@ sub _select_model_for_context {
     $page_context //= 'general';
     $installed_models //= [];
 
-    # Build a quick lookup: short name → full model name
+    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
+    my $is_chat_model = sub {
+        my ($n) = @_;
+        return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+    };
+
+    # Build a quick lookup: short name → full model name (chat models only)
     my %installed;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
         next unless $name;
+        next unless $is_chat_model->($name);
         $installed{$name} = $name;
         (my $short = $name) =~ s/:.*$//;
         $installed{$short} = $name;
@@ -2848,22 +2855,27 @@ sub _select_model_for_context {
 
     # Preferred models per context (ordered: first match wins)
     my %context_prefs = (
-        chat      => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        helpdesk  => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        ency      => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
-        bmaster   => ['llama3.1', 'llama3', 'mistral', 'tinyllama'],
-        general   => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
-        code      => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker    => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'tinyllama', 'mistral'],
+        helpdesk    => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        ency        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
+        bmaster     => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral', 'tinyllama'],
+        csc         => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        general     => ['llama3.1', 'llama3', 'tinyllama', 'mistral'],
+        navigation  => ['tinyllama', 'llama3.1', 'llama3'],
+        simple      => ['tinyllama', 'llama3.1', 'llama3'],
+        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
+        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
+        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
     );
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk' if $ctx =~ /helpdesk/;
-    $ctx = 'code'     if $ctx =~ /code|developer/;
-    $ctx = 'ency'     if $ctx =~ /ency|beekeeping|bmast/;
-    $ctx = 'docker'   if $ctx =~ /docker/;
-    $ctx = 'general'  unless exists $context_prefs{$ctx};
+    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
+    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
+    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
+    $ctx = 'csc'        if $ctx =~ /^csc$/;
+    $ctx = 'ency'       if $ctx =~ /^ency$/;
+    $ctx = 'docker'     if $ctx =~ /docker/;
+    $ctx = 'general'    unless exists $context_prefs{$ctx};
 
     my $prefs = $context_prefs{$ctx} || $context_prefs{general};
 
@@ -2875,9 +2887,12 @@ sub _select_model_for_context {
         }
     }
 
-    # Fall back: default_model if installed, else first available, else hardcoded
-    return $default_model if $default_model && ($installed{$default_model} || grep { $_ eq $default_model } values %installed);
-    return (values %installed)[0] if %installed;
+    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
+    if ($default_model && $is_chat_model->($default_model)) {
+        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
+    }
+    my @chat_values = values %installed;
+    return $chat_values[0] if @chat_values;
     return 'llama3.1:latest';
 }
 
