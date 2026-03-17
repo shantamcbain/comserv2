@@ -157,8 +157,8 @@ sub COMPONENT {
             "DBForager: Using database driver: $driver (available: $driver_available)");
         
         my %driver_attrs = $driver eq 'MariaDB'
-            ? (mariadb_enable_utf8 => 1, mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
-            : (mysql_enable_utf8   => 1, mysql_connect_timeout   => 10, mysql_read_timeout   => 30, mysql_write_timeout   => 30);
+            ? (mariadb_enable_utf8mb4 => 1, mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            : (mysql_enable_utf8      => 1, mysql_connect_timeout   => 10, mysql_read_timeout   => 30, mysql_write_timeout   => 30);
         $connect_info = {
             dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
@@ -172,8 +172,8 @@ sub COMPONENT {
             name_sep => '.',
             limit_dialect => 'LimitXY',
             on_connect_do => [
-                "SET NAMES 'utf8'",
-                "SET CHARACTER SET 'utf8'",
+                "SET NAMES 'utf8mb4'",
+                "SET CHARACTER SET 'utf8mb4'",
                 "SET SESSION max_execution_time=60000",
                 "SET SESSION net_read_timeout=30",
                 "SET SESSION net_write_timeout=30",
