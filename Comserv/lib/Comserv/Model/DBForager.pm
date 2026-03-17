@@ -174,7 +174,9 @@ sub COMPONENT {
             on_connect_do => [
                 "SET NAMES 'utf8mb4'",
                 "SET CHARACTER SET 'utf8mb4'",
-                "SET SESSION max_execution_time=60000",
+                ($driver eq 'MariaDB'
+                    ? "SET SESSION max_statement_time=60"
+                    : "SET SESSION max_execution_time=60000"),
                 "SET SESSION net_read_timeout=30",
                 "SET SESSION net_write_timeout=30",
             ],
