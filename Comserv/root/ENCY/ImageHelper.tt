@@ -35,7 +35,11 @@
      [% IF w %]width="[% w %]"[% END %]
      [% IF h %]height="[% h %]"[% END %]
      style="max-width:100%;object-fit:contain"
-     onerror="this.style.display='none'">
+     onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+<span style="display:none;color:#aaa;font-size:.8rem">
+  (image unavailable)<br>
+  <a href="[% src %]" target="_blank" rel="noopener" style="font-size:.75rem;word-break:break-all">[% src %]</a>
+</span>
 [% ELSE %]
 <span style="color:#aaa;font-size:.85rem">(no image)</span>
 [% END %]
