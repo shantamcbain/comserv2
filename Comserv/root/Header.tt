@@ -102,15 +102,15 @@
     <link rel="stylesheet" type="text/css" href="/static/css/icon-fix.css">
     
     <!-- Component-specific CSS -->
-    [% IF template.match('ApiCredentials/') %]
+    [% IF c.stash.template.match('ApiCredentials/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/themes/api_credentials.css">
     [% END %]
     
-    [% IF template.match('todo/') %]
+    [% IF c.stash.template.match('todo/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
     [% END %]
 
-    [% IF template.match('membership/') %]
+    [% IF c.stash.template.match('membership/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
     [% END %]
 
