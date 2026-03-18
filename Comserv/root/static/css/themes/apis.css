@@ -33,5 +33,7 @@
 }
 
 body {
-  background-image: url(../images/BMaster/honey2.jpg);
+  background-image: url(../../images/BMaster/honey2.jpg);
+  background-repeat: repeat-x;
+  background-position: top center;
 }

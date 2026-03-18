@@ -201,6 +201,19 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     $promo->update({ uses_count => $promo->uses_count + 1 });
                 }
 
+                my $plan_role = 'member_' . ($plan->slug || lc($plan->name));
+                my $user_obj = $c->model('DBEncy')->resultset('User')->find($c->session->{user_id});
+                if ($user_obj) {
+                    my $existing_roles = $user_obj->roles || 'normal';
+                    my @roles = map { s/^\s+|\s+$//gr }
+                                grep { $_ !~ /^member_/ }
+                                split /,/, $existing_roles;
+                    push @roles, $plan_role;
+                    my $new_roles_str = join(',', @roles);
+                    $user_obj->update({ roles => $new_roles_str });
+                    $c->session->{roles} = \@roles;
+                }
+
                 $c->model('DBEncy')->resultset('PaymentTransaction')->create({
                     user_id      => $c->session->{user_id},
                     payable_type => 'membership',
