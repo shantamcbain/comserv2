@@ -1675,13 +1675,27 @@ sub models :Local :Args(0) {
                             'models', "Failed to get installed models from $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
                     }
                     
-                    # Get available models (this returns static list)
+                    # Get available models (static catalog), then exclude already-installed ones
                     my $available = $ollama->list_available_models();
                     if ($available && ref($available) eq 'ARRAY') {
-                        $server_info->{available_models} = $available;
-                        
-                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
-                            'models', "Retrieved " . scalar(@$available) . " available models from catalog");
+                        # Build a set of installed base names (strip tag) for fast lookup
+                        my %installed_names;
+                        for my $m (@{ $server_info->{installed_models} || [] }) {
+                            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+                            $n =~ s/:.*$//;   # strip tag (e.g. "llama3.1:latest" → "llama3.1")
+                            $installed_names{$n} = 1;
+                            $installed_names{$m->{name} || $m} = 1 if ref($m);  # also full name
+                        }
+                        my @not_installed = grep {
+                            my $aname = ref($_) ? ($_->{name} || '') : ($_ || '');
+                            (my $abase = $aname) =~ s/:.*$//;
+                            !$installed_names{$aname} && !$installed_names{$abase};
+                        } @$available;
+                        $server_info->{available_models} = \@not_installed;
+
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
+                            'models', "Catalog: " . scalar(@$available) . " total, "
+                                . scalar(@not_installed) . " not yet installed");
                     }
                 } else {
                     $server_info->{error} = "Connection test failed: " . ($ollama->last_error || 'unknown error');
