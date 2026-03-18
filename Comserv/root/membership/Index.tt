@@ -20,10 +20,58 @@
   <div class="page-header">
     <h1>Membership Plans</h1>
     <p>[% site_name | html %] membership gives you access to advanced features, AI models, hosting, and more.</p>
+    [% IF is_admin %]
+    <div class="admin-actions" style="margin-top:0.75rem;">
+      <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Admin Dashboard</a>
+      <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-secondary">Manage Plans</a>
+      <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-secondary">All Subscribers</a>
+      <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="btn btn-secondary">Cost Tracking</a>
+    </div>
+    [% END %]
   </div>
 
   <div class="content-container">
     <div class="content-primary">
+
+      [% IF is_admin AND all_members.size %]
+      <div class="content-section">
+        <h2>Current Members — [% site_name | html %]</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Plan</th>
+                <th>Status</th>
+                <th>Billing</th>
+                <th>Expires</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH m IN all_members %]
+              <tr>
+                <td>[% m.user.username | html %]</td>
+                <td>[% m.user.first_name | html %] [% m.user.last_name | html %]</td>
+                <td>[% m.plan.name | html %]</td>
+                <td><span class="badge badge-[% m.status | html %]">[% m.status | html %]</span></td>
+                <td>[% m.billing_cycle | html %]</td>
+                <td>[% m.expires_at || 'Never' | html %]</td>
+                <td class="action-cell">
+                  <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="btn btn-sm">View</a>
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% ELSIF is_admin %]
+      <div class="content-section">
+        <p class="empty-state">No members yet for [% site_name | html %].</p>
+      </div>
+      [% END %]
 
       [% IF user_membership %]
       <div class="content-section">
@@ -116,7 +164,7 @@
       [% ELSE %]
       <div class="content-section">
         <p class="empty-state">No membership plans have been configured for this site yet.</p>
-        [% IF c.session.roles.grep('admin').size %]
+        [% IF is_admin %]
         <p><a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Configure Plans</a></p>
         [% END %]
       </div>
