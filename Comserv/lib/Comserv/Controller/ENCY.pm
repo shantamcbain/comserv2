@@ -73,7 +73,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         $c->stash(
             error_msg => "Invalid or missing herb record for editing. Please try again.",
             template  => 'ENCY/HerbView.tt',
-            edit_mode => 0, # Keep edit_mode off since no valid record is loaded
+            mode => 'view',
         );
         return; # Do not redirect; just render the view with an error message
     }
@@ -86,7 +86,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         $c->stash(
             error_msg => "Herb not found in the database. Please try again.",
             template  => 'ENCY/HerbView.tt',
-            edit_mode => 0, # Render view mode since no valid herb is loaded
+            mode => 'view',
         );
         return; # Do not redirect; just render the view
     }
@@ -129,7 +129,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             $c->stash(
                 error_msg => "Failed to update herb: $error_message",
                 herb      => { %$herb, %$form_data }, # Combine original and submitted data for display
-                edit_mode => 1, # Stay in edit mode for correction
+                mode => 'edit',
                 template  => 'ENCY/HerbView.tt',
             );
             return; # Re-render the form with an error message
@@ -140,7 +140,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     $self->_stash_image_files($c);
     $c->stash(
         herb      => $herb,
-        edit_mode => 1, # Enable edit mode
+        mode => 'edit',
         template  => 'ENCY/HerbView.tt',
     );
 
