@@ -37,6 +37,18 @@ sub auto :Private {
     return 1;
 }
 
+sub _is_admin {
+    my ($self, $c) = @_;
+    return 0 unless $c->session->{username};
+    my $roles = $c->session->{roles};
+    if (ref $roles eq 'ARRAY') {
+        return 1 if grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @$roles;
+    } elsif ($roles) {
+        return 1 if lc($roles) eq 'admin' || lc($roles) eq 'site_admin';
+    }
+    return 0;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
@@ -45,6 +57,8 @@ sub index :Path :Args(0) {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     my $plans     = [];
     my $user_membership = undef;
+    my $is_admin  = $self->_is_admin($c);
+    my $all_members = [];
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
@@ -65,6 +79,18 @@ sub index :Path :Args(0) {
                     { order_by => { -desc => 'created_at' }, rows => 1 }
                 )->single;
             }
+
+            if ($is_admin) {
+                my @members = $c->model('DBEncy')->resultset('UserMembership')->search(
+                    { site_id => $site->id },
+                    {
+                        prefetch => ['user', 'plan'],
+                        order_by => [{ -asc => 'me.status' }, { -asc => 'user.username' }],
+                        rows     => 200,
+                    }
+                )->all;
+                $all_members = \@members;
+            }
         }
     };
     if ($@) {
@@ -74,10 +100,12 @@ sub index :Path :Args(0) {
     }
 
     $c->stash(
-        template       => 'membership/Index.tt',
-        plans          => $plans,
+        template        => 'membership/Index.tt',
+        plans           => $plans,
         user_membership => $user_membership,
-        site_name      => $site_name,
+        site_name       => $site_name,
+        is_admin        => $is_admin,
+        all_members     => $all_members,
     );
     $c->forward($c->view('TT'));
 }
