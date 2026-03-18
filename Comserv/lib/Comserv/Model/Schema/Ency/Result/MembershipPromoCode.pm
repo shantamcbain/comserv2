@@ -105,12 +105,18 @@ sub is_valid {
     if (defined $self->max_uses && $self->uses_count >= $self->max_uses) {
         return 0;
     }
-    my $now = time();
+    my @t   = localtime(time());
+    my $now = sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+        $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
     if ($self->valid_from) {
-        return 0 if $now < $self->valid_from->epoch;
+        my $vf = ref($self->valid_from) ? $self->valid_from->strftime('%Y-%m-%d %H:%M:%S')
+                                        : $self->valid_from;
+        return 0 if $now lt $vf;
     }
     if ($self->valid_until) {
-        return 0 if $now > $self->valid_until->epoch;
+        my $vu = ref($self->valid_until) ? $self->valid_until->strftime('%Y-%m-%d %H:%M:%S')
+                                         : $self->valid_until;
+        return 0 if $now gt $vu;
     }
     return 1;
 }
