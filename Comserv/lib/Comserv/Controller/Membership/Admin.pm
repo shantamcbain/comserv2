@@ -326,23 +326,30 @@ sub subscribers :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'subscribers',
         "Subscribers list called");
 
-    my $site        = $self->_get_site($c);
-    my @memberships = ();
-    my $status_filter = $c->req->param('status') || '';
+    my $status_filter  = $c->req->param('status')  || '';
+    my $site_id_filter = $c->req->param('site_id') || '';
+    my @memberships    = ();
+    my @all_sites      = ();
 
     eval {
-        if ($site) {
-            my %search = (site_id => $site->id);
-            $search{status} = $status_filter if $status_filter;
-            @memberships = $c->model('DBEncy')->resultset('UserMembership')->search(
-                \%search,
-                {
-                    prefetch => ['user', 'plan'],
-                    order_by => { -desc => 'created_at' },
-                    rows     => 100,
-                }
-            )->all;
-        }
+        @all_sites = $c->model('DBEncy')->resultset('Site')->search(
+            {}, { order_by => 'name' }
+        )->all;
+    };
+
+    eval {
+        my %search = ();
+        $search{status}  = $status_filter  if $status_filter;
+        $search{site_id} = $site_id_filter if $site_id_filter;
+
+        @memberships = $c->model('DBEncy')->resultset('UserMembership')->search(
+            \%search,
+            {
+                prefetch => ['user', 'plan', 'site'],
+                order_by => { -desc => 'created_at' },
+                rows     => 200,
+            }
+        )->all;
     };
     if ($@) {
         my $err = "$@";
@@ -352,10 +359,11 @@ sub subscribers :Local :Args(0) {
     }
 
     $c->stash(
-        template      => 'membership/admin/Subscribers.tt',
-        site          => $site,
-        memberships   => \@memberships,
-        status_filter => $status_filter,
+        template       => 'membership/admin/Subscribers.tt',
+        memberships    => \@memberships,
+        all_sites      => \@all_sites,
+        status_filter  => $status_filter,
+        site_id_filter => $site_id_filter,
     );
     $c->forward($c->view('TT'));
 }
