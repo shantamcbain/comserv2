@@ -79,7 +79,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     }
 
     # Retrieve the herb record
-    my $herb = $c->model('ENCYModel')->get_herb_by_id($record_id);
+    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
