@@ -339,8 +339,12 @@ sub subscribers :Local :Args(0) {
 
     eval {
         my %search = ();
-        $search{status}  = $status_filter  if $status_filter;
-        $search{site_id} = $site_id_filter if $site_id_filter;
+        $search{'me.status'}  = $status_filter  if $status_filter;
+        $search{'me.site_id'} = $site_id_filter if $site_id_filter;
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'subscribers',
+            "Querying memberships with status=" . ($status_filter || 'all')
+            . " site_id=" . ($site_id_filter || 'all'));
 
         @memberships = $c->model('DBEncy')->resultset('UserMembership')->search(
             \%search,
@@ -350,12 +354,15 @@ sub subscribers :Local :Args(0) {
                 rows     => 200,
             }
         )->all;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'subscribers',
+            "Loaded " . scalar(@memberships) . " memberships");
     };
     if ($@) {
         my $err = "$@";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'subscribers',
             "Error loading subscribers: $err");
-        $c->flash->{error_msg} = "Error loading subscribers: $err";
+        $c->stash->{error_msg} = "Error loading subscribers: see application log for details.";
     }
 
     $c->stash(
