@@ -1,0 +1,156 @@
+[% META
+   title = "System Cost Tracking"
+   description = "Track operational costs vs membership revenue"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/admin/CostTracking.tt,v 0.01 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>System Cost Tracking</h1>
+    [% IF site %]<p>Site: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back to Admin</a>
+      </div>
+
+      <div class="content-section">
+        <h2>Summary</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <strong>Total Logged Costs</strong>
+            <div class="stat-value [% IF total_cost > 0 %]text-danger[% END %]">
+              [% total_cost %] USD
+            </div>
+          </div>
+          <div class="form-field">
+            <strong>Est. Monthly Revenue</strong>
+            <div class="stat-value [% IF total_revenue > 0 %]text-success[% END %]">
+              [% total_revenue %] USD
+            </div>
+          </div>
+          <div class="form-field">
+            <strong>Net (Revenue - Costs)</strong>
+            <div class="stat-value [% IF net >= 0 %]text-success[% ELSE %]text-danger[% END %]">
+              [% net %] USD
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Add Cost Entry</h2>
+        <form method="post" action="[% c.uri_for('/membership/admin/cost_tracking') %]">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="cost_category">Category *</label>
+              <select id="cost_category" name="cost_category" required>
+                <option value="">-- Select --</option>
+                <option value="hosting">Hosting / Server</option>
+                <option value="ai_api">AI / GPU / API</option>
+                <option value="email">Email Service</option>
+                <option value="bandwidth">Bandwidth / CDN</option>
+                <option value="domain">Domain / DNS</option>
+                <option value="ssl">SSL Certificate</option>
+                <option value="support">Support Tools</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="amount">Amount *</label>
+              <input type="number" id="amount" name="amount" step="0.01" min="0" required>
+            </div>
+            <div class="form-field">
+              <label for="currency">Currency</label>
+              <select id="currency" name="currency">
+                <option value="USD">USD</option>
+                <option value="CAD">CAD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="period_start">Period Start *</label>
+              <input type="date" id="period_start" name="period_start" required>
+            </div>
+            <div class="form-field">
+              <label for="period_end">Period End *</label>
+              <input type="date" id="period_end" name="period_end" required>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="is_recurring" value="1"> Recurring Monthly</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="is_global" value="1"> Global (shared across all sites)</label>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="vendor">Vendor</label>
+              <input type="text" id="vendor" name="vendor" placeholder="e.g. AWS, Namecheap">
+            </div>
+            <div class="form-field">
+              <label for="invoice_reference">Invoice / Reference</label>
+              <input type="text" id="invoice_reference" name="invoice_reference">
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Cost Entry</button>
+        </form>
+      </div>
+
+      <div class="content-section">
+        <h2>Cost History</h2>
+        [% IF costs.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Period</th>
+                <th>Recurring</th>
+                <th>Vendor</th>
+                <th>Scope</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH cost IN costs %]
+              <tr>
+                <td>[% cost.cost_category | html %]</td>
+                <td>[% cost.description | html %]</td>
+                <td>[% cost.currency | html %] [% cost.amount %]</td>
+                <td>[% cost.period_start | html %] – [% cost.period_end | html %]</td>
+                <td>[% cost.is_recurring ? 'Yes' : 'No' %]</td>
+                <td>[% cost.vendor | html %]</td>
+                <td>[% cost.site_id ? 'Site' : 'Global' %]</td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No cost entries recorded yet. Add your first entry above.</p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>

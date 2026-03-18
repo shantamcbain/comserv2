@@ -1,0 +1,90 @@
+[% META
+   title = "Membership Subscribers"
+   description = "View and manage membership subscribers"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/admin/Subscribers.tt,v 0.01 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Membership Subscribers</h1>
+    [% IF site %]<p>Site: <strong>[% site.name | html %]</strong></p>[% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <div class="action-bar">
+          <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back</a>
+          <span style="margin-left:1em">Filter by status:</span>
+          <a href="[% c.uri_for('/membership/admin/subscribers') %]"
+             class="btn btn-small [% UNLESS status_filter %]btn-primary[% END %]">All</a>
+          <a href="[% c.uri_for('/membership/admin/subscribers', { status => 'active' }) %]"
+             class="btn btn-small [% IF status_filter == 'active' %]btn-primary[% END %]">Active</a>
+          <a href="[% c.uri_for('/membership/admin/subscribers', { status => 'grace' }) %]"
+             class="btn btn-small [% IF status_filter == 'grace' %]btn-primary[% END %]">Grace</a>
+          <a href="[% c.uri_for('/membership/admin/subscribers', { status => 'cancelled' }) %]"
+             class="btn btn-small [% IF status_filter == 'cancelled' %]btn-primary[% END %]">Cancelled</a>
+          <a href="[% c.uri_for('/membership/admin/subscribers', { status => 'expired' }) %]"
+             class="btn btn-small [% IF status_filter == 'expired' %]btn-primary[% END %]">Expired</a>
+        </div>
+      </div>
+
+      <div class="content-section">
+        [% IF memberships.size %]
+        <p>[% memberships.size %] record(s) shown.</p>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Plan</th>
+                <th>Billing</th>
+                <th>Price Paid</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Expires</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH m IN memberships %]
+              <tr>
+                <td>[% m.user.username | html %]<br><small>[% m.user.email | html %]</small></td>
+                <td>[% m.plan.name | html %]</td>
+                <td>[% m.billing_cycle | html %]</td>
+                <td>
+                  [% IF m.price_paid %]
+                    [% m.currency_paid | html %] [% m.price_paid %]
+                  [% ELSE %]
+                    Free
+                  [% END %]
+                </td>
+                <td>[% m.payment_provider | html %]</td>
+                <td>
+                  <span class="status-[% m.status | html %]">[% m.status | html %]</span>
+                </td>
+                <td>[% m.started_at | html %]</td>
+                <td>[% m.expires_at || 'Never' | html %]</td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No subscribers found[% IF status_filter %] with status '[% status_filter | html %]'[% END %].</p>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>
