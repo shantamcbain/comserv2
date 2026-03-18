@@ -346,7 +346,7 @@ sub subscribers :Local :Args(0) {
             \%search,
             {
                 prefetch => ['user', 'plan', 'site'],
-                order_by => { -desc => 'created_at' },
+                order_by => { -desc => 'me.created_at' },
                 rows     => 200,
             }
         )->all;
