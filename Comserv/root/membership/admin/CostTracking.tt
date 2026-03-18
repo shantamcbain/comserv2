@@ -74,7 +74,7 @@
                 <td>[% ct.monthly %] [% default_currency || 'CAD' %]</td>
                 <td>
                   [% IF total_monthly_cost > 0 %]
-                    [% pct = (ct.monthly / total_monthly_cost * 100).int %][% pct %]%
+                    [% (ct.monthly / total_monthly_cost * 100) | format('%d') %]%
                   [% ELSE %]—[% END %]
                 </td>
               </tr>
