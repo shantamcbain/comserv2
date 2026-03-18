@@ -1,0 +1,150 @@
+[% META
+   title = "Membership Plans"
+   description = "View and join membership plans for this site"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/Index.tt,v 0.01 2026/03/18 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Membership Plans</h1>
+    <p>[% site_name | html %] membership gives you access to advanced features, AI models, hosting, and more.</p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF user_membership %]
+      <div class="content-section">
+        <h2>Your Current Plan</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr>
+              <th>Plan</th>
+              <th>Status</th>
+              <th>Billing</th>
+              <th>Expires</th>
+              <th>Actions</th>
+            </tr>
+            <tr>
+              <td>[% user_membership.plan.name | html %]</td>
+              <td>[% user_membership.status | html %]</td>
+              <td>[% user_membership.billing_cycle | html %]</td>
+              <td>[% user_membership.expires_at || 'Never' | html %]</td>
+              <td class="action-cell">
+                <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">Manage</a>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      [% END %]
+
+      [% IF plans.size %]
+      <div class="content-section">
+        <h2>Available Plans</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Monthly</th>
+                <th>Annual</th>
+                <th>AI Models</th>
+                <th>Email</th>
+                <th>Hosting</th>
+                <th>Beekeeping</th>
+                <th>Planning</th>
+                <th>Currency</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH plan IN plans %]
+              <tr[% IF plan.is_featured %] class="featured-plan"[% END %]>
+                <td>
+                  <strong>[% plan.name | html %]</strong>
+                  [% IF plan.is_featured %]<span class="badge">Popular</span>[% END %]
+                  [% IF plan.description %]<br><small>[% plan.description | html %]</small>[% END %]
+                </td>
+                <td>
+                  [% IF plan.price_monthly == 0 %]
+                    Free
+                  [% ELSE %]
+                    [% plan.price_currency | html %] [% plan.price_monthly %]/mo
+                  [% END %]
+                </td>
+                <td>
+                  [% IF plan.price_annual == 0 %]
+                    Free
+                  [% ELSE %]
+                    [% plan.price_currency | html %] [% plan.price_annual %]/yr
+                  [% END %]
+                </td>
+                <td>[% IF plan.ai_requests_per_day > 0 %][% plan.ai_requests_per_day %]/day[% ELSE %]—[% END %]</td>
+                <td>[% IF plan.has_email %][% plan.email_addresses %] addr[% ELSE %]—[% END %]</td>
+                <td>[% IF plan.has_hosting %][% plan.hosting_tier || 'Included' | html %][% ELSE %]—[% END %]</td>
+                <td>[% plan.has_beekeeping ? '✓' : '—' %]</td>
+                <td>[% plan.has_planning ? '✓' : '—' %]</td>
+                <td>[% plan.has_currency ? '✓' : '—' %]</td>
+                <td class="action-cell">
+                  [% IF c.session.username %]
+                    <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
+                       class="btn btn-primary">Join</a>
+                  [% ELSE %]
+                    <a href="[% c.uri_for('/user/login', { return_to => c.uri_for('/membership/subscribe', { plan_id => plan.id }) }) %]"
+                       class="btn btn-primary">Join</a>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No membership plans have been configured for this site yet.</p>
+        [% IF c.session.roles.grep('admin').size %]
+        <p><a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Configure Plans</a></p>
+        [% END %]
+      </div>
+      [% END %]
+
+      <div class="content-section">
+        <h2>Payment Options</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <strong>PayPal</strong> — Pay securely with your PayPal account or credit card.
+          </div>
+          <div class="form-field">
+            <strong>Patreon</strong> — Support via Patreon and link your patron account.
+          </div>
+          <div class="form-field">
+            <strong>Site Credits</strong> — Use your internal coin balance to pay for membership.
+          </div>
+        </div>
+      </div>
+
+      [% IF c.session.username %]
+      <div class="content-section">
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">My Account</a>
+        </div>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>

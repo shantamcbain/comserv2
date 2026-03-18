@@ -1,0 +1,78 @@
+[% META
+   title = "My Membership"
+   description = "View and manage your membership account"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% PageVersion = 'membership/Account.tt,v 0.01 2026/03/18 AI Assistant Exp AI Assistant ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>My Membership</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      [% IF currency_account %]
+      <div class="content-section">
+        <h2>Site Credits</h2>
+        <p>Balance: <strong>[% currency_account.balance %] coins</strong></p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/currency') %]" class="btn btn-primary">Manage Credits</a>
+        </div>
+      </div>
+      [% END %]
+
+      [% IF memberships.size %]
+      <div class="content-section">
+        <h2>Subscriptions</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Status</th>
+                <th>Billing</th>
+                <th>Started</th>
+                <th>Expires</th>
+                <th>Provider</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH m IN memberships %]
+              <tr>
+                <td>[% m.plan.name | html %]</td>
+                <td>[% m.status | html %]</td>
+                <td>[% m.billing_cycle | html %]</td>
+                <td>[% m.started_at | html %]</td>
+                <td>[% m.expires_at || 'Never' | html %]</td>
+                <td>[% m.payment_provider | html %]</td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">You have no active memberships.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">View Plans</a>
+        </div>
+      </div>
+      [% END %]
+
+    </div>
+  </div>
+</div>
