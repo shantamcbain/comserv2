@@ -126,31 +126,14 @@ sub COMPONENT {
             quote_char => '`',
         };
     } else {
-        # CRITICAL FIX (November 2025): Select available database driver
-        # Try MariaDB first (preferred), fall back to mysql if not installed
-        my $driver = $db_type eq 'mariadb' ? 'MariaDB' : 'mysql';
+        # Select driver: prefer DBD::MariaDB regardless of config db_type string,
+        # fall back to DBD::mysql only if MariaDB module is not installed
+        my $driver = 'mysql';
         my $driver_available = 0;
-        
-        # Check if preferred driver is available
-        if ($driver eq 'MariaDB') {
-            eval {
-                require DBD::MariaDB;
-                $driver_available = 1;
-            };
-            # Fall back to mysql if MariaDB not available
-            if (!$driver_available) {
-                eval {
-                    require DBD::mysql;
-                    $driver = 'mysql';
-                    $driver_available = 1;
-                };
-            }
-        } else {
-            # If already set to mysql, check it's available
-            eval {
-                require DBD::mysql;
-                $driver_available = 1;
-            };
+
+        eval { require DBD::MariaDB; $driver = 'MariaDB'; $driver_available = 1; };
+        unless ($driver_available) {
+            eval { require DBD::mysql; $driver_available = 1; };
         }
         
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
@@ -158,9 +141,11 @@ sub COMPONENT {
         
         my %driver_attrs = $driver eq 'MariaDB'
             ? (mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
-            : (mysql_enable_utf8       => 1, mysql_connect_timeout => 10, mysql_read_timeout   => 30, mysql_write_timeout   => 30);
+            : ();  # mysql fallback: timeouts go in DSN to avoid attribute-rejection by older DBIx::Class
+        my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
+        $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
         $connect_info = {
-            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => $dsn,
             user => $conn->{username},
             password => $conn->{password},
             %driver_attrs,
