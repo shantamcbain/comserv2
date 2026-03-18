@@ -119,15 +119,6 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->has_many(
-    payment_transactions => 'Comserv::Model::Schema::Ency::Result::PaymentTransaction',
-    {
-        'foreign.payable_type' => \'\'membership\'',
-        'foreign.payable_id'   => 'self.id',
-    },
-    { cascade_delete => 0 }
-);
-
-__PACKAGE__->has_many(
     service_access => 'Comserv::Model::Schema::Ency::Result::MembershipServiceAccess',
     { 'foreign.membership_id' => 'self.id' }
 );
