@@ -547,20 +547,133 @@ sub cost_tracking :Local :Args(0) {
         ? sprintf('%.2f', $total_monthly_cost / $active_member_count)
         : undef;
 
+    my $overhead          = 1.30;
+    my $avg_plan_price    = 15;
+    my $break_even_members = ($total_monthly_cost > 0)
+        ? int(($total_monthly_cost * $overhead) / $avg_plan_price) + 1
+        : 0;
+
+    my @benefactor_contribs = ();
+    my $benefactor_total_cad = 0;
+    eval {
+        @benefactor_contribs = $c->model('DBEncy')->resultset('BenefactorContribution')->search(
+            {},
+            {
+                prefetch => 'user',
+                order_by => { -desc => 'contribution_date' },
+                rows     => 200,
+            }
+        )->all;
+        for my $bc (@benefactor_contribs) {
+            $benefactor_total_cad += $bc->total_value_cad;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'cost_tracking',
+            "Could not load benefactor contributions (table may not exist yet): $@");
+    }
+
     $c->stash(
-        template               => 'membership/admin/CostTracking.tt',
-        site                   => $site,
-        costs                  => \@costs,
-        total_cost             => sprintf('%.2f', $total_cost),
-        total_monthly_cost     => sprintf('%.2f', $total_monthly_cost),
-        total_revenue          => sprintf('%.2f', $total_revenue),
-        net                    => sprintf('%.2f', $total_revenue - $total_monthly_cost),
-        category_totals        => \@category_totals,
+        template                => 'membership/admin/CostTracking.tt',
+        site                    => $site,
+        costs                   => \@costs,
+        total_cost              => sprintf('%.2f', $total_cost),
+        total_monthly_cost      => sprintf('%.2f', $total_monthly_cost),
+        total_revenue           => sprintf('%.2f', $total_revenue),
+        net                     => sprintf('%.2f', $total_revenue - $total_monthly_cost),
+        category_totals         => \@category_totals,
         monthly_cost_per_member => $monthly_cost_per_member,
-        active_member_count    => $active_member_count,
-        overhead_pct           => 30,
-        pricing_recommendation => \@pricing_recommendation,
-        default_currency       => 'CAD',
+        active_member_count     => $active_member_count,
+        break_even_members      => $break_even_members,
+        overhead_pct            => 30,
+        pricing_recommendation  => \@pricing_recommendation,
+        default_currency        => 'CAD',
+        benefactor_contribs     => \@benefactor_contribs,
+        benefactor_total_cad    => sprintf('%.2f', $benefactor_total_cad),
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub benefactor_contribution :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'benefactor_contribution',
+        "Benefactor contribution called, method=" . $c->req->method);
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+
+        my $amount_cad = $p->{amount_cad} || 0;
+        my $hours      = $p->{hours}      || 0;
+        my $rate       = $p->{hourly_rate_cad} || 75;
+        if ($hours > 0 && $amount_cad == 0) {
+            $amount_cad = $hours * $rate;
+        }
+
+        my $coins = $amount_cad;
+
+        eval {
+            $c->model('DBEncy')->schema->txn_do(sub {
+                my $contrib = $c->model('DBEncy')->resultset('BenefactorContribution')->create({
+                    user_id           => $p->{user_id},
+                    contribution_type => $p->{contribution_type},
+                    description       => $p->{description},
+                    amount_cad        => $amount_cad,
+                    hours             => $hours,
+                    hourly_rate_cad   => $rate,
+                    coins_credited    => $coins,
+                    cost_tracking_id  => $p->{cost_tracking_id} || undef,
+                    contribution_date => $p->{contribution_date},
+                });
+
+                my $acct = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->find_or_create(
+                    { user_id => $p->{user_id} },
+                    { key     => 'unique_user_id' }
+                );
+
+                my $new_balance = ($acct->balance || 0) + $coins;
+                my $tx = $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
+                    from_user_id     => undef,
+                    to_user_id       => $p->{user_id},
+                    amount           => $coins,
+                    transaction_type => 'earn',
+                    description      => 'Benefactor contribution: ' . ($p->{description} || $p->{contribution_type}),
+                    reference_type   => 'benefactor_contribution',
+                    reference_id     => $contrib->id,
+                    balance_after    => $new_balance,
+                });
+
+                $acct->update({
+                    balance         => $new_balance,
+                    lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
+                });
+
+                $contrib->update({ currency_transaction_id => $tx->id });
+            });
+            $c->flash->{success_msg} = sprintf(
+                'Contribution recorded. %.2f CAD value credited as %.2f coins.', $amount_cad, $coins);
+        };
+        if ($@) {
+            my $err = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'benefactor_contribution',
+                "Error recording contribution: $err");
+            $c->flash->{error_msg} = "Error recording contribution: see application log for details.";
+        }
+        $c->response->redirect($c->uri_for('/membership/admin/cost_tracking'));
+        return;
+    }
+
+    my @users = ();
+    eval {
+        @users = $c->model('DBEncy')->resultset('User')->search(
+            {}, { order_by => 'username', columns => ['id','username','first_name','last_name'] }
+        )->all;
+    };
+
+    $c->stash(
+        template => 'membership/admin/BenefactorContribution.tt',
+        users    => \@users,
     );
     $c->forward($c->view('TT'));
 }

@@ -56,7 +56,72 @@
             </div>
           </div>
           [% END %]
+          [% IF break_even_members %]
+          <div class="form-field">
+            <strong>Paid Members Needed to Break Even</strong>
+            <div class="stat-value [% IF active_member_count >= break_even_members %]text-success[% ELSE %]text-danger[% END %]">
+              [% break_even_members %]
+              <small style="font-size:0.7em;display:block;">
+                ([% active_member_count %] active now — based on avg $[% avg_plan_price || 15 %]/mo Pro rate + [% overhead_pct %]% overhead)
+              </small>
+            </div>
+          </div>
+          [% END %]
+          [% IF benefactor_total_cad %]
+          <div class="form-field">
+            <strong>Total Benefactor Contributions</strong>
+            <div class="stat-value text-success">
+              [% benefactor_total_cad %] [% default_currency || 'CAD' %]
+            </div>
+          </div>
+          [% END %]
         </div>
+      </div>
+
+      <div class="content-section">
+        <h2>Benefactor Contributions — Shanta McBain</h2>
+        <p style="font-size:0.9em;color:#555;">
+          Shanta is the founding benefactor of this platform: she covers all operating expenses,
+          performs all programming and system administration, and donates her labour. Each logged
+          contribution is credited to her internal coin account at 1 coin = 1 CAD.
+        </p>
+        <div style="margin-bottom:0.75rem;">
+          <a href="[% c.uri_for('/membership/admin/benefactor_contribution') %]" class="btn btn-primary">
+            Log a Contribution
+          </a>
+        </div>
+        [% IF benefactor_contribs.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Benefactor</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Value (CAD)</th>
+                <th>Hours</th>
+                <th>Coins Credited</th>
+              </tr>
+            </thead>
+            <tbody>
+              [% FOREACH bc IN benefactor_contribs %]
+              <tr>
+                <td>[% bc.contribution_date | html %]</td>
+                <td>[% bc.user.first_name | html %] [% bc.user.last_name | html %]</td>
+                <td>[% bc.contribution_type | html %]</td>
+                <td>[% bc.description | html %]</td>
+                <td>[% bc.amount_cad %]</td>
+                <td>[% bc.hours > 0 ? bc.hours : '—' %]</td>
+                <td>[% bc.coins_credited %]</td>
+              </tr>
+              [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <p class="empty-state">No benefactor contributions logged yet.</p>
+        [% END %]
       </div>
 
       [% IF category_totals %]
