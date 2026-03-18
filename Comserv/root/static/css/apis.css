@@ -20,10 +20,8 @@
 }
 
 body {
-  background-image: url('../images/BMaster/rainbow.jpg');
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center center;
+  background-image: url('../images/BMaster/honey2.jpg');
+  background-repeat: repeat-x;
+  background-position: top center;
 }
 

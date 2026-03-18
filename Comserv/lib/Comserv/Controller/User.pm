@@ -1086,6 +1086,10 @@ sub do_create_account :Local {
                 "Could not create UserSiteRole (table may not exist): $@");
         }
         
+        delete $c->session->{$_} for qw(
+            username user_id roles first_name last_name email
+            group_membership group_name SiteName theme_name debug_mode
+        );
         $c->session->{verification_user_id} = $new_user->id;
         $c->session->{verification_code_display} = $verification_code;
         
