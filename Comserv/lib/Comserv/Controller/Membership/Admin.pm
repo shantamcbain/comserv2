@@ -413,27 +413,128 @@ sub cost_tracking :Local :Args(0) {
         }
     }
 
+    my $total_monthly_cost  = 0;
+    my $active_member_count = 0;
+    my %cat_group_totals    = ();
+    my @category_totals     = ();
+    my @pricing_recommendation = ();
+
+    my %cat_group_labels = (
+        facility    => 'Facility & Power (electricity, cooling, rent, UPS)',
+        hardware    => 'Hardware (servers, network, storage, workstations)',
+        connectivity => 'Connectivity (ISP, IP addressing, CDN)',
+        hosting     => 'Hosting & Domains (cloud, domains, SSL, backup)',
+        ai          => 'AI & Compute (Ollama/GPU, xAI, OpenAI, Anthropic)',
+        software    => 'Software & Licensing (OS, tools, monitoring, security)',
+        communication => 'Communication (email, SMS)',
+        personnel   => 'Personnel & Services (dev, sysadmin, support, legal)',
+        compliance  => 'Compliance & Risk (insurance, audits)',
+        other       => 'Other',
+    );
+
+    my %cat_to_group = (
+        power_electricity    => 'facility',
+        cooling_hvac         => 'facility',
+        server_room_rent     => 'facility',
+        hardware_ups         => 'facility',
+        hardware_servers     => 'hardware',
+        hardware_network     => 'hardware',
+        hardware_storage     => 'hardware',
+        hardware_workstations => 'hardware',
+        isp_primary          => 'connectivity',
+        isp_backup           => 'connectivity',
+        ip_addressing        => 'connectivity',
+        cdn                  => 'connectivity',
+        hosting_cloud        => 'hosting',
+        domain_registration  => 'hosting',
+        ssl_certificates     => 'hosting',
+        backup_services      => 'hosting',
+        ai_ollama_gpu        => 'ai',
+        ai_xai               => 'ai',
+        ai_openai            => 'ai',
+        ai_anthropic         => 'ai',
+        ai_other             => 'ai',
+        software_os          => 'software',
+        software_licenses    => 'software',
+        software_monitoring  => 'software',
+        software_security    => 'software',
+        email_service        => 'communication',
+        sms_notifications    => 'communication',
+        programming_labor    => 'personnel',
+        sysadmin_labor       => 'personnel',
+        customer_support     => 'personnel',
+        accounting_legal     => 'personnel',
+        insurance            => 'compliance',
+        security_audit       => 'compliance',
+    );
+
     eval {
         my %search = ();
         $search{'-or'} = [
-            { site_id => undef },
-            { site_id => $site->id }
+            { 'me.site_id' => undef },
+            { 'me.site_id' => $site->id }
         ] if $site;
         @costs = $c->model('DBEncy')->resultset('SystemCostTracking')->search(
             \%search,
             { order_by => { -desc => 'period_start' }, rows => 200 }
         )->all;
-        $total_cost += $_->amount for @costs;
+
+        for my $c_entry (@costs) {
+            my $monthly = eval { $c_entry->monthly_equivalent } || $c_entry->amount;
+            $total_cost         += $c_entry->amount;
+            $total_monthly_cost += $monthly;
+            my $grp = $cat_to_group{ $c_entry->cost_category } || 'other';
+            $cat_group_totals{$grp} += $monthly;
+        }
 
         if ($site) {
             my @active = $c->model('DBEncy')->resultset('UserMembership')->search(
-                { site_id => $site->id, status => 'active' },
+                { 'me.site_id' => $site->id, 'me.status' => 'active' },
                 { prefetch => 'plan' }
             )->all;
+            $active_member_count = scalar @active;
             for my $m (@active) {
                 $total_revenue += $m->price_paid || 0 if $m->billing_cycle eq 'monthly';
                 $total_revenue += ($m->price_paid || 0) / 12 if $m->billing_cycle eq 'annual';
             }
+        }
+
+        for my $grp (sort keys %cat_group_totals) {
+            push @category_totals, {
+                label   => $cat_group_labels{$grp} || $grp,
+                monthly => sprintf('%.2f', $cat_group_totals{$grp}),
+            };
+        }
+
+        if ($total_monthly_cost > 0 && $active_member_count > 0) {
+            my $overhead       = 1.30;
+            my $base_per_member = ($total_monthly_cost * $overhead) / $active_member_count;
+            push @pricing_recommendation, (
+                {
+                    name    => 'Free',
+                    monthly => '0.00',
+                    annual  => '0.00',
+                    notes   => 'No revenue; subsidized by paid tiers. Keep features minimal.',
+                },
+                {
+                    name    => 'Basic',
+                    monthly => sprintf('%.2f', $base_per_member * 0.6),
+                    annual  => sprintf('%.2f', $base_per_member * 0.6 * 10),
+                    notes   => 'Below break-even — relies on Pro/Business to offset.',
+                },
+                {
+                    name    => 'Pro',
+                    monthly => sprintf('%.2f', $base_per_member * 1.2),
+                    annual  => sprintf('%.2f', $base_per_member * 1.2 * 10),
+                    notes   => 'Slightly above break-even; target majority of paid members.',
+                },
+                {
+                    name    => 'Business',
+                    monthly => sprintf('%.2f', $base_per_member * 2.5),
+                    annual  => sprintf('%.2f', $base_per_member * 2.5 * 10),
+                    notes   => 'Premium tier — funds free/basic subsidies and growth.',
+                },
+            );
         }
     };
     if ($@) {
@@ -442,13 +543,24 @@ sub cost_tracking :Local :Args(0) {
             "Error loading costs: $err");
     }
 
+    my $monthly_cost_per_member = ($active_member_count > 0)
+        ? sprintf('%.2f', $total_monthly_cost / $active_member_count)
+        : undef;
+
     $c->stash(
-        template      => 'membership/admin/CostTracking.tt',
-        site          => $site,
-        costs         => \@costs,
-        total_cost    => sprintf('%.2f', $total_cost),
-        total_revenue => sprintf('%.2f', $total_revenue),
-        net           => sprintf('%.2f', $total_revenue - $total_cost),
+        template               => 'membership/admin/CostTracking.tt',
+        site                   => $site,
+        costs                  => \@costs,
+        total_cost             => sprintf('%.2f', $total_cost),
+        total_monthly_cost     => sprintf('%.2f', $total_monthly_cost),
+        total_revenue          => sprintf('%.2f', $total_revenue),
+        net                    => sprintf('%.2f', $total_revenue - $total_monthly_cost),
+        category_totals        => \@category_totals,
+        monthly_cost_per_member => $monthly_cost_per_member,
+        active_member_count    => $active_member_count,
+        overhead_pct           => 30,
+        pricing_recommendation => \@pricing_recommendation,
+        default_currency       => 'CAD',
     );
     $c->forward($c->view('TT'));
 }
