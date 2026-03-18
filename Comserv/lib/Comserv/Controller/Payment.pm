@@ -1,0 +1,284 @@
+package Comserv::Controller::Payment;
+use Moose;
+use namespace::autoclean;
+use Comserv::Util::Logging;
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+__PACKAGE__->config(namespace => 'payment');
+
+has 'logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
+
+sub _require_login {
+    my ($self, $c) = @_;
+    unless ($c->session->{username}) {
+        $c->session->{post_login_redirect} = $c->req->uri->as_string;
+        $c->flash->{error_msg} = 'Please log in to continue.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return 0;
+    }
+    return 1;
+}
+
+sub _validate_promo {
+    my ($self, $c, $code, $plan_id, $site_id) = @_;
+    return undef unless $code;
+
+    my $promo;
+    eval {
+        $promo = $c->model('DBEncy')->resultset('MembershipPromoCode')->search({
+            code      => $code,
+            is_active => 1,
+            '-or' => [
+                { site_id => undef },
+                { site_id => $site_id },
+            ],
+        })->first;
+    };
+    return undef unless $promo;
+
+    unless ($promo->is_valid) {
+        $c->flash->{error_msg} = 'Promo code has expired or reached its usage limit.';
+        return undef;
+    }
+
+    if ($promo->plan_id && $promo->plan_id != $plan_id) {
+        $c->flash->{error_msg} = 'Promo code is not valid for this plan.';
+        return undef;
+    }
+
+    eval {
+        my $prior_uses = $c->model('DBEncy')->resultset('UserMembership')->count({
+            user_id  => $c->session->{user_id},
+            site_id  => $site_id,
+        });
+        if ($prior_uses >= $promo->max_uses_per_user) {
+            $c->flash->{error_msg} = 'You have already used this promo code.';
+            $promo = undef;
+        }
+    };
+    return $promo;
+}
+
+sub _apply_promo_discount {
+    my ($self, $promo, $price, $billing_cycle) = @_;
+    return $price unless $promo;
+
+    if ($promo->discount_type eq 'months_free') {
+        return 0;
+    } elsif ($promo->discount_type eq 'percent_off') {
+        return $price * (1 - $promo->discount_value / 100);
+    } elsif ($promo->discount_type eq 'fixed_amount') {
+        my $discounted = $price - $promo->discount_value;
+        return $discounted < 0 ? 0 : $discounted;
+    }
+    return $price;
+}
+
+# ============================================================
+# Internal Currency Checkout
+# GET:  show confirmation page
+# POST: complete the transaction
+# ============================================================
+sub internal_checkout :Path('internal/checkout') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'internal_checkout',
+        "Internal checkout, method=" . $c->req->method);
+
+    my $plan_id       = $c->req->param('plan_id');
+    my $billing_cycle = $c->req->param('billing_cycle') || 'monthly';
+    my $promo_code    = $c->req->param('promo_code')    || '';
+
+    my $plan = undef;
+    my $site = undef;
+    my $account = undef;
+    my $promo = undef;
+    my $final_price = 0;
+
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+        $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
+        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
+            { user_id => $c->session->{user_id} }
+        )->single;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
+            "Error loading data: $@");
+        $c->flash->{error_msg} = 'Error loading checkout data. Please try again.';
+        $c->response->redirect($c->uri_for('/membership'));
+        return;
+    }
+
+    unless ($plan && $site) {
+        $c->flash->{error_msg} = 'Invalid plan or site.';
+        $c->response->redirect($c->uri_for('/membership'));
+        return;
+    }
+
+    $promo = $self->_validate_promo($c, $promo_code, $plan->id, $site->id);
+
+    my $base_price = $billing_cycle eq 'annual' ? $plan->price_annual : $plan->price_monthly;
+    $final_price = $self->_apply_promo_discount($promo, $base_price, $billing_cycle);
+
+    if ($c->req->method eq 'POST') {
+        my $schema = $c->model('DBEncy')->schema;
+        my $error;
+
+        eval {
+            $schema->txn_do(sub {
+                if ($final_price > 0) {
+                    unless ($account) {
+                        die "No coin account found. Please contact support to get coins.\n";
+                    }
+                    if ($account->balance < $final_price) {
+                        die sprintf("Insufficient coins. You have %.2f but need %.2f.\n",
+                            $account->balance, $final_price);
+                    }
+
+                    my $new_balance = $account->balance - $final_price;
+                    $account->update({ balance => $new_balance, lifetime_spent => $account->lifetime_spent + $final_price });
+
+                    $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
+                        from_user_id     => $c->session->{user_id},
+                        to_user_id       => undef,
+                        amount           => $final_price,
+                        transaction_type => 'spend',
+                        balance_after    => $new_balance,
+                        description      => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')',
+                        reference_type   => 'membership',
+                    });
+                }
+
+                my $expires_at = undef;
+                if ($billing_cycle eq 'monthly') {
+                    $expires_at = DateTime->now->add(months => 1)->strftime('%Y-%m-%d %H:%M:%S');
+                } elsif ($billing_cycle eq 'annual') {
+                    $expires_at = DateTime->now->add(years => 1)->strftime('%Y-%m-%d %H:%M:%S');
+                }
+                if ($promo && $promo->discount_type eq 'months_free') {
+                    $expires_at = DateTime->now->add(months => int($promo->discount_value))->strftime('%Y-%m-%d %H:%M:%S');
+                }
+
+                my $existing = $c->model('DBEncy')->resultset('UserMembership')->search({
+                    user_id => $c->session->{user_id},
+                    site_id => $site->id,
+                    status  => ['active', 'grace'],
+                })->first;
+
+                if ($existing) {
+                    $existing->update({
+                        plan_id          => $plan->id,
+                        billing_cycle    => $billing_cycle,
+                        payment_provider => 'internal',
+                        price_paid       => $final_price,
+                        currency_paid    => $plan->price_currency,
+                        expires_at       => $expires_at,
+                        status           => 'active',
+                    });
+                } else {
+                    $c->model('DBEncy')->resultset('UserMembership')->create({
+                        user_id          => $c->session->{user_id},
+                        plan_id          => $plan->id,
+                        site_id          => $site->id,
+                        billing_cycle    => $billing_cycle,
+                        status           => 'active',
+                        payment_provider => 'internal',
+                        price_paid       => $final_price,
+                        currency_paid    => $plan->price_currency,
+                        region_code      => 'CA',
+                        expires_at       => $expires_at,
+                    });
+                }
+
+                if ($promo) {
+                    $promo->update({ uses_count => $promo->uses_count + 1 });
+                }
+
+                $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+                    user_id      => $c->session->{user_id},
+                    payable_type => 'membership',
+                    payable_id   => $plan->id,
+                    amount       => $final_price,
+                    currency     => $plan->price_currency,
+                    provider     => 'internal',
+                    status       => 'completed',
+                    description  => 'Membership: ' . $plan->name . ' (' . $billing_cycle . ')'
+                        . ($promo ? ' [promo: ' . $promo->code . ']' : ''),
+                    ip_address   => $c->req->address,
+                });
+            });
+        };
+        if ($@) {
+            $error = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
+                "Checkout failed: $error");
+        }
+
+        if ($error) {
+            $c->flash->{error_msg} = $error;
+            $c->response->redirect($c->uri_for('/payment/internal/checkout',
+                { plan_id => $plan_id, billing_cycle => $billing_cycle, promo_code => $promo_code }));
+        } else {
+            $c->flash->{success_msg} = 'Membership activated! Welcome to ' . $plan->name . '.';
+            $c->response->redirect($c->uri_for('/membership/account'));
+        }
+        return;
+    }
+
+    $c->stash(
+        template      => 'payment/InternalCheckout.tt',
+        plan          => $plan,
+        site          => $site,
+        account       => $account,
+        billing_cycle => $billing_cycle,
+        promo_code    => $promo_code,
+        promo         => $promo,
+        base_price    => $base_price,
+        final_price   => $final_price,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
+# PayPal — stub (requires PayPal credentials in config)
+# ============================================================
+sub paypal_checkout :Path('paypal/checkout') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_checkout',
+        "PayPal checkout requested (not yet configured)");
+
+    $c->stash(
+        template      => 'payment/PaypalPending.tt',
+        plan_id       => $c->req->param('plan_id'),
+        billing_cycle => $c->req->param('billing_cycle') || 'monthly',
+        promo_code    => $c->req->param('promo_code')    || '',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub paypal_return :Path('paypal/return') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_return',
+        "PayPal return called");
+    $c->flash->{success_msg} = 'Payment received via PayPal. Activating membership...';
+    $c->response->redirect($c->uri_for('/membership/account'));
+}
+
+sub paypal_cancel :Path('paypal/cancel') :Args(0) {
+    my ($self, $c) = @_;
+    $c->flash->{error_msg} = 'PayPal payment was cancelled.';
+    $c->response->redirect($c->uri_for('/membership'));
+}
+
+__PACKAGE__->meta->make_immutable;
+
+1;
