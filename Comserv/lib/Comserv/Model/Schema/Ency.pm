@@ -43,6 +43,8 @@ __PACKAGE__->register_class('MembershipServiceAccess', 'Comserv::Model::Schema::
 __PACKAGE__->register_class('MembershipTransaction', 'Comserv::Model::Schema::Ency::Result::PaymentTransaction');
 __PACKAGE__->register_class('SystemCostTracking', 'Comserv::Model::Schema::Ency::Result::SystemCostTracking');
 
+__PACKAGE__->register_class('MembershipPromoCode', 'Comserv::Model::Schema::Ency::Result::MembershipPromoCode');
+
 # Register unified Payment and Currency classes
 __PACKAGE__->register_class('PaymentTransaction', 'Comserv::Model::Schema::Ency::Result::PaymentTransaction');
 __PACKAGE__->register_class('InternalCurrencyAccount', 'Comserv::Model::Schema::Ency::Result::InternalCurrencyAccount');
