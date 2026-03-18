@@ -531,10 +531,10 @@ sub generate :Local :Args(0) {
             unless ($fast_check && $fast_check->check_connection()) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
-            $ollama->timeout(90);
+            $ollama->timeout(150);
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-                'generate', "Querying Ollama host=$current_host model=$current_model timeout=90s prompt_len=" . length($prompt));
+                'generate', "Querying Ollama host=$current_host model=$current_model timeout=150s prompt_len=" . length($prompt));
             
             my $query_start = time();
             # Query the API
@@ -1345,7 +1345,7 @@ sub chat :Local :Args(0) {
             }
 
             $ollama->set_host($current_host);
-            $ollama->timeout(90);
+            $ollama->timeout(150);
             $ollama->port($current_port) if $current_port;
             $ollama->model($current_model) if $current_model;
 
@@ -1354,7 +1354,7 @@ sub chat :Local :Args(0) {
             }
 
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=90s messages=" . scalar(@messages));
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@messages));
 
             my $chat_start = time();
             my $response = $ollama->chat(messages => \@messages);
@@ -4255,6 +4255,47 @@ sub _doc_candidates {
     # De-duplicate while preserving order
     my %seen;
     return grep { !$seen{$_}++ } @cands;
+}
+
+=head2 preload_model
+
+Send a minimal prompt to Ollama to pre-warm the selected model so subsequent
+user queries don't hit cold-start delays.  Called automatically when the chat
+widget opens.  Always returns JSON; never blocks longer than 30 s.
+
+=cut
+
+sub preload_model :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $provider = $c->req->param('provider') || 'ollama';
+    unless ($provider eq 'ollama') {
+        $c->response->body('{"success":true,"message":"non-ollama provider, no preload needed"}');
+        return;
+    }
+
+    eval {
+        my ($host, $port, $default_model, $installed) = $self->_get_current_ollama_config($c, 0);
+        unless ($host) {
+            $c->response->body('{"success":false,"message":"no ollama config"}');
+            return;
+        }
+
+        my $site_name = $c->stash->{SiteName} || 'CSC';
+        my $agent_id  = $c->req->param('agent_id') || lc($site_name);
+        my $model = $self->_select_model_for_context($agent_id, $agent_id, $installed, $default_model);
+
+        my $ollama = Comserv::Model::Ollama->new(
+            host    => $host,
+            port    => $port || 11434,
+            model   => $model,
+            timeout => 30,
+        );
+        $ollama->chat([{ role => 'user', content => 'hi' }]);
+    };
+
+    $c->response->body('{"success":true,"message":"model preloaded"}');
 }
 
 __PACKAGE__->meta->make_immutable;

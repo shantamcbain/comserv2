@@ -891,6 +891,18 @@
         // Focus on the input field
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
+
+        // Pre-warm the Ollama model in the background so the user's first
+        // real message doesn't hit a cold-start delay.
+        const provParts = (state.selectedProvider || 'ollama').split('|');
+        if (provParts[0] === 'ollama' && !state._preloadFired) {
+            state._preloadFired = true;
+            const agentId = (state.pageContext && state.pageContext.agent_id) || '';
+            fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
+                method: 'GET',
+                credentials: 'include'
+            }).catch(function() {});
+        }
     }
     
     // Reset conversation - clear session and UI
@@ -1064,14 +1076,27 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Provider-aware client timeout: Ollama (local) can be slow with large models,
-        // so match the server-side 90s. External APIs (Grok etc.) should be fast; cap at 30s.
+        // Provider-aware client timeout: Ollama can be slow loading a large model from disk;
+        // give it 180 s (server-side is 150 s). External APIs (Grok etc.) cap at 30 s.
         const isOllama = providerName === 'ollama';
-        const clientTimeoutMs = isOllama ? 95000 : 30000;
+        const clientTimeoutMs = isOllama ? 180000 : 30000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
         }, clientTimeoutMs);
+
+        // Progressive loading status: update the placeholder message so the user
+        // knows a model is being loaded rather than assuming the page is frozen.
+        let progressTimer1, progressTimer2;
+        if (isOllama) {
+            const loadingEl = document.getElementById('ai-loading');
+            progressTimer1 = setTimeout(function() {
+                if (loadingEl) loadingEl.textContent = '⏳ Loading AI model into memory…';
+            }, 15000);
+            progressTimer2 = setTimeout(function() {
+                if (loadingEl) loadingEl.textContent = '⏳ Still loading model (first load can take ~60 s)… please wait';
+            }, 45000);
+        }
 
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
@@ -1082,7 +1107,12 @@
             body: JSON.stringify(requestPayload),
             signal: abortCtrl.signal
         })
-        .then(function(response) { clearTimeout(abortTimer); return response.json(); })
+        .then(function(response) {
+            clearTimeout(abortTimer);
+            clearTimeout(progressTimer1);
+            clearTimeout(progressTimer2);
+            return response.json();
+        })
         .then(data => {
             // Remove loading message
             const loading = document.getElementById('ai-loading');
@@ -1156,6 +1186,8 @@
         })
         .catch(function(error) {
             clearTimeout(abortTimer);
+            clearTimeout(progressTimer1);
+            clearTimeout(progressTimer2);
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
 
