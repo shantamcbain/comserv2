@@ -14,11 +14,21 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub _is_admin {
+    my ($self, $c) = @_;
+    return 0 unless $c->session->{username};
+    my $roles = $c->session->{roles};
+    if (ref $roles eq 'ARRAY') {
+        return 1 if grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @$roles;
+    } elsif ($roles) {
+        return 1 if lc($roles) eq 'admin' || lc($roles) eq 'site_admin';
+    }
+    return 0;
+}
+
 sub _require_admin {
     my ($self, $c) = @_;
-    unless ($c->session->{username} && (
-        $c->check_user_roles('admin') || $c->check_user_roles('site_admin')
-    )) {
+    unless ($self->_is_admin($c)) {
         $c->flash->{error_msg} = 'Administrator access required.';
         $c->response->redirect($c->uri_for('/user/login'));
         return 0;
@@ -29,7 +39,15 @@ sub _require_admin {
 sub _get_site {
     my ($self, $c) = @_;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    return $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+    my $site;
+    eval {
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_site',
+            "Could not look up site '$site_name': $@");
+    }
+    return $site;
 }
 
 sub auto :Private {
