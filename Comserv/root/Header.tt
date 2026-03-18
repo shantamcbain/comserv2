@@ -90,9 +90,9 @@
     <!-- Menu CSS (part of theme system) -->
     <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
 
-    <!-- Debug: Using theme system only, removed old CSS references -->
-    [% IF c.session.debug_mode == 1 %]
-    <!-- Removed old CSS references: css_view_name, log_css, menu_css, todo_css -->
+    <!-- Site-specific CSS (background images, site branding) -->
+    [% IF css_view_name %]
+    <link rel="stylesheet" type="text/css" href="[% css_view_name %]">
     [% END %]
 
     <!-- Local SVG icon solution (no external dependencies) -->
@@ -108,6 +108,10 @@
     
     [% IF template.match('todo/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
+    [% END %]
+
+    [% IF template.match('membership/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
     [% END %]
 
     <!-- Back to Top Button CSS -->
