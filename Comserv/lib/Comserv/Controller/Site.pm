@@ -2,6 +2,7 @@ package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
 # In your controller or script file
 use Try::Tiny;
@@ -123,6 +124,13 @@ sub index :Path :Args(0) {
 
 sub add_site :Local {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_site')) {
+        $c->flash->{error_msg} = 'You must be an administrator to add sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Get the site details from the request
     my $site = $c->request->body_parameters;
@@ -262,6 +270,13 @@ sub details :Local {
 sub add_domain :Local {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_domain')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Get the site_id from the request parameters
     my $site_id = $c->request->parameters->{site_id};
 
@@ -304,6 +319,14 @@ sub get_site_details {
 
 sub delete_domain :Local {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'delete_domain')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $domain_id = $c->request->parameters->{domain_id};
     my $site_id = $c->request->parameters->{site_id};
 
@@ -329,6 +352,13 @@ sub delete_domain :Local {
 sub delete :Path('delete') :Args(0) {
     my ($self, $c) = @_;
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'delete_site')) {
+        $c->flash->{error_msg} = 'You must be an administrator to delete sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Log entry into the delete method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 'Entered site delete method');
     
@@ -624,6 +654,13 @@ sub fetch_available_sites :Private {
 
 sub add_domain_post :Local {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_domain_post')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Get the site_id and domain from the form parameters
     my $site_id = $c->request->parameters->{site_id};
