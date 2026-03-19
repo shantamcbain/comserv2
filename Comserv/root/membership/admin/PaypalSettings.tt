@@ -95,47 +95,64 @@
       <div class="content-section">
         <h2>How to Set Up PayPal</h2>
 
-        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 1 — Create a Business Account</h3>
+        <div style="background:#e8f5e9;border:1px solid #66bb6a;border-radius:6px;padding:0.6rem 0.9rem;margin-bottom:1rem;font-size:0.9em">
+          <strong>Good news:</strong> You do <em>not</em> need to create a developer app or know anything technical.
+          All you need is a free PayPal Business account and its email address.
+        </div>
+
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 1 — Get a PayPal Business Account</h3>
+        <p style="font-size:0.88em;margin:0 0 0.4rem">
+          If you already accept PayPal payments anywhere, you already have this — just use that email address.
+          If not:
+        </p>
         <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
           <li>Go to <a href="https://www.paypal.com/bizsignup" target="_blank" rel="noopener">paypal.com/bizsignup</a></li>
-          <li>Choose <strong>Business Account</strong></li>
-          <li>Complete identity verification</li>
-          <li>Your business email becomes the <strong>Business Email</strong> above</li>
+          <li>Sign up for a <strong>Business account</strong> (it is free)</li>
+          <li>Verify your email address when PayPal sends you a confirmation</li>
+          <li>That verified email is your <strong>PayPal Business Email</strong> — enter it in the form on the left</li>
         </ol>
 
-        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 2 — Test with Sandbox First</h3>
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 2 — Go Live</h3>
         <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
-          <li>Go to <a href="https://developer.paypal.com" target="_blank" rel="noopener">developer.paypal.com</a></li>
-          <li>Log in with your PayPal account</li>
-          <li>Under <strong>Sandbox → Accounts</strong>, note the test <em>business</em> email</li>
-          <li>Enter that test email above and keep <strong>Sandbox Mode</strong> checked</li>
-          <li>Use sandbox buyer credentials from the same page to test a purchase</li>
+          <li>Enter your PayPal Business email in the <strong>PayPal Business Email</strong> field</li>
+          <li>Set <strong>Currency</strong> to match your PayPal account currency</li>
+          <li>Make sure <strong>Sandbox Mode is unchecked</strong></li>
+          <li>Click <strong>Save Settings</strong></li>
+          <li>Members can now pay with real money via PayPal</li>
         </ol>
 
-        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Step 3 — Go Live</h3>
+        <h3 style="font-size:1em;margin:1rem 0 0.25rem">Optional — Test Before Going Live</h3>
+        <p style="font-size:0.88em;margin:0 0 0.4rem">
+          PayPal provides a free test environment called <em>Sandbox</em>. To use it:
+        </p>
         <ol style="padding-left:1.2rem;margin:0 0 0.75rem;font-size:0.9em">
-          <li>Replace the business email with your <strong>real PayPal Business email</strong></li>
-          <li>Uncheck <strong>Sandbox Mode</strong></li>
-          <li>Save — payments are now live</li>
+          <li>Go to <a href="https://developer.paypal.com/dashboard/accounts" target="_blank" rel="noopener">developer.paypal.com/dashboard/accounts</a> and log in with your normal PayPal account</li>
+          <li>You will see two pre-made test accounts — one labelled <strong>Business</strong> and one <strong>Personal</strong></li>
+          <li>Click the <strong>Business</strong> account → <em>View/Edit Account</em> → copy the email shown</li>
+          <li>Paste that test email into <strong>PayPal Business Email</strong> on this form</li>
+          <li>Leave <strong>Sandbox Mode checked</strong> and save</li>
+          <li>To simulate a purchase, use the <strong>Personal</strong> test account email and password shown on the same page</li>
+          <li>When you are happy with testing, switch back to your real email and uncheck Sandbox</li>
         </ol>
 
-        <h3 style="font-size:1em;margin:1rem 0 0.25rem">REST API (optional)</h3>
-        <ol style="padding-left:1.2rem;margin:0;font-size:0.9em">
-          <li>At <a href="https://developer.paypal.com/dashboard/applications" target="_blank" rel="noopener">developer.paypal.com/dashboard/applications</a></li>
-          <li>Create an app and copy the <strong>Client ID</strong> and <strong>Secret</strong></li>
-          <li>Use <em>Sandbox</em> credentials while testing, <em>Live</em> when ready</li>
-        </ol>
+        <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em">
+          <strong>Client ID / Secret fields</strong> — you can ignore these completely.
+          They are only needed for a future feature (automatic recurring subscriptions).
+          Leave them blank for now.
+        </div>
       </div>
 
       <div class="content-section" style="background:rgba(255,253,231,0.95);border-color:#f0ad4e">
-        <h2 style="color:#7a5700">IPN / Return URL</h2>
-        <p style="font-size:0.88em">PayPal will send payment notifications to:</p>
+        <h2 style="color:#7a5700">Technical Note</h2>
+        <p style="font-size:0.88em">
+          When a member pays, PayPal automatically notifies this site at:
+        </p>
         <code style="word-break:break-all;font-size:0.82em;display:block;padding:0.4rem;background:#fff;border:1px solid #ddd;border-radius:4px">
           [% c.uri_for('/payment/paypal/ipn') %]
         </code>
         <p style="font-size:0.88em;margin-top:0.5rem">
-          No configuration needed in PayPal — the URL is sent automatically with each transaction.
-          For production, this URL must be publicly reachable (not localhost).
+          Nothing extra needs to be set up in PayPal for this — it happens automatically.
+          For live payments, this address must be reachable from the internet (not just your local network).
         </p>
       </div>
 
