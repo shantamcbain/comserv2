@@ -1807,7 +1807,7 @@ sub end : ActionClass('RenderView') {
                 "frame-src 'none'; " .
                 "object-src 'none'; " .
                 "base-uri 'self'; " .
-                "form-action 'self';"
+                "form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com;"
         );
     }
     
