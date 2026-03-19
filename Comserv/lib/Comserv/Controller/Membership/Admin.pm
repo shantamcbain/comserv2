@@ -685,6 +685,74 @@ sub benefactor_contribution :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+# ============================================================
+# PayPal Settings
+# ============================================================
+sub paypal_settings :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my %FIELDS = (
+        paypal_sandbox    => { label => 'Sandbox Mode',      secret => 0, type => 'boolean' },
+        paypal_business   => { label => 'PayPal Business Email', secret => 0, type => 'string' },
+        paypal_currency   => { label => 'Currency Code',     secret => 0, type => 'string' },
+        paypal_client_id  => { label => 'REST Client ID (optional)', secret => 0, type => 'string' },
+        paypal_secret     => { label => 'REST Secret (optional)',     secret => 1, type => 'string' },
+    );
+
+    if ($c->req->method eq 'POST') {
+        my $rs = $c->model('DBEncy')->resultset('EnvVariable');
+        my $uid = $c->session->{user_id};
+
+        for my $key (keys %FIELDS) {
+            my $val = $c->req->param($key) // '';
+            $val = ($val ? '1' : '0') if $FIELDS{$key}{type} eq 'boolean';
+
+            eval {
+                $rs->update_or_create(
+                    {
+                        key        => $key,
+                        value      => $val,
+                        var_type   => $FIELDS{$key}{type},
+                        is_secret  => $FIELDS{$key}{secret} ? 1 : 0,
+                        updated_by => $uid,
+                    },
+                    { key => 'key_unique' }
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'paypal_settings', "Error saving $key: $@");
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'paypal_settings', "PayPal settings updated by user_id=$uid");
+        $c->flash->{success_msg} = 'PayPal settings saved.';
+        $c->response->redirect($c->uri_for('/membership/admin/paypal_settings'));
+        return;
+    }
+
+    my %current;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -in => [keys %FIELDS] } }
+        )->all;
+        $current{$_->key} = $_->value for @rows;
+    };
+
+    $current{paypal_sandbox}  //= $c->config->{PayPal}{sandbox}       // '1';
+    $current{paypal_business} //= $c->config->{PayPal}{business}      // '';
+    $current{paypal_currency} //= $c->config->{PayPal}{currency_code} // 'USD';
+
+    $c->stash(
+        template => 'membership/admin/PaypalSettings.tt',
+        current  => \%current,
+        fields   => \%FIELDS,
+    );
+    $c->forward($c->view('TT'));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

@@ -272,11 +272,20 @@ my @COIN_PACKAGES = (
 
 sub _paypal_config {
     my ($self, $c) = @_;
-    my $cfg = $c->config->{PayPal} || {};
+    my $cfg  = $c->config->{PayPal} || {};
+    my %db;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -in => [qw(paypal_sandbox paypal_business paypal_currency paypal_client_id paypal_secret)] } }
+        )->all;
+        $db{$_->key} = $_->value for @rows;
+    };
     return {
-        sandbox       => $cfg->{sandbox}       // 1,
-        business      => $cfg->{business}      || 'paypal@computersystemconsulting.ca',
-        currency_code => $cfg->{currency_code} || 'USD',
+        sandbox       => (exists $db{paypal_sandbox}  ? $db{paypal_sandbox}  : ($cfg->{sandbox}       // 1)) + 0,
+        business      => ($db{paypal_business}  || $cfg->{business}      || 'paypal@computersystemconsulting.ca'),
+        currency_code => ($db{paypal_currency}  || $cfg->{currency_code} || 'USD'),
+        client_id     => ($db{paypal_client_id} || ''),
+        secret        => ($db{paypal_secret}    || ''),
     };
 }
 
