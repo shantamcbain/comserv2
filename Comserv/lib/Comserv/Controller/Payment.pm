@@ -375,7 +375,11 @@ sub paypal_checkout :Path('paypal/checkout') :Args(0) {
     my $custom     = join(':', 'membership', $c->session->{user_id}, $plan->id, $site->id, $billing);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_checkout',
-        "PayPal membership checkout plan_id=$plan_id billing=$billing price=$final_price sandbox=" . $paypal_cfg->{sandbox});
+        "PayPal checkout plan=$plan_id billing=$billing price=$final_price"
+        . " sandbox=" . $paypal_cfg->{sandbox}
+        . " business=" . ($paypal_cfg->{business} || '(none)')
+        . " currency=" . $paypal_cfg->{currency_code}
+        . " is_configured=" . $paypal_cfg->{is_configured});
 
     $c->stash(
         template      => 'payment/PaypalMembershipCheckout.tt',
