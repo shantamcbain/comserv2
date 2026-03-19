@@ -891,6 +891,18 @@
         // Focus on the input field
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
+
+        // Pre-warm the Ollama model in the background so the user's first
+        // real message doesn't hit a cold-start delay.
+        const provParts = (state.selectedProvider || 'ollama').split('|');
+        if (provParts[0] === 'ollama' && !state._preloadFired) {
+            state._preloadFired = true;
+            const agentId = (state.pageContext && state.pageContext.agent_id) || '';
+            fetch('/ai/preload_model?provider=ollama&agent_id=' + encodeURIComponent(agentId), {
+                method: 'GET',
+                credentials: 'include'
+            }).catch(function() {});
+        }
     }
     
     // Reset conversation - clear session and UI
@@ -1064,14 +1076,27 @@
         
         console.debug('Sending AI request with agent:', state.pageContext.agent_id, requestPayload);
         
-        // Provider-aware client timeout: Ollama (local) can be slow with large models,
-        // so match the server-side 90s. External APIs (Grok etc.) should be fast; cap at 30s.
+        // Provider-aware client timeout: Ollama can be slow loading a large model from disk;
+        // give it 180 s (server-side is 150 s). External APIs (Grok etc.) cap at 30 s.
         const isOllama = providerName === 'ollama';
-        const clientTimeoutMs = isOllama ? 95000 : 30000;
+        const clientTimeoutMs = isOllama ? 180000 : 30000;
         const abortCtrl = new AbortController();
         const abortTimer = setTimeout(function() {
             abortCtrl.abort();
         }, clientTimeoutMs);
+
+        // Progressive loading status: update the placeholder message so the user
+        // knows a model is being loaded rather than assuming the page is frozen.
+        let progressTimer1, progressTimer2;
+        if (isOllama) {
+            const loadingEl = document.getElementById('ai-loading');
+            progressTimer1 = setTimeout(function() {
+                if (loadingEl) loadingEl.textContent = '⏳ Loading AI model into memory…';
+            }, 15000);
+            progressTimer2 = setTimeout(function() {
+                if (loadingEl) loadingEl.textContent = '⏳ Still loading model (first load can take ~60 s)… please wait';
+            }, 45000);
+        }
 
         fetch(config.apiEndpoints.generateResponse, {
             method: 'POST',
@@ -1082,7 +1107,12 @@
             body: JSON.stringify(requestPayload),
             signal: abortCtrl.signal
         })
-        .then(function(response) { clearTimeout(abortTimer); return response.json(); })
+        .then(function(response) {
+            clearTimeout(abortTimer);
+            clearTimeout(progressTimer1);
+            clearTimeout(progressTimer2);
+            return response.json();
+        })
         .then(data => {
             // Remove loading message
             const loading = document.getElementById('ai-loading');
@@ -1156,6 +1186,8 @@
         })
         .catch(function(error) {
             clearTimeout(abortTimer);
+            clearTimeout(progressTimer1);
+            clearTimeout(progressTimer2);
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
 
@@ -1383,8 +1415,8 @@
             }
             
             .chat-button {
-                background-color: var(--primary-color);
-                color: var(--text-color);
+                background-color: var(--accent-color, #FF9900);
+                color: #fff;
                 border: none;
                 border-radius: 50px;
                 padding: 10px 20px;
@@ -1412,9 +1444,9 @@
                 height: 500px;
                 min-height: 300px;
                 max-height: 90vh;
-                background-color: var(--background-color);
+                background-color: #ffffff;
                 border-radius: 10px;
-                box-shadow: var(--dropdown-shadow);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
                 display: flex;
                 flex-direction: column;
                 font-family: inherit;
@@ -1423,8 +1455,8 @@
             }
             
             .chat-header {
-                background-color: var(--primary-color);
-                color: var(--text-color);
+                background-color: var(--accent-color, #FF9900);
+                color: #fff;
                 padding: 8px 12px;
                 border-top-left-radius: 10px;
                 border-top-right-radius: 10px;
@@ -1451,17 +1483,17 @@
             }
 
             .chat-header-icon-btn {
-                background: none; border: none; color: var(--text-color);
+                background: none; border: none; color: #fff;
                 font-size: 15px; cursor: pointer; padding: 2px 5px;
-                border-radius: 4px; opacity: 0.75; transition: opacity 0.15s, background 0.15s;
+                border-radius: 4px; opacity: 0.85; transition: opacity 0.15s, background 0.15s;
             }
-            .chat-header-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+            .chat-header-icon-btn:hover { opacity: 1; background: rgba(255,255,255,0.2); }
 
             /* History drawer */
             .widget-history-drawer {
                 display: flex; flex-direction: column;
-                background-color: var(--background-color);
-                border-bottom: 1px solid var(--border-color);
+                background-color: #fafafa;
+                border-bottom: 1px solid #ddd;
                 max-height: 220px; overflow: hidden; flex-shrink: 0;
             }
             .widget-history-header {
@@ -1496,21 +1528,21 @@
             }
             
             #new-chat {
-                background: none; border: none; color: var(--text-color);
+                background: none; border: none; color: #fff;
                 font-size: 15px; cursor: pointer; padding: 2px 5px;
-                border-radius: 4px; opacity: 0.75;
+                border-radius: 4px; opacity: 0.85;
             }
             
             #close-chat {
-                background: none; border: none; color: var(--text-color);
-                font-size: 18px; cursor: pointer; opacity: 0.75;
+                background: none; border: none; color: #fff;
+                font-size: 18px; cursor: pointer; opacity: 0.85;
             }
             
             .chat-messages {
                 flex-grow: 1;
                 padding: 10px 12px;
                 overflow-y: auto;
-                background-color: var(--background-color);
+                background-color: #ffffff;
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
@@ -1540,20 +1572,20 @@
             }
             
             .user-message {
-                background-color: var(--primary-color);
-                color: var(--text-color);
+                background-color: var(--accent-color, #FF9900);
+                color: #fff;
                 align-self: flex-end;
                 margin-left: auto;
                 border-bottom-right-radius: 5px;
             }
             
             .ai-message {
-                background-color: var(--secondary-color);
-                color: var(--text-color);
+                background-color: #f0f4f8;
+                color: #222;
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
-                border-left: 3px solid var(--success-color);
+                border-left: 3px solid var(--accent-color, #FF9900);
             }
             
             .ai-message.loading {
@@ -1575,8 +1607,9 @@
                 padding: 5px 10px;
                 font-size: 0.8em;
                 text-align: center;
-                background-color: var(--background-color);
-                border-top: 1px solid var(--border-color);
+                background-color: #fafafa;
+                border-top: 1px solid #ddd;
+                color: #555;
             }
             
             .chat-status.connected {
@@ -1605,7 +1638,7 @@
             .provider-selector {
                 padding: 8px 15px;
                 background-color: #f5f5f5;
-                border-bottom: 1px solid var(--border-color);
+                border-bottom: 1px solid #ddd;
                 display: flex;
                 align-items: center;
                 gap: 10px;
@@ -1614,15 +1647,16 @@
             
             .provider-selector label {
                 font-weight: 600;
-                color: #555;
+                color: #444;
             }
             
             .provider-selector select {
                 flex-grow: 1;
                 padding: 5px 10px;
-                border: 1px solid var(--border-color);
+                border: 1px solid #ccc;
                 border-radius: 4px;
-                background-color: white;
+                background-color: #fff;
+                color: #333;
                 cursor: pointer;
             }
             
@@ -1632,16 +1666,16 @@
                 justify-content: center;
                 width: 28px;
                 height: 28px;
-                background: var(--link-color);
-                color: white;
+                background: var(--accent-color, #FF9900);
+                color: #fff;
                 border-radius: 4px;
                 text-decoration: none;
                 font-size: 14px;
-                transition: background 0.2s;
+                transition: opacity 0.2s;
             }
             
             .manage-keys-link:hover {
-                background: #0056b3;
+                opacity: 0.85;
                 text-decoration: none;
             }
             
@@ -1653,19 +1687,19 @@
             
             #message-input {
                 flex-grow: 1;
-                border: 1px solid var(--border-color);
+                border: 1px solid #ccc;
                 border-radius: 4px;
                 padding: 8px;
                 resize: none;
                 height: 40px;
                 margin-right: 8px;
-                background-color: var(--background-color);
-                color: var(--text-color);
+                background-color: #fff;
+                color: #222;
             }
             
             #send-message {
-                background-color: var(--primary-color);
-                color: var(--text-color);
+                background-color: var(--accent-color, #FF9900);
+                color: #fff;
                 border: none;
                 border-radius: 4px;
                 padding: 8px 15px;
@@ -1674,14 +1708,12 @@
             }
             
             #send-message:hover {
-                background-color: var(--primary-color);
-                opacity: 0.8;
-                color: var(--text-color);
+                opacity: 0.85;
             }
             
             #send-message:disabled {
-                background-color: var(--secondary-color);
-                color: var(--schema-text-muted);
+                background-color: #ccc;
+                color: #888;
                 cursor: not-allowed;
             }
 
