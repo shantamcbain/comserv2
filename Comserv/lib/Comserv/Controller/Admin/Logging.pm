@@ -139,6 +139,32 @@ sub index :Path('/admin/logging') :Args(0) {
         $health_status->{eval_summary} = $eval_summary;
     };
 
+    # Hardware Monitor — latest reading per metric/host for HealthDash include
+    my @hardware_latest;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        my @rows = $rs->search(
+            {},
+            { order_by => { -asc => 'timestamp' }, rows => 500 }
+        );
+        my %seen;
+        for my $m (reverse @rows) {
+            my $key = $m->hostname . '|' . $m->metric_name;
+            next if $seen{$key}++;
+            push @hardware_latest, {
+                hostname     => $m->hostname,
+                metric_name  => $m->metric_name,
+                metric_value => $m->metric_value,
+                metric_text  => $m->metric_text,
+                unit         => $m->unit,
+                level        => $m->level,
+                timestamp    => $m->timestamp,
+            };
+        }
+        @hardware_latest = sort { $a->{hostname} cmp $b->{hostname}
+                               || $a->{metric_name} cmp $b->{metric_name} } @hardware_latest;
+    };
+
     # Get available levels for filter
     my @levels = sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY;
 
@@ -152,8 +178,9 @@ sub index :Path('/admin/logging') :Args(0) {
         db_logs         => \@db_logs,
         db_error        => $db_error,
         total_count     => $total_count,
-        health_status   => $health_status,
-        levels          => \@levels,
+        health_status    => $health_status,
+        hardware_latest  => \@hardware_latest,
+        levels           => \@levels,
         filter_level    => $filter_level,
         filter_sitename => $filter_sitename,
         filter_username => $filter_username,

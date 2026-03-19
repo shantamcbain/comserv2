@@ -16,7 +16,7 @@ has 'logging' => (
 sub models :Path('/ai/admin/models') :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->check_user_roles('admin')) {
+    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
@@ -65,7 +65,7 @@ sub models :Path('/ai/admin/models') :Args(0) {
 sub add_model :Path('/ai/admin/add_model') :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->check_user_roles('admin')) {
+    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
@@ -133,7 +133,7 @@ sub add_model :Path('/ai/admin/add_model') :Args(0) {
 sub update_model :Path('/ai/admin/update_model') :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->check_user_roles('admin')) {
+    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
@@ -196,7 +196,7 @@ sub update_model :Path('/ai/admin/update_model') :Args(0) {
 sub delete_model :Path('/ai/admin/delete_model') :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->check_user_roles('admin')) {
+    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
         $c->response->status(403);
         $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
         return;
@@ -246,7 +246,7 @@ sub delete_model :Path('/ai/admin/delete_model') :Args(0) {
 sub agents :Path('/ai/admin/agents') :Args(0) {
     my ($self, $c) = @_;
     
-    unless ($c->check_user_roles('admin')) {
+    my $_roles = $c->session->{roles} || []; my $_is_admin = (ref($_roles) ? grep { lc($_) eq 'admin' } @$_roles : 0) || $c->session->{is_admin}; unless ($_is_admin) {
         $c->response->redirect($c->uri_for('/'));
         return;
     }
