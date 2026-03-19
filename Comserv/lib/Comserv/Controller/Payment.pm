@@ -328,7 +328,8 @@ sub buy_coins :Path('buy/coins') :Args(0) {
 }
 
 # ============================================================
-# PayPal — membership plan checkout (stub → redirect to coins)
+# PayPal — membership plan checkout
+# Renders a page with a PayPal form that the user submits
 # ============================================================
 sub paypal_checkout :Path('paypal/checkout') :Args(0) {
     my ($self, $c) = @_;
@@ -336,16 +337,50 @@ sub paypal_checkout :Path('paypal/checkout') :Args(0) {
 
     my $plan_id  = $c->req->param('plan_id')       || '';
     my $billing  = $c->req->param('billing_cycle')  || 'monthly';
-    my $promo    = $c->req->param('promo_code')      || '';
+    my $promo_code = $c->req->param('promo_code')   || '';
+
+    my $plan = undef;
+    my $site = undef;
+    my $final_price = 0;
+    my $promo = undef;
+
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+        $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan_id) if $plan_id;
+    };
+
+    unless ($plan && $site) {
+        $c->flash->{error_msg} = 'Invalid plan or site.';
+        $c->response->redirect($c->uri_for('/membership'));
+        return;
+    }
+
+    $promo = $self->_validate_promo($c, $promo_code, $plan->id, $site->id);
+    my $base_price = $billing eq 'annual' ? $plan->price_annual : $plan->price_monthly;
+    $final_price   = $self->_apply_promo_discount($promo, $base_price, $billing);
+
+    my $paypal_cfg = $self->_paypal_config($c);
+    my $custom     = join(':', 'membership', $c->session->{user_id}, $plan->id, $site->id, $billing);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_checkout',
-        "PayPal membership checkout requested plan_id=$plan_id billing=$billing");
+        "PayPal membership checkout plan_id=$plan_id billing=$billing price=$final_price sandbox=" . $paypal_cfg->{sandbox});
 
     $c->stash(
-        template      => 'payment/PaypalPending.tt',
-        plan_id       => $plan_id,
+        template      => 'payment/PaypalMembershipCheckout.tt',
+        plan          => $plan,
+        site          => $site,
         billing_cycle => $billing,
-        promo_code    => $promo,
+        promo_code    => $promo_code,
+        promo         => $promo,
+        base_price    => $base_price,
+        final_price   => $final_price,
+        paypal_url    => $self->_paypal_url($c),
+        paypal_cfg    => $paypal_cfg,
+        custom        => $custom,
+        return_url    => $c->uri_for('/payment/paypal/return')->as_string,
+        cancel_url    => $c->uri_for('/payment/paypal/cancel')->as_string,
+        notify_url    => $c->uri_for('/payment/paypal/ipn')->as_string,
     );
     $c->forward($c->view('TT'));
 }
@@ -528,10 +563,110 @@ sub patreon_checkout :Path('patreon/checkout') :Args(0) {
 
 sub paypal_return :Path('paypal/return') :Args(0) {
     my ($self, $c) = @_;
+    my $custom = $c->req->param('custom') || '';
+    my $tx     = $c->req->param('tx')     || '';
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_return',
-        "PayPal membership return called");
-    $c->flash->{success_msg} = 'Payment received via PayPal. Activating membership...';
+        "PayPal membership return custom=$custom tx=$tx");
+
+    my ($type, $user_id, $plan_id, $site_id, $billing) = split /:/, $custom;
+    my $session_uid = $c->session->{user_id} || 0;
+
+    if ($type && $type eq 'membership'
+        && $user_id && $user_id == $session_uid
+        && $plan_id && $site_id)
+    {
+        eval {
+            $self->_activate_paypal_membership($c, $user_id, $plan_id, $site_id,
+                $billing || 'monthly', $tx || 'PP-' . time);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_return',
+                "Error activating membership: $@");
+            $c->flash->{error_msg} = 'Payment received but membership activation failed. Please contact support with reference: ' . ($tx || 'unknown');
+        } else {
+            $c->flash->{success_msg} = 'Payment confirmed via PayPal! Your membership is now active.';
+        }
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'paypal_return',
+            "Could not verify return: custom=$custom session_uid=$session_uid");
+        $c->flash->{success_msg} = 'Payment received. Your membership will be activated shortly.';
+    }
+
     $c->response->redirect($c->uri_for('/membership/account'));
+}
+
+sub _activate_paypal_membership {
+    my ($self, $c, $user_id, $plan_id, $site_id, $billing, $tx_id) = @_;
+    use DateTime;
+
+    my $schema = $c->model('DBEncy')->schema;
+    $schema->txn_do(sub {
+        my $plan = $schema->resultset('MembershipPlan')->find($plan_id)
+            or die "Plan $plan_id not found\n";
+
+        my $base_price = $billing eq 'annual' ? $plan->price_annual : $plan->price_monthly;
+
+        my $expires_at = $billing eq 'annual'
+            ? DateTime->now->add(years  => 1)->strftime('%Y-%m-%d %H:%M:%S')
+            : DateTime->now->add(months => 1)->strftime('%Y-%m-%d %H:%M:%S');
+
+        my $existing = $schema->resultset('UserMembership')->search({
+            user_id => $user_id,
+            site_id => $site_id,
+            status  => ['active', 'grace'],
+        })->first;
+
+        if ($existing) {
+            $existing->update({
+                plan_id           => $plan_id,
+                billing_cycle     => $billing,
+                payment_provider  => 'paypal',
+                payment_reference => $tx_id,
+                price_paid        => $base_price,
+                currency_paid     => $plan->price_currency,
+                expires_at        => $expires_at,
+                status            => 'active',
+            });
+        } else {
+            $schema->resultset('UserMembership')->create({
+                user_id           => $user_id,
+                plan_id           => $plan_id,
+                site_id           => $site_id,
+                billing_cycle     => $billing,
+                status            => 'active',
+                payment_provider  => 'paypal',
+                payment_reference => $tx_id,
+                price_paid        => $base_price,
+                currency_paid     => $plan->price_currency,
+                region_code       => 'CA',
+                expires_at        => $expires_at,
+            });
+        }
+
+        my $plan_role = 'member_' . ($plan->slug || lc($plan->name));
+        my $user_obj  = $schema->resultset('User')->find($user_id);
+        if ($user_obj) {
+            my @roles = grep { $_ !~ /^member_/ }
+                        map  { s/^\s+|\s+$//gr }
+                        split /,/, ($user_obj->roles || 'normal');
+            push @roles, $plan_role;
+            $user_obj->update({ roles => join(',', @roles) });
+            $c->session->{roles} = \@roles;
+        }
+
+        $schema->resultset('PaymentTransaction')->create({
+            user_id      => $user_id,
+            payable_type => 'membership',
+            payable_id   => $plan_id,
+            amount       => $base_price,
+            currency     => $plan->price_currency,
+            provider     => 'paypal',
+            status       => 'completed',
+            description  => 'PayPal membership: ' . $plan->name . " ($billing)",
+            ip_address   => eval { $c->req->address } || undef,
+        });
+    });
 }
 
 sub paypal_cancel :Path('paypal/cancel') :Args(0) {
