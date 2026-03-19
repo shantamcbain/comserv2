@@ -686,6 +686,75 @@ sub benefactor_contribution :Local :Args(0) {
 }
 
 # ============================================================
+# Patreon Settings (per-site)
+# ============================================================
+sub patreon_settings :Local :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_admin($c);
+
+    my $site      = $self->_get_site($c);
+    my $site_name = $site ? lc($site->name) : 'csc';
+    my $uid       = $c->session->{user_id};
+
+    my @KEYS = qw(url email active);
+
+    if ($c->req->method eq 'POST') {
+        my $rs = $c->model('DBEncy')->resultset('EnvVariable');
+        for my $k (@KEYS) {
+            my $val = $c->req->param($k) // '';
+            $val = ($val ? '1' : '0') if $k eq 'active';
+            eval {
+                $rs->update_or_create(
+                    {
+                        key        => "patreon_${site_name}_${k}",
+                        value      => $val,
+                        var_type   => 'string',
+                        is_secret  => 0,
+                        updated_by => $uid,
+                    },
+                    { key => 'key_unique' }
+                );
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                    'patreon_settings', "Error saving patreon_${site_name}_${k}: $@");
+            }
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'patreon_settings', "Patreon settings saved for site=$site_name by uid=$uid");
+        $c->flash->{success_msg} = 'Patreon settings saved.';
+        $c->response->redirect($c->uri_for('/membership/admin/patreon_settings'));
+        return;
+    }
+
+    my %current;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -like => "patreon_${site_name}_%" } }
+        )->all;
+        for my $row (@rows) {
+            my $k = $row->key;
+            $k =~ s/^patreon_${site_name}_//;
+            $current{$k} = $row->value;
+        }
+    };
+
+    my @all_sites;
+    eval {
+        @all_sites = $c->model('DBEncy')->resultset('Site')->search({}, { order_by => 'name' })->all;
+    };
+
+    $c->stash(
+        template    => 'membership/admin/PatreonSettings.tt',
+        current     => \%current,
+        site        => $site,
+        site_name   => $site_name,
+        all_sites   => \@all_sites,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
 # PayPal Settings
 # ============================================================
 sub paypal_settings :Local :Args(0) {

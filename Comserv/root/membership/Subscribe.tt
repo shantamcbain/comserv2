@@ -75,18 +75,29 @@
           <div class="form-row">
 
             <div class="form-field" style="text-align:center;padding:1em;border:1px solid #ddd;border-radius:8px">
-              <strong>Site Credits (Coins)</strong><br>
-              <small>Pay using your internal coin balance — instant activation.</small><br><br>
+              <strong>Site Coins</strong>
+              <em style="font-size:0.8em;display:block;color:var(--warning-color,#e67e22)">Promotional Offer</em>
+              <small>Pay using your coin balance. Coins can also be used for services offered by participating members.</small><br><br>
               <button type="submit" formaction="[% c.uri_for('/payment/internal/checkout') %]"
                       class="btn btn-primary">Pay with Coins</button>
+              <br><small><a href="[% c.uri_for('/payment/buy/coins') %]">Need coins?</a></small>
             </div>
 
             <div class="form-field" style="text-align:center;padding:1em;border:1px solid #ddd;border-radius:8px">
               <strong>PayPal</strong><br>
-              <small>Pay securely with PayPal or any credit/debit card.</small><br><br>
+              <small>Pay securely with PayPal or any credit/debit card. No PayPal account required.</small><br><br>
               <button type="submit" formaction="[% c.uri_for('/payment/paypal/checkout') %]"
                       class="btn btn-primary">Pay with PayPal</button>
             </div>
+
+            [% IF patreon_cfg AND patreon_cfg.active %]
+            <div class="form-field" style="text-align:center;padding:1em;border:2px solid #f96854;border-radius:8px">
+              <strong style="color:#f96854">Patreon</strong><br>
+              <small>Become a patron to support this site and receive membership benefits.</small><br><br>
+              <button type="submit" formaction="[% c.uri_for('/payment/patreon/checkout') %]"
+                      class="btn" style="background:#f96854;color:#fff;border:none">Support on Patreon</button>
+            </div>
+            [% END %]
 
           </div>
         </form>

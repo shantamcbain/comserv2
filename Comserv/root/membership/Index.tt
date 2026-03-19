@@ -174,13 +174,19 @@
         <h2>Payment Options</h2>
         <div class="form-row">
           <div class="form-field">
-            <strong>PayPal</strong> — Pay securely with your PayPal account or credit card.
+            <strong>PayPal</strong> — Pay securely with your PayPal account or any credit / debit card.
           </div>
+          [% IF patreon_cfg AND patreon_cfg.active %]
           <div class="form-field">
-            <strong>Patreon</strong> — Support via Patreon and link your patron account.
+            <strong>Patreon</strong> — Support [% site_name | html %] through Patreon and receive membership benefits automatically.
+            [% IF patreon_cfg.url %]<br><a href="[% patreon_cfg.url | html %]" target="_blank" rel="noopener">Visit our Patreon page →</a>[% END %]
           </div>
+          [% END %]
           <div class="form-field">
-            <strong>Site Credits</strong> — Use your internal coin balance to pay for membership.
+            <strong>Site Coins</strong> <em style="font-size:0.85em;color:var(--warning-color,#e67e22)">(Promotional)</em>
+            — Use your internal coin balance to pay for memberships and services offered by participating members.
+            New accounts receive <strong>100 free coins</strong> to get started.
+            <br><a href="[% c.uri_for('/payment/buy/coins') %]">Buy more coins →</a>
           </div>
         </div>
       </div>

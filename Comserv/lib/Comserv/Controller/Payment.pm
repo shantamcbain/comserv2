@@ -492,6 +492,40 @@ sub _credit_coins {
 # ============================================================
 # PayPal — legacy membership return / cancel
 # ============================================================
+sub patreon_checkout :Path('patreon/checkout') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $plan_id  = $c->req->param('plan_id')      || '';
+    my $billing  = $c->req->param('billing_cycle') || 'monthly';
+    my $site_name = lc($c->stash->{SiteName} || $c->session->{SiteName} || 'csc');
+
+    my %patreon;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -like => "patreon_${site_name}_%" } }
+        )->all;
+        for my $row (@rows) {
+            my $k = $row->key;
+            $k =~ s/^patreon_${site_name}_//;
+            $patreon{$k} = $row->value;
+        }
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'patreon_checkout',
+        "Patreon checkout requested plan_id=$plan_id site=$site_name url=" . ($patreon{url} || 'not configured'));
+
+    $c->stash(
+        template    => 'payment/PatreonCheckout.tt',
+        plan_id     => $plan_id,
+        billing     => $billing,
+        patreon_url => $patreon{url}   || '',
+        patreon_email => $patreon{email} || '',
+        site_name   => $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC',
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub paypal_return :Path('paypal/return') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_return',
