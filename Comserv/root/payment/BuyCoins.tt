@@ -32,9 +32,19 @@
         <h2>Choose a Coin Package</h2>
         <p style="margin-top:0">Coins never expire. 1 coin ≈ $0.01 USD. Secure checkout via PayPal.</p>
 
-        [% IF paypal_cfg.sandbox %]
-        <div class="info-box" style="padding:0.6rem 1rem;border:1px solid #f0ad4e;border-radius:6px;background:#fffde7;margin-bottom:1rem">
-          <strong>Sandbox Mode</strong> — PayPal is in test mode. Use PayPal sandbox test accounts.
+        [% IF NOT paypal_cfg.is_configured %]
+        <div style="padding:0.75rem 1rem;border:2px solid #c0392b;border-radius:6px;background:#fdf0ef;margin-bottom:1rem">
+          <strong>PayPal is not yet configured.</strong>
+          [% IF c.session.roles.grep('admin').size OR c.session.roles == 'admin' %]
+          Go to <a href="[% c.uri_for('/membership/admin/paypal_settings') %]">PayPal Settings</a>
+          and enter your PayPal Business email address to enable payments.
+          [% ELSE %]
+          Please contact the site administrator to enable PayPal payments.
+          [% END %]
+        </div>
+        [% ELSIF paypal_cfg.sandbox %]
+        <div style="padding:0.6rem 1rem;border:1px solid #f0ad4e;border-radius:6px;background:#fffde7;margin-bottom:1rem">
+          <strong>Sandbox / Test Mode</strong> — No real money charged. Use a PayPal sandbox buyer account.
         </div>
         [% END %]
 
@@ -56,16 +66,17 @@
               [% pkg.label %]
             </div>
             <div style="font-size:1.25em;color:var(--accent-color,#b88a00);margin:0.3rem 0">
-              USD $[% pkg.price %]
+              [% paypal_cfg.currency_code %] $[% pkg.price %]
             </div>
             <div style="font-size:0.85em;color:var(--text-muted-color,#666);margin-bottom:1rem">
-              $[% pkg.price / pkg.coins * 100 FILTER format('%.3f') %]¢ per coin
+              ¢[% pkg.price / pkg.coins * 100 FILTER format('%.2f') %] per coin
             </div>
 
+            [% IF paypal_cfg.is_configured %]
             <form method="post" action="[% paypal_url | html %]">
               <input type="hidden" name="cmd"           value="_xclick">
               <input type="hidden" name="business"      value="[% paypal_cfg.business | html %]">
-              <input type="hidden" name="item_name"     value="[% pkg.label | html %] — CSC Site Coins">
+              <input type="hidden" name="item_name"     value="[% pkg.label | html %] — Site Coins">
               <input type="hidden" name="amount"        value="[% pkg.price | html %]">
               <input type="hidden" name="currency_code" value="[% paypal_cfg.currency_code | html %]">
               <input type="hidden" name="no_shipping"   value="1">
@@ -81,6 +92,12 @@
                 Buy via PayPal
               </button>
             </form>
+            [% ELSE %]
+            <button disabled style="width:100%;padding:0.6rem 1rem;border-radius:6px;border:1px solid #ccc;
+                                    background:#eee;color:#999;cursor:not-allowed;font-weight:bold">
+              PayPal Not Configured
+            </button>
+            [% END %]
           </div>
           [% END %]
 

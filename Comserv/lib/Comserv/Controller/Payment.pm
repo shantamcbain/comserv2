@@ -270,6 +270,9 @@ my @COIN_PACKAGES = (
     { id => 5, coins => 5000, price => '32.00', label => '5,000 Coins',  popular => 0 },
 );
 
+my %VALID_CURRENCIES = map { $_ => 1 } qw(CAD USD AUD GBP EUR NZD CHF JPY HKD SGD);
+my $PLACEHOLDER_EMAIL = 'paypal@computersystemconsulting.ca';
+
 sub _paypal_config {
     my ($self, $c) = @_;
     my $cfg  = $c->config->{PayPal} || {};
@@ -280,12 +283,19 @@ sub _paypal_config {
         )->all;
         $db{$_->key} = $_->value for @rows;
     };
+
+    my $currency = uc($db{paypal_currency} || $cfg->{currency_code} || 'CAD');
+    $currency = 'CAD' unless $VALID_CURRENCIES{$currency};
+
+    my $business = $db{paypal_business} || $cfg->{business} || '';
+
     return {
-        sandbox       => (exists $db{paypal_sandbox}  ? $db{paypal_sandbox}  : ($cfg->{sandbox}       // 1)) + 0,
-        business      => ($db{paypal_business}  || $cfg->{business}      || 'paypal@computersystemconsulting.ca'),
-        currency_code => ($db{paypal_currency}  || $cfg->{currency_code} || 'USD'),
+        sandbox       => (exists $db{paypal_sandbox} ? $db{paypal_sandbox} : ($cfg->{sandbox} // 1)) + 0,
+        business      => $business,
+        currency_code => $currency,
         client_id     => ($db{paypal_client_id} || ''),
         secret        => ($db{paypal_secret}    || ''),
+        is_configured => ($business && $business ne $PLACEHOLDER_EMAIL) ? 1 : 0,
     };
 }
 
