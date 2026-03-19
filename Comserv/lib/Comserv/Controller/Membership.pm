@@ -163,6 +163,66 @@ sub account :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub autopay_settings :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $membership_id = $c->req->param('membership_id');
+    unless ($membership_id && $membership_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid membership.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    my $mem;
+    eval {
+        $mem = $c->model('DBEncy')->resultset('UserMembership')->find($membership_id);
+    };
+    unless ($mem && $mem->user_id == $c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Membership not found.';
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $enabled     = $c->req->param('autopay_enabled') ? 1 : 0;
+        my $method      = $c->req->param('autopay_method') || 'coins';
+        my $topup_coins = $c->req->param('autopay_topup_coins') || 0;
+        $method = 'coins' unless $method eq 'paypal' || $method eq 'coins';
+        $topup_coins = int($topup_coins);
+        $topup_coins = 0 if $topup_coins < 0;
+
+        eval {
+            $mem->update({
+                autopay_enabled     => $enabled,
+                autopay_method      => $enabled ? $method : undef,
+                autopay_topup_coins => $topup_coins,
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'autopay_settings',
+                "Error saving autopay: $@");
+            $c->flash->{error_msg} = 'Could not save auto-pay settings.';
+        } else {
+            $c->flash->{success_msg} = $enabled
+                ? 'Auto-pay enabled. You will be notified before renewals.'
+                : 'Auto-pay disabled.';
+        }
+        $c->response->redirect($c->uri_for('/membership/account'));
+        return;
+    }
+
+    $c->stash(
+        template   => 'membership/Account.tt',
+        autopay_mem => $mem,
+    );
+    $c->forward('account');
+}
+
 sub subscribe :Local :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'subscribe',
