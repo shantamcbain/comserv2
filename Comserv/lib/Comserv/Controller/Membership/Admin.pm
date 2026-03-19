@@ -327,15 +327,22 @@ sub subscribers :Local :Args(0) {
         "Subscribers list called");
 
     my $status_filter  = $c->req->param('status')  || '';
-    my $site_id_filter = $c->req->param('site_id') || '';
     my @memberships    = ();
     my @all_sites      = ();
+    my $current_site   = $self->_get_site($c);
 
     eval {
         @all_sites = $c->model('DBEncy')->resultset('Site')->search(
             {}, { order_by => 'name' }
         )->all;
     };
+
+    my $site_id_filter = $c->req->param('site_id');
+    if (!defined $site_id_filter) {
+        $site_id_filter = $current_site ? $current_site->id : '';
+    } elsif ($site_id_filter eq '0' || $site_id_filter eq 'all') {
+        $site_id_filter = '';
+    }
 
     eval {
         my %search = ();
