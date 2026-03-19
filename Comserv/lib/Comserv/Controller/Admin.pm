@@ -4798,6 +4798,13 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
         "Docker list API called");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_list')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     # Check if we're inside a Docker container
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
@@ -4911,12 +4918,20 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
         "Docker restart requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_restart')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all' 
         ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
@@ -4940,12 +4955,20 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
         "Docker start requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
@@ -4969,12 +4992,20 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
         "Docker stop requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_stop')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
@@ -4998,12 +5029,20 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
         "Docker up requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_up')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
@@ -5027,14 +5066,22 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
         "Docker logs requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_logs')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
-    # Get lines parameter from query string, default to 100
-    my $lines = $c->req->params->{lines} || 100;
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $lines = int($c->req->params->{lines} || 100);
+    $lines = 100 unless $lines > 0 && $lines <= 10000;
     
     my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
     my $output = `$cmd`;
@@ -5056,13 +5103,20 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_rebuild',
         "Docker rebuild requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
-    # Rebuild with --no-cache and --progress=plain for detailed output
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $cmd = $service eq 'all'
         ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
         : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
@@ -5086,6 +5140,13 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
         "Docker prune requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_prune')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5125,6 +5186,13 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_system_df',
         "Docker system df requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_system_df')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5150,12 +5218,20 @@ sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_save_image',
         "Docker save image requested for service: $service");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_save_image')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
     my $timestamp = time();
     my $export_dir = "$ENV{HOME}/docker-exports";
     system("mkdir -p $export_dir") unless -d $export_dir;
@@ -5184,6 +5260,13 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_test_ssh',
         "Docker SSH connection test requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_test_ssh')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5194,6 +5277,16 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $save_credentials = $c->req->params->{save_credentials} || '';
+
+    # Validate ssh_target: must be user@hostname format with safe characters only
+    unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
+        $c->response->body('{"success": false, "error": "Invalid SSH target format (expected user@hostname)"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    # Validate port is a number
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
     
     if (!$ssh_target) {
         $c->response->body('{"success": false, "error": "SSH target not specified"}');
@@ -5215,8 +5308,9 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
         return;
     }
     
-    # Use sshpass for password-based SSH
-    my $cmd = qq(sshpass -p '$ssh_password' ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    # Use SSHPASS env var to avoid password on command line (prevents shell injection)
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
@@ -5264,6 +5358,13 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
         "Docker deploy to production requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
@@ -5288,16 +5389,22 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
     
-    # Parse user@host format
-    my ($user, $host) = $ssh_target =~ /^([^@]+)@(.+)$/;
+    # Parse user@host format - validate safe characters only
+    my ($user, $host) = $ssh_target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/;
     unless ($user && $host) {
-        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname"}');
+        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname (alphanumeric only)"}');
         $c->response->content_type('application/json');
         return;
     }
     
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    $production_directory =~ s/[^a-zA-Z0-9_\-\/\.~]//g;
+    
     my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
-    my $cmd = "SSHPASS='$ssh_password' perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
     
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
@@ -5318,6 +5425,13 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_ssh_terminal',
         "SSH Terminal WebSocket requested");
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_ssh_terminal')) {
+        $c->response->status(403);
+        $c->response->body('Access denied: admin required');
+        return;
+    }
+
     # Get parameters from query string
     my $ssh_target = $c->req->params->{ssh_target} || 'ubuntu@192.168.1.126';
     my $ssh_port = $c->req->params->{ssh_port} || 22;
