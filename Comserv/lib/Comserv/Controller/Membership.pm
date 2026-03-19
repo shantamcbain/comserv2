@@ -99,6 +99,8 @@ sub index :Path :Args(0) {
             "Could not load membership plans (table may not exist yet): $err");
     }
 
+    my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+
     $c->stash(
         template        => 'membership/Index.tt',
         plans           => $plans,
@@ -106,6 +108,7 @@ sub index :Path :Args(0) {
         site_name       => $site_name,
         is_admin        => $is_admin,
         all_members     => $all_members,
+        patreon_cfg     => $patreon_cfg,
     );
     $c->forward($c->view('TT'));
 }
@@ -186,11 +189,32 @@ sub subscribe :Local :Args(0) {
         }
     }
 
+    my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+
     $c->stash(
-        template => 'membership/Subscribe.tt',
-        plan     => $plan,
+        template    => 'membership/Subscribe.tt',
+        plan        => $plan,
+        patreon_cfg => $patreon_cfg,
     );
     $c->forward($c->view('TT'));
+}
+
+sub _get_patreon_config {
+    my ($self, $c, $site_name) = @_;
+    $site_name = lc($site_name || 'csc');
+    my %cfg;
+    eval {
+        my @rows = $c->model('DBEncy')->resultset('EnvVariable')->search(
+            { key => { -like => "patreon_${site_name}_%" } }
+        )->all;
+        for my $row (@rows) {
+            my $key = $row->key;
+            $key =~ s/^patreon_${site_name}_//;
+            $cfg{$key} = $row->value;
+        }
+    };
+    return keys %cfg ? \%cfg : undef;
 }
 
 __PACKAGE__->meta->make_immutable;
