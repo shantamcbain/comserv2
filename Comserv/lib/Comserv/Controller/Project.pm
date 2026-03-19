@@ -20,6 +20,11 @@ sub add_project :Path('addproject') :Args(0) {
     my ( $self, $c ) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 'Starting add_project action' );
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path_query }));
+        return;
+    }
+
     # Store the previous URL for redirect after form submission
     $c->session->{previous_url} = $c->req->referer;
 
@@ -78,7 +83,32 @@ sub add_project :Path('addproject') :Args(0) {
 sub  create_project :Local :Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $form_data = $c->request->body_parameters;
+
+    # Validate required fields before touching the database
+    my @missing;
+    push @missing, 'Project Name' unless $form_data->{name} && $form_data->{name} =~ /\S/;
+    push @missing, 'Client Name'  unless $form_data->{client_name} && $form_data->{client_name} =~ /\S/;
+    if (@missing) {
+        my $site_controller = $c->controller('Site');
+        my $sites = $site_controller->fetch_available_sites($c);
+        my $projects = $self->fetch_projects_with_subprojects($c);
+        $c->stash(
+            form_data     => $form_data,
+            sites         => $sites,
+            projects      => $projects,
+            error_message => "Required fields missing: " . join(', ', @missing),
+            template      => 'todo/add_project.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     my $schema = $c->model('DBEncy');
     my $project_rs = $schema->resultset('Project');
     my $date_time_posted = DateTime->now;
@@ -466,6 +496,11 @@ sub editproject :Path('editproject') :Args(0) {
     # Log the start of the editproject action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'editproject', 'Starting editproject action');
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path_query }));
+        return;
+    }
+
     # Get project_id from either body parameters (POST) or query parameters (GET)
     my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};
 
@@ -683,6 +718,11 @@ sub update_project :Local :Args(0)  {
 
     # Log the start of the update_project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_project', 'Starting update_project action');
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     my $form_data = $c->request->body_parameters;
     my $project_id = $form_data->{project_id};
