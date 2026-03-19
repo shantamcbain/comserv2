@@ -13,6 +13,31 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub _alert_admin {
+    my ($self, $c, $subject, $body) = @_;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+        my $admin_email = ($site && $site->mail_to_admin) ? $site->mail_to_admin
+                        : $c->config->{FallbackSMTP}{username}
+                        || 'admin@computersystemconsulting.ca';
+
+        my $full_body = "PAYMENT ALERT — " . uc($site_name) . "\n"
+            . "Time: " . scalar(localtime) . "\n"
+            . "URL:  " . (eval { $c->req->uri->as_string } || 'unknown') . "\n"
+            . "User: " . ($c->session->{username} || 'guest')
+            . " (id=" . ($c->session->{user_id} || '?') . ")\n"
+            . "\n$body\n";
+
+        $c->model('Mail')->send_email($c, $admin_email,
+            "[Payment Alert] $subject", $full_body, eval { $site->id } || undef);
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_alert_admin',
+            "Could not send admin alert email: $@");
+    }
+}
+
 sub _require_login {
     my ($self, $c) = @_;
     unless ($c->session->{username}) {
@@ -233,6 +258,10 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
             $error = "$@";
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'internal_checkout',
                 "Checkout failed: $error");
+            $self->_alert_admin($c, 'Internal checkout failed',
+                "Plan: " . ($plan ? $plan->name . " (id=" . $plan->id . ")" : "unknown") . "\n"
+                . "Billing: $billing_cycle\n"
+                . "Error: $error");
         }
 
         if ($error) {
@@ -444,8 +473,11 @@ sub paypal_ipn :Path('paypal/ipn') :Args(0) {
         }
     };
     if ($@) {
+        my $err = "$@";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_ipn',
-            "IPN processing error: $@");
+            "IPN processing error: $err");
+        $self->_alert_admin($c, 'PayPal IPN processing error',
+            "IPN params: " . join(', ', map { "$_=$params{$_}" } sort keys %params) . "\nError: $err");
     }
 
     $c->response->status(200);
@@ -476,8 +508,11 @@ sub paypal_coins_return :Path('paypal/coins_return') :Args(0) {
                 "PayPal coin purchase: $coins coins");
         };
         if ($@) {
+            my $err = "$@";
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_coins_return',
-                "Error crediting coins: $@");
+                "Error crediting coins: $err");
+            $self->_alert_admin($c, 'PayPal coin credit failed — user may need manual credit',
+                "TX: $tx\nCustom: $custom\nCoins: $coins\nError: $err");
             $c->flash->{error_msg} = 'Payment received but coins could not be applied. Please contact support.';
         } else {
             $c->flash->{success_msg} = "Payment confirmed! $coins coins have been added to your account.";
@@ -596,8 +631,12 @@ sub paypal_return :Path('paypal/return') :Args(0) {
                 $billing || 'monthly', $tx || 'PP-' . time);
         };
         if ($@) {
+            my $err = "$@";
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_return',
-                "Error activating membership: $@");
+                "Error activating membership: $err");
+            $self->_alert_admin($c, 'PayPal membership activation failed — manual activation needed',
+                "TX: $tx\nCustom: $custom\nPlan: $plan_id  Site: $site_id  Billing: $billing\n"
+                . "User ID: $user_id\nError: $err");
             $c->flash->{error_msg} = 'Payment received but membership activation failed. Please contact support with reference: ' . ($tx || 'unknown');
         } else {
             $c->flash->{success_msg} = 'Payment confirmed via PayPal! Your membership is now active.';
