@@ -27,9 +27,9 @@
           <div class="form-field">
             <label for="site_id"><strong>Site</strong></label>
             <select id="site_id" name="site_id" onchange="this.form.submit()">
-              <option value="">All Sites</option>
+              <option value="0" [% 'selected' IF !site_id_filter %]>All Sites</option>
               [% FOREACH s IN all_sites %]
-              <option value="[% s.id %]" [% 'selected' IF site_id_filter == s.id %]>[% s.name | html %]</option>
+              <option value="[% s.id %]" [% 'selected' IF site_id_filter AND site_id_filter == s.id %]>[% s.name | html %]</option>
               [% END %]
             </select>
           </div>

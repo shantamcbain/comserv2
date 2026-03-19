@@ -260,28 +260,233 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
 }
 
 # ============================================================
-# PayPal — stub (requires PayPal credentials in config)
+# Coin packages available for purchase
+# ============================================================
+my @COIN_PACKAGES = (
+    { id => 1, coins => 200,  price => '2.00',  label => '200 Coins',    popular => 0 },
+    { id => 2, coins => 500,  price => '4.50',  label => '500 Coins',    popular => 0 },
+    { id => 3, coins => 1000, price => '8.00',  label => '1,000 Coins',  popular => 1 },
+    { id => 4, coins => 2500, price => '18.00', label => '2,500 Coins',  popular => 0 },
+    { id => 5, coins => 5000, price => '32.00', label => '5,000 Coins',  popular => 0 },
+);
+
+sub _paypal_config {
+    my ($self, $c) = @_;
+    my $cfg = $c->config->{PayPal} || {};
+    return {
+        sandbox       => $cfg->{sandbox}       // 1,
+        business      => $cfg->{business}      || 'paypal@computersystemconsulting.ca',
+        currency_code => $cfg->{currency_code} || 'USD',
+    };
+}
+
+sub _paypal_url {
+    my ($self, $c) = @_;
+    my $cfg = $self->_paypal_config($c);
+    return $cfg->{sandbox}
+        ? 'https://www.sandbox.paypal.com/cgi-bin/webscr'
+        : 'https://www.paypal.com/cgi-bin/webscr';
+}
+
+# ============================================================
+# Buy Coins — GET: show packages  POST: launch PayPal form
+# ============================================================
+sub buy_coins :Path('buy/coins') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $account;
+    eval {
+        $account = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->search(
+            { user_id => $c->session->{user_id} }
+        )->single;
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'buy_coins',
+        "Buy-coins page for user_id=" . ($c->session->{user_id} || '?'));
+
+    $c->stash(
+        template     => 'payment/BuyCoins.tt',
+        packages     => \@COIN_PACKAGES,
+        account      => $account,
+        paypal_url   => $self->_paypal_url($c),
+        paypal_cfg   => $self->_paypal_config($c),
+        return_url   => $c->uri_for('/payment/paypal/coins_return')->as_string,
+        cancel_url   => $c->uri_for('/payment/paypal/coins_cancel')->as_string,
+        notify_url   => $c->uri_for('/payment/paypal/ipn')->as_string,
+    );
+    $c->forward($c->view('TT'));
+}
+
+# ============================================================
+# PayPal — membership plan checkout (stub → redirect to coins)
 # ============================================================
 sub paypal_checkout :Path('paypal/checkout') :Args(0) {
     my ($self, $c) = @_;
     return unless $self->_require_login($c);
 
+    my $plan_id  = $c->req->param('plan_id')       || '';
+    my $billing  = $c->req->param('billing_cycle')  || 'monthly';
+    my $promo    = $c->req->param('promo_code')      || '';
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_checkout',
-        "PayPal checkout requested (not yet configured)");
+        "PayPal membership checkout requested plan_id=$plan_id billing=$billing");
 
     $c->stash(
         template      => 'payment/PaypalPending.tt',
-        plan_id       => $c->req->param('plan_id'),
-        billing_cycle => $c->req->param('billing_cycle') || 'monthly',
-        promo_code    => $c->req->param('promo_code')    || '',
+        plan_id       => $plan_id,
+        billing_cycle => $billing,
+        promo_code    => $promo,
     );
     $c->forward($c->view('TT'));
 }
 
+# ============================================================
+# PayPal — IPN (Instant Payment Notification) handler
+# PayPal POSTs here to verify coin purchases server-side
+# ============================================================
+sub paypal_ipn :Path('paypal/ipn') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_ipn',
+        "IPN received from " . $c->req->address);
+
+    my %params = %{ $c->req->body_parameters };
+
+    eval {
+        require LWP::UserAgent;
+        my $ua  = LWP::UserAgent->new(timeout => 20);
+        my $url = $self->_paypal_url($c);
+        my $verify_response = $ua->post($url, {
+            cmd => '_notify-validate',
+            %params,
+        });
+
+        my $verified = ($verify_response->is_success
+            && $verify_response->decoded_content eq 'VERIFIED');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_ipn',
+            "IPN verification: " . ($verified ? 'VERIFIED' : 'INVALID')
+            . " payment_status=" . ($params{payment_status} || '?')
+            . " custom=" . ($params{custom} || '?'));
+
+        if ($verified && ($params{payment_status} || '') eq 'Completed') {
+            my $custom   = $params{custom} || '';
+            my ($user_id, $coins) = split /:/, $custom;
+
+            if ($user_id && $coins && $user_id =~ /^\d+$/ && $coins =~ /^\d+$/) {
+                $self->_credit_coins($c, $user_id, $coins, 'paypal',
+                    $params{txn_id} || 'IPN-' . time,
+                    sprintf('PayPal coin purchase: %s coins (IPN)', $coins));
+
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_ipn',
+                    "Credited $coins coins to user_id=$user_id via IPN txn=" . ($params{txn_id} || ''));
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_ipn',
+            "IPN processing error: $@");
+    }
+
+    $c->response->status(200);
+    $c->response->body('OK');
+    return;
+}
+
+# ============================================================
+# PayPal — coins_return: user returns after PayPal payment
+# ============================================================
+sub paypal_coins_return :Path('paypal/coins_return') :Args(0) {
+    my ($self, $c) = @_;
+    return unless $self->_require_login($c);
+
+    my $custom    = $c->req->param('custom') || '';
+    my $tx        = $c->req->param('tx')     || '';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_coins_return',
+        "PayPal coins return custom=$custom tx=$tx user_id=" . ($c->session->{user_id} || '?'));
+
+    my ($user_id, $coins) = split /:/, $custom;
+    my $session_uid = $c->session->{user_id} || 0;
+
+    if ($user_id && $coins && $user_id == $session_uid && $coins =~ /^\d+$/) {
+        eval {
+            $self->_credit_coins($c, $user_id, $coins, 'paypal',
+                $tx || 'PP-' . time,
+                "PayPal coin purchase: $coins coins");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'paypal_coins_return',
+                "Error crediting coins: $@");
+            $c->flash->{error_msg} = 'Payment received but coins could not be applied. Please contact support.';
+        } else {
+            $c->flash->{success_msg} = "Payment confirmed! $coins coins have been added to your account.";
+        }
+    } else {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'paypal_coins_return',
+            "Could not verify coin return: custom=$custom session_uid=$session_uid");
+        $c->flash->{success_msg} = 'Payment received. Your coin balance will be updated shortly (IPN pending).';
+    }
+
+    $c->response->redirect($c->uri_for('/membership/account'));
+}
+
+sub paypal_coins_cancel :Path('paypal/coins_cancel') :Args(0) {
+    my ($self, $c) = @_;
+    $c->flash->{error_msg} = 'PayPal payment was cancelled. No coins were purchased.';
+    $c->response->redirect($c->uri_for('/payment/buy/coins'));
+}
+
+# ============================================================
+# Internal helper — credit coins to a user account
+# ============================================================
+sub _credit_coins {
+    my ($self, $c, $user_id, $coins, $provider, $tx_id, $description) = @_;
+
+    my $schema = $c->model('DBEncy')->schema;
+    $schema->txn_do(sub {
+        my $acct = $schema->resultset('InternalCurrencyAccount')->find_or_create(
+            { user_id => $user_id },
+            { key => 'primary' }
+        );
+        my $new_balance = ($acct->balance || 0) + $coins;
+        $acct->update({
+            balance        => $new_balance,
+            lifetime_earned => ($acct->lifetime_earned || 0) + $coins,
+        });
+
+        $schema->resultset('InternalCurrencyTransaction')->create({
+            to_user_id       => $user_id,
+            from_user_id     => undef,
+            amount           => $coins,
+            transaction_type => 'earn',
+            balance_after    => $new_balance,
+            description      => $description,
+            reference_type   => 'purchase',
+        });
+
+        $schema->resultset('PaymentTransaction')->create({
+            user_id      => $user_id,
+            payable_type => 'coins',
+            payable_id   => $coins,
+            amount       => $coins,
+            currency     => 'COINS',
+            provider     => $provider,
+            status       => 'completed',
+            description  => $description,
+            ip_address   => eval { $c->req->address } || undef,
+        });
+    });
+}
+
+# ============================================================
+# PayPal — legacy membership return / cancel
+# ============================================================
 sub paypal_return :Path('paypal/return') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'paypal_return',
-        "PayPal return called");
+        "PayPal membership return called");
     $c->flash->{success_msg} = 'Payment received via PayPal. Activating membership...';
     $c->response->redirect($c->uri_for('/membership/account'));
 }

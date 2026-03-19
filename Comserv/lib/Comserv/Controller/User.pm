@@ -1086,6 +1086,33 @@ sub do_create_account :Local {
                 "Could not create UserSiteRole (table may not exist): $@");
         }
         
+        eval {
+            my $acct = $c->model('DBEncy')->resultset('InternalCurrencyAccount')->find_or_create(
+                { user_id => $new_user->id },
+                { key => 'primary' }
+            );
+            my $welcome_coins = 100;
+            $acct->update({
+                balance        => ($acct->balance || 0) + $welcome_coins,
+                lifetime_earned => ($acct->lifetime_earned || 0) + $welcome_coins,
+            });
+            $c->model('DBEncy')->resultset('InternalCurrencyTransaction')->create({
+                to_user_id       => $new_user->id,
+                from_user_id     => undef,
+                amount           => $welcome_coins,
+                transaction_type => 'earn',
+                balance_after    => ($acct->balance || 0),
+                description      => 'Welcome bonus — new account',
+                reference_type   => 'signup',
+            });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
+                "Granted $welcome_coins welcome coins to user_id=" . $new_user->id);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+                "Could not grant welcome coins (table may not exist yet): $@");
+        }
+
         delete $c->session->{$_} for qw(
             username user_id roles first_name last_name email
             group_membership group_name SiteName theme_name debug_mode
