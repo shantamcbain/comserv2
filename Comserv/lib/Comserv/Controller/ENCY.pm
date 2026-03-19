@@ -186,6 +186,11 @@ sub get_reference_by_id :Local {
 sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/add_herb' }));
+        return;
+    }
+
     if ($c->request->method eq 'POST') {
         # Handle form submission
         my $form_data = $c->request->body_parameters;
