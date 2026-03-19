@@ -13,6 +13,68 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub _notify_admin_membership {
+    my ($self, $c, $user_id, $plan, $site, $billing_cycle, $price_paid, $currency) = @_;
+    eval {
+        unless (ref $plan) {
+            $plan = $c->model('DBEncy')->resultset('MembershipPlan')->find($plan);
+        }
+        unless (ref $site) {
+            $site = $c->model('DBEncy')->resultset('Site')->find($site);
+        }
+        return unless $plan && $site;
+
+        my $user = $c->model('DBEncy')->resultset('User')->find($user_id);
+        return unless $user;
+
+        my $admin_email = ($site->mail_to_admin)
+            ? $site->mail_to_admin
+            : $c->config->{FallbackSMTP}{username}
+            || 'admin@computersystemconsulting.ca';
+
+        my $site_name  = $site->name;
+        my $user_name  = join(' ', grep { $_ } ($user->first_name, $user->last_name));
+        $user_name   ||= $user->username;
+        my $amount_str = sprintf('%.2f %s', $price_paid || 0,
+                                  $currency || $plan->price_currency || 'USD');
+        my $timestamp  = scalar localtime;
+
+        my $body = <<"END_BODY";
+New Membership Activated — $site_name
+Time: $timestamp
+
+Member : $user_name
+  Username : @{[ $user->username ]}
+  Email    : @{[ $user->email ]}
+  User ID  : $user_id
+
+Plan     : @{[ $plan->name ]}
+Billing  : $billing_cycle
+Amount   : $amount_str
+
+This is an automated notification from the membership system.
+END_BODY
+
+        $c->model('Mail')->send_email(
+            $c,
+            $admin_email,
+            "[Membership] New " . $plan->name . " subscriber on $site_name",
+            $body,
+            eval { $site->id } || undef,
+        );
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Admin membership notification sent to $admin_email for user_id=$user_id "
+            . "plan=" . $plan->name . " site=$site_name");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            '_notify_admin_membership',
+            "Could not send admin membership notification: $@");
+    }
+}
+
 sub _alert_admin {
     my ($self, $c, $subject, $body) = @_;
     eval {
@@ -269,6 +331,9 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
             $c->response->redirect($c->uri_for('/payment/internal/checkout',
                 { plan_id => $plan_id, billing_cycle => $billing_cycle, promo_code => $promo_code }));
         } else {
+            $self->_notify_admin_membership($c,
+                $c->session->{user_id}, $plan, $site,
+                $billing_cycle, $final_price, $plan->price_currency);
             $c->flash->{success_msg} = 'Membership activated! Welcome to ' . $plan->name . '.';
             $c->response->redirect($c->uri_for('/membership/account'));
         }
@@ -639,6 +704,9 @@ sub paypal_return :Path('paypal/return') :Args(0) {
                 . "User ID: $user_id\nError: $err");
             $c->flash->{error_msg} = 'Payment received but membership activation failed. Please contact support with reference: ' . ($tx || 'unknown');
         } else {
+            $self->_notify_admin_membership($c,
+                $user_id, $plan_id, $site_id,
+                $billing || 'monthly', undef, undef);
             $c->flash->{success_msg} = 'Payment confirmed via PayPal! Your membership is now active.';
         }
     } else {
