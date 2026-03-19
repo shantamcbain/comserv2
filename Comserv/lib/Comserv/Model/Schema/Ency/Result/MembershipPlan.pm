@@ -172,6 +172,25 @@ __PACKAGE__->has_many(
     { 'foreign.plan_id' => 'self.id' }
 );
 
+__PACKAGE__->has_many(
+    benefits => 'Comserv::Model::Schema::Ency::Result::PlanBenefit',
+    { 'foreign.plan_id' => 'self.id' }
+);
+
+sub get_benefit {
+    my ($self, $module, $benefit_key) = @_;
+    return $self->benefits->search(
+        { module => $module, benefit_key => $benefit_key, is_active => 1 },
+        { rows => 1 }
+    )->single;
+}
+
+sub benefit_value {
+    my ($self, $module, $benefit_key, $default) = @_;
+    my $b = $self->get_benefit($module, $benefit_key);
+    return defined $b ? $b->benefit_value : $default;
+}
+
 sub get_ai_models {
     my $self = shift;
     return [] unless $self->ai_models_allowed;
