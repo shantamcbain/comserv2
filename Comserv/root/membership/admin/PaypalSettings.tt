@@ -52,8 +52,9 @@
             <label for="paypal_currency"><strong>Currency Code</strong></label>
             <select id="paypal_currency" name="paypal_currency"
                     style="padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
-              [% FOR code IN ['USD','CAD','AUD','GBP','EUR'] %]
-              <option value="[% code %]" [% 'selected' IF current.paypal_currency == code %]>[% code %]</option>
+              [% SET cur = current.paypal_currency || 'CAD' %]
+              [% FOR code IN ['CAD','USD','AUD','GBP','EUR'] %]
+              <option value="[% code %]" [% 'selected' IF cur == code %]>[% code %]</option>
               [% END %]
             </select>
           </div>

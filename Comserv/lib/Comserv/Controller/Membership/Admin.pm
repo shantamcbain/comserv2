@@ -773,9 +773,15 @@ sub paypal_settings :Local :Args(0) {
         my $rs = $c->model('DBEncy')->resultset('EnvVariable');
         my $uid = $c->session->{user_id};
 
+        my %VALID_CURRENCIES = map { $_ => 1 } qw(CAD USD AUD GBP EUR NZD CHF JPY HKD SGD);
+
         for my $key (keys %FIELDS) {
             my $val = $c->req->param($key) // '';
             $val = ($val ? '1' : '0') if $FIELDS{$key}{type} eq 'boolean';
+            if ($key eq 'paypal_currency') {
+                $val = uc($val);
+                $val = 'CAD' unless $VALID_CURRENCIES{$val};
+            }
 
             eval {
                 $rs->update_or_create(
