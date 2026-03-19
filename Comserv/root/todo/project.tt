@@ -760,11 +760,13 @@
 [% display_project_tree(projects) %]
 
 <!-- Button to add a new project -->
+[% IF c.session.username %]
 <div class="mt-4">
     <button type="button" class="btn btn-success" onclick="window.location.href='/project/addproject';">
         <i class="fas fa-plus"></i> Add New Project
     </button>
 </div>
+[% END %]
 
 <!-- JavaScript for collapsible cards and filter handling -->
 <script>
