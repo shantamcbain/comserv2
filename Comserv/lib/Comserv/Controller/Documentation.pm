@@ -609,11 +609,14 @@ sub view :Path('/Documentation') :Args(1) {
         "After scanning, found $pages_count pages in documentation_pages hash");
 
     # Get the current user's role
-    my $user_role = 'normal';  # Default to normal user
+    my $user_role = '';  # Empty by default - unauthenticated users have no role
+    my $is_authenticated = 0;
     my $is_admin = 0;  # Flag to track if user has admin role
     
     # First check if user is authenticated
     if ($c->user_exists) {
+        $is_authenticated = 1;
+        $user_role = 'normal';  # Authenticated users get at least 'normal' role
         # Check if roles are stored in session
         if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) {
             # Log all roles for debugging
@@ -638,6 +641,10 @@ sub view :Path('/Documentation') :Args(1) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
                 "User role determined from session: $user_role, is_admin: $is_admin");
         }
+    }
+    else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
+            "Unauthenticated request for documentation page: $page");
     }
     
     # Special case for site CSC - ensure admin role is recognized
@@ -677,13 +684,22 @@ sub view :Path('/Documentation') :Args(1) {
             return;
         }
 
-        # Check role access
+        # Check role access - unauthenticated users have no role and cannot access any docs
         my $has_role = $is_admin; # Admins can see everything
         unless ($has_role) {
+            if (!$is_authenticated) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                    "Access denied to page $page: unauthenticated request");
+                $c->response->status(403);
+                $c->stash(
+                    error_msg => "Access denied: You must be logged in to view documentation.",
+                    template => 'Documentation/Error.tt'
+                );
+                return;
+            }
             foreach my $role (@{$metadata->{roles}}) {
                 if ($role eq $user_role || 
-                    ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}}) ||
-                    ($role eq 'normal' && $user_role)) {
+                    ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}})) {
                     $has_role = 1;
                     last;
                 }
@@ -849,6 +865,18 @@ sub view :Path('/Documentation') :Args(1) {
     my $md_full_path = $c->path_to('root', $md_path);
 
     if (-e $md_full_path) {
+        # Check admin access for unregistered markdown files
+        unless ($is_admin) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+                "Access denied to unregistered markdown page $page: admin required");
+            $c->response->status(403);
+            $c->stash(
+                error_msg => "Access denied: Unregistered documentation requires admin privileges.",
+                template => 'Documentation/Error.tt'
+            );
+            return;
+        }
+
         # Read the markdown file
         open my $fh, '<:encoding(UTF-8)', $md_full_path or die "Cannot open $md_full_path: $!";
         my $content = do { local $/; <$fh> };

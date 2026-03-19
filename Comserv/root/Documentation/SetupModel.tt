@@ -1,0 +1,17 @@
+[% META title = 'Setup Model' roles = 'admin,developer' %]
+[% PageVersion = 'Documentation/SetupModel.tt,v 0.01 2026/03/19 Shanta Exp shanta ' %]
+
+<h1 id="setup_model_top"><a href="#top">Setup Model</a></h1>
+
+<h2>Intent of the Setup Model</h2>
+<p>The Setup Model is responsible for managing the data and business logic of the setup process. It interacts with the database to deploy schemas, check database existence, and ensure the application is properly configured.</p>
+
+<h2>Current State of the Setup Model</h2>
+<p>The Setup Model handles the following:</p>
+<ul>
+    <li>Checking if required databases exist.</li>
+    <li>Deploying database schemas when needed.</li>
+    <li>Validating database connection parameters.</li>
+</ul>
+
+<p><a href="#setup_model_top">Back to top of Setup Model Documentation</a></p>
