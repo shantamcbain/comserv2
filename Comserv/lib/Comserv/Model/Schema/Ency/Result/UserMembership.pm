@@ -89,6 +89,26 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    autopay_enabled => {
+        data_type     => 'tinyint',
+        default_value => 0,
+        is_nullable   => 0,
+    },
+    autopay_method => {
+        data_type   => 'enum',
+        extra       => { list => ['coins', 'paypal'] },
+        is_nullable => 1,
+    },
+    autopay_topup_coins => {
+        data_type     => 'integer',
+        default_value => 0,
+        is_nullable   => 0,
+        documentation => 'Fixed coin top-up amount (0 = exact renewal cost)',
+    },
+    renewal_warning_sent_at => {
+        data_type   => 'timestamp',
+        is_nullable => 1,
+    },
     created_at => {
         data_type     => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
