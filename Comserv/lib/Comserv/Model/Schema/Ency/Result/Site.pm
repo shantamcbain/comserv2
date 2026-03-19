@@ -132,4 +132,15 @@ __PACKAGE__->has_many(project_sites => 'Comserv::Model::Schema::Result::ProjectS
 __PACKAGE__->many_to_many(projects => 'project_sites', 'project');
 
 __PACKAGE__->has_many(site_domains => 'Comserv::Model::Schema::Ency::Result::SiteDomain', 'site_id');
+
+__PACKAGE__->has_many(
+    membership_plans => 'Comserv::Model::Schema::Ency::Result::MembershipPlan',
+    { 'foreign.site_id' => 'self.id' }
+);
+
+__PACKAGE__->has_many(
+    user_memberships => 'Comserv::Model::Schema::Ency::Result::UserMembership',
+    { 'foreign.site_id' => 'self.id' }
+);
+
 1;
