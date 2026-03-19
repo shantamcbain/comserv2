@@ -29,7 +29,16 @@
         <h2>Site Credits</h2>
         <p>Balance: <strong>[% currency_account.balance %] coins</strong></p>
         <div class="form-actions">
-          <a href="[% c.uri_for('/currency') %]" class="btn btn-primary">Manage Credits</a>
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy More Coins</a>
+          <a href="[% c.uri_for('/currency') %]" class="btn btn-secondary">Transaction History</a>
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <h2>Site Credits</h2>
+        <p>You don't have a coin account yet. Purchase coins to pay for memberships.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Coins</a>
         </div>
       </div>
       [% END %]
