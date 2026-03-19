@@ -416,10 +416,6 @@ sub index :Path('/Documentation') :Args(0) {
     foreach my $page_name (keys %$pages) {
         my $metadata = $pages->{$page_name};
 
-        # TEMPORARY: Show ALL pages for debugging - REMOVE THIS LATER
-        $filtered_pages{$page_name} = $metadata;
-        next;  # Skip all the filtering logic temporarily
-
         # Log the admin status for debugging
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
             "Processing page $page_name, is_admin: $is_admin");
