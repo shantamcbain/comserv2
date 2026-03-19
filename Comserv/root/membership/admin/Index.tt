@@ -59,6 +59,10 @@
             <a href="[% c.uri_for('/membership/admin/paypal_settings') %]" class="btn btn-secondary">PayPal Settings</a>
             <p>Configure PayPal business email, sandbox mode, and API credentials.</p>
           </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/membership/admin/patreon_settings') %]" class="btn btn-secondary" style="background:#f96854;color:#fff;border:none">Patreon Settings</a>
+            <p>Enable and configure Patreon as a payment option for this site.</p>
+          </div>
         </div>
       </div>
 
