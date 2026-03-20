@@ -49,16 +49,19 @@ The main Proxmox management page
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
-    # Log that we're accessing the Proxmox controller without role check
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'proxmox_index')) {
+        $c->flash->{error_msg} = 'You must be an administrator to access Proxmox management.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-        "Accessing Proxmox controller - role check disabled");
-        
-    # Get roles for debugging purposes only
+        "Accessing Proxmox controller");
+
     my $roles = $c->session->{roles} || [];
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-        "User roles (for debugging): " . join(", ", @$roles));
-        
-    # No role check - all API interactions are handled via API tokens
+        "User roles: " . join(", ", @$roles));
 
     # Use server_id from parameter or default
     my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id} || 'ProxmoxDevelopment';
