@@ -4375,7 +4375,7 @@ sub preload_model :Local :Args(0) {
             host    => $host,
             port    => $port || 11434,
             model   => $model,
-            timeout => 30,
+            timeout => 120,
         );
         $ollama->chat([{ role => 'user', content => 'hi' }]);
     };
