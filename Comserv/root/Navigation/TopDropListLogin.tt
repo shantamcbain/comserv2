@@ -34,6 +34,7 @@
         || c.stash.user_roles.grep('devops').size
         || c.stash.user_roles.grep('editor').size
         || c.stash.user_roles.grep('user').size
+        || c.stash.user_roles.grep('normal').size
     ))
 ) %]
 
@@ -94,10 +95,14 @@
             <!-- Planning Submenu (visible to all logged-in users; links filtered by role) -->
             <div class="dropdown-divider"></div>
             <div class="submenu-item">
-                [% IF is_csc && can_plan %]
-                    <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                [% IF can_plan %]
+                    [% IF is_csc %]
+                        <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                    [% ELSE %]
+                        <a href="/admin/plan/list" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                    [% END %]
                 [% ELSE %]
-                    <a href="/admin/plan/list" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                    <span class="submenu-header"><i class="icon-calendar"></i>Planning</span>
                 [% END %]
                 <div class="submenu">
                     [% IF can_plan %]
