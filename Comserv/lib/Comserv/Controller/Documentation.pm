@@ -2151,6 +2151,30 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my ($self, $c, @args) = @_;
     my $requested_date = $args[0] if @args;
 
+    # Access control: text-based DailyPlan is CSC-only.
+    # Non-CSC sites are redirected to the DB-driven planning view.
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    unless (uc($sitename) eq 'CSC') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
+            "Non-CSC site '$sitename' redirected from text-based DailyPlan to DB planning view");
+        $c->res->redirect($c->uri_for('/admin/plan/list'));
+        $c->detach;
+    }
+
+    # Role check: only admin, developer, devops can access DailyPlan
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
+    my $has_access = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'devops' } @$user_roles;
+    unless ($has_access) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Access denied to DailyPlan for user: " . ($c->session->{username} || 'Guest'));
+        $c->stash(
+            error_msg => "Access denied: DailyPlan requires admin, developer, or devops role.",
+            template => 'Documentation/Error.tt'
+        );
+        $c->detach;
+    }
+
     # Get current date in YYYY-MM-DD format
     my $now = Time::Piece->new();
     my $current_date_str = $now->strftime('%Y-%m-%d');

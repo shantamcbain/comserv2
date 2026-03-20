@@ -38,9 +38,17 @@ sub begin :Private {
         $c->res->redirect($c->uri_for('/'));
         $c->detach;
     }
-    
+
+    # Store SiteName-based visibility context in stash:
+    # CSC admins can see all sites; non-CSC admins/developers only see their own site.
+    my $session_sitename = $c->session->{SiteName} || 'CSC';
+    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && (grep { $_ eq 'admin' } @$roles);
+    $c->stash->{plan_sitename}   = $session_sitename;
+    $c->stash->{is_csc_admin}    = $is_csc_admin;
+
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
-        "User authorized to access PlanManagement: " . ($c->session->{username} || 'Guest'));
+        "User authorized to access PlanManagement: " . ($c->session->{username} || 'Guest')
+        . " site=$session_sitename is_csc_admin=" . ($is_csc_admin ? 1 : 0));
 }
 
 sub list :Path('/admin/plan/list') :Args(0) {
@@ -52,10 +60,22 @@ sub list :Path('/admin/plan/list') :Args(0) {
     try {
         my $schema = $c->model('DBEncy');
         my $rs = $schema->resultset('DailyPlan');
-        
-        my $sitename = $c->session->{SiteName};
+
+        # CSC admins can view all sites (with optional filter); others only see their own site.
+        my $is_csc_admin  = $c->stash->{is_csc_admin};
+        my $sitename      = $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC';
+        my $filter_site   = $c->req->param('sitename');  # optional filter for CSC admin
+
+        my %search_cond;
+        if ($is_csc_admin && $filter_site) {
+            %search_cond = (sitename => $filter_site);
+        } elsif (!$is_csc_admin) {
+            %search_cond = (sitename => $sitename);
+        }
+        # CSC admin with no filter sees all plans (empty search condition)
+
         my @plans = $rs->search(
-            { sitename => $sitename },
+            \%search_cond,
             { order_by => { -desc => 'created_at' } }
         );
         
@@ -77,8 +97,11 @@ sub list :Path('/admin/plan/list') :Args(0) {
             $c->forward('View::JSON');
         } else {
             $c->stash(
-                plans => \@plan_data,
-                template => 'admin/documentation/DailyPlan.tt'
+                plans        => \@plan_data,
+                is_csc_admin => $c->stash->{is_csc_admin},
+                plan_sitename => $c->stash->{plan_sitename},
+                filter_site  => $filter_site,
+                template     => 'admin/documentation/DailyPlan.tt'
             );
             $c->forward($c->view('TT'));
         }
@@ -108,7 +131,19 @@ sub details :Path('/admin/plan') :Args(1) {
             $c->forward('View::JSON');
             $c->detach;
         }
-        
+
+        # Enforce SiteName-based access: non-CSC users cannot view other sites' plans
+        unless ($c->stash->{is_csc_admin}) {
+            my $user_site = $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC';
+            if ($plan->sitename ne $user_site) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+                    "Access denied: plan site " . $plan->sitename . " != user site $user_site");
+                $c->stash->{json} = { success => 0, error => "Access denied" };
+                $c->forward('View::JSON');
+                $c->detach;
+            }
+        }
+
         my %plan_data = $plan->get_columns;
         $plan_data{progress_percentage} = $plan->get_progress_percentage;
         
