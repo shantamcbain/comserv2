@@ -117,9 +117,6 @@ Please ensure that all navigation links within each sub-document are unique. Thi
 <h3 id="inventory"><a href="#top">Back to top of Documentation</a></h3>
 [% TRY; INCLUDE 'Documentation/Inventory.tt'; CATCH; END %]
 
-<h3 id="forager"><a href="#top">Back to top of Documentation</a></h3>
-[% INCLUDE 'Documentation/Forager.tt' %] <!-- Include Forager documentation -->
-
 <h2>Instructions for Developers</h2>
 <p>Welcome to the Comserv Application Documentation. Here are some guidelines and best practices to keep in mind while working with this project:</p>
 <ul>
