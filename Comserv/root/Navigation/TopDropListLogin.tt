@@ -96,30 +96,23 @@
             <div class="dropdown-divider"></div>
             <div class="submenu-item">
                 [% IF can_plan %]
-                    [% IF is_csc %]
-                        <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
-                    [% ELSE %]
-                        <a href="/admin/plan/list" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
-                    [% END %]
+                    <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
                 [% ELSE %]
                     <span class="submenu-header"><i class="icon-calendar"></i>Planning</span>
                 [% END %]
                 <div class="submenu">
                     [% IF can_plan %]
-                        [% IF is_csc %]
-                            <a href="/Documentation/DailyPlan" class="submenu-link">
-                                <i class="icon-calendar"></i> Daily Plan
-                            </a>
-                            <a href="/Documentation/MasterPlanCoordination" class="submenu-link">
-                                <i class="icon-list"></i> Master Plan
-                            </a>
-                        [% END %]
-                        <a href="/admin/plan/list" class="submenu-link">
-                            <i class="icon-tasks"></i> DB Plans
+                        <a href="/Documentation/DailyPlan" class="submenu-link">
+                            <i class="icon-calendar"></i> Daily Plan
                         </a>
                         <a href="/todo" class="submenu-link">
                             <i class="icon-check-square"></i> Todo System
                         </a>
+                        [% IF is_admin %]
+                        <a href="/todo/addtodo" class="submenu-link">
+                            <i class="icon-plus"></i> Add Todo
+                        </a>
+                        [% END %]
                     [% ELSE %]
                         <a href="/todo" class="submenu-link">
                             <i class="icon-check-square"></i> My Todos
