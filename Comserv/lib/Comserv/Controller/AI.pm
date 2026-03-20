@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use JSON;
+use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
@@ -1176,6 +1177,8 @@ sub chat :Local :Args(0) {
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
     my $chat_page_path  = $json_data->{page_path}  || $c->request->params->{page_path}  || '';
     my $chat_page_title = $json_data->{page_title} || $c->request->params->{page_title} || '';
+    my $chat_agent_id   = $json_data->{agent_id}   || $c->request->params->{agent_id}   || '';
+    my $chat_agent_system = $json_data->{system}   || $c->request->params->{system}     || '';
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1234,6 +1237,17 @@ sub chat :Local :Args(0) {
 
     # Role-based capability injection into messages (insert as system message)
     my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+
+    # Build combined system prompt: agent-specific prompt + role prompt + live module data
+    my @system_parts;
+    push @system_parts, $chat_agent_system if $chat_agent_system;
+    push @system_parts, $role_prompt_chat  if $role_prompt_chat;
+
+    # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
+    my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
+    push @system_parts, $module_data if $module_data;
+
+    my $combined_system_prompt = join("\n\n", @system_parts);
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
@@ -1306,10 +1320,10 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
 
-            # Prepend role-based system prompt if available
+            # Prepend combined system prompt if available
             my @final_messages = @messages;
-            if ($role_prompt_chat) {
-                unshift @final_messages, { role => 'system', content => $role_prompt_chat };
+            if ($combined_system_prompt) {
+                unshift @final_messages, { role => 'system', content => $combined_system_prompt };
             }
 
             my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
@@ -1353,11 +1367,17 @@ sub chat :Local :Args(0) {
                 $ollama->model($model);
             }
 
+            # Prepend combined system prompt for Ollama (role + agent + live data)
+            my @ollama_messages = @messages;
+            if ($combined_system_prompt) {
+                unshift @ollama_messages, { role => 'system', content => $combined_system_prompt };
+            }
+
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@messages));
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@ollama_messages));
 
             my $chat_start = time();
-            my $response = $ollama->chat(messages => \@messages);
+            my $response = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
@@ -2522,6 +2542,68 @@ sub start_server :Local :Args(0) {
     $c->response->body($json_response);
 }
 
+=head2 _get_module_data
+
+Fetch live application data relevant to the user's prompt and return it as a
+context string to append to the system prompt.  The fetch uses the Catalyst
+context so it automatically respects the current user's session / role.
+
+  $c        - Catalyst context
+  $prompt   - the user's raw query text
+  $agent_id - agent id string (e.g. 'bmaster', 'csc')
+
+Returns a string of data context, or empty string when nothing relevant found.
+
+=cut
+
+sub _get_module_data {
+    my ($self, $c, $prompt, $agent_id) = @_;
+    $prompt   //= '';
+    $agent_id //= '';
+
+    my @sections;
+
+    # --- Workshop data ---
+    if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
+        eval {
+            my ($workshops, $err) = $c->model('WorkShop')->get_active_workshops($c);
+            if ($workshops && @$workshops) {
+                my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+                my $today = DateTime->today->ymd;
+
+                my @visible;
+                for my $ws (@$workshops) {
+                    next unless !$ws->date || $ws->date ge $today;
+                    my $share    = $ws->share    // '';
+                    my $sitename = $ws->sitename // '';
+                    next unless $share eq 'public' || lc($sitename) eq lc($site_name);
+
+                    my $title    = $ws->title        // 'Untitled';
+                    my $date     = $ws->date         // 'TBA';
+                    my $location = $ws->location     // '';
+                    my $desc     = $ws->description  // '';
+                    $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+
+                    push @visible, "- $title | Date: $date"
+                        . ($location ? " | Location: $location" : '')
+                        . ($desc     ? " | $desc" : '');
+                }
+
+                if (@visible) {
+                    push @sections,
+                        "LIVE WORKSHOP DATA (current as of query time):\n"
+                        . join("\n", @visible)
+                        . "\nUsers can browse all workshops at /workshop";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Workshop fetch error: $@") if $@;
+    }
+
+    return join("\n\n", @sections);
+}
+
 =head2 _build_role_system_prompt
 
 Build a role-aware addition to the system prompt granting or restricting
@@ -2601,7 +2683,10 @@ sub _build_role_system_prompt {
 
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer based on the page content and documentation provided. "
-         . "Do not invent data; if you don't know something, say so."
+         . "Do not invent data; if you don't know something, say so. "
+         . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
+         . "respond with the URL from the navigation guide so the application can automatically navigate there. "
+         . "Use the exact URL from the list — the application will redirect the browser for you."
          . $no_internet
          . $page_nav
          . $nav_guide;
@@ -2640,20 +2725,11 @@ sub _build_navigation_command_guide {
         [ 'Documentation', 'guest', [
             [ 'Documentation home',         '/Documentation'            ],
             [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
-            [ 'CSS themes',                 '/Documentation/CssThemes'  ],
-            [ 'User guides',                '/documentation?category=user_guides' ],
-            [ 'Tutorials',                  '/documentation?category=tutorials'   ],
-            [ 'Changelog',                  '/documentation?category=changelog'   ],
         ]],
         [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
             [ 'Encyclopedia search',        '/ENCY/search'              ],
-            [ 'Plants',                     '/ENCY/plants'              ],
-            [ 'Animals',                    '/ENCY/animals'             ],
-            [ 'Birds',                      '/ENCY/birds'               ],
-            [ 'Insects',                    '/ENCY/insects'             ],
-            [ 'Fungi',                      '/ENCY/fungi'               ],
-            [ 'Recipes',                    '/ENCY/recipes'             ],
-            [ 'My encyclopedia entries',    '/ENCY/my_entries'          ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
         ]],
         [ 'HelpDesk', 'guest', [
             [ 'HelpDesk home',              '/HelpDesk'                 ],
@@ -2697,18 +2773,23 @@ sub _build_navigation_command_guide {
         [ 'Admin', 'admin', [
             [ 'Admin panel',                '/admin'                    ],
             [ 'User management',            '/admin/users'              ],
-            [ 'View log',                   '/admin/view_log'           ],
+            [ 'Application logs',           '/admin/logs'               ],
             [ 'Git pull',                   '/admin/git_pull'           ],
             [ 'Docker containers',          '/admin/docker-containers'  ],
-            [ 'Infrastructure',             '/admin/infrastructure'     ],
-            [ 'Theme management',           '/admin/theme'              ],
+            [ 'Theme management',           '/themeadmin'               ],
             [ 'Planning',                   '/admin/planning'           ],
-            [ 'AI configuration',           '/admin/ai/configure'       ],
-            [ 'Network devices',            '/admin/network_devices'    ],
-            [ 'Site settings',              '/site'                     ],
-            [ 'Log',                        '/log'                      ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
             [ 'File management',            '/file/list'                ],
             [ 'Duplicate files',            '/file/duplicates'          ],
+        ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
         ]],
     );
 
@@ -2726,13 +2807,17 @@ sub _build_navigation_command_guide {
     }
 
     return "\n\nApplication sections and navigation guide:\n"
-         . "Use this map for TWO purposes:\n"
+         . "Use this map for THREE purposes:\n"
          . "1. Navigation: when the user asks to go to a page or says 'take me to [page]', "
          . "reply with the matching URL(s). List ALL links in the section when multiple apply.\n"
          . "2. Content suggestions: when answering a question, proactively mention relevant "
          . "application sections the user can visit for more information. "
          . "For example, if asked about plants or pollinators, point to the Encyclopedia (ENCY) section. "
          . "If asked about workshops, point to the Workshops section.\n"
+         . "3. Link validation: when asked to check, audit, or review links on the current page, "
+         . "compare EVERY link shown in the page content against this navigation guide. "
+         . "Report ALL links that have no matching entry — not just the first one. "
+         . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
          . "Only use URLs from this list; do not invent others. "
          . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
          . $guide;
@@ -3936,7 +4021,7 @@ sub get_user_providers :Local :Args(0) {
         user_id            => $user_id  || 0,
         is_guest           => $is_guest  ? JSON::true : JSON::false,
         is_admin           => $is_admin  ? JSON::true : JSON::false,
-        can_access_history => $is_admin  ? JSON::true : JSON::false,
+        can_access_history => (!$is_guest) ? JSON::true : JSON::false,
     }));
 }
 
@@ -4290,7 +4375,7 @@ sub preload_model :Local :Args(0) {
             host    => $host,
             port    => $port || 11434,
             model   => $model,
-            timeout => 30,
+            timeout => 120,
         );
         $ollama->chat([{ role => 'user', content => 'hi' }]);
     };

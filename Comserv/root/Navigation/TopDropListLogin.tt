@@ -150,6 +150,7 @@
                     [% END %]
                     sessionStorage.removeItem('chatMessages');
                     sessionStorage.removeItem('currentConversationId');
+                    sessionStorage.removeItem('chatUser');
                 });
             </script>
         </div>
