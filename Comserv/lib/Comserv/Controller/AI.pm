@@ -21,6 +21,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use JSON;
+use DateTime;
 use Comserv::Util::Logging;
 use Comserv::Model::Ollama;
 use Comserv::Model::Grok;
@@ -1176,6 +1177,8 @@ sub chat :Local :Args(0) {
     my $use_search_chat = $json_data->{use_search} ? 1 : 0;
     my $chat_page_path  = $json_data->{page_path}  || $c->request->params->{page_path}  || '';
     my $chat_page_title = $json_data->{page_title} || $c->request->params->{page_title} || '';
+    my $chat_agent_id   = $json_data->{agent_id}   || $c->request->params->{agent_id}   || '';
+    my $chat_agent_system = $json_data->{system}   || $c->request->params->{system}     || '';
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -1234,6 +1237,17 @@ sub chat :Local :Args(0) {
 
     # Role-based capability injection into messages (insert as system message)
     my $role_prompt_chat = $self->_build_role_system_prompt($c, $user_roles_chat, $is_grok_model ? 'grok' : 'ollama', $chat_page_path, $chat_page_title);
+
+    # Build combined system prompt: agent-specific prompt + role prompt + live module data
+    my @system_parts;
+    push @system_parts, $chat_agent_system if $chat_agent_system;
+    push @system_parts, $role_prompt_chat  if $role_prompt_chat;
+
+    # Fetch live module data (workshops, ENCY, etc.) when the prompt contains relevant keywords
+    my $module_data = $self->_get_module_data($c, $prompt, $chat_agent_id);
+    push @system_parts, $module_data if $module_data;
+
+    my $combined_system_prompt = join("\n\n", @system_parts);
 
     # Only admins/editors may use web search
     $use_search_chat = 0 unless $can_select_model_perm;
@@ -1306,10 +1320,10 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                 'chat', "Calling Grok API with model: " . $grok->model . " web_search=$use_search_chat");
 
-            # Prepend role-based system prompt if available
+            # Prepend combined system prompt if available
             my @final_messages = @messages;
-            if ($role_prompt_chat) {
-                unshift @final_messages, { role => 'system', content => $role_prompt_chat };
+            if ($combined_system_prompt) {
+                unshift @final_messages, { role => 'system', content => $combined_system_prompt };
             }
 
             my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
@@ -1353,11 +1367,17 @@ sub chat :Local :Args(0) {
                 $ollama->model($model);
             }
 
+            # Prepend combined system prompt for Ollama (role + agent + live data)
+            my @ollama_messages = @messages;
+            if ($combined_system_prompt) {
+                unshift @ollama_messages, { role => 'system', content => $combined_system_prompt };
+            }
+
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@messages));
+                'chat', "Querying Ollama host=$current_host model=" . $ollama->model . " timeout=150s messages=" . scalar(@ollama_messages));
 
             my $chat_start = time();
-            my $response = $ollama->chat(messages => \@messages);
+            my $response = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
@@ -2520,6 +2540,68 @@ sub start_server :Local :Args(0) {
     
     my $json_response = encode_json($response_data);
     $c->response->body($json_response);
+}
+
+=head2 _get_module_data
+
+Fetch live application data relevant to the user's prompt and return it as a
+context string to append to the system prompt.  The fetch uses the Catalyst
+context so it automatically respects the current user's session / role.
+
+  $c        - Catalyst context
+  $prompt   - the user's raw query text
+  $agent_id - agent id string (e.g. 'bmaster', 'csc')
+
+Returns a string of data context, or empty string when nothing relevant found.
+
+=cut
+
+sub _get_module_data {
+    my ($self, $c, $prompt, $agent_id) = @_;
+    $prompt   //= '';
+    $agent_id //= '';
+
+    my @sections;
+
+    # --- Workshop data ---
+    if ($prompt =~ /workshop|class|course|session|seminar|event|beekeep/i) {
+        eval {
+            my ($workshops, $err) = $c->model('WorkShop')->get_active_workshops($c);
+            if ($workshops && @$workshops) {
+                my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+                my $today = DateTime->today->ymd;
+
+                my @visible;
+                for my $ws (@$workshops) {
+                    next unless !$ws->date || $ws->date ge $today;
+                    my $share    = $ws->share    // '';
+                    my $sitename = $ws->sitename // '';
+                    next unless $share eq 'public' || lc($sitename) eq lc($site_name);
+
+                    my $title    = $ws->title        // 'Untitled';
+                    my $date     = $ws->date         // 'TBA';
+                    my $location = $ws->location     // '';
+                    my $desc     = $ws->description  // '';
+                    $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+
+                    push @visible, "- $title | Date: $date"
+                        . ($location ? " | Location: $location" : '')
+                        . ($desc     ? " | $desc" : '');
+                }
+
+                if (@visible) {
+                    push @sections,
+                        "LIVE WORKSHOP DATA (current as of query time):\n"
+                        . join("\n", @visible)
+                        . "\nUsers can browse all workshops at /workshop";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Workshop fetch error: $@") if $@;
+    }
+
+    return join("\n\n", @sections);
 }
 
 =head2 _build_role_system_prompt
