@@ -1757,7 +1757,7 @@
                 width: 16px;
                 height: 16px;
                 cursor: se-resize;
-                background: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
+                background: linear-gradient(135deg, transparent 50%, #aaa 50%);
                 border-bottom-right-radius: 10px;
                 opacity: 0.6;
                 z-index: 10;
@@ -1768,10 +1768,10 @@
                 display: block;
                 margin-top: 6px;
                 padding: 4px 12px;
-                border: 1px solid var(--border-color);
+                border: 1px solid #ccc;
                 border-radius: 4px;
-                background: var(--secondary-color);
-                color: var(--text-color);
+                background: #f5f5f5;
+                color: #333;
                 cursor: pointer;
                 font-size: 0.85em;
                 font-family: inherit;
