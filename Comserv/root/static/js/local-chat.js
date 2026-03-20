@@ -215,45 +215,55 @@
         return bodyText.substring(0, 2000);
     }
 
-    // Extract all meaningful links from the current page (quick links, content links)
+    // Extract all meaningful links from the current page (nav menu + quick links + content links)
     function extractPageLinks() {
         const seen = new Set();
-        const links = [];
+        const navLinks = [];
+        const contentLinks = [];
         const skip = /^(javascript:|mailto:|#|$)/i;
 
-        // Priority: quick-link cards and explicitly labelled link sections first
+        function collectLink(a, bucket) {
+            const href = a.getAttribute('href');
+            const label = (a.textContent || a.title || '').replace(/\s+/g, ' ').trim();
+            if (!href || skip.test(href) || !label || seen.has(href)) return;
+            seen.add(href);
+            const abs = href.startsWith('http') ? href : (window.location.origin + (href.startsWith('/') ? href : '/' + href));
+            bucket.push(label + ': ' + abs);
+        }
+
+        // 1. Navigation menu and header links (always include these for link auditing)
+        const navSelectors = ['nav', 'header nav', '.navbar', '#main-menu', '#nav', '.nav-menu', '.site-nav', '.menu', 'header'];
+        navSelectors.forEach(function(sel) {
+            const el = document.querySelector(sel);
+            if (!el) return;
+            // Exclude the chat widget itself
+            if (el.closest('#local-chat-widget, #chat-panel')) return;
+            el.querySelectorAll('a[href]').forEach(function(a) { collectLink(a, navLinks); });
+        });
+
+        // 2. Quick-link cards and explicitly labelled link sections
         const prioritySelectors = [
             '.quick-link-card', '.quick-links a', '[class*="quick-link"] a',
             '.page-links a', '.link-list a', '.resource-links a',
             '.tabs a', '.tab-links a', '[data-tab] a'
         ];
         prioritySelectors.forEach(function(sel) {
-            document.querySelectorAll(sel).forEach(function(a) {
-                const href = a.getAttribute('href');
-                const label = (a.textContent || a.title || '').replace(/\s+/g, ' ').trim();
-                if (!href || skip.test(href) || !label || seen.has(href)) return;
-                seen.add(href);
-                const abs = href.startsWith('http') ? href : (window.location.origin + (href.startsWith('/') ? href : '/' + href));
-                links.push(label + ': ' + abs);
-            });
+            document.querySelectorAll(sel).forEach(function(a) { collectLink(a, contentLinks); });
         });
 
-        // Then general content-area links (excluding nav/footer/chat widget)
+        // 3. General content-area links
         const contentSelectors = ['main', '.main-content', '#content', '.content-area', '.page-content', 'article'];
         contentSelectors.forEach(function(sel) {
             const el = document.querySelector(sel);
             if (!el) return;
-            el.querySelectorAll('a[href]').forEach(function(a) {
-                const href = a.getAttribute('href');
-                const label = (a.textContent || a.title || '').replace(/\s+/g, ' ').trim();
-                if (!href || skip.test(href) || !label || seen.has(href)) return;
-                seen.add(href);
-                const abs = href.startsWith('http') ? href : (window.location.origin + (href.startsWith('/') ? href : '/' + href));
-                links.push(label + ': ' + abs);
-            });
+            el.querySelectorAll('a[href]').forEach(function(a) { collectLink(a, contentLinks); });
         });
 
-        return links.slice(0, 40); // cap at 40 links
+        // Return nav links labelled separately so AI knows which section they came from
+        const result = [];
+        if (navLinks.length)    result.push('[Navigation menu links]\n' + navLinks.map(function(l) { return '  ' + l; }).join('\n'));
+        if (contentLinks.length) result.push('[Page content links]\n' + contentLinks.map(function(l) { return '  ' + l; }).join('\n'));
+        return result; // array of sections
     }
 
     // Detect page context (documentation, helpdesk, project, etc.)
@@ -272,10 +282,11 @@
         };
         
         // Extract current page content and links for context awareness
+        // extractPageLinks() returns an array of section strings (nav + content)
         const pageContent = extractPageContent();
-        const pageLinks = extractPageLinks();
-        const linksSection = pageLinks.length > 0
-            ? '\n\nLinks on this page:\n' + pageLinks.map(function(l) { return '- ' + l; }).join('\n')
+        const pageLinkSections = extractPageLinks();
+        const linksSection = pageLinkSections.length > 0
+            ? '\n\nLinks on this page:\n' + pageLinkSections.join('\n\n')
             : '';
 
         if (selectedAgent) {
