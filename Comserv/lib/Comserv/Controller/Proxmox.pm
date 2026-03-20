@@ -5,6 +5,7 @@ use JSON;
 use Data::Dumper;
 use Try::Tiny;
 use Comserv::Util::Logging;
+use Comserv::Util::ProxmoxCredentials;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -59,56 +60,55 @@ sub index :Path :Args(0) {
         
     # No role check - all API interactions are handled via API tokens
 
-    # Use server_id from parameter or default
-    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id} || 'ProxmoxDevelopment';
+    # Determine server_id: use request param, session, or first configured server
+    my $all_servers = Comserv::Util::ProxmoxCredentials::get_all_servers();
+    my $first_configured = @$all_servers ? $all_servers->[0]{id} : undef;
+
+    my $server_id = $c->req->param('server_id')
+                 || $c->session->{proxmox_server_id}
+                 || $first_configured;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-        "Starting Proxmox VM management for server: $server_id");
+        "Starting Proxmox VM management for server: " . ($server_id // 'none'));
 
     # Configure the Proxmox model
     my $proxmox = $c->model('Proxmox');
 
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
-        "Configured Proxmox model for server: $server_id");
-
     my $auth_success = 0;
     my $auth_error = '';
 
-    # Try to connect to Proxmox server
-    eval {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "Checking connection to Proxmox server: $server_id");
-
-        # Configure the model with the server ID
-        $proxmox->set_server_id($server_id);
-
-        # Check connection status
-        $auth_success = $proxmox->check_connection();
-
-        # Get debug info from the Proxmox model
-        my $debug_info = $proxmox->{debug_info} || {};
-
-        if ($auth_success) {
+    unless ($server_id) {
+        $auth_error = 'No Proxmox servers configured. Please add a server via Admin > Proxmox Servers.';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', $auth_error);
+    } else {
+        # Try to connect to Proxmox server
+        eval {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-                "Successfully connected to Proxmox server");
+                "Checking connection to Proxmox server: $server_id");
 
-            # Store server_id in session for future requests
-            $c->session->{proxmox_server_id} = $server_id;
-        } else {
-            $auth_error = 'Failed to connect to Proxmox server. Please contact system administrator.';
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+            $proxmox->set_server_id($server_id);
+            $auth_success = $proxmox->check_connection();
 
-            # Add more detailed error information if available
-            if ($debug_info && $debug_info->{response_code}) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                    "API response: " . $debug_info->{response_code} . " - " .
-                        ($debug_info->{response_status} || "Unknown status"));
+            my $debug_info = $proxmox->{debug_info} || {};
+
+            if ($auth_success) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
+                    "Successfully connected to Proxmox server: $server_id");
+                $c->session->{proxmox_server_id} = $server_id;
+            } else {
+                $auth_error = "Failed to connect to Proxmox server '$server_id'. Check credentials and network.";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
+                if ($debug_info && $debug_info->{response_code}) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                        "API response: " . $debug_info->{response_code} . " - " .
+                            ($debug_info->{response_status} || "Unknown status"));
+                }
             }
+        };
+        if ($@) {
+            $auth_error = "Error connecting to Proxmox server '$server_id': $@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
         }
-    };
-    if ($@) {
-        $auth_error = "Error connecting to Proxmox server: $@";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', $auth_error);
     }
 
     my $vms = [];

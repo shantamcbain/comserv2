@@ -9,6 +9,8 @@ use DBI;
 use Try::Tiny;
 use Data::Dumper;
 use JSON;
+use IO::Socket::INET;
+use POSIX qw(WNOHANG);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -309,28 +311,76 @@ sub test_connection {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        # Use MariaDB driver (compatible with MySQL)
-        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
+
+        # Fast TCP pre-flight: fail in 1s if host is unreachable, before attempting DBI connect.
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => $host,
+            PeerPort => $port,
+            Proto    => 'tcp',
+            Timeout  => 1,
+        );
+        unless ($sock) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+                "TCP pre-flight failed for '$conn_name' ($host:$port): $!");
+            return 0;
+        }
+        $sock->close();
+
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
     }
     
-    try {
-        my $dbh = DBI->connect($dsn, $username, $password, {
-            RaiseError => 1,
-            PrintError => 0,
-            AutoCommit => 1,
-        });
-        
-        $dbh->disconnect();
-        
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-            "Connection test successful for '$conn_name'");
-        
-        return 1;
-    } catch {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
-            "Connection test failed for '$conn_name': $_");
+    # Fork a child to test the DBI connection so we can SIGKILL it after a timeout.
+    # alarm() cannot interrupt C-level DBI blocking calls; fork+kill can.
+    my $timeout = 3;
+    my $pid = fork();
+    unless (defined $pid) {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
+            "fork() failed for '$conn_name': $! — skipping connection test");
         return 0;
-    };
+    }
+
+    if ($pid == 0) {
+        # Child process: attempt DBI connect, exit 0 on success, exit 1 on failure.
+        eval {
+            my %connect_attrs = (
+                RaiseError => 1,
+                PrintError => 0,
+                AutoCommit => 1,
+                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 2) : ()),
+            );
+            my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
+            $dbh->disconnect() if $dbh;
+        };
+        exit($@ ? 1 : 0);
+    }
+
+    # Parent: wait up to $timeout seconds, then kill the child.
+    my $start = time();
+    my $result = 0;
+    while (1) {
+        my $kid = waitpid($pid, POSIX::WNOHANG());
+        if ($kid == $pid) {
+            $result = ($? == 0) ? 1 : 0;
+            last;
+        }
+        if (time() - $start >= $timeout) {
+            kill 'KILL', $pid;
+            waitpid($pid, POSIX::WNOHANG());
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+                "Connection test timed out after ${timeout}s for '$conn_name'");
+            last;
+        }
+        select(undef, undef, undef, 0.1);
+    }
+
+    if ($result) {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+            "Connection test successful for '$conn_name'");
+    } else {
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+            "Connection test failed for '$conn_name'");
+    }
+    return $result;
 }
 
 sub select_connection {
@@ -350,14 +400,9 @@ sub select_connection {
         ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
     } @matching_connections;
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-        "RemoteDB Connection Selection for '$database_name' - Testing in priority order:");
-    foreach my $conn_name (@matching_connections) {
-        my $priority = $config->{$conn_name}{priority} // 999;
-        my $desc = $config->{$conn_name}{description} || 'No description';
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-            "  Priority $priority: $conn_name - $desc");
-    }
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+        "RemoteDB Connection Selection for '$database_name' - candidates: " .
+        join(', ', map { "$_ (p" . ($config->{$_}{priority}//999) . ")" } @matching_connections));
 
     my @failed_attempts;
     
@@ -389,7 +434,7 @@ sub select_connection {
             next;
         }
 
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
             "Attempting Priority " . ($conn->{priority} // 999) . " ($conn_name): $host:$port");
         
         if ($self->test_connection($conn_name)) {
