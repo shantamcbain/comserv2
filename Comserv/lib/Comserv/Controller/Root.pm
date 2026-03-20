@@ -239,6 +239,34 @@ sub auto :Private {
         # Check admin status
         if ($user_logged_in) {
             $is_admin = $self->check_user_roles($c, 'admin');
+
+            # If not admin from global roles, check UserSiteRole for the current site.
+            # This allows site-specific admins to get admin privileges without re-login.
+            if (!$is_admin && $user_id) {
+                eval {
+                    my $site_name_check = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+                    if ($site_name_check && lc($site_name_check) ne 'csc') {
+                        my $site_obj = $c->model('DBEncy')->resultset('Site')
+                            ->search({ name => $site_name_check })->single;
+                        if ($site_obj) {
+                            my $site_admin_count = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                                user_id   => $user_id,
+                                site_id   => $site_obj->id,
+                                role      => { -like => 'admin' },
+                                is_active => 1,
+                            })->count;
+                            if ($site_admin_count) {
+                                $is_admin = 1;
+                                $c->session->{is_admin} = 1;
+                                unless (grep { lc($_) eq 'admin' } @$user_roles) {
+                                    push @$user_roles, 'admin';
+                                    $c->session->{roles} = $user_roles;
+                                }
+                            }
+                        }
+                    }
+                };
+            }
         }
         
         # Set stash variables
