@@ -2,7 +2,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-<div class="container">
+<div class="app-container">
     <h1>Archived Log Viewer</h1>
     
     [% IF error_msg %]

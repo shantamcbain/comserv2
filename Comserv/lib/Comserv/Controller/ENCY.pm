@@ -73,26 +73,28 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         $c->stash(
             error_msg => "Invalid or missing herb record for editing. Please try again.",
             template  => 'ENCY/HerbView.tt',
-            edit_mode => 0, # Keep edit_mode off since no valid record is loaded
+            mode => 'view',
         );
         return; # Do not redirect; just render the view with an error message
     }
 
     # Retrieve the herb record
-    my $herb = $c->model('ENCYModel')->get_herb_by_id($record_id);
+    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
         $c->stash(
             error_msg => "Herb not found in the database. Please try again.",
             template  => 'ENCY/HerbView.tt',
-            edit_mode => 0, # Render view mode since no valid herb is loaded
+            mode => 'view',
         );
         return; # Do not redirect; just render the view
     }
 
     # Handle POST request for herb updates (if applicable)
     if ($c->request->method eq 'POST') {
+        
+
         my $form_data = {
             botanical_name      => $c->request->params->{botanical_name} // '',
             common_names        => $c->request->params->{common_names} // '',
@@ -127,7 +129,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             $c->stash(
                 error_msg => "Failed to update herb: $error_message",
                 herb      => { %$herb, %$form_data }, # Combine original and submitted data for display
-                edit_mode => 1, # Stay in edit mode for correction
+                mode => 'edit',
                 template  => 'ENCY/HerbView.tt',
             );
             return; # Re-render the form with an error message
@@ -138,7 +140,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     $self->_stash_image_files($c);
     $c->stash(
         herb      => $herb,
-        edit_mode => 1, # Enable edit mode
+        mode => 'edit',
         template  => 'ENCY/HerbView.tt',
     );
 
@@ -187,6 +189,8 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
     my ( $self, $c ) = @_;
 
     if ($c->request->method eq 'POST') {
+        
+
         # Handle form submission
         my $form_data = $c->request->body_parameters;
 
@@ -311,15 +315,8 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Entered bee_pasture_view method');
     push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
 
-    # Fetch bee forage plants data
+    # Fetch bee forage plants — only herbs with a forage category or non-zero nectar/pollen
     my $bee_plants = $c->model('DBForager')->get_bee_forage_plants();
-
-    # If no specific bee forage plants method exists, use the general herbal data
-    if (!$bee_plants || !@$bee_plants) {
-        $bee_plants = $c->model('DBForager')->get_herbal_data();
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
-        push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
-    }
 
     # Pass the data to the template
     $c->stash(
@@ -328,6 +325,7 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
         debug_msg => "Bee Pasture View loaded with " . scalar(@$bee_plants) . " plants"
     );
 }
+
 
 __PACKAGE__->meta->make_immutable;
 

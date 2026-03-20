@@ -1,0 +1,182 @@
+[% META
+   title = "Membership Plan"
+   description = "Create or edit a membership plan"
+   roles = "admin,site_admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-03-18"
+%]
+[% SET title = action == 'create' ? "Create Membership Plan" : "Edit Membership Plan" %]
+[% PageVersion = 'membership/admin/EditPlan.tt,v 0.01 2026/03/18' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+[% form_action = action == 'create'
+     ? c.uri_for('/membership/admin/create_plan')
+     : c.uri_for('/membership/admin/edit_plan', plan.id) %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>[% action == 'create' ? 'Create New Plan' : 'Edit Plan: ' _ plan.name %]</h1>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+        <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-secondary">← Back to Plans</a>
+      </div>
+
+      <div class="content-section">
+        <form method="post" action="[% form_action %]">
+
+          <h3>Basic Information</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="name">Plan Name *</label>
+              <input type="text" id="name" name="name" required
+                     value="[% plan.name | html %]" placeholder="e.g. Pro">
+            </div>
+            <div class="form-field">
+              <label for="slug">Slug *</label>
+              <input type="text" id="slug" name="slug" required
+                     value="[% plan.slug | html %]" placeholder="e.g. pro">
+              <small>Lowercase, no spaces. Used in URLs and code.</small>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3">[% plan.description | html %]</textarea>
+          </div>
+
+          <h3>Pricing</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="price_monthly">Monthly Price</label>
+              <input type="number" id="price_monthly" name="price_monthly" step="0.01" min="0"
+                     value="[% plan.price_monthly || '0.00' %]">
+            </div>
+            <div class="form-field">
+              <label for="price_annual">Annual Price</label>
+              <input type="number" id="price_annual" name="price_annual" step="0.01" min="0"
+                     value="[% plan.price_annual || '0.00' %]">
+              <small>Set to 0 for monthly-only billing.</small>
+            </div>
+            <div class="form-field">
+              <label for="price_currency">Currency</label>
+              <select id="price_currency" name="price_currency">
+                <option value="USD" [% 'selected' IF plan.price_currency == 'USD' || !plan %]>USD</option>
+                <option value="CAD" [% 'selected' IF plan.price_currency == 'CAD' %]>CAD</option>
+                <option value="EUR" [% 'selected' IF plan.price_currency == 'EUR' %]>EUR</option>
+                <option value="GBP" [% 'selected' IF plan.price_currency == 'GBP' %]>GBP</option>
+              </select>
+            </div>
+          </div>
+
+          <h3>AI Access</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="ai_models_allowed">Allowed AI Models (JSON array)</label>
+              <textarea id="ai_models_allowed" name="ai_models_allowed" rows="3"
+                        placeholder='["llama3.2","mistral"]'>[% plan.ai_models_allowed | html %]</textarea>
+              <small>Ollama model names: llama3.2, mistral, codellama, gemma2, deepseek-r1, llava, phi3, qwen2.5</small>
+            </div>
+            <div class="form-field">
+              <label for="ai_requests_per_day">AI Requests Per Day</label>
+              <input type="number" id="ai_requests_per_day" name="ai_requests_per_day" min="0"
+                     value="[% plan.ai_requests_per_day || 0 %]">
+              <small>0 = no AI access. 9999 = unlimited.</small>
+            </div>
+          </div>
+
+          <h3>Services &amp; Features</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label><input type="checkbox" name="has_email" value="1"
+                [% 'checked' IF plan.has_email %]> Email Addresses</label>
+              <input type="number" id="email_addresses" name="email_addresses" min="0"
+                     value="[% plan.email_addresses || 0 %]" placeholder="Number of addresses">
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="has_hosting" value="1"
+                [% 'checked' IF plan.has_hosting %]> Web Hosting</label>
+              <select name="hosting_tier">
+                <option value="">None</option>
+                <option value="starter" [% 'selected' IF plan.hosting_tier == 'starter' %]>Starter</option>
+                <option value="business" [% 'selected' IF plan.hosting_tier == 'business' %]>Business</option>
+                <option value="pro" [% 'selected' IF plan.hosting_tier == 'pro' %]>Pro</option>
+                <option value="enterprise" [% 'selected' IF plan.hosting_tier == 'enterprise' %]>Enterprise</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label><input type="checkbox" name="has_subdomain" value="1"
+                [% 'checked' IF plan.has_subdomain %]> Subdomain</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="has_custom_domain" value="1"
+                [% 'checked' IF plan.has_custom_domain %]> Custom Domain</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="has_beekeeping" value="1"
+                [% 'checked' IF plan.has_beekeeping %]> Beekeeping (Apiary)</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="has_planning" value="1"
+                [% 'checked' IF plan.has_planning %]> Planning System</label>
+            </div>
+          </div>
+
+          <h3>Internal Currency</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label><input type="checkbox" name="has_currency" value="1"
+                [% 'checked' IF plan.has_currency %]> Currency System Access</label>
+            </div>
+            <div class="form-field">
+              <label for="currency_bonus">Signup Coin Bonus</label>
+              <input type="number" id="currency_bonus" name="currency_bonus" step="0.01" min="0"
+                     value="[% plan.currency_bonus || '0.00' %]">
+            </div>
+          </div>
+
+          <h3>Display &amp; Limits</h3>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="max_services">Max Services</label>
+              <input type="number" id="max_services" name="max_services" min="1"
+                     value="[% plan.max_services || 1 %]">
+            </div>
+            <div class="form-field">
+              <label for="sort_order">Sort Order</label>
+              <input type="number" id="sort_order" name="sort_order" min="0"
+                     value="[% plan.sort_order || 0 %]">
+              <small>Lower = shown first.</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label><input type="checkbox" name="is_active" value="1"
+                [% 'checked' IF plan.is_active || !plan %]> Active (visible to users)</label>
+            </div>
+            <div class="form-field">
+              <label><input type="checkbox" name="is_featured" value="1"
+                [% 'checked' IF plan.is_featured %]> Featured (highlighted)</label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              [% action == 'create' ? 'Create Plan' : 'Save Changes' %]
+            </button>
+            <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

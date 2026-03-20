@@ -31,7 +31,7 @@ sub begin :Private {
         $c->detach;
     }
     
-    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+    unless (grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
@@ -42,7 +42,7 @@ sub begin :Private {
     # Store SiteName-based visibility context in stash:
     # CSC admins can see all sites; non-CSC admins/developers only see their own site.
     my $session_sitename = $c->session->{SiteName} || 'CSC';
-    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && (grep { $_ eq 'admin' } @$roles);
+    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && (grep { lc($_) eq 'admin' } @$roles);
     $c->stash->{plan_sitename}   = $session_sitename;
     $c->stash->{is_csc_admin}    = $is_csc_admin;
 
