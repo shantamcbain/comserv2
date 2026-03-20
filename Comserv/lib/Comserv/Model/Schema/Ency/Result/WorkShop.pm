@@ -45,6 +45,7 @@ __PACKAGE__->add_columns(
     },
     max_participants => {
         data_type => 'integer',
+        is_nullable => 1,
     },
     status => {
         data_type => 'enum',

@@ -10,6 +10,12 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    return 1;
+}
+
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -124,6 +130,8 @@ sub index :Path :Args(0) {
 sub add_site :Local {
     my ($self, $c) = @_;
 
+    
+
     # Get the site details from the request
     my $site = $c->request->body_parameters;
 
@@ -234,7 +242,8 @@ sub details :Local {
     $c->stash->{domains} = \@site_domains;
 
     # If domain is defined in the form parameters, insert a new row into the SiteDomain table
-    if (my $domain = $c->request->parameters->{domain}) {
+    if ($c->request->method eq 'POST' && (my $domain = $c->request->parameters->{domain})) {
+        
         eval {
             $c->model('DBEncy::SiteDomain')->create({
                 site_id => $site_id,
@@ -264,6 +273,10 @@ sub add_domain :Local {
 
     # Get the site_id from the request parameters
     my $site_id = $c->request->parameters->{site_id};
+
+    if ($c->request->method eq 'POST') {
+        
+    }
 
     # Get the new_domain from the request parameters
     my $new_domain = $c->request->parameters->{new_domain};
@@ -304,8 +317,13 @@ sub get_site_details {
 
 sub delete_domain :Local {
     my ($self, $c) = @_;
+
     my $domain_id = $c->request->parameters->{domain_id};
     my $site_id = $c->request->parameters->{site_id};
+
+    if ($c->request->method eq 'POST') {
+        
+    }
 
     eval {
         my $domain = $c->model('DBEncy::SiteDomain')->find($domain_id);
@@ -624,6 +642,8 @@ sub fetch_available_sites :Private {
 
 sub add_domain_post :Local {
     my ($self, $c) = @_;
+
+    
 
     # Get the site_id and domain from the form parameters
     my $site_id = $c->request->parameters->{site_id};

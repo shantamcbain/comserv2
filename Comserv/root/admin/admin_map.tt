@@ -92,10 +92,22 @@
             </div>
         </div>
 
+        <!-- System Health Section -->
+        <div class="map-section">
+            <h2 class="section-title"><i class="icon-system"></i> System Health</h2>
+            <div class="map-links">
+                <a href="/admin/hardware_monitor" class="map-link"><i class="icon-server"></i> Hardware Monitor</a>
+                <a href="/admin/logging" class="map-link"><i class="icon-log"></i> Logging Administration</a>
+                <a href="/admin/logging/audit" class="map-link"><i class="icon-status"></i> Log Audit &amp; Health</a>
+                <a href="/admin/docker-containers" class="map-link"><i class="icon-docker"></i> Docker Containers</a>
+            </div>
+        </div>
+
         <!-- Logging Section -->
         <div class="map-section">
             <h2 class="section-title"><i class="icon-log"></i> Logging</h2>
             <div class="map-links">
+                <a href="/admin/hardware_monitor" class="map-link"><i class="icon-server"></i> Hardware Monitor</a>
                 <a href="/log" class="map-link"><i class="icon-log"></i> Logging System</a>
                 <a href="/admin/view_log" class="map-link"><i class="icon-view"></i> View Application Log</a>
                 <a href="/admin/git_pull" class="map-link"><i class="icon-git"></i> Pull from Git Repository</a>

@@ -382,12 +382,13 @@ sub index :Path('/Documentation') :Args(0) {
     
     # Special case for site CSC - ensure admin role is recognized
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        # Check if user should have admin privileges on this site
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        # Check if user should have admin privileges on this site using centralized utility
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_index')) {
             $user_role = 'admin';
             $is_admin = 1;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-                "Admin role granted for CSC site user: " . $c->session->{username});
+                "Admin role granted for CSC site user (via AdminAuth)");
         }
     }
 
@@ -642,12 +643,13 @@ sub view :Path('/Documentation') :Args(1) {
     
     # Special case for site CSC - ensure admin role is recognized
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        # Check if user should have admin privileges on this site
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        # Check if user should have admin privileges on this site using centralized utility
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_view')) {
             $user_role = 'admin';
             $is_admin = 1;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', 
-                "Admin role granted for CSC site user: " . $c->session->{username});
+                "Admin role granted for CSC site user (via AdminAuth)");
         }
     }
 
@@ -1706,11 +1708,10 @@ sub _check_admin_access {
         return 1 if grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @{$c->session->{roles}};
     }
     
-    # Special case for site CSC
+    # Special case for site CSC - using centralized utility
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
-            return 1;
-        }
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        return 1 if $admin_auth->check_admin_access($c, '_check_admin_access');
     }
     
     return 0;
@@ -1825,9 +1826,10 @@ sub search :Path('/documentation/search') :Args(0) {
         $is_admin = 1 if lc($user_role) eq 'admin';
     }
     
-    # Special case for CSC site
+    # Special case for CSC site using centralized utility
     if ($c->stash->{SiteName} && $c->stash->{SiteName} eq 'CSC') {
-        if ($c->session->{username} && ($c->session->{username} eq 'Shanta' || $c->session->{username} eq 'admin')) {
+        my $admin_auth = Comserv::Util::AdminAuth->new();
+        if ($admin_auth->check_admin_access($c, 'documentation_search')) {
             $user_role = 'admin';
             $is_admin = 1;
         }

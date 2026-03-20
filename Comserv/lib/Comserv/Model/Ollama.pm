@@ -50,14 +50,14 @@ Comserv::Model::Ollama - Catalyst Model for Ollama API integration
     
     # Using remote server
     my $ollama_remote = Comserv::Model::Ollama->new(
-        host => '192.168.1.171',
+        host => '192.168.1.199',
         model => 'llama3.1',
         timeout => 120
     );
     
     # Or specify endpoint directly (legacy method)
     my $ollama_legacy = Comserv::Model::Ollama->new(
-        endpoint => 'http://192.168.1.171:11434/api/generate',
+        endpoint => 'http://192.168.1.199:11434/api/generate',
         model => 'llama3.1',
         timeout => 120
     );
@@ -69,7 +69,7 @@ It handles HTTP communication, streaming responses, error handling, and
 parsing of structured data from LLM responses.
 
 The module supports connecting to Ollama servers on both localhost and remote hosts
-(e.g., 192.168.1.171). You can specify the host and port separately, or provide a
+(e.g., 192.168.1.199). You can specify the host and port separately, or provide a
 complete endpoint URL. The endpoint is automatically built from the host and port
 if not explicitly provided.
 
@@ -80,8 +80,8 @@ if not explicitly provided.
 has 'host' => (
     is => 'rw',
     isa => 'Str',
-    default => 'localhost',
-    documentation => 'Ollama server host (localhost or 192.168.1.171)'
+    default => '192.168.1.199',
+    documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
 has 'port' => (
@@ -1275,7 +1275,7 @@ Helper method to change the Ollama server host and automatically rebuild the end
     $ollama->set_host('localhost');
     
     # Switch to remote server
-    $ollama->set_host('192.168.1.171');
+    $ollama->set_host('192.168.1.199');
 
 This method updates both the host attribute and clears the endpoint cache so it will
 be rebuilt with the new host on the next access.

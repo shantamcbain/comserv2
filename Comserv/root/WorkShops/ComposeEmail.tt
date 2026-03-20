@@ -53,7 +53,7 @@
                             <div class="form-field">
                                 <label for="subject">Subject:</label>
                                 <input type="text" id="subject" name="subject" class="form-input" size="80" 
-                                       value="[% form_data.subject | html OR '' %]" required>
+                                       value="[% form_data.subject || '' | html %]" required>
                             </div>
                         </div>
                         

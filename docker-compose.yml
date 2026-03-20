@@ -48,19 +48,22 @@ services:
       CATALYST_DEBUG: 1
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 3000
+      SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-workstation-dev}"
       WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
+      SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
-      # External Database Configuration (192.168.1.198) - via db_config.json
+      DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
+      # External Database Configuration (192.168.1.198) - credentials via K8s secrets (~/.comserv/secrets)
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
-      DB_USER: ${DB_USER:-comserv}
-      DB_PASSWORD: ${DB_PASSWORD}
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
     ports:
       - "3000:3000"
     networks:
@@ -74,19 +77,20 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - comserv-workshop:/data/nfs:rw
+      - workshop_files_nfs:/data/nfs:rw
       - comserv-logs:/opt/comserv/root/log:rw
+      - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
     depends_on:
       redis:
         condition: service_healthy
     extra_hosts:
       - "database:192.168.1.198"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD-SHELL", "curl -f --max-time 8 http://localhost:${WEB_PORT:-3000}/health || exit 1"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
@@ -108,19 +112,23 @@ services:
       CATALYST_DEBUG: 0
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
+      SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-production-prod}"
       WORKSHOP_RESOURCES_PATH: ${WORKSHOP_RESOURCES_PATH:-/data/nfs}
+      SKIP_NFS_SETUP: 0
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass_dev}
       TZ: ${TZ:-UTC}
-      # External Database Configuration (192.168.1.198) - via db_config.json
+      STARMAN_WORKERS: ${STARMAN_WORKERS:-5}
+      DB_LOG_MIN_LEVEL: ${DB_LOG_MIN_LEVEL:-WARN}
+      # External Database Configuration (192.168.1.198) - credentials via K8s secrets (~/.comserv/secrets)
       DB_LOAD_SOURCE: db_config
       ACTIVE_DB_ENVIRONMENT: ${ACTIVE_DB_ENVIRONMENT:-production}
       DB_HOST: ${DB_HOST:-192.168.1.198}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
-      DB_USER: ${DB_USER:-comserv}
-      DB_PASSWORD: ${DB_PASSWORD}
+      COMSERV_SESSION_DIR: /tmp/comserv/session
+      COMSERV_SESSION_COOKIE: comserv_session
     ports:
       - "5000:5000"
     networks:
@@ -134,17 +142,19 @@ services:
       - ${APP_MOUNT:-.}/Comserv/t:/opt/comserv/t:delegated
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - comserv-workshop:/data/nfs:rw
+      - workshop_files_nfs:/data/nfs:rw
       - comserv-logs:/opt/comserv/root/log:rw
+      - comserv-sessions:/tmp/comserv/session:rw
+      - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD-SHELL", "curl -f --max-time 8 http://localhost:5000/health || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      timeout: 12s
+      retries: 5
+      start_period: 120s
     logging:
       driver: "json-file"
       options:
@@ -152,15 +162,21 @@ services:
         max-file: "10"
 
 # Volumes for persistent data
-# comserv-workshop and comserv-logs are named volumes (NOT deleted by docker system prune)
-# To use NFS backend instead, see docker-compose.nfs.yml override
+# comserv-logs is a named volume (NOT deleted by docker system prune)
+# comserv-workshop now uses bind mount to /home/shanta/nfs for direct access
 volumes:
   redis_data:
     driver: local
-  comserv-workshop:
-    driver: local
   comserv-logs:
     driver: local
+  comserv-sessions:
+    driver: local
+  workshop_files_nfs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=${NFS_SERVER:-192.168.1.175},rw,noatime,nfsvers=3,soft"
+      device: ":${NFS_WORKSHOP_PATH:-/mnt/data/comserv}"
 
 # Shared bridge network for all services
 networks:
