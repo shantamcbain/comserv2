@@ -26,12 +26,16 @@
     [% END %]
 [% END %]
 
-[%# Can access planning tools: admin, developer, devops %]
-[% SET can_plan = is_admin
+[%# Can access planning tools: all roles above member (user, editor, developer, devops, admin) %]
+[% SET can_plan = c.session.username && (
+    is_admin
     || (c.stash.user_roles && (
         c.stash.user_roles.grep('developer').size
         || c.stash.user_roles.grep('devops').size
-    )) %]
+        || c.stash.user_roles.grep('editor').size
+        || c.stash.user_roles.grep('user').size
+    ))
+) %]
 
 [% IF c.session.debug_mode == 1 %]
     <!-- Debug: Username: [% c.session.username %] -->
