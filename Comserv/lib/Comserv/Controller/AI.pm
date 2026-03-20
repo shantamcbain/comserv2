@@ -2683,7 +2683,10 @@ sub _build_role_system_prompt {
 
     return "You are a helpful assistant for logged-in users of this application. "
          . "Answer based on the page content and documentation provided. "
-         . "Do not invent data; if you don't know something, say so."
+         . "Do not invent data; if you don't know something, say so. "
+         . "NAVIGATION: When the user says 'take me to', 'open', 'go to', 'navigate to', or 'show me' a page, "
+         . "respond with the URL from the navigation guide so the application can automatically navigate there. "
+         . "Use the exact URL from the list — the application will redirect the browser for you."
          . $no_internet
          . $page_nav
          . $nav_guide;
