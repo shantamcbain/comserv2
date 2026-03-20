@@ -98,10 +98,11 @@ sub list :Path('/admin/plan/list') :Args(0) {
         } else {
             $c->stash(
                 plans        => \@plan_data,
+                is_admin     => $c->stash->{is_admin},
                 is_csc_admin => $c->stash->{is_csc_admin},
                 plan_sitename => $c->stash->{plan_sitename},
                 filter_site  => $filter_site,
-                template     => 'admin/documentation/DailyPlan.tt'
+                template     => 'admin/plan/list.tt'
             );
             $c->forward($c->view('TT'));
         }
