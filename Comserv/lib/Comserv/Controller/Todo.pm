@@ -117,7 +117,7 @@ sub begin :Private {
     }
 
     # Allow all roles above member: admin, developer, devops, editor, user
-    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user)$/ } @$roles) {
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
         # Stash the current path for potential use

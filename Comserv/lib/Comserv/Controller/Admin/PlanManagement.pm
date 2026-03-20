@@ -31,7 +31,7 @@ sub begin :Private {
         $c->detach;
     }
     
-    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user)$/ } @$roles) {
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
@@ -195,51 +195,72 @@ sub details :Path('/admin/plan') :Args(1) {
 
 sub create :Path('/admin/plan/create') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+
+    # GET — render creation form
+    if ($c->req->method ne 'POST') {
+        $c->stash(
+            sitename  => $c->stash->{plan_sitename} || $c->session->{SiteName} || 'CSC',
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    # POST — process form submission
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
         'Creating new plan');
-    
+
+    my $params       = $c->req->body_parameters;
+    my $plan_name    = $params->{plan_name};
+    my $plan_desc    = $params->{plan_description};
+    my $start_date   = $params->{start_date} || undef;
+    my $due_date     = $params->{due_date}   || undef;
+    my $priority     = $params->{priority}   || 0;
+    my $status       = $params->{status}     || 'active';
+    my $sitename     = $c->session->{SiteName} || 'CSC';
+
+    unless ($plan_name) {
+        $c->stash(
+            error_msg => "Plan name is required.",
+            sitename  => $sitename,
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
     try {
-        my $params = $c->req->body_parameters;
-        my $plan_name = $params->{plan_name};
-        my $plan_description = $params->{plan_description};
-        my $start_date = $params->{start_date};
-        my $due_date = $params->{due_date};
-        my $priority = $params->{priority} || 0;
-        my $status = $params->{status} || 'active';
-        
-        unless ($plan_name) {
-            $c->stash->{json} = { success => 0, error => "Plan name is required" };
-            $c->forward('View::JSON');
-            $c->detach;
-        }
-        
-        my $schema = $c->model('DBEncy');
-        my $plan = $schema->resultset('DailyPlan')->create({
-            plan_name => $plan_name,
-            plan_description => $plan_description,
-            sitename => $c->session->{SiteName},
-            status => $status,
-            start_date => $start_date,
-            due_date => $due_date,
-            priority => $priority,
-            created_by => $c->session->{username} || 'unknown',
+        my $plan = $c->model('DBEncy')->resultset('DailyPlan')->create({
+            plan_name        => $plan_name,
+            plan_description => $plan_desc,
+            sitename         => $sitename,
+            status           => $status,
+            start_date       => $start_date,
+            due_date         => $due_date,
+            priority         => $priority,
+            created_by       => $c->session->{username} || 'unknown',
         });
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
             "Plan created successfully: " . $plan->id);
-        
-        $c->stash->{json} = { 
-            success => 1, 
-            plan_id => $plan->id,
-            message => "Plan created successfully"
-        };
-        $c->forward('View::JSON');
+
+        $c->res->redirect($c->uri_for('/admin/plan/list'));
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
-            "Error creating plan: $_");
-        $c->stash->{json} = { success => 0, error => "Error creating plan: $_" };
-        $c->forward('View::JSON');
+        my $err = $_;
+        # Re-throw Catalyst internal exceptions (detach, redirect, etc.)
+        die $err if ref $err && $err->isa('Catalyst::Exception');
+
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
+            "Error creating plan: $err");
+        $c->stash(
+            error_msg => "Error creating plan: $err",
+            sitename  => $sitename,
+            is_admin  => $c->stash->{is_admin},
+            template  => 'admin/plan/create.tt',
+        );
+        $c->forward($c->view('TT'));
     };
 }
 
