@@ -2781,6 +2781,13 @@ sub _build_navigation_command_guide {
             [ 'File management',            '/file/list'                ],
             [ 'Duplicate files',            '/file/duplicates'          ],
         ]],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
+        ]],
     );
 
     my %role_rank = ( guest => 0, user => 1, admin => 2 );
