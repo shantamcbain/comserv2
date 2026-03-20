@@ -116,8 +116,8 @@ sub begin :Private {
         $c->detach;
     }
 
-    # Check if the user has the 'admin' or 'developer' role (case-insensitive)
-    unless (grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @$roles) {
+    # Allow all roles above member: admin, developer, devops, editor, user
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
         # Stash the current path for potential use
