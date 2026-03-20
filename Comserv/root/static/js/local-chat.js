@@ -1179,9 +1179,31 @@
                 console.error('Error getting AI response:', data.error);
                 statusIndicator.textContent = 'AI Error';
                 statusIndicator.className = 'chat-status error';
-                
-                // Show error in chat
-                addMessage(`Error: ${data.error || 'Failed to get response. Please try again.'}`, 'error-message');
+
+                const errText = data.error || 'Failed to get response. Please try again.';
+                const isServerTimeout = /timeout|timed.out|read timeout/i.test(errText);
+
+                const chatMessages = document.getElementById('chat-messages');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const label = document.createElement('div');
+                label.className = 'msg-label';
+                label.textContent = 'System';
+                const errEl = document.createElement('div');
+                errEl.className = 'message error-message';
+                errEl.textContent = 'Error: ' + errText
+                    + (isServerTimeout ? ' — Ollama may still be loading the model.' : '');
+                wrapper.appendChild(label);
+                wrapper.appendChild(errEl);
+                if (isServerTimeout) {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'chat-retry-btn';
+                    retryBtn.textContent = '↺ Try Again';
+                    retryBtn.onclick = function() { wrapper.remove(); queryAI(prompt); };
+                    wrapper.appendChild(retryBtn);
+                }
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         })
         .catch(function(error) {
