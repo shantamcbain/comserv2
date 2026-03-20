@@ -31,7 +31,7 @@ sub begin :Private {
         $c->detach;
     }
     
-    unless (grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @$roles) {
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
