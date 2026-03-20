@@ -2153,27 +2153,19 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my ($self, $c, @args) = @_;
     my $requested_date = $args[0] if @args;
 
-    # Access control: text-based DailyPlan is CSC-only.
-    # Non-CSC sites are redirected to the DB-driven planning view.
+    # DailyPlan is accessible to all sites — non-CSC sites see only DB-driven sections.
+    # CSC sees text-based planning tabs in addition to the DB-driven sections.
     my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-    unless (uc($sitename) eq 'CSC') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'daily_plan',
-            "Non-CSC site '$sitename' redirected from text-based DailyPlan to DB planning view");
-        $c->res->redirect($c->uri_for('/admin/plan/list'));
-        $c->detach;
-    }
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
 
-    # Role check: only admin, developer, devops can access DailyPlan
+    # Role check: all roles above member (admin, developer, devops, editor, user, normal)
     my $user_roles = $c->session->{roles} || [];
     $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
-    my $has_access = grep { $_ eq 'admin' || $_ eq 'developer' || $_ eq 'devops' } @$user_roles;
+    my $has_access = grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
     unless ($has_access) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
             "Access denied to DailyPlan for user: " . ($c->session->{username} || 'Guest'));
-        $c->stash(
-            error_msg => "Access denied: DailyPlan requires admin, developer, or devops role.",
-            template => 'Documentation/Error.tt'
-        );
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
@@ -2305,8 +2297,34 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     # Set proper charset for UTF-8 content
     $c->response->content_type('text/html; charset=utf-8');
 
+    # Fetch DB plans for this site (used in PLANNING tab for all sites)
+    my @db_plans;
+    eval {
+        my %search_cond = $is_csc ? () : (sitename => $sitename);
+        my $rs = $c->model('DBEncy')->resultset('DailyPlan');
+        my @plan_rows = $rs->search(\%search_cond, { order_by => { -asc => 'priority' } });
+        for my $plan (@plan_rows) {
+            my %h = $plan->get_columns;
+            $h{progress_percentage}     = $plan->get_progress_percentage;
+            $h{todo_count}              = $plan->get_todo_count;
+            $h{completed_todo_count}    = $plan->get_completed_todo_count;
+            $h{is_overdue}              = $plan->is_overdue;
+            push @db_plans, \%h;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch DB plans: $@");
+    }
+
     # Pass all date information and todos to template
     $c->stash(
+        # Site context
+        is_csc       => $is_csc,
+        plan_sitename => $sitename,
+        db_plans     => \@db_plans,
+        is_admin     => $c->stash->{is_admin},
+
         # Date strings
         current_date_str => $current_date_str,
         current_display => $current_display,
