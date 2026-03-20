@@ -1586,8 +1586,8 @@
             }
             
             .system-message {
-                background-color: var(--secondary-color);
-                color: var(--text-color);
+                background-color: #f5f5f5;
+                color: #333;
                 align-self: flex-start;
                 margin-right: auto;
                 border-bottom-left-radius: 5px;
@@ -1611,15 +1611,15 @@
             }
             
             .ai-message.loading {
-                background-color: var(--secondary-color);
-                color: var(--schema-text-muted);
+                background-color: #f0f4f8;
+                color: #888;
                 font-style: italic;
             }
             
             .error-message {
-                background-color: var(--secondary-color);
-                border: 1px solid var(--warning-color);
-                color: var(--text-color);
+                background-color: #fff3f3;
+                border: 1px solid #cc0000;
+                color: #cc0000;
                 align-self: center;
                 margin: 5px auto;
                 font-size: 0.9em;
