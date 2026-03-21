@@ -52,13 +52,30 @@ print "Comserv Security Crawl\n";
 print "Target: $base_url  Site: $sitename\n";
 print "=" x 60 . "\n\n";
 
-my $jar = HTTP::Cookies->new;
-my $ua  = LWP::UserAgent->new(
-    cookie_jar        => $jar,
-    max_redirect      => 5,
-    timeout           => 15,
-    agent             => 'ComservSecurityScanner/1.0',
+# Two separate cookie jars / agents — both are fully unauthenticated.
+# The crawl UA optionally sends X-Sitename so Phase 1 can render site-specific
+# public pages.  The probe UA sends NO X-Sitename so Phase 2/3/4 hit routes
+# exactly as a fresh anonymous browser would (Host header determines the site,
+# just like a real user).  Neither UA ever shares the admin browser session.
+my $crawl_jar = HTTP::Cookies->new;
+my $probe_jar = HTTP::Cookies->new;
+
+my $ua = LWP::UserAgent->new(
+    cookie_jar   => $crawl_jar,
+    max_redirect => 5,
+    timeout      => 15,
+    agent        => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
 );
+
+my $probe_ua = LWP::UserAgent->new(
+    cookie_jar   => $probe_jar,
+    max_redirect => 5,
+    timeout      => 15,
+    agent        => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+);
+
+# Site header: only sent by crawl UA, and only when --site is a real site name
+my @site_hdr = ($sitename && $sitename ne 'none') ? ('X-Sitename' => $sitename) : ();
 
 # Known sensitive path patterns — any 200 response here is a finding
 my @SENSITIVE_PATTERNS = (
@@ -205,7 +222,7 @@ while (@queue && $page_count < $max_pages) {
     next if $visited{$url}++;
     $page_count++;
 
-    my $resp = $ua->get($url, 'X-Sitename' => $sitename);
+    my $resp = $ua->get($url, @site_hdr);
     my $finding = classify_response($url, $resp);
 
     push @findings, { phase => 'crawl', %$finding };
@@ -234,12 +251,15 @@ while (@queue && $page_count < $max_pages) {
     }
 }
 
-print "  Crawled $page_count pages, found " . scalar(grep { $_->{result} =~ /EXPOSED|LEAK/ } @findings) . " issues.\n\n";
+print "  Crawled $page_count pages, found " . scalar(grep { $_->{result} =~ /EXPOSED|LEAK/ } @findings) . " issues.\n";
+print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 2: Directly probe sensitive GET endpoints
+# (uses probe_ua — NO X-Sitename header — exactly like a fresh
+#  anonymous browser.  Host header determines the site.)
 # ============================================================
-print "[Phase 2] Probing known sensitive GET endpoints...\n";
+print "[Phase 2] Probing known sensitive GET endpoints (no session, no site header)...\n";
 
 my @SENSITIVE_GET = (
     '/admin',
@@ -279,7 +299,7 @@ my @SENSITIVE_GET = (
 for my $path (@SENSITIVE_GET) {
     my $url = $base_url . $path;
     next if $visited{$url};
-    my $resp = $ua->get($url, 'X-Sitename' => $sitename);
+    my $resp = $probe_ua->get($url);
     my $finding = classify_response($url, $resp);
     $finding->{phase} = 'probe_get';
 
@@ -287,21 +307,20 @@ for my $path (@SENSITIVE_GET) {
                $finding->{result} eq 'PROTECTED'    ? 'ok' : '--';
     printf "  %s [%s] %-50s => %s\n", $icon, $resp->code, $path, $finding->{result};
 
-    push @findings, $finding
-        unless $finding->{result} eq 'NOT_FOUND';
+    push @findings, $finding;
 }
 
-print "\n";
+print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 3: Probe sensitive POST endpoints with dummy data
+# (probe_ua — no session, no site header)
 # ============================================================
-print "[Phase 3] Probing sensitive POST endpoints...\n";
+print "[Phase 3] Probing sensitive POST endpoints (no session)...\n";
 
 for my $path (@SENSITIVE_POST_ENDPOINTS) {
     my $url = $base_url . $path;
-    my $resp = $ua->post($url,
-        'X-Sitename' => $sitename,
+    my $resp = $probe_ua->post($url,
         Content => [name => 'test', client_name => 'test', project_id => '1', record_id => '1'],
     );
     my $code  = $resp->code;
@@ -328,19 +347,20 @@ for my $path (@SENSITIVE_POST_ENDPOINTS) {
         unless $result eq 'NOT_FOUND';
 }
 
-print "\n";
+print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 4: Check public pages for links to private areas
+# (probe_ua — no session, no site header — true public view)
 # ============================================================
-print "[Phase 4] Checking public pages for leaking private links...\n";
+print "[Phase 4] Checking public pages for leaking private links (no session)...\n";
 
 my @PUBLIC_PAGES = ('/', '/ENCY', '/ENCY/BeePastureView', '/ENCY/BotanicalNameView',
                     '/workshop', '/HelpDesk', '/WeaverBeck', '/MCoop', '/3d', '/CSC');
 
 for my $path (@PUBLIC_PAGES) {
     my $url  = $base_url . $path;
-    my $resp = $ua->get($url, 'X-Sitename' => $sitename);
+    my $resp = $probe_ua->get($url);
     next unless $resp->code == 200 && $resp->content_type =~ /html/;
 
     my @links   = extract_links($url, $resp->decoded_content // '');
@@ -357,7 +377,7 @@ for my $path (@PUBLIC_PAGES) {
     }
 }
 
-print "\n";
+print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Summary
