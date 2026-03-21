@@ -2159,9 +2159,11 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
     my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
 
     # Role check: all roles above member (admin, developer, devops, editor, user, normal)
-    my $user_roles = $c->session->{roles} || [];
+    # Also accept stash is_admin set by Root::auto (catches site-specific admins)
+    my $user_roles = $c->stash->{user_roles} || $c->session->{roles} || [];
     $user_roles = [$user_roles] unless ref $user_roles eq 'ARRAY';
-    my $has_access = grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
+    my $has_access = $c->stash->{is_admin}
+        || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$user_roles;
     unless ($has_access) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
             "Access denied to DailyPlan for user: " . ($c->session->{username} || 'Guest'));
