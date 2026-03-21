@@ -430,8 +430,7 @@
     <!-- TAB: PLANNING — Project→Plan hierarchy; DB-driven for all sites; CSC also sees legacy Planning.tt -->
     <div id="planning" class="tab-content">
 
-        [%# ── Query: get filter param and determine visible sitenames ── %]
-        [% SET filter_site = c.req.params.filter_site || '' %]
+        [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
         [%# ── Header row ── %]
@@ -452,46 +451,27 @@
             </div>
         </div>
 
-        [%# ── CSC admin: SiteName filter toggle ── %]
-        [% IF is_csc %]
-        [% TRY %]
-        [% SET site_rs = c.model('DBEncy').resultset('Project').search({}, { columns => ['sitename'], distinct => 1, order_by => 'sitename' }) %]
+        [%# ── CSC admin: SiteName filter toggle (from stash plan_sitenames) ── %]
+        [% IF is_csc && plan_sitenames && plan_sitenames.size %]
         <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
             <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
-            <a href="[% c.uri_for('/Documentation/DailyPlan') %]#planning"
+            <a href="/Documentation/DailyPlan#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
                [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
-            [% FOREACH site_row IN site_rs.all %]
-            [% NEXT UNLESS site_row.sitename %]
-            <a href="[% c.uri_for('/Documentation/DailyPlan') %]?filter_site=[% site_row.sitename %]#planning"
+            [% FOREACH sname IN plan_sitenames %]
+            <a href="/Documentation/DailyPlan?filter_site=[% sname %]#planning"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
-               [% IF filter_site == site_row.sitename %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
-                [% site_row.sitename %]
+               [% IF filter_site == sname %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+                [% sname %]
             </a>
             [% END %]
         </div>
-        [% CATCH %][% END %]
         [% END %]
 
-        [%# ── Project → Plan hierarchy ── %]
-        [% TRY %]
-        [% IF is_csc && !filter_site %]
-        [% SET projects_rs = c.model('DBEncy').resultset('Project').search({}, { order_by => ['sitename','name'] }) %]
-        [% ELSE %]
-        [% SET projects_rs = c.model('DBEncy').resultset('Project').search({sitename => view_sitename}, { order_by => ['sitename','name'] }) %]
-        [% END %]
-        [% SET total_projects = projects_rs ? projects_rs.count : 0 %]
-        [% IF c.session.debug_mode == 1 %]
-        <div style="background:#e8f4f8;border:1px solid #aaa;padding:6px 10px;font-size:0.78em;border-radius:3px;margin-bottom:8px;">
-            DEBUG: is_csc=[% is_csc %] filter_site=[% filter_site %] view_sitename=[% view_sitename %] total_projects=[% total_projects %]
-        </div>
-        [% END %]
-
-        [% IF total_projects > 0 %]
+        [%# ── Project → Plan hierarchy (from stash planning_projects) ── %]
+        [% IF planning_projects && planning_projects.size %]
         [% SET current_site_label = '' %]
-        [% FOREACH proj IN projects_rs.all %]
-            [% NEXT IF proj.parent_id %][%# top-level projects only %]
-
+        [% FOREACH proj IN planning_projects %]
             [%# Site group header for CSC all-sites view %]
             [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
             [% SET current_site_label = proj.sitename %]
@@ -525,11 +505,10 @@
                     <div style="font-size:0.85em;color:var(--text-color);margin:6px 0 10px;">[% proj.description %]</div>
                     [% END %]
 
-                    [%# Plans linked to this project %]
-                    [% SET proj_plans = proj.dailyplans %]
-                    [% IF proj_plans.count > 0 %]
+                    [%# Plans linked to this project (from proj.linked_plans set by controller) %]
+                    [% IF proj.linked_plans && proj.linked_plans.size %]
                     <div style="margin-left:8px;border-left:2px solid var(--primary-color);padding-left:10px;">
-                        [% FOREACH pln IN proj_plans.all %]
+                        [% FOREACH pln IN proj.linked_plans %]
                         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-color);">
                             <div>
                                 <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;font-size:0.9em;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
@@ -557,18 +536,7 @@
         [% END %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
-        [% IF is_csc && !filter_site %]
-        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search({}, {order_by => 'created_at DESC'}) %]
-        [% ELSE %]
-        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search({sitename => view_sitename}, {order_by => 'created_at DESC'}) %]
-        [% END %]
-        [% SET orphan_plans = [] %]
-        [% FOREACH pln IN all_plans_rs.all %]
-            [% IF pln.dailyplan_projects.count == 0 %]
-            [% orphan_plans.push(pln) %]
-            [% END %]
-        [% END %]
-        [% IF orphan_plans.size %]
+        [% IF orphan_plans && orphan_plans.size %]
         <div style="margin-top:20px;">
             <h3 style="font-size:0.95em;color:var(--text-muted-color);margin-bottom:8px;">📋 Standalone Plans (not yet linked to a project)</h3>
             [% FOREACH pln IN orphan_plans %]
@@ -594,16 +562,10 @@
         [% ELSE %]
         <div style="text-align:center;padding:40px;color:var(--text-muted-color);">
             <p>No projects found for <strong>[% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]</strong>.</p>
-            <p style="font-size:0.82em;margin-top:4px;">(is_csc=[% is_csc %] filter=[% filter_site || 'none' %] count=[% total_projects %])</p>
             [% IF is_admin %]
-            <p>You can add projects at <a href="/project/addproject" style="color:var(--primary-color);">/project/addproject</a> or create a plan:</p>
+            <p>Add a project at <a href="/project/addproject" style="color:var(--primary-color);">/project/addproject</a>, then it will appear here.</p>
             <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Create the first plan</a>
             [% END %]
-        </div>
-        [% END %]
-        [% CATCH %]
-        <div style="background:#fee;border:1px solid #f88;padding:10px;border-radius:4px;font-size:0.85em;">
-            ⚠️ Error loading projects: <strong>[% error.type %]</strong> — [% error.info %]
         </div>
         [% END %]
 
