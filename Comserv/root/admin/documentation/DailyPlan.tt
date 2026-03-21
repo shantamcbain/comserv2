@@ -552,7 +552,7 @@
 
         [%# ── Standalone plans (not linked to any project) ── %]
         [% SET plan_search = is_csc && !filter_site ? {} : {sitename => view_sitename} %]
-        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search(plan_search, {order_by => {-desc => 'created_at'}}) %]
+        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search(plan_search, {order_by => 'created_at DESC'}) %]
         [% SET orphan_plans = [] %]
         [% FOREACH pln IN all_plans_rs.all %]
             [% IF pln.dailyplan_projects.count == 0 %]
