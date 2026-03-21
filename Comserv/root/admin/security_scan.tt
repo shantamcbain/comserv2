@@ -94,6 +94,17 @@
         </div>
     </div>
 
+    <!-- Scan history -->
+    <div class="card mb-3" id="history-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Past Scans</strong>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadHistory()">Refresh</button>
+        </div>
+        <div class="card-body p-0" id="history-body">
+            <p class="p-3 text-muted mb-0">Loading history...</p>
+        </div>
+    </div>
+
     <!-- Results table (shown after scan completes) -->
     <div id="scan-results">
         <div class="card mb-3">
@@ -127,6 +138,8 @@
 <script>
 var pollTimer = null;
 var pollOffset = 0;
+
+window.addEventListener('DOMContentLoaded', function() { loadHistory(); });
 
 function applyPreset(sel) {
     var opt = sel.options[sel.selectedIndex];
@@ -193,6 +206,7 @@ function doPoll() {
             if (data.results && data.results.findings) {
                 renderResults(data.results.findings);
             }
+            loadHistory();
         }
     })
     .catch(function(err) { appendLine('Poll error: ' + err); });
@@ -259,6 +273,49 @@ function statCard(cls, n, label) {
 
 function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadHistory() {
+    fetch('/admin/security-scan-history')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var el = document.getElementById('history-body');
+        if (!data.scans || data.scans.length === 0) {
+            el.innerHTML = '<p class="p-3 text-muted mb-0">No past scans found.</p>';
+            return;
+        }
+        var rows = data.scans.map(function(s) {
+            var crit = (s.summary && s.summary.exposed) ? s.summary.exposed : 0;
+            var tot  = (s.summary && s.summary.total)   ? s.summary.total   : 0;
+            var badge = crit > 0
+                ? '<span class="badge badge-danger">' + crit + ' critical</span>'
+                : '<span class="badge badge-success">clean</span>';
+            return '<tr>' +
+                '<td><small>' + esc(s.scan_time||'') + '</small></td>' +
+                '<td><code style="font-size:0.8em">' + esc(s.base_url||'') + '</code> <small class="text-muted">' + esc(s.sitename||'') + '</small></td>' +
+                '<td>' + tot + ' URLs</td>' +
+                '<td>' + badge + '</td>' +
+                '<td><button class="btn btn-xs btn-outline-primary" onclick="loadArchive(' + JSON.stringify(s.file) + ')">View</button></td>' +
+                '</tr>';
+        }).join('');
+        el.innerHTML = '<table class="table table-sm table-bordered mb-0"><thead class="thead-light"><tr><th>Time</th><th>Target</th><th>URLs</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    })
+    .catch(function(e) {
+        document.getElementById('history-body').innerHTML = '<p class="p-3 text-danger mb-0">Error loading history: ' + e + '</p>';
+    });
+}
+
+function loadArchive(filename) {
+    fetch('/admin/security-scan-load?file=' + encodeURIComponent(filename))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        document.getElementById('results-target').textContent =
+            (data.base_url||'') + '  site=' + (data.sitename||'') + '  [' + (data.scan_time||'') + ']';
+        renderResults(data.findings || []);
+        document.getElementById('scan-results').scrollIntoView({ behavior: 'smooth' });
+    })
+    .catch(function(e) { alert('Error loading report: ' + e); });
 }
 
 function filterTable(result) {
