@@ -1,5 +1,13 @@
-[% META title = 'Virtualmin Coexistence Guide' %]
 [% PageVersion = 'Documentation/Virtualmin_Integration.tt,v 0.12 2024/05/20 Admin Exp admin ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Virtualmin Coexistence Guide' %]
+
+<!-- Documentation page for Virtualmin_Integration -->
+<div class="documentation-content">
+
 
 <h1 id="virt-top">Virtualmin/Proxmox/Starman Coexistence</h1>
 
@@ -43,7 +51,7 @@
 <ol class="steps">
     <li><strong>Starman as Backend Server</strong>
         <pre>
-# Use high ports outside Virtualmin's range
+<h1>Use high ports outside Virtualmin's range</h1>
 --listen :5000  # Safe (Virtualmin uses 80/443/21/etc)</pre>
     </li>
     <li><strong>Proxmox Network Isolation</strong>
@@ -52,7 +60,7 @@ qm set &lt;VMID&gt; -net0 virtio,bridge=vmbr2  # Separate from Virtualmin's vmbr
     </li>
     <li><strong>Virtualmin Proxy Integration</strong>
         <pre>
-# In Virtualmin: Services → Configure Website → Proxy to URL
+<h1>In Virtualmin: Services → Configure Website → Proxy to URL</h1>
 http://localhost:5000/  # Reverse proxy setup</pre>
     </li>
 </ol>
@@ -68,8 +76,8 @@ http://localhost:5000/  # Reverse proxy setup</pre>
 
 <h3>Service User Isolation</h3>
 <pre>
-# Virtualmin users: web_*
-# Manual users: starman_*
+<h1>Virtualmin users: web_*</h1>
+<h1>Manual users: starman_*</h1>
 sudo useradd --system --shell /usr/sbin/nologin starman_svc</pre>
 
 <h3>Backup Coordination</h3>
@@ -104,11 +112,13 @@ sudo chown -R starman_svc:starman_svc /home/starman</pre>
 
 <h3>Emergency Rollback Procedure</h3>
 <pre>
-# Restore Virtualmin core services
+<h1>Restore Virtualmin core services</h1>
 sudo virtualmin restore-backup --all-features --force
 
-# Preserve manual configurations
+<h1>Preserve manual configurations</h1>
 mv /home/starman /home/starman.bak
-# Restore from Proxmox backup</pre>
+<h1>Restore from Proxmox backup</pre></h1>
 
 <p><a href="#virt-top">Back to top</a></p>
+
+</div>

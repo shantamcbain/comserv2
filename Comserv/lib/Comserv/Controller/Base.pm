@@ -16,6 +16,29 @@ sub stash_message {
     $c->stash(error_messages => $current_error_messages);
 }
 
+# Safe method to get username that handles undefined user objects
+sub get_safe_username {
+    my ($self, $c, $default) = @_;
+    $default ||= 'Guest';
+    
+    # First try to get username from authenticated user
+    if ($c->user_exists && $c->user) {
+        eval {
+            my $username = $c->user->username;
+            return $username if defined $username && $username ne '';
+        };
+        # If user object exists but username method fails, continue to session check
+    }
+    
+    # Fall back to session username
+    if ($c->session->{username}) {
+        return $c->session->{username};
+    }
+    
+    # Final fallback
+    return $default;
+}
+
 
 
 __PACKAGE__->meta->make_immutable;

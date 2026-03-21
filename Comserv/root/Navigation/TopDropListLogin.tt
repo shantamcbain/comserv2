@@ -1,7 +1,6 @@
-
-[% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.06 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.05 2024/06/02 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [%# PageVersion %]
+    [% PageVersion %]
 [% END %]
 
 [%# Determine user role for display %]
@@ -28,24 +27,12 @@
 
 <li class="horizontal-dropdown">
     [% IF c.session.username %]
-        <!-- User is logged in - Clean main button without role badge -->
+        <!-- User is logged in -->
         <a href="#" class="dropbtn user-menu">
             <span class="username"><i class="icon-user"></i> [% c.session.username %]</span>
+            <span class="role-badge">[% display_role %]</span>
         </a>
         <div class="dropdown-content">
-            <!-- User info with role displayed in dropdown -->
-            <div class="user-info-header">
-                <span class="dropdown-username">[% c.session.username %]</span>
-                <span class="dropdown-role-badge">[% display_role %]</span>
-            </div>
-            <div class="dropdown-divider"></div>
-            
-            <!-- Navigation Management -->
-            <a href="/navigation/add_link" class="menu-item"><i class="icon-add"></i>Add Link</a>
-            
-            <div class="dropdown-divider"></div>
-            
-            <!-- User Account Options -->
             <a href="/user/profile" class="menu-item">
                 <i class="icon-user"></i> My Profile
             </a>
@@ -53,39 +40,43 @@
                 <i class="icon-cog"></i> Account Settings
             </a>
 
-            <!-- Private Links Submenu -->
-            [% IF c.stash.private_links && c.stash.private_links.size %]
-            <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-link"></i>My Private Links</span>
-                <div class="submenu">
-                    [% FOREACH link IN c.stash.private_links %]
-                        <a href="[% link.url %]" class="submenu-link" target="[% link.target || '_self' %]">
-                            [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                            [% link.name %]
+            <!-- Private Links Section - Available to ALL logged-in users -->
+            [% IF private_links && private_links.size %]
+                <div class="dropdown-divider"></div>
+                <div class="submenu-section">
+                    <span class="submenu-section-title">Private Links</span>
+                    [% FOREACH link IN private_links %]
+                        <a href="[% link.url %]" class="menu-item" target="[% link.target %]" title="[% link.name %]">
+                            <i class="icon-link"></i> [% link.name %]
                         </a>
-                        [% IF c.session.roles.grep('admin').size || link.owner == c.session.username %]
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                        [% END %]
                     [% END %]
                 </div>
-            </div>
             [% END %]
+            
+            <!-- Private Links Management - Available to ALL logged-in users -->
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/manage_private_links" class="menu-item">
+                <i class="icon-link"></i> Manage Private Links
+            </a>
+            <a href="/navigation/add_private_link" class="menu-item">
+                <i class="icon-plus"></i> Add Private Link
+            </a>
 
-            <!-- Admin/Developer Options -->
             [% IF c.session.roles.grep('admin').size || c.session.roles.grep('developer').size %]
                 <div class="dropdown-divider"></div>
                 <a href="/admin" class="menu-item">
                     <i class="icon-tachometer-alt"></i> Admin Dashboard
-                </a>
-                <a href="/navigation/manage_links" class="menu-item">
-                    <i class="icon-manage"></i> Manage All Links
                 </a>
                 [% IF c.session.debug_mode == 1 %]
                     <a href="/reset_session" class="menu-item">
                         <i class="icon-sync"></i> Reset Session
                     </a>
                 [% END %]
+            [% END %]
+
+            [% IF c.session.roles.grep('admin').size %]
+                <div class="dropdown-divider"></div>
+                <a href="/navigation/add_link?menu=login" class="menu-item"><i class="icon-plus"></i> Add Menu Link</a>
             [% END %]
 
             <div class="dropdown-divider"></div>
@@ -112,7 +103,7 @@
             <a href="/user/login" class="menu-item">
                 <i class="icon-sign-in-alt"></i> Login
             </a>
-            <a href="/user/create_account" class="menu-item">
+            <a href="/user/register" class="menu-item">
                 <i class="icon-user-plus"></i> Register
             </a>
             <a href="/user/forgot_password" class="menu-item">
@@ -120,5 +111,15 @@
             </a>
         </div>
     [% END %]
-</li>
 
+    <!-- Additional login-related links -->
+    [% IF c.session.login_links.size %]
+        <div class="dropdown-divider"></div>
+        [% FOREACH link IN c.session.login_links %]
+            <a href="[% link.url %]" class="menu-item">[% link.name %]</a>
+            [% IF c.session.roles.grep('admin').size %]
+                <a href="/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+            [% END %]
+        [% END %]
+    [% END %]
+</li>

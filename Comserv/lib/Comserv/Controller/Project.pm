@@ -83,9 +83,9 @@ sub  create_project :Local :Args(0) {
     my $project_rs = $schema->resultset('Project');
     my $date_time_posted = DateTime->now;
 
-    # Get username safely
+    # Get username safely - check both user_exists AND that user object is defined
     my $username = '';
-    if ($c->user_exists) {
+    if ($c->user_exists && $c->user) {
         $username = $c->user->username;
     } elsif ($c->session->{username}) {
         $username = $c->session->{username};
@@ -182,8 +182,8 @@ sub project :Path('project') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'project', 
         "Filter parameters - Role: $role_filter, Project: $project_filter, Priority: $priority_filter");
 
-    # Use the existing method to fetch projects with sub-projects (request full data including todos)
-    my $projects = $self->fetch_projects_with_subprojects($c, 1);
+    # Use the existing method to fetch projects with sub-projects
+    my $projects = $self->fetch_projects_with_subprojects($c);
     
     # Enhance project data with additional fields needed for filtering
     $projects = $self->enhance_project_data($c, $projects);
@@ -199,7 +199,7 @@ sub project :Path('project') :Args(0) {
         success_message => 'Project priority display has been updated. All projects without a priority are now shown as Medium priority.',
         additional_css => ['/static/css/components/project-cards.css?v=' . time()], # Add timestamp to force CSS reload
         use_fluid_container => 1, # Use fluid container for better card layout
-        debug_mode => 0 # Disable debug mode - template version hidden
+        debug_mode => 1 # Enable debug mode to see template version
     );
     
     # Log that we're using the project cards CSS
@@ -293,18 +293,6 @@ sub details :Path('details') :Args(0) {
     # Fetch sub-projects and their todos recursively
     my $project_tree = $self->build_project_tree($c, $project);
 
-    # Log what we're putting in the stash
-    if ($project_tree) {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', 
-            "Project tree built successfully. Project name: " . ($project_tree->{name} || 'UNDEFINED') . 
-            ", ID: " . ($project_tree->{id} || 'UNDEFINED') . 
-            ", Todos count: " . (scalar(@{$project_tree->{todos} || []}) || 0) .
-            ", Sub-projects count: " . (scalar(@{$project_tree->{sub_projects} || []}) || 0));
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 
-            "Project tree is undefined or empty after build_project_tree call");
-    }
-
     # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
         project => $project_tree,
@@ -322,36 +310,51 @@ sub details :Path('details') :Args(0) {
 # See the implementation there
 
 sub fetch_projects_with_subprojects :Private {
-    my ($self, $c, $full_data) = @_;
-    
-    # Default to basic data (just names, IDs) unless explicitly requested
-    $full_data //= 0;
-    
+    my ($self, $c) = @_;
     # Log the start of the project-fetching subroutine
     $self->logging->log_with_details(
         $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-        'Fetching parent projects with sub-projects (full_data=' . ($full_data ? 'true' : 'false') . ')'
+        'Fetching parent projects with sub-projects'
     );
 
     # Get the schema and SiteName
     my $schema = $c->model('DBEncy');
     my $SiteName = $c->session->{SiteName} || '';
 
+    # Enhanced logging for debugging
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+        "Session SiteName: '" . ($SiteName || 'EMPTY/NULL') . "'"
+    );
+
     # Check if SiteName is defined
     if (!$SiteName) {
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
-            'SiteName is not defined in session, using empty string'
+            'SiteName is not defined in session, using empty string - this may cause empty results'
+        );
+        
+        # Try to get all projects regardless of sitename for debugging
+        my $total_projects_count;
+        eval {
+            $total_projects_count = $schema->safe_search($c, 'Project', {})->count;
+        };
+        $self->logging->log_with_details(
+            $c, 'info', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+            "Total projects in database (all sites): " . ($total_projects_count || 'ERROR')
         );
     }
 
     # Fetch top-level projects (those without a parent)
     my @top_projects;
     eval {
-        @top_projects = $schema->resultset('Project')->search(
+        @top_projects = $schema->safe_search($c, 'Project',
             {
                 'sitename' => $SiteName,
-                'parent_id' => undef
+                -or => [
+                    'parent_id' => undef,
+                    'parent_id' => ''
+                ]
             },
             {
                 order_by => { -asc => 'name' }
@@ -372,46 +375,91 @@ sub fetch_projects_with_subprojects :Private {
 
     # Process each top-level project
     foreach my $project (@top_projects) {
-        my $project_hash;
-        
-        if ($full_data) {
-            # Use build_project_tree to get full project data including todos
-            $project_hash = $self->build_project_tree($c, $project, 0);
-        } else {
-            # Basic data only (for dropdowns, etc.)
-            $project_hash = {
-                id => $project->id,
-                name => $project->name,
-                parent_id => $project->parent_id,
-                status => $project->status || 1,
-                start_date => $project->start_date,
-                end_date => $project->end_date,
-                developer_name => $project->developer_name || '',
-                client_name => $project->client_name || '',
-                priority => 2,
+        # Create a hashref for this project
+        my $project_hash = {
+            id => $project->id,
+            name => $project->name,
+            description => $project->description || '',
+            parent_id => $project->parent_id,
+            status => $project->status || 1, # Default to 'New' status
+            start_date => $project->start_date,
+            end_date => $project->end_date,
+            developer_name => $project->developer_name || '',
+            client_name => $project->client_name || '',
+            priority => 2, # Default to medium priority since field doesn't exist
+            sub_projects => []
+        };
+
+        # Fetch first-level sub-projects
+        my @level1_subprojects;
+        eval {
+            @level1_subprojects = $schema->safe_search($c, 'Project',
+                { parent_id => $project->id },
+                { order_by => { -asc => 'name' } }
+            );
+        };
+
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+                "Error fetching level 1 sub-projects for project ID " . $project->id . ": $@"
+            );
+            next;
+        }
+
+        # Process first-level sub-projects
+        foreach my $subproject1 (@level1_subprojects) {
+            my $subproject1_hash = {
+                id => $subproject1->id,
+                name => $subproject1->name,
+                description => $subproject1->description || '',
+                parent_id => $subproject1->parent_id,
+                status => $subproject1->status || 1, # Default to 'New' status
+                start_date => $subproject1->start_date,
+                end_date => $subproject1->end_date,
+                developer_name => $subproject1->developer_name || '',
+                client_name => $subproject1->client_name || '',
+                priority => 2, # Default to medium priority since field doesn't exist
                 sub_projects => []
             };
-            
-            # Fetch first-level sub-projects (basic data only)
-            my @level1_subprojects;
+
+            # Fetch second-level sub-projects
+            my @level2_subprojects;
             eval {
-                @level1_subprojects = $schema->resultset('Project')->search(
-                    { parent_id => $project->id },
+                @level2_subprojects = $schema->resultset('Project')->search(
+                    { parent_id => $subproject1->id },
                     { order_by => { -asc => 'name' } }
                 )->all;
             };
-            
-            foreach my $subproject1 (@level1_subprojects) {
-                push @{$project_hash->{sub_projects}}, {
-                    id => $subproject1->id,
-                    name => $subproject1->name,
-                    parent_id => $subproject1->parent_id,
-                    status => $subproject1->status || 1,
-                    sub_projects => []
+
+            if ($@) {
+                $self->logging->log_with_details(
+                    $c, 'error', __FILE__, __LINE__, 'fetch_projects_with_subprojects',
+                    "Error fetching level 2 sub-projects for project ID " . $subproject1->id . ": $@"
+                );
+                next;
+            }
+
+            # Process second-level sub-projects
+            foreach my $subproject2 (@level2_subprojects) {
+                push @{$subproject1_hash->{sub_projects}}, {
+                    id => $subproject2->id,
+                    name => $subproject2->name,
+                    description => $subproject2->description || '',
+                    parent_id => $subproject2->parent_id,
+                    status => $subproject2->status || 1, # Default to 'New' status
+                    start_date => $subproject2->start_date,
+                    end_date => $subproject2->end_date,
+                    developer_name => $subproject2->developer_name || '',
+                    client_name => $subproject2->client_name || '',
+                    priority => 2, # Default to medium priority since field doesn't exist
+                    sub_projects => [] # Empty array, we don't go deeper
                 };
             }
+
+            push @{$project_hash->{sub_projects}}, $subproject1_hash;
         }
-        
+
         push @projects, $project_hash;
     }
 
@@ -596,10 +644,6 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
-        # Safely get accumulated_time (may not exist in all schemas)
-        my $accumulated_time = 0;
-        eval { $accumulated_time = $todo->accumulated_time || 0; };
-        
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,
@@ -608,8 +652,7 @@ sub build_project_tree :Private {
             start_date => $todo->start_date,
             due_date => $todo->due_date,
             status => $todo->status,
-            priority => $todo->priority,
-            accumulated_time => $accumulated_time
+            priority => $todo->priority
         };
     }
     $project_hash->{todos} = \@todo_hashrefs;

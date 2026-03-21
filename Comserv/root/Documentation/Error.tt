@@ -7,24 +7,26 @@
 
 <!-- Include Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-<!-- Include documentation CSS -->
-<link rel="stylesheet" href="/static/css/documentation.css">
 
-<div class="documentation-error">
-    <div class="error-container">
-        <div class="error-icon">
-            <i class="fas fa-exclamation-circle"></i>
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-exclamation-triangle"></i> Documentation Error</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Site:</strong> [% site_name || 'default' %]</span>
+            <span class="context-item"><strong>User:</strong> [% c.session.username || 'Not logged in' %]</span>
         </div>
+    </header>
 
-        <h1>Documentation Error</h1>
-
-        <div class="error-message">
-            [% IF error_msg %]
-                <p>[% error_msg %]</p>
-            [% ELSE %]
-                <p>An error occurred while accessing the documentation.</p>
-            [% END %]
-        </div>
+    <div class="alert alert-warning">
+        <h3>Error</h3>
+        [% IF error_msg %]
+            <p>[% error_msg %]</p>
+        [% ELSE %]
+            <p>An error occurred while accessing the documentation.</p>
+        [% END %]
+    </div>
 
         <div class="user-context">
             <div class="site-info">
@@ -32,32 +34,62 @@
                 <span class="value">[% site_name || 'default' %]</span>
             </div>
             <div class="role-info">
-                <span class="label">User Role:</span>
-                <span class="value">[% user_role || 'normal' %]</span>
+                <span class="label">Roles:</span>
+                <span class="value">
+                    [% IF user_roles && user_roles.size > 0 %]
+                        [% user_roles.join(', ') %]
+                    [% ELSE %]
+                        No roles defined
+                    [% END %]
+                </span>
             </div>
             <div class="session-info">
                 <span class="label">Username:</span>
                 <span class="value">[% c.session.username || 'Not logged in' %]</span>
             </div>
-            [% IF c.session.roles %]
             <div class="session-roles-info">
                 <span class="label">Session Roles:</span>
-                <span class="value">[% c.session.roles.join(', ') %]</span>
+                <span class="value">
+                    [% IF session_roles && session_roles.size > 0 %]
+                        [% session_roles.join(', ') %]
+                    [% ELSIF c.session.roles && c.session.roles.size > 0 %]
+                        [% c.session.roles.join(', ') %]
+                    [% ELSE %]
+                        No session roles found
+                    [% END %]
+                </span>
             </div>
-            [% END %]
         </div>
 
-        [% IF c.session.debug_mode == 1 || user_role == 'admin' || user_role == 'developer' %]
+        [% # Check if user has admin or developer role - for showing debug information
+           has_debug_access = 0;
+           IF c.session.debug_mode == 1;
+               has_debug_access = 1;
+           ELSIF user_roles && user_roles.size > 0;
+               FOREACH role IN user_roles;
+                   IF role == 'admin' || role == 'developer';
+                       has_debug_access = 1;
+                   END;
+               END;
+           ELSIF c.session.roles && c.session.roles.size > 0;
+               FOREACH role IN c.session.roles;
+                   IF role == 'admin' || role == 'developer';
+                       has_debug_access = 1;
+                   END;
+               END;
+           END;
+           IF has_debug_access %]
         <div class="debug-section">
             <h2>Debug Information</h2>
             <p>The documentation system is looking for your file in the following locations:</p>
             <ul>
+                <li>Documentation/[% page_name %].tt</li>
                 <li>Documentation/[% page_name %].md</li>
-                <li>Documentation/roles/normal/[% page_name %].md</li>
-                <li>Documentation/roles/admin/[% page_name %].md</li>
-                <li>Documentation/roles/developer/[% page_name %].md</li>
-                <li>Documentation/tutorials/[% page_name %].md</li>
-                <li>Documentation/sites/[% site_name %]/[% page_name %].md</li>
+                <li>Documentation/roles/user/[% page_name %].tt</li>
+                <li>Documentation/roles/admin/[% page_name %].tt</li>
+                <li>Documentation/roles/developer/[% page_name %].tt</li>
+                <li>Documentation/tutorials/[% page_name %].tt</li>
+                <li>Documentation/sites/[% site_name %]/[% page_name %].tt</li>
             </ul>
 
             <div class="debug-actions">
@@ -81,15 +113,16 @@
             </ul>
         </div>
 
-        <div class="error-actions">
-            <a href="[% c.uri_for('/Documentation') %]" class="action-button primary">Return to Documentation Home</a>
-            <a href="javascript:history.back()" class="action-button secondary">Go Back</a>
+    <div class="quick-actions">
+        <h3><i class="fas fa-tools"></i> Available Actions</h3>
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/Documentation') %]" class="btn btn-primary"><i class="fas fa-home"></i> Return to Documentation Home</a>
+            <a href="javascript:history.back()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Go Back</a>
         </div>
     </div>
 </div>
 
-<style>
-    .documentation-error {
+<!-- Now uses standard apiary-container, alert, and button styles from base-containers.css -->
         max-width: 800px;
         margin: 50px auto;
         padding: 20px;

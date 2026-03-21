@@ -16,11 +16,9 @@ requires 'DBIx::Class::TimeStamp';
 requires 'DBIx::Class::Migration';
 requires 'DBIx::Class::EncodedColumn';
 requires 'SQL::Translator';
-requires 'DBD::MariaDB';
-requires 'Object::Signature';
+requires 'DBD::mysql';
 #json
 requires 'JSON';
-requires 'JSON::XS';
 requires 'Config::JSON';
 
 # Template Toolkit and plugins
@@ -50,7 +48,6 @@ requires 'Catalyst::Plugin::Authorization::ACL';
 requires 'Catalyst::Plugin::Log::Dispatch';
 requires 'Log::Dispatch::Config';
 requires 'Catalyst::View::TT';
-requires 'Catalyst::View::JSON';
 # DateTime related
 requires 'DateTime';
 requires 'DateTime::Event::Recurrence';
@@ -62,57 +59,51 @@ requires 'Net::CIDR';
 requires 'File::Find';
 requires 'File::Basename';
 requires 'File::Slurp';
-requires 'Archive::Tar';
+requires 'File::Path';
+requires 'File::Spec';
+requires 'File::Copy';
+requires 'Module::Load';
+
+# PDF and Image handling
+requires 'PDF::API2';
+requires 'PDF::TextBlock';
+requires 'GD';           # For image manipulation
+requires 'GD::Text';
 
 # Network related
-requires 'Protocol::WebSocket';
-requires 'AnyEvent';
-requires 'AnyEvent::Handle';
-requires 'Twiggy';
-requires 'IO::Pty';
+requires 'LWP::UserAgent';
+requires 'LWP::Protocol::https';
+requires 'HTTP::Request';
 
 # Cryptography and Security
-requires 'Crypt::CBC';
-requires 'Crypt::OpenSSL::AES';
-requires 'Crypt::Random';
-requires 'MIME::Base64';
 requires 'Digest::SHA';
 
 # Email handling
 requires 'Email::Simple';
 requires 'Email::Simple::Creator';
-requires 'Email::MIME';
 requires 'Email::Sender::Simple';
 requires 'Email::Sender::Transport::SMTP';
-requires 'Catalyst::View::Email';
-requires 'Catalyst::View::Email::Template';
+requires 'MIME::Lite';
 
 # Utility modules
 requires 'URI::Escape';
 requires 'Data::FormValidator';
 requires 'LWP::UserAgent';
-requires 'LWP::Protocol::https';
 requires 'HTTP::Request';
-requires 'HTTP::Parser::XS';
-requires 'WWW::Form::UrlEncoded';
-requires 'HTTP::Entity::Parser';
 requires 'Try::Tiny';
 requires 'Text::Markdown';
+requires 'YAML::XS';
 requires 'YAML::Tiny';
-requires 'IPC::Run';
-requires 'IPC::Run3';
+requires 'YAML::Syck';
 
 # Development and testing
 requires 'Term::ReadPassword';
-requires 'Term::Size::Any';
 requires 'Text::CSV';
 requires 'Starman';
 requires 'Test::More' => '0.88';
 requires 'Test::Pod';
 requires 'Test::Pod::Coverage';
 requires 'Test::WWW::Mechanize::Catalyst';
-requires 'Test::Exception';
-requires 'Test::MockObject';
 requires 'Catalyst::ScriptRunner';
 requires 'Log::Log4perl';
 requires 'local::lib';

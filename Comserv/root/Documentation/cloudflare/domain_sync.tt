@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/cloudflare/domain_sync.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Cloudflare Domain Synchronization' %]
+
+<!-- Documentation page for     Cloudflare Domain Synchronization -->
+<div class="documentation-content">
+
 [% META 
    title = 'Cloudflare Domain Synchronization'
    date = '2025-07-15'

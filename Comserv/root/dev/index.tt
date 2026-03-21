@@ -1,11 +1,9 @@
-[%# INCLUDE 'layout.tt' %]
-[% PageVersion = 'dev/index.tt,v 0.01 2024/01/03 shanta Exp shanta ' %]
+[% PageVersion = 'dev/index.tt,v 0.03 2025/01/27 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-[% END %]
     [% PageVersion %]
     [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-<h1>Welcome to the Dev Site</h1>
+[% END %]
+<h2>Development Site</h2>
 
 <p>This site is dedicated to tracking the development of our application and keeping the team on track.</p>
 

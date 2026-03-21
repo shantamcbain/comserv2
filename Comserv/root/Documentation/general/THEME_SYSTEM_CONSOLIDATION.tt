@@ -1,0 +1,197 @@
+[% PageVersion = 'Comserv/root/Documentation/general/THEME_SYSTEM_CONSOLIDATION.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Theme System Consolidation' %]
+
+<!-- Documentation page for THEME_SYSTEM_CONSOLIDATION -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+This document explains the consolidation of the theme system in the Comserv application. The theme system has been simplified to follow a cleaner MVC pattern and reduce duplication.
+
+
+
+<h2>Current Structure</h2>
+
+
+
+The theme system now consists of the following components:
+
+
+
+<ol><li>**Model**: <code>Comserv::Model::ThemeConfig</code></li></ol>
+
+   - Handles all theme data operations
+
+   - Manages theme definitions and mappings
+
+   - Generates CSS files
+
+
+
+<ol><li>**Controller**: <code>Comserv::Controller::Admin::Theme</code></li></ol>
+
+   - Provides all theme management actions
+
+   - Handles theme selection, editing, and creation
+
+   - Includes legacy URL redirection for backward compatibility
+
+
+
+<ol><li>**Configuration Files**:</li></ol>
+
+   - <code>/comserv/Comserv/root/static/config/theme_definitions.json</code> - Theme definitions
+
+   - <code>/comserv/Comserv/root/static/config/theme_mappings.json</code> - Site to theme mappings
+
+
+
+<ol><li>**CSS Files**:</li></ol>
+
+   - <code>/comserv/Comserv/root/static/css/themes/</code> - Generated theme CSS files
+
+
+
+<h2>Deprecated Files</h2>
+
+
+
+The following files have been deprecated and replaced with empty stubs to prevent errors:
+
+
+
+<ol><li><code>Comserv::Controller::Admin::ThemeController.pm</code></li></ol>
+
+<ol><li><code>Comserv::Controller::Admin::ThemeEditor.pm</code></li></ol>
+
+
+
+These files now contain only a package declaration and a return statement to prevent errors when old code tries to load them.
+
+
+
+<h2>Utility Files</h2>
+
+
+
+The <code>Comserv::Util::ThemeManager.pm</code> utility has been deprecated, with its functionality moved to the <code>Comserv::Model::ThemeConfig</code> model.
+
+
+
+<h2>How to Use the Theme System</h2>
+
+
+
+<h3>Setting a Theme for a Site</h3>
+
+
+
+<code></code>`perl
+
+$c->model('ThemeConfig')->set_site_theme($c, $site_name, $theme_name);
+
+<code></code>`
+
+
+
+<h3>Getting a Site's Theme</h3>
+
+
+
+<code></code>`perl
+
+my $theme = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
+
+<code></code>`
+
+
+
+<h3>Creating a New Theme</h3>
+
+
+
+<code></code>`perl
+
+my $theme_data = {
+
+    name => "Theme Name",
+
+    description => "Theme Description",
+
+    variables => {
+
+        "primary-color" => "#ffffff",
+
+        "secondary-color" => "#f9f9f9",
+
+        # ... other variables
+
+    }
+
+};
+
+
+
+$c->model('ThemeConfig')->create_theme($c, $theme_name, $theme_data);
+
+<code></code>`
+
+
+
+<h3>Generating CSS Files</h3>
+
+
+
+<code></code>`perl
+
+$c->model('ThemeConfig')->generate_all_theme_css($c);
+
+<code></code>`
+
+
+
+<h2>URLs</h2>
+
+
+
+The theme system is accessible through the following URLs:
+
+
+
+<ul><li><code>/admin/theme</code> - Theme management interface</li></ul>
+
+<ul><li><code>/admin/theme/update</code> - Update theme for a site</li></ul>
+
+<ul><li><code>/admin/theme/edit/[theme]</code> - Edit theme CSS</li></ul>
+
+<ul><li><code>/admin/theme/create_custom</code> - Create a custom theme</li></ul>
+
+
+
+Legacy URLs are automatically redirected to the new URLs:
+
+
+
+<ul><li><code>/themeadmin</code> → <code>/admin/theme</code></li></ul>
+
+<ul><li><code>/themeadmin/update_theme</code> → <code>/admin/theme/update</code></li></ul>
+
+<ul><li><code>/themeadmin/edit_theme_css/[theme]</code> → <code>/admin/theme/edit/[theme]</code></li></ul>
+
+<ul><li><code>/themeadmin/wysiwyg_editor/[theme]</code> → <code>/admin/theme/edit/[theme]</code></li></ul>
+
+</div>

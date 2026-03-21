@@ -40,7 +40,7 @@
                     [% END %]
                 [% END %]
                 [% IF c.session.group == 'admin' %]
-                    <a href="/add_link?menu=global">Add</a>
+                    <a href="/navigation/add_link?menu=global"><i class="icon-plus"></i> Add Menu Link</a>
                 [% END %]
     [% END %]
         <!-- Global menu -->

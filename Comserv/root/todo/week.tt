@@ -1,84 +1,50 @@
-[% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
-   IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan'));
-      is_daily_plan = 1;
-      base_url = '/Documentation/DailyPlan';
-      planning_hash = '#planning';
-      week_hash = '#weekly-view';
-      month_hash = '#month-view';
-   ELSE;
-      base_url = '/todo/week';
-      planning_hash = '';
-      week_hash = '';
-      month_hash = '';
-   END;
-
-   # Normalize variables from different controllers (Todo.pm vs Documentation.pm)
-   IF !date AND selected_date;
-      date = selected_date;
-   END;
-%]
-
+<!-- Include the new CSS file -->
 <link rel="stylesheet" type="text/css" href="/static/css/week_view.css">
-<link rel="stylesheet" type="text/css" href="/static/css/components/tables.css">
-<link rel="stylesheet" type="text/css" href="/static/css/themes/themes.css">
-<link rel="stylesheet" type="text/css" href="/static/css/themes/site_themes.css">
-<link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
-<link rel="stylesheet" type="text/css" href="/static/css/todo_shared.css">
-<script src="/static/js/todo_drag_drop.js"></script>
 
-[% PageVersion  = '/todo/week.tt, v 0.8 2026/02/09 Shanta Exp Shanta - Added overdue todos section (shows todos before week start)' %]
+<!-- Template Toolkit -->
+[% PageVersion  = '/todo/week.tt,v 0.2 2025/03/26 Shanta Exp Shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <style>
-    /* Week View Grid Layout - 7 columns for 7 days */
-    .week-grid-container {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 10px;
-        margin-top: 20px;
-        width: 100%;
-    }
-    
-    .week-day-column {
-        border: 1px solid var(--border-color, #ddd);
-        border-radius: 4px;
-        background-color: var(--background-color, white);
-        overflow: hidden;
-        min-width: 0; /* Allow columns to shrink */
-    }
-    
-    .week-day-header {
-        background-color: var(--primary-color, #4CAF50);
-        color: var(--nav-text, white);
-        text-align: center;
-        padding: 8px 4px;
-        font-weight: bold;
-        font-size: 0.9em;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-    
-    .week-day-header.today {
-        background-color: var(--accent-color, #ff9800);
-    }
-    
-    .week-day-content {
-        padding: 5px;
-        max-height: 70vh;
-        overflow-y: auto;
-    }
-    
-    /* Old table styles (keep for backward compatibility or remove if not needed) */
     .week-view-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
-        background-color: var(--background-color, white);
-        border: 1px solid var(--border-color, #ddd);
-        display: none; /* Hide old table */
+    }
+
+    .week-view-table th, .week-view-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        vertical-align: top;
+        width: 14.28%;
+        height: 100px;
+    }
+
+    .week-view-table th {
+        background-color: #4CAF50;
+        color: white;
+        text-align: center;
+        height: auto;
+    }
+
+    .week-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin: 20px 0;
+    }
+
+    .week-navigation a {
+        padding: 8px 15px;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .week-navigation a:hover {
+        background-color: #45a049;
     }
 
     .todo-button {
@@ -87,24 +53,35 @@
         text-align: left;
         padding: 5px;
         margin-bottom: 5px;
+        background-color: #f1f1f1;
         border: none;
         border-radius: 3px;
         cursor: pointer;
         font-size: 0.9em;
-        transition: all 0.2s ease;
     }
 
     .todo-button:hover {
-        opacity: 0.8;
-        transform: translateY(-1px);
+        background-color: #e0e0e0;
     }
 
     .overdue {
-        background-color: var(--error-color, #ffcccc);
+        background-color: #ffcccc;
     }
 
     .overdue:hover {
-        background-color: var(--error-hover-color, #ffb3b3);
+        background-color: #ffb3b3;
+    }
+
+    .priority-1 {
+        background-color: #ffcccc;
+    }
+
+    .priority-2 {
+        background-color: #ffffcc;
+    }
+
+    .priority-3 {
+        background-color: #ccffcc;
     }
 
     .add-button {
@@ -113,188 +90,109 @@
         text-align: center;
         padding: 3px;
         margin-top: 5px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
         font-size: 0.8em;
     }
 
-    /* Drag and Drop Styles */
-    .todo-button {
-        cursor: move;
-        position: relative;
+    .add-button:hover {
+        background-color: #45a049;
     }
 
-    .todo-button.dragging {
-        opacity: 0.5;
-        transform: scale(0.95);
+    .view-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
     }
 
-    .week-view-table td.drag-over {
-        background-color: var(--primary-color-light, #c8e6c9) !important;
-        border: 2px dashed var(--primary-color, #4CAF50);
+    .view-buttons a {
+        padding: 8px 15px;
+        background-color: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        text-align: center;
     }
 
-    .drag-handle {
-        cursor: grab;
-        padding: 0 3px;
-        color: var(--secondary-text, #999);
-        font-size: 1em;
-        display: inline-block;
+    .view-buttons a:hover {
+        background-color: #0b7dda;
     }
 
-    .drag-handle:active {
-        cursor: grabbing;
-    }
-
-    /* Responsive design for week view */
-    @media (max-width: 1200px) {
-        .week-grid-container {
-            grid-template-columns: repeat(4, 1fr);
-        }
-    }
-    
-    @media (max-width: 768px) {
-        .week-grid-container {
-            grid-template-columns: repeat(2, 1fr);
-        }
-        
-        .week-day-header {
-            font-size: 0.8em;
-            padding: 6px 3px;
-        }
-        
-        .todo-button {
-            font-size: 0.8em;
-            padding: 3px;
-        }
-        
-        .add-button {
-            font-size: 0.7em;
-            padding: 2px;
-        }
-    }
-    
-    @media (max-width: 480px) {
-        .week-grid-container {
-            grid-template-columns: 1fr;
-        }
+    .view-buttons a.active {
+        background-color: #0b7dda;
+        font-weight: bold;
     }
 </style>
 
-<script>
-// Ensure theme class is applied based on site
-document.addEventListener('DOMContentLoaded', function() {
-    const sitename = '[% sitename %]';
-    const siteThemeMap = {
-        'default': 'theme-default',
-        'apis': 'theme-apis',
-        'usbm': 'theme-usbm', 
-        'csc': 'theme-csc',
-        'bmaster': 'theme-apis',
-        'mcoop': 'theme-mcoop'
-    };
-    
-    const themeClass = siteThemeMap[sitename.toLowerCase()] || 'theme-default';
-    if (!document.body.classList.contains(themeClass)) {
-        document.body.className = document.body.className.replace(/theme-\w+/, '');
-        document.body.classList.add(themeClass);
-    }
+<h1>[% sitename %] Todos for Week: [% start_of_week %] - [% end_of_week %]</h1>
 
-    // Scroll to current hour
-    const now = new Date();
-    const currentHour = now.getHours();
-    const displayHour = currentHour < 10 ? '0' + currentHour : currentHour;
-    // Find the row with the current hour label
-    const timeCells = document.querySelectorAll('.week-view-table td');
-    for (const cell of timeCells) {
-        if (cell.textContent.trim() === displayHour + ':00') {
-            setTimeout(() => {
-                cell.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 600);
-            break;
-        }
-    }
-});
-</script>
-
-<a id="week-view-anchor"></a>
-
-[% IF is_daily_plan %]
-    <div class="week-navigation view-navigation">
-        <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">◀ Previous Week</a>
-        <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]">Month View</a>
-        <a href="/todo/addtodo">Add New Todo</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
-        <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week ▶</a>
-    </div>
-[% ELSE %]
-    <h1>[% sitename %] Todos for Week: [% start_of_week %] - [% end_of_week %]</h1>
-
-    <div class="week-navigation view-navigation">
-        <a href="/todo/week/[% prev_week_date %][% url_hash %]">◀ Previous Week</a>
-        <a href="/todo[% url_hash %]">List View</a>
-        <a href="/todo/day[% IF date %]/[% date %][% ELSIF current_date_str %]/[% current_date_str %][% END %][% url_hash %]">Day View</a>
-        <a href="/todo/month[% IF date %]/[% date %][% ELSIF current_date_str %]/[% current_date_str %][% END %][% url_hash %]">Month View</a>
-        <a href="/todo/addtodo">Add New Todo</a>
-        <a href="/todo[% url_hash %]">Back to Todo List</a>
-        <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week ▶</a>
-    </div>
-[% END %]
-
-[% # Process todos by date for each day column and collect overdue %]
-[% SET todos_by_date = {} %]
-[% SET all_overdue_todos = [] %]
-[% SET first_day_of_week = week_dates.0.date_str %]
-[% FOREACH todo IN todos %]
-    [% SET todo_date = todo.start_date || todo.due_date %]
-    [% IF todo_date %]
-        [% # Check if todo is overdue (before the start of this week) and not completed %]
-        [% IF todo_date < first_day_of_week AND todo.status != 3 %]
-            [% all_overdue_todos.push(todo) %]
-        [% END %]
-        [% UNLESS todos_by_date.$todo_date %]
-            [% todos_by_date.$todo_date = [] %]
-        [% END %]
-        [% todos_by_date.$todo_date.push(todo) %]
-    [% END %]
-[% END %]
-
-<div class="week-grid-container">
-    [% FOREACH day_info IN week_dates %]
-        [% SET d_str = day_info.date_str %]
-        <div class="week-day-column">
-            <div class="week-day-header [% IF day_info.is_today %]today[% END %]">
-                <div>[% day_info.day_name %]</div>
-                <div style="font-size: 1.1em; font-weight: bold;">
-                    <a href="[% IF is_daily_plan %][% base_url %]/[% d_str %][% planning_hash %][% ELSE %]/todo/day/[% d_str %][% END %]" style="color: inherit; text-decoration: none;">[% day_info.day_num %]</a>
-                </div>
-            </div>
-            <div class="week-day-content">
-                [% # Include day.tt for this specific day - pass overdue todos to first day %]
-                [% INCLUDE 'todo/day.tt'
-                    include_mode = 1
-                    date = d_str
-                    todos = todos_by_date.$d_str || []
-                    overdue_todos = (loop.first ? all_overdue_todos : [])
-                    previous_date = day_info.prev_date
-                    next_date = day_info.next_date
-                %]
-            </div>
-        </div>
-    [% END %]
+<div class="view-buttons">
+    <a href="/todo">List View</a>
+    <a href="/todo/day">Day View</a>
+    <a href="/todo/week" class="active">Week View</a>
+    <a href="/todo/month">Month View</a>
+    <a href="/todo/addtodo" style="margin-left: auto;">Add New Todo</a>
 </div>
 
-[% IF is_daily_plan %]
-    <div class="week-navigation view-navigation">
-        <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">Previous Week</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]" title="Month View">Month</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
-        <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week</a>
-    </div>
-[% ELSE %]
-    <div class="week-navigation view-navigation">
-        <a href="/todo/week/[% prev_week_date %][% url_hash %]">Previous Week</a>
-        <a href="/todo[% url_hash %]">Back to Todo List</a>
-        <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week</a>
-    </div>
-[% END %]
+<div class="week-navigation">
+    <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    <a href="/todo">Back to Todo List</a>
+    <a href="/todo/week/[% next_week_date %]">Next Week</a>
+</div>
+
+<table class="week-view-table">
+    <!-- Display the days of the week -->
+    <tr>
+        <th>Sunday</th>
+        <th>Monday</th>
+        <th>Tuesday</th>
+        <th>Wednesday</th>
+        <th>Thursday</th>
+        <th>Friday</th>
+        <th>Saturday</th>
+    </tr>
+
+    <!-- Create a row for the dates -->
+    <tr>
+        [% # Use pre-calculated week days from controller %]
+        [% FOREACH day IN week_days %]
+            <td style="[% IF day.is_today %]background-color: #e6f7ff;[% END %]">
+                <div style="font-weight: bold; text-align: right; margin-bottom: 5px;">
+                    <a href="/todo/day/[% day.date %]">[% day.day_number %]</a>
+                </div>
+
+                [% # Find todos for this day %]
+                [% day_todos = [] %]
+                [% FOREACH todo IN todos %]
+                    [% IF todo.start_date == day.date || todo.due_date == day.date %]
+                        [% day_todos.push(todo) %]
+                    [% END %]
+                [% END %]
+
+                [% # Display todos for this day %]
+                [% FOREACH todo IN day_todos %]
+                    <form action="/todo/details" method="POST">
+                        <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                        <button type="submit" class="todo-button priority-[% todo.priority %]" title="[% todo.description %]">
+                            [% todo.subject %]
+                        </button>
+                    </form>
+                [% END %]
+
+                <form action="/todo/addtodo" method="post">
+                    <input type="hidden" name="start_date" value="[% day.date %]">
+                    <button type="submit" class="add-button">+ Add</button>
+                </form>
+            </td>
+        [% END %]
+    </tr>
+</table>
+
+<div class="week-navigation">
+    <a href="/todo/week/[% prev_week_date %]">Previous Week</a>
+    <a href="/todo">Back to Todo List</a>
+    <a href="/todo/week/[% next_week_date %]">Next Week</a>
+</div>

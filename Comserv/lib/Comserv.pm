@@ -1,36 +1,42 @@
 # perl
+# Production deployment fix - ensuring latest version is deployed
+# Last updated: Sun 22 Jun 2025 06:46:31 AM PDT - Version check for production deployment
+                package Comserv;
+                use Moose;
+                use namespace::autoclean;
+                use Config::JSON;
+                use FindBin '$Bin';
+                use Comserv::Util::Logging;
 
-package Comserv;
-use Moose;
-use namespace::autoclean;
-use Config::JSON;
-use FindBin '$Bin';
-use Comserv::Util::Logging;
-use Comserv::Util::ConfigDatabaseInit;
+                # Initialize the logging system
+                BEGIN {
+                    Comserv::Util::Logging->init();
+                }
 
-# Initialize the logging system
-BEGIN {
-    Comserv::Util::Logging->init();
-}
-
-use Catalyst::Runtime 5.80;
-use Catalyst qw/
-    ConfigLoader
-    Static::Simple
-    Session
-    Session::State::Cookie
-    Session::Store::File
-    Authentication
-/;
+                use Catalyst::Runtime 5.80;
+                use Catalyst qw/
+                    ConfigLoader
+                    Static::Simple
+                    StackTrace
+                    Session
+                    Session::Store::File
+                    Session::State::Cookie
+                    Authentication
+                    Authorization::Roles
+                    Log::Dispatch
+                    Authorization::ACL
+                /;
 
 extends 'Catalyst';
 
 our $VERSION = '0.01';
 
-# REMOVED: Custom log setup that was causing segfaults
-# The problematic code tried to access $self->dispatchers->[0] which doesn't exist
-# during early request handling. Using Plugin::Log::Dispatch config instead.
-# This was the root cause of the "Empty reply from server" / segmentation fault issues.
+__PACKAGE__->log(Catalyst::Log->new(output => sub {
+    my ($self, $level, $message) = @_;
+    $level = 'debug' unless defined $level;
+    $message = '' unless defined $message;
+    $self->dispatchers->[0]->log(level => $level, message => $message);
+}));
 
 __PACKAGE__->config(
     name => 'Comserv',
@@ -41,9 +47,6 @@ __PACKAGE__->config(
     default_view => 'TT',
     use_request_uri_for_path => 1,  # Use the request URI for path matching
     use_hash_path_suffix => 1,      # Use hash path suffix for better URL handling
-    # Configure URI generation to not include port
-    using_frontend_proxy => 1,
-    ignore_frontend_proxy_port => 1,
     'Plugin::Log::Dispatch' => {
         dispatchers => [
             {
@@ -55,62 +58,57 @@ __PACKAGE__->config(
             },
         ],
     },
-    'Plugin::Authentication' => {
-        default_realm => 'default',
-        realms        => {
-            default => {
-                credential => {
-                    class          => 'Password',
-                    password_field => 'password',
-                    password_type  => 'hashed',
-                },
-                store => {
-                    class         => 'DBIx::Class',
-                    user_model    => 'Schema::Ency',
-                    user_class    => 'User',
-                },
-            },
-            members => {
-                credential => {
-                    class          => 'Password',
-                    password_field => 'password',
-                    password_type  => 'hashed',
-                },
-                store => {
-                    class         => 'DBIx::Class',
-                    user_model    => 'Schema::Ency',
-                    user_class    => 'User',
-                },
-            },
-        },
-    },
-    'Plugin::Session' => {
-        expires => 3600,
-        cookie_name => 'comserv_session',
-        cookie_secure => 0,
-        cookie_httponly => 1,
-    },
-    'Plugin::Session::Store::File' => {
-        dir => '/tmp/session_data',
-    },
-    'Model::ThemeConfig' => {
-        # Theme configuration model
-    },
-    'Model::Proxmox' => {
-        # Proxmox VE API configuration
-        proxmox_host => '172.30.236.89',
-        api_url_base => 'https://172.30.236.89:8006/api2/json',
-        node => 'pve',  # Default Proxmox node name
-        image_url_base => 'http://172.30.167.222/kvm-images',  # URL for VM templates
-        username => 'root',  # Proxmox username
-        password => 'password',  # Proxmox password - CHANGE THIS TO YOUR ACTUAL PASSWORD
-        realm => 'pam',  # Proxmox authentication realm
-    },
-    'Model::NPM' => {
-        # NPM configuration is loaded dynamically from environment-specific config files
-        # See Comserv::Controller::NPM for implementation details
-    },
 );
+                __PACKAGE__->config(
+                    name => 'Comserv',
+                    disable_component_resolution_regex_fallback => 1,
+                    enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
+                    encoding => 'UTF-8',
+                    debug => $ENV{CATALYST_DEBUG} // 0,
+                    default_view => 'TT',
+                    # Configure URI generation to not include port
+                    using_frontend_proxy => 1,
+                    ignore_frontend_proxy_port => 1,
+                    'Plugin::Authentication' => {
+                        default_realm => 'members',
+                        realms        => {
+                            members => {
+                                credential => {
+                                    class          => 'Password',
+                                    password_field => 'password',
+                                    password_type  => 'hashed',
+                                },
+                                store => {
+                                    class         => 'DBIx::Class',
+                                    user_model    => 'DB::User',
+                                    role_relation => 'roles',
+                                    role_field    => 'role',
+                                },
+                            },
+                        },
+                    },
+                    'Plugin::Session' => {
+                        storage => '/tmp/session_data',
+                        expires => 3600,
+                    },
+                    'Model::ThemeConfig' => {
+                        # Theme configuration model
+                    },
+                    'Model::Proxmox' => {
+                        # Proxmox VE API configuration
+                        proxmox_host => '172.30.236.89',
+                        api_url_base => 'https://172.30.236.89:8006/api2/json',
+                        node => 'pve',  # Default Proxmox node name
+                        image_url_base => 'http://172.30.167.222/kvm-images',  # URL for VM templates
+                        username => 'root',  # Proxmox username
+                        password => 'password',  # Proxmox password - CHANGE THIS TO YOUR ACTUAL PASSWORD
+                        realm => 'pam',  # Proxmox authentication realm
+                    },
+                    'Model::NPM' => {
+                        # NPM configuration is loaded dynamically from environment-specific config files
+                        # See Comserv::Controller::NPM for implementation details
+                    },
+                );
 
 sub psgi_app {
     my $self = shift;
@@ -120,231 +118,177 @@ sub psgi_app {
     return sub {
         my $env = shift;
 
-        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
-        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
+                        $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
+                        $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-        return $app->($env);
-    };
-}
-
-# Auto-fix for missing modules - attempt to load modules with fallbacks
-# This ensures the application works even if modules are missing
-
-# First, try to load email modules
-my $email_modules_loaded = 0;
-# Temporarily disabled email modules to fix startup issues
-# eval {
-#     require Comserv::View::Email;
-#     require Comserv::View::Email::Template;
-# };
-# if ($@) {
-warn "Warning: Email modules disabled for testing\n";
-warn "Email functionality may not work correctly.\n";
-# $email_modules_loaded = 0;
-
-# Try to auto-install the modules if we're in development mode
-# if ($ENV{CATALYST_DEBUG}) {
-#     warn "Attempting to auto-install email modules...\n";
-#     eval {
-#         require App::cpanminus;
-#         my $local_lib = __PACKAGE__->path_to('local');
-#         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
-#         
-#         # Try loading again after installation
-#         require Comserv::View::Email;
-#         require Comserv::View::Email::Template;
-#         $email_modules_loaded = 1;
-#     };
-#     if ($@) {
-#         warn "Auto-installation failed: $@\n";
-#         warn "Email functionality will be limited.\n";
-#     }
-# }
-# }
-
-# Session store is now properly configured in the plugin list above
-
-# LAYER 3: Global Application Error Handler
-# Catches exceptions that escape individual controller error handling
-around 'finalize_error' => sub {
-    my ($orig, $c) = @_;
-
-    # Log all unhandled errors with context
-    eval {
-        if ($c && $c->error && @{$c->error}) {
-            my $error = $c->error->[0];
-            my $error_msg = ref $error ? $error->message : "$error";
-            my $logger = Comserv::Util::Logging->instance;
-            $logger->log_with_details($c, 'error', __FILE__, __LINE__, 'global_error_handler',
-                "[GLOBAL ERROR] Unhandled exception: $error_msg");
-        }
-    };
-
-    # If error.tt hasn't been rendered yet, render it now
-    eval {
-        if ($c && !$c->response->body) {
-            $c->response->status(500) unless $c->response->status;
-
-            $c->stash->{error_title} ||= 'Application Error';
-            $c->stash->{error_msg}   ||= 'An unexpected error occurred.';
-            $c->stash->{technical_details} ||= join(', ', @{$c->error // []});
-            $c->stash->{template} = 'error.tt';
-
-            eval {
-                my $view = $c->view('TT');
-                $view->process($c);
-            };
-
-            if ($@) {
-                $c->response->content_type('text/plain; charset=utf-8');
-                $c->response->body("Internal Server Error\n\nAn error occurred and we were unable to render the error page.\nPlease contact the system administrator.");
-            }
-        }
-    };
-
-    # Call the original finalize_error to complete response processing
-    $c->$orig();
-};
-
-__PACKAGE__->_initialize_database_config();
-__PACKAGE__->setup();
-__PACKAGE__->_initialize_ai_chat_schema();
-
-# DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
-# The config-db initialization is not required for current functionality
-# as the application uses db_config.json for database connections instead.
-# Comserv::Util::ConfigDatabaseInit->initialize();
-
-1;
-
-=head1 INTERNAL METHODS
-
-=head2 _initialize_database_config
-
-Initializes database configuration from db_config.json at application startup.
-This ensures environment variables are populated before models are loaded.
-
-If db_config.json exists, it reads the primary production connection and exports
-to environment variables (COMSERV_DB_HOST, COMSERV_DB_PORT, COMSERV_DB_USER, COMSERV_DB_PASS).
-
-If db_config.json doesn't exist, it creates a template and sets a flag so the
-application can show setup instructions on first request.
-
-This is called automatically during application startup (before setup()).
-
-=cut
-
-sub _initialize_database_config {
-    my $class = shift;
-    
-    use JSON;
-    use File::Spec;
-    use FindBin '$Bin';
-    
-    # Skip if env vars already set (allows manual override)
-    return if $ENV{COMSERV_DB_HOST} && $ENV{COMSERV_DB_USER};
-    
-    # Find db_config.json in application root
-    my @search_paths = (
-        File::Spec->catfile($Bin, '..', 'db_config.json'),
-        File::Spec->catfile($Bin, '..', '..', 'db_config.json'),
-        'db_config.json',
-        '/opt/comserv/db_config.json',
-        $ENV{COMSERV_DB_CONFIG} ? $ENV{COMSERV_DB_CONFIG} : (),
-    );
-    
-    my $config_file;
-    foreach my $path (@search_paths) {
-        if (-f $path) {
-            $config_file = $path;
-            last;
-        }
-    }
-    
-    if ($config_file && -r $config_file) {
-        # File exists - load primary production connection
-        eval {
-            open my $fh, '<', $config_file or die "Cannot open $config_file: $!";
-            my $json_text = do { local $/; <$fh> };
-            close $fh;
-            
-            my $config = decode_json($json_text);
-            
-            # Use production_server as default (priority 1)
-            if ($config->{production_server}) {
-                my $prod = $config->{production_server};
-                $ENV{COMSERV_DB_HOST} ||= $prod->{host};
-                $ENV{COMSERV_DB_PORT} ||= $prod->{port} || 3306;
-                $ENV{COMSERV_DB_USER} ||= $prod->{username};
-                $ENV{COMSERV_DB_PASS} ||= $prod->{password};
-                $ENV{COMSERV_DB_NAME} ||= $prod->{database};
-            }
-            
-            # Mark that config was loaded successfully
-            $ENV{COMSERV_CONFIG_LOADED} = 1;
-        };
-        
-        if ($@) {
-            warn "Warning: Error reading db_config.json: $@\n";
-            warn "Application will attempt to use environment variables or fallback to SQLite\n";
-        }
-    } else {
-        # File doesn't exist - application will show setup wizard on first request
-        warn "Info: db_config.json not found.\n";
-        warn "The application will redirect to /setup page on first request to configure database connection.\n";
-        warn "Alternatively, set environment variables: COMSERV_DB_HOST, COMSERV_DB_USER, COMSERV_DB_PASS, etc.\n";
-        $ENV{COMSERV_CONFIG_PENDING} = 1;
-    }
-    
-    return 1;
-}
-
-sub _initialize_ai_chat_schema {
-    my $class = shift;
-    
-    eval {
-        use Comserv::Util::Logging;
-        my $log = Comserv::Util::Logging->instance;
-        
-        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-            'Checking AI Chat schema tables...');
-        
-        my @ai_chat_tables = (
-            'documentation_metadata_index',
-            'code_search_index',
-            'web_search_results',
-            'ai_model_config',
-            'documentation_role_access'
-        );
-        
-        foreach my $table (@ai_chat_tables) {
-            eval {
-                my $schema = $class->model('DBEncy');
-                if ($schema && $schema->storage && $schema->storage->dbh) {
-                    my $dbh = $schema->storage->dbh;
-                    my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
-                    $sth->execute($table);
-                    my $exists = $sth->fetchrow_arrayref();
-                    
-                    if (!$exists) {
-                        $log->log_with_details(undef, 'warn', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-                            "Table '$table' not found in ENCY database. Will be created on first admin request.");
-                    }
+                        return $app->($env);
+                    };
                 }
-            };
-            if ($@) {
-                $log->log_with_details(undef, 'warn', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-                    "Could not check table '$table': $@");
-            }
-        }
-        
-        $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_ai_chat_schema',
-            'AI Chat schema check complete.');
-    };
-    
-    if ($@) {
-        warn "Warning during AI Chat schema initialization: $@\n";
-    }
-    
-    return 1;
-}
+
+
+                # Auto-fix for missing modules - attempt to load modules with fallbacks
+                # This ensures the application works even if modules are missing
+                
+                # First, try to load email modules
+                my $email_modules_loaded = 0;  # Temporarily disabled for development
+                # eval {
+                #     require Comserv::View::Email;
+                #     require Comserv::View::Email::Template;
+                # };
+                # if ($@) {
+                    warn "Warning: Email modules temporarily disabled for development\n";
+                    warn "Email functionality may not work correctly.\n";
+                    # $email_modules_loaded = 0;
+                    
+                    # Try to auto-install the modules if we're in development mode
+                    # Temporarily disabled for development
+                    # if ($ENV{CATALYST_DEBUG}) {
+                    #     warn "Attempting to auto-install email modules...\n";
+                    #     eval {
+                    #         require App::cpanminus;
+                    #         my $local_lib = __PACKAGE__->path_to('local');
+                    #         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
+                    #         
+                    #         # Try loading again after installation
+                    #         require Comserv::View::Email;
+                    #         require Comserv::View::Email::Template;
+                    #         $email_modules_loaded = 1;
+                    #     };
+                    #     if ($@) {
+                    #         warn "Auto-installation failed: $@\n";
+                    #         warn "Email functionality will be limited.\n";
+                    #     }
+                    # }
+                
+                # Check for session store modules
+                my $session_modules_loaded = 1;
+                eval {
+                    require Catalyst::Plugin::Session::Store::File;
+                };
+                if ($@) {
+                    warn "Warning: Could not load session store modules: $@\n";
+                    warn "Using fallback session storage mechanism.\n";
+                    $session_modules_loaded = 0;
+                    
+                    # Configure to use Cookie store as fallback
+                    __PACKAGE__->config(
+                        'Plugin::Session' => {
+                            storage => 'Cookie',
+                        }
+                    );
+                }
+
+                
+                # Add authentication helper methods to the context
+                sub user_exists {
+                    my $c = shift;
+                    return ($c->session->{username} && $c->session->{user_id}) ? 1 : 0;
+                }
+
+                # Legacy check_user_roles method - maintained for backward compatibility
+                sub check_user_roles {
+                    my ($c, $role) = @_;
+                    
+                    # First check if the user exists
+                    return 0 unless $c->user_exists;
+                    
+                    # Get roles from session
+                    my $roles = $c->session->{roles};
+                    
+                    # Check if the user has the admin role in the session
+                    if ($role eq 'admin') {
+                        # For admin role, check if user is in the admin group or has admin privileges
+                        if ($c->session->{is_admin}) {
+                            return 1;
+                        }
+                        
+                        # Check roles array
+                        if (ref($roles) eq 'ARRAY') {
+                            foreach my $user_role (@$roles) {
+                                if (lc($user_role) eq 'admin') {
+                                    return 1;
+                                }
+                            }
+                        }
+                        # Check roles string
+                        elsif (defined $roles && !ref($roles)) {
+                            if ($roles =~ /\badmin\b/i) {
+                                return 1;
+                            }
+                        }
+                        
+                        # Check user_groups
+                        my $user_groups = $c->session->{user_groups};
+                        if (ref($user_groups) eq 'ARRAY') {
+                            foreach my $group (@$user_groups) {
+                                if (lc($group) eq 'admin') {
+                                    return 1;
+                                }
+                            }
+                        }
+                        elsif (defined $user_groups && !ref($user_groups)) {
+                            if ($user_groups =~ /\badmin\b/i) {
+                                return 1;
+                            }
+                        }
+                    }
+                    
+                    # For other roles, check if the role is in the user's roles
+                    if (ref($roles) eq 'ARRAY') {
+                        foreach my $user_role (@$roles) {
+                            if (lc($user_role) eq lc($role)) {
+                                return 1;
+                            }
+                        }
+                    }
+                    elsif (defined $roles && !ref($roles)) {
+                        if ($roles =~ /\b$role\b/i) {
+                            return 1;
+                        }
+                    }
+                    
+                    # Role not found
+                    return 0;
+                }
+
+                # Enhanced access control methods
+                sub check_user_roles_enhanced {
+                    my ($c, $role, $site_id) = @_;
+                    
+                    # Load the access control utility
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->check_user_roles_enhanced($c, $role, $site_id);
+                }
+
+                sub get_user_site_context {
+                    my ($c) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->get_user_site_context($c);
+                }
+
+                sub set_user_site_context {
+                    my ($c, $site_id) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->set_user_site_context($c, $site_id);
+                }
+
+                sub get_user_accessible_sites {
+                    my ($c) = @_;
+                    
+                    require Comserv::Util::AccessControl;
+                    my $access_control = Comserv::Util::AccessControl->new();
+                    
+                    return $access_control->get_user_accessible_sites($c);
+                }
+
+                __PACKAGE__->setup();
+
+                1;

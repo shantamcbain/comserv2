@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/BMaserModel.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'BMaserModel' %]
+
+<!-- Documentation page for BMaserModel -->
+<div class="documentation-content">
+
 <h1 id="bmasteModel"><a href="#BMaster_top">BMaster Model Documentation</a> </h1>
 
 <h2 id="get_frames_for_queen">get_frames_for_queen</h2>
@@ -5,3 +15,5 @@
 
 <h2 id="get_yards_for_site">get_yards_for_site</h2>
 <p>This function fetches all yards for a given site based on the site's name. It returns a reference to an array of yards.</p>
+
+</div>

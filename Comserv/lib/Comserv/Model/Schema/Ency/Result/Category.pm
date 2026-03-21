@@ -3,10 +3,7 @@ use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('categories');
 __PACKAGE__->add_columns(
-    category_id => {
-        data_type => 'integer',
-        is_auto_increment => 1,
-    },
+category_id => { data_type => 'INT', size => 11, is_nullable => 0 },
     category => {
         data_type => 'varchar',
         size => 255,

@@ -1,123 +1,64 @@
-[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.03 2025/09/03 Shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListMember.tt,v 0.02 2024/01/17 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-
-<!-- Member menu -->
-<li class="horizontal-dropdown">
-    <a href="/membership" class="dropbtn"><i class="icon-member"></i>Member</a>
-    <div class="dropdown-content">
-        <!-- Core Membership Services -->
-        <a href="/membership" class="menu-item"><i class="icon-info"></i>Membership Information</a>
-        <a href="/applymembership" class="menu-item"><i class="icon-apply"></i>Apply for Membership</a>
-        
-        [% IF c.session.username %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/add_link?menu=Member" class="menu-item"><i class="icon-add"></i>Add Member Link</a>
-        [% END %]
-        
-        <!-- Public Member Links from database -->
-        [% SET member_db_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Member_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-        [% IF member_db_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-services"></i>Member Services</span>
-            <div class="submenu">
-                [% FOREACH link IN member_db_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Legacy Member Links Support -->
-        [% IF member_links.defined && member_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-legacy"></i>Member Resources</span>
-            <div class="submenu">
-                [% FOREACH link IN member_links %]
-                    <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Legacy Member Pages Support -->
-        [% IF member_pages.defined && member_pages.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-pages"></i>Member Pages</span>
-            <div class="submenu">
-                [% FOREACH link IN member_pages %]
-                    <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.view_name %]
-                    </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/pages/edit?page_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Private Member Links for logged in users -->
-        [% IF c.session.username && c.stash.private_links %]
-            [% SET has_private_member_links = 0 %]
-            [% FOREACH link IN c.stash.private_links %]
-                [% IF link.category == 'Member_links' || link.menu == 'Member' %]
-                    [% SET has_private_member_links = 1 %]
-                [% END %]
-            [% END %]
-            
-            [% IF has_private_member_links %]
-            <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-user-member"></i>My Member Links</span>
-                <div class="submenu">
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'Member_links' || link.menu == 'Member' %]
-                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+       <!-- Member menu -->
+        <li class="horizontal-dropdown">
+            <a href="/membership" class="dropbtn">Member</a>
+            <div class="dropdown-content">
+                <a href="/membership">Membership Information</a>
+                <a href="/applymembership">Apply for Membership</a>
+   [% IF member_links.defined %]
+       [% FOREACH link IN member_links %]
+           <a href="[% link.url %]?site=[% SiteName %]&amp;[% session_string %]&amp;[% link.view_name %]" name="Contact" target="[% link.target %]" title=" [% link.name %] ">[% link.name %]</a>
+       [% END %]
+    [% END %]
+    
+    [% IF member_pages.defined %]
+       [% FOREACH link IN member_pages %]
+           <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title=" [% link.view_name %] ">[% link.view_name %]</a>
+           [% IF c.session.group == 'admin' %]
+               <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+           [% END %]
+       [% END %]
+    [% END %]
+                <!-- Add more member options -->
+                [% IF c.session.member_links.size %]
+                    [% FOREACH link IN c.session.member_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
                         [% END %]
                     [% END %]
-                </div>
-            </div>
-            [% END %]
-        [% END %]
-        
-        <!-- Special Features -->
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-special"></i>Special Features</span>
-            <div class="submenu">
+                [% END %]
                 <!-- Link to the list of herbs -->
-                <a href="/ENCY/BotanicalNameView" class="submenu-link"><i class="icon-herb"></i>List of Herbs</a>
+                <a href="/ENCY/BotanicalNameView">List of Herbs</a>
+                
+                <!-- Private Links Section - Available to ALL logged-in users -->
+                [% IF c.user_exists && private_links && private_links.size %]
+                    <div class="dropdown-divider"></div>
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Private Links</span>
+                        [% FOREACH link IN private_links %]
+                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                                <i class="icon-link"></i> [% link.name %]
+                            </a>
+                        [% END %]
+                    </div>
+                [% END %]
+                
+                <!-- Link Management -->
+                [% IF c.user_exists %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
+                    <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
+                [% END %]
+                
+                [% IF c.session.group == 'admin' %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_link?menu=member"><i class="icon-add"></i> Add Menu Link</a>
+                [% END %]
             </div>
-        </div>
-        
-        [% IF c.session.roles.grep('admin').size %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/manage_links?menu=Member" class="menu-item"><i class="icon-manage"></i>Manage Member Menu</a>
-        [% END %]
-    </div>
-</li>
-
+        </li>

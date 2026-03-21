@@ -1,89 +1,13 @@
-[% PageVersion = 'addtodo.tt,v 0.08 2026/02/08 Shanta - Added current time default and fixed selection logic' %]
+[% PageVersion = 'addtodo.tt,v 0.04 2024/11/23 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
     Version: [% PageVersion %]
 [% END %]
 
-<style>
-    /* Form styling */
-    form div {
-        margin-bottom: 15px;
-    }
 
-    label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-
-    input[type="text"],
-    input[type="number"],
-    select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-sizing: border-box;
-    }
-
-    input[type="date"] {
-        width: 200px;
-        max-width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-sizing: border-box;
-    }
-
-    input[type="submit"] {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 15px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-    }
-
-    input[type="submit"]:hover {
-        background-color: #45a049;
-    }
-
-    /* Textarea styling */
-    textarea {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-sizing: border-box;
-        min-height: 60px;
-        resize: vertical;
-    }
-
-    /* Form container */
-    form {
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
-    /* Responsive design for smaller screens */
-    @media (max-width: 768px) {
-        input[type="date"] {
-            width: 100%;
-        }
-        
-        form {
-            max-width: 100%;
-            margin: 0;
-            padding: 0 10px;
-        }
-    }
-</style>
 
 <h1>Add a New To-do Item</h1>
 
 <form action="/todo/create" method="post">
-    <input type="hidden" name="return_to" value="[% return_to %]">
-    <!-- record_id is auto-increment, no need for manual input -->
     <div>
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% SiteName OR 'Site Name' %]" readonly>
@@ -99,57 +23,45 @@
 
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
-        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Enter numeric project ID if you know it, otherwise leave blank">
-        <small style="color: #666; font-size: 0.9em; display: block; margin-top: 2px;">
-            Only use this field if you know the exact numeric project ID. Otherwise, use the dropdown above.
-        </small>
+        <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Only if project not in list">
     </div>
     <div>
         <label for="due_date">Due Date:</label>
         <input type="date" id="due_date" name="due_date" value="[% todo.due_date OR '' %]">
     </div>
     <div>
-        <label for="time_of_day">Time of Day:</label>
-        <select id="time_of_day" name="time_of_day">
-            <option value="">-- Select Time --</option>
-            [% 
-                USE date;
-                IF time_of_day;
-                    SET default_time = time_of_day;
-                ELSE;
-                    # Default to current system time
-                    SET default_time = date.format(date.now, '%H:%M');
-                END;
-                
-                FOREACH hour IN [0..23];
-                    SET hour_24 = hour < 10 ? '0' _ hour : hour;
-                    
-                    # Convert to 12-hour format
-                    IF hour == 0;
-                        SET hour_12 = 12;
-                        SET period = 'AM';
-                    ELSIF hour < 12;
-                        SET hour_12 = hour;
-                        SET period = 'AM';
-                    ELSIF hour == 12;
-                        SET hour_12 = 12;
-                        SET period = 'PM';
-                    ELSE;
-                        SET hour_12 = hour - 12;
-                        SET period = 'PM';
-                    END;
-                    
-                    FOREACH minute IN ['00', '30'];
-                        SET time_value_24 = hour_24 _ ':' _ minute;
-                        SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
-            %]
-            <option value="[% time_value_24 %]:00" [% IF default_time == time_value_24 %]selected[% END %]>[% time_display %]</option>
-            [%
-                    END;
-                END;
-            %]
-        </select>
+        <label for="time_of_day">Time of Day (optional):</label>
+        <div class="time-input-container">
+            <select id="time_preset" class="time-preset" onchange="setTimeFromPreset()" style="margin-bottom: 5px; padding: 5px; width: 100%;">
+                <option value="">-- Select Common Time --</option>
+                <option value="08:00">8:00 AM</option>
+                <option value="09:00">9:00 AM</option>
+                <option value="10:00">10:00 AM</option>
+                <option value="11:00">11:00 AM</option>
+                <option value="12:00">12:00 PM</option>
+                <option value="13:00">1:00 PM</option>
+                <option value="14:00">2:00 PM</option>
+                <option value="15:00">3:00 PM</option>
+                <option value="16:00">4:00 PM</option>
+                <option value="17:00">5:00 PM</option>
+                <option value="18:00">6:00 PM</option>
+                <option value="19:00">7:00 PM</option>
+                <option value="20:00">8:00 PM</option>
+            </select>
+            <input type="time" id="time_of_day" name="time_of_day" value="[% todo.time_of_day OR '' %]" placeholder="HH:MM" style="width: 100%; padding: 5px;">
+        </div>
+        <small style="color: #666; font-size: 0.9em;">Select from common times or enter manually for day view organization</small>
     </div>
+
+    <script>
+    function setTimeFromPreset() {
+        var preset = document.getElementById('time_preset');
+        var manual = document.getElementById('time_of_day');
+        if (preset.value) {
+            manual.value = preset.value;
+        }
+    }
+    </script>
     <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% todo.subject OR '' %]">
@@ -181,8 +93,8 @@
     <div>
         <label for="priority">Priority:</label>
         <select id="priority" name="priority" class="form-select">
-        [% FOREACH key IN build_priority.keys.sort %]
-        <option value="[% key %]" [% IF key == todo.priority %]selected[% END %]>[% build_priority.$key %]</option>
+        [% FOREACH priority IN [1..10] %]
+        <option value="[% priority %]" [% IF priority == todo.priority %]selected[% END %]>[% priority %]</option>
         [% END %]
         </select>
     </div>
