@@ -63,6 +63,11 @@ sub index :Path('/ENCY') :Args(0) {
 sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     my ($self, $c) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/edit_herb' }));
+        return;
+    }
+
     # Fetch the record_id from the session
     my $record_id = $c->session->{record_id};
 
@@ -158,14 +163,28 @@ sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my ( $self, $c, $id ) = @_;
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Fetching herb details for ID: $id");
-   if ($herb) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'herb_detail', "Herb not found for ID: $id");
+
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid herb ID');
+        return;
     }
-    $c->session->{record_id} = $id;  # Store the id in the session
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Fetching herb details for ID: $id");
+    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+
+    unless ($herb) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'herb_detail', "Herb not found for ID: $id");
+        $c->response->status(404);
+        $c->stash(
+            error_message => "Herb record #$id was not found.",
+            template      => 'error.tt',
+        );
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
+    $c->session->{record_id} = $id;
 
     $self->_stash_image_files($c);
     $c->stash(
