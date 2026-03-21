@@ -125,7 +125,8 @@
 </div>
 
 <script>
-var evtSource = null;
+var pollTimer = null;
+var pollOffset = 0;
 
 function applyPreset(sel) {
     var opt = sel.options[sel.selectedIndex];
@@ -150,48 +151,60 @@ function startScan() {
     document.getElementById('scan-progress').style.display = 'block';
     document.getElementById('scan-results').style.display  = 'none';
     document.getElementById('live-output').textContent = '';
-    document.getElementById('scan-status').textContent = 'Running...';
+    document.getElementById('scan-status').textContent = 'Starting scan...';
     document.getElementById('results-target').textContent = targetUrl + '  site=' + siteName;
+    pollOffset = 0;
 
-    var params = new URLSearchParams({ target_url: targetUrl, site_name: siteName, max_pages: maxPages });
-    evtSource = new EventSource('/admin/security-scan-stream?' + params.toString());
+    fetch('/admin/security-scan-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ target_url: targetUrl, site_name: siteName, max_pages: maxPages })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            appendLine('ERROR: ' + data.error);
+            scanDone();
+            return;
+        }
+        appendLine('Scan started (pid ' + data.pid + ')...');
+        document.getElementById('scan-status').textContent = 'Running...';
+        pollTimer = setInterval(doPoll, 600);
+    })
+    .catch(function(err) {
+        appendLine('ERROR starting scan: ' + err);
+        scanDone();
+    });
+}
 
-    evtSource.onmessage = function(e) {
-        var data = e.data;
+function doPoll() {
+    fetch('/admin/security-scan-poll?offset=' + pollOffset)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) { appendLine('Poll error: ' + data.error); return; }
 
-        if (data === '__DONE__') {
-            evtSource.close();
-            evtSource = null;
+        (data.lines || []).forEach(function(line) { appendLine(line); });
+        pollOffset = data.offset || pollOffset;
+
+        if (data.done) {
+            clearInterval(pollTimer); pollTimer = null;
             document.getElementById('scan-status').textContent = 'Scan complete.';
-            document.getElementById('stop-btn').style.display  = 'none';
-            document.getElementById('start-btn').style.display = '';
-            return;
-        }
-
-        if (data.startsWith('__JSON__')) {
-            try {
-                var report = JSON.parse(data.substring(8));
-                renderResults(report.findings || []);
-            } catch(ex) {
-                appendLine('ERROR parsing results JSON: ' + ex);
+            scanDone();
+            if (data.results && data.results.findings) {
+                renderResults(data.results.findings);
             }
-            return;
         }
-
-        appendLine(data);
-    };
-
-    evtSource.onerror = function() {
-        if (evtSource) { evtSource.close(); evtSource = null; }
-        document.getElementById('scan-status').textContent = 'Connection closed.';
-        document.getElementById('stop-btn').style.display  = 'none';
-        document.getElementById('start-btn').style.display = '';
-    };
+    })
+    .catch(function(err) { appendLine('Poll error: ' + err); });
 }
 
 function stopScan() {
-    if (evtSource) { evtSource.close(); evtSource = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     document.getElementById('scan-status').textContent = 'Stopped by user.';
+    scanDone();
+}
+
+function scanDone() {
     document.getElementById('stop-btn').style.display  = 'none';
     document.getElementById('start-btn').style.display = '';
 }
