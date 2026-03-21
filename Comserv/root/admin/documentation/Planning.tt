@@ -246,13 +246,12 @@ last_updated = '2026/02/08'
                         <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
                         <a href="#group-planning" class="jump-link">ProjectDetails</a> |
                         <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
-                        <a href="#anchor-phase1" class="jump-link">Phase1⏳</a> |
-                        <a href="#anchor-phase2" class="jump-link">Phase2🔜</a> |
-                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicDailyView↗</a> |
-                        <a href="#anchor-priority-17" class="jump-link">ThemeSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">PlanController</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
+                        <a href="#anchor-phase1" class="jump-link">DBEnvMgmt⏳</a> |
+                        <a href="#anchor-phase2" class="jump-link">SchemaModels🔜</a> |
+                        <a href="#anchor-priority-5" class="jump-link">PlanController🔜</a> |
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI🔜</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo🔜</a> |
+                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicView↗</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
