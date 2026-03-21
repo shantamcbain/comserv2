@@ -244,7 +244,7 @@ last_updated = '2026/02/08'
                     <div class="jump-line">
                         <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>
                         <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
-                        <a href="#group-planning" class="jump-link">ProjectDetails</a> |
+                        <a href="#anchor-planning-system-project" class="jump-link">ProjectDetails</a> |
                         <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
                         <a href="#anchor-phase1" class="jump-link">DBEnvMgmt⏳</a> |
                         <a href="#anchor-phase2" class="jump-link">SchemaModels🔜</a> |
@@ -862,9 +862,96 @@ last_updated = '2026/02/08'
             <summary class="group-header">📅 Planning System</summary>
             <div class="priority-content">
 
-            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
-            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
+            <!-- ═══════════════════════════════════════
+                 PROJECT DETAILS & CURRENT PLAN STATUS
+                 Mirrors plan.md (planningsystem-59ae)
+            ═══════════════════════════════════════ -->
+            <div id="anchor-planning-system-project" class="nav-anchor"></div>
+            <div style="background:var(--bg-secondary);border:1px solid var(--primary-color);border-radius:6px;padding:16px;margin-bottom:18px;">
+                <h3 style="margin:0 0 8px;font-size:1.1em;">📋 Planning System — Project Summary</h3>
+                <p style="margin:0 0 10px;font-size:0.92em;">
+                    <strong>Goal:</strong> Migrate all planning from text-based .tt files to a fully DB-driven system with SiteName-based access controls,
+                    role-based visibility, developer time logging, and a points-based payment system. Each SiteName gets its own plan view.
+                    CSC retains access to this legacy text section during migration; all other sites see DB plans only.
+                </p>
+                <p style="margin:0 0 6px;font-size:0.88em;">
+                    <strong>Zenflow task:</strong> <code>planningsystem-59ae</code> |
+                    <strong>Branch:</strong> <code>planningsystem-59ae</code> (port 4001) |
+                    <strong>Priority:</strong> HIGH |
+                    <a href="/Documentation" style="color:var(--primary-color);">All Docs</a> |
+                    <a href="/Documentation/MasterPlanCoordination" style="color:var(--primary-color);">Master Plan</a>
+                </p>
+
+                <!-- BRANCHES TO CONSOLIDATE -->
+                <details style="margin:10px 0 0;">
+                    <summary style="cursor:pointer;font-size:0.88em;font-weight:bold;color:var(--text-muted-color);">🔀 Branch Consolidation Status</summary>
+                    <div style="font-size:0.85em;padding:8px 0 0;line-height:2;">
+                        <span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">merged</span> <code>cssthemes-9195</code> — CSS themes<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>membership-1304</code> — roles/membership (needed for role-based access docs step)<br>
+                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>aichatsystem-ef4e</code> — AI chat (port 4001 originally)<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> pointsystem (new branch) — Developer points &amp; payments step<br>
+                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> <code>api-bc05</code> — API work (independent)<br>
+                    </div>
+                </details>
+
+                <!-- CURRENT PLAN STEPS (mirrors plan.md planningsystem-59ae) -->
+                <h4 style="margin:16px 0 8px;font-size:0.95em;">📌 Plan Steps — Current State</h4>
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
+                    <thead>
+                        <tr style="background:var(--primary-color);color:#fff;">
+                            <th style="padding:6px 10px;text-align:left;width:30%;">Step</th>
+                            <th style="padding:6px 10px;text-align:left;width:15%;">Status</th>
+                            <th style="padding:6px 10px;text-align:left;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;font-weight:bold;">1. Implementation</td>
+                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
+                            <td style="padding:6px 10px;">SiteName access gates, DB plan list in DailyPlan.tt, 'normal' role, plan create form, UserSiteRole login merge</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;font-weight:bold;">2. Migrate DailyPlan.tt to DB coordinator</td>
+                            <td style="padding:6px 10px;"><span style="background:#17a2b8;color:#fff;padding:1px 6px;border-radius:3px;">⏳ IN PROGRESS</span></td>
+                            <td style="padding:6px 10px;">DailyPlan.tt now routes by SiteName; CSC-only tabs wrapped. Next: remove hardcoded weekly lists, pull priorities from DB.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">3. Refactor MasterPlanCoordination</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Coordinator-only role; link to DB records. Blocked by: step 2 complete.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">4. Role-Based Access Documentation</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Role matrix: CSC admin → all, SiteName admin → own site. Coordinate with <code>membership-1304</code>.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">5. DB Schema verification</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Verify <code>dailyplan</code>, <code>dailyplan_entry</code> tables in production. Update DocumentationConfig.json.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
+                            <td style="padding:6px 10px;">6. Developer Points &amp; Payments</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">4 new DB tables, PointsLedger utility, hooks into Todo/Plan create. Handoff to <code>pointsystem-XXXX</code> branch.</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 10px;">7. Test &amp; Verify</td>
+                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
+                            <td style="padding:6px 10px;">Manual tests: CSC text+DB, non-CSC DB-only, plan creation, role access, points system.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:12px;padding:10px 14px;background:#d4edda;border:1px solid #28a745;border-radius:4px;font-size:0.9em;">
+                    <strong>▶ Next Step:</strong> <em>Migrate DailyPlan.tt to DB coordinator</em> —
+                    Remove hardcoded weekly task lists from DAILY PRIORITIES tab; replace with DB-pulled todos for the date.
+                    Depends on <code>dailyplan</code> table being populated in production.
+                </div>
+            </div>
+
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 2 of 7</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+            <p><strong>Zenflow Task:</strong> <code>planningsystem-59ae</code> (port 4001) | <strong>Branch:</strong> <code>planningsystem-59ae</code></p>
 
             <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
 
