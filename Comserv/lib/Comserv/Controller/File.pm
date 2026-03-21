@@ -67,7 +67,7 @@ sub admin_browser :Path('/file/admin_browser') :Args(0) {
 
     unless ($is_admin) {
         $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
@@ -886,7 +886,7 @@ sub edit :Path('/file/edit') :Args(1) {
 
     unless ($is_admin) {
         $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
