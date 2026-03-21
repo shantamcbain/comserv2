@@ -1347,8 +1347,93 @@ sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
     }
 
     my %resp = (lines => \@new_lines, offset => $new_offset, done => $done);
-    $resp{results} = $results if $done && $results;
+    if ($done && $results) {
+        $resp{results} = $results;
+        # Return the archive file that was written (last one in the archive dir)
+        my $archive_dir = $c->path_to('logs', 'security_scans');
+        if (-d $archive_dir) {
+            my @files = sort glob("$archive_dir/*.json");
+            $resp{archive_file} = $files[-1] if @files;
+        }
+    }
     $c->response->body(encode_json(\%resp));
+}
+
+# Security scan — list archived scan reports (GET, returns JSON)
+sub security_scan_history :Path('/admin/security-scan-history') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_history')) {
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my @scans;
+
+    if (-d $archive_dir) {
+        for my $file (reverse sort glob("$archive_dir/*.json")) {
+            my $name = $file; $name =~ s|.*/||;
+            my $size = -s $file;
+            my $mtime = (stat $file)[9];
+            eval {
+                my $json_text = do { local $/; open(my $f, '<', $file) or die; <$f> };
+                my $data = decode_json($json_text);
+                push @scans, {
+                    file      => $name,
+                    scan_time => $data->{scan_time} // '',
+                    base_url  => $data->{base_url}  // '',
+                    sitename  => $data->{sitename}  // '',
+                    summary   => $data->{summary}   // {},
+                    size      => $size,
+                };
+            };
+            push @scans, { file => $name, size => $size, error => $@ } if $@;
+        }
+    }
+
+    $c->response->body(encode_json({ scans => \@scans }));
+}
+
+# Security scan — load a specific archived report (GET, returns JSON)
+sub security_scan_load :Path('/admin/security-scan-load') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_load')) {
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $file = $c->req->param('file') // '';
+    $file =~ s|[^a-zA-Z0-9._-]||g;
+
+    unless ($file =~ /\.json$/) {
+        $c->response->body(encode_json({ error => 'Invalid file name' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my $path = "$archive_dir/$file";
+
+    unless (-f $path) {
+        $c->response->body(encode_json({ error => 'File not found' }));
+        return;
+    }
+
+    eval {
+        my $json_text = do { local $/; open(my $f, '<', $path) or die $!; <$f> };
+        my $data = decode_json($json_text);
+        $c->response->body(encode_json($data));
+    };
+    if ($@) {
+        $c->response->body(encode_json({ error => "Cannot read file: $@" }));
+    }
 }
 
 # Admin backup and restore

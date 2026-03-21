@@ -8,6 +8,10 @@ use URI;
 use URI::Escape;
 use JSON;
 use Getopt::Long;
+use POSIX qw(strftime);
+use File::Path qw(make_path);
+use File::Basename qw(dirname);
+use FindBin qw($Bin);
 
 # ============================================================
 # Comserv Security Crawl Script
@@ -22,15 +26,24 @@ my $base_url    = 'http://localhost:3000';
 my $sitename    = 'none';
 my $verbose     = 0;
 my $max_pages   = 200;
-my $output_file = 'security_crawl_report.json';
+my $output_file = '';
+my $archive_dir = '';
 
 GetOptions(
-    'url=s'     => \$base_url,
-    'site=s'    => \$sitename,
-    'verbose'   => \$verbose,
-    'max=i'     => \$max_pages,
-    'output=s'  => \$output_file,
-) or die "Usage: $0 --url http://host:port [--site sitename] [--verbose] [--max N] [--output file.json]\n";
+    'url=s'         => \$base_url,
+    'site=s'        => \$sitename,
+    'verbose'       => \$verbose,
+    'max=i'         => \$max_pages,
+    'output=s'      => \$output_file,
+    'archive-dir=s' => \$archive_dir,
+) or die "Usage: $0 --url http://host:port [--site sitename] [--verbose] [--max N] [--output file.json] [--archive-dir dir]\n";
+
+# Default archive dir next to the script: ../logs/security_scans/
+$archive_dir ||= "$Bin/../logs/security_scans";
+make_path($archive_dir) unless -d $archive_dir;
+
+# Default live output file (overwritten each run for the poll endpoint)
+$output_file ||= '/tmp/comserv_security_scan.json';
 
 $base_url =~ s|/$||;
 
@@ -202,12 +215,22 @@ while (@queue && $page_count < $max_pages) {
                $finding->{result} eq 'NOT_FOUND'    ? '  ' : '--';
     printf "  %s [%s] %-60s => %s\n", $icon, $resp->code, $url, $finding->{result};
 
-    # Extract links only from public pages
-    if ($resp->code == 200 && $resp->content_type =~ /html/) {
+    # Only extract links from pages that were NOT redirected elsewhere.
+    # If the final URL differs from requested URL the page redirected (e.g. to login).
+    # Following links from the login page would just re-queue login/home links.
+    my $final_url = $resp->request->uri->as_string;
+    my $redirected = ($final_url ne $url && $final_url ne "$url/");
+    if ($resp->code == 200 && $resp->content_type =~ /html/ && !$redirected) {
         my @links = extract_links($url, $resp->decoded_content // '');
+        my $new_count = 0;
         for my $link (@links) {
-            push @queue, $link unless $visited{$link};
+            unless ($visited{$link}) {
+                push @queue, $link;
+                $new_count++;
+            }
         }
+        printf "       -> queued %d new links (queue depth: %d)\n", $new_count, scalar @queue
+            if $new_count > 0;
     }
 }
 
@@ -358,21 +381,43 @@ if (@critical) {
     }
 }
 
-# Write JSON report
-open my $fh, '>', $output_file or warn "Cannot write $output_file: $!";
-print $fh encode_json({
-    scan_time => scalar localtime,
+# Build the report payload
+my $ts_iso  = strftime('%Y-%m-%dT%H:%M:%S', localtime);
+my $ts_file = strftime('%Y-%m-%d_%H-%M-%S', localtime);
+my $host    = $base_url; $host =~ s|https?://||; $host =~ s|[:/]|_|g;
+
+my %report = (
+    scan_time => $ts_iso,
     base_url  => $base_url,
     sitename  => $sitename,
     summary   => {
-        total    => scalar @findings,
-        exposed  => scalar @critical,
+        total     => scalar @findings,
+        exposed   => scalar @critical,
         protected => scalar @protected,
-        errors   => scalar @errors,
+        errors    => scalar @errors,
     },
     findings => \@findings,
-});
-close $fh;
+);
+my $json_text = encode_json(\%report);
 
-print "\nFull report written to: $output_file\n";
+# Write live file (overwritten each run — used by poll endpoint)
+if (open my $fh, '>', $output_file) {
+    print $fh $json_text;
+    close $fh;
+    print "\nLive report written to: $output_file\n";
+} else {
+    warn "Cannot write $output_file: $!";
+}
+
+# Write timestamped archive (never overwritten — permanent history)
+my $archive_file = "$archive_dir/${ts_file}_${host}.json";
+if (open my $af, '>', $archive_file) {
+    print $af $json_text;
+    close $af;
+    print "Archive report written to: $archive_file\n";
+} else {
+    warn "Cannot write archive $archive_file: $!";
+}
+
+print "Full report written to: $output_file\n";
 print "=" x 60 . "\n";
