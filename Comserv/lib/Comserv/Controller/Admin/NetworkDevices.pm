@@ -17,7 +17,7 @@ sub begin : Private {
     my ($self, $c) = @_;
     
     # Add detailed logging
-    my $username = $c->user_exists ? $c->user->username : 'Guest';
+    my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
     my $path = $c->req->path;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 

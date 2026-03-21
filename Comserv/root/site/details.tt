@@ -3,59 +3,7 @@
     [% PageVersion %]
 [% END %]
 
-<style>
-    .domain-actions {
-        display: flex;
-        gap: 5px;
-        margin-top: 5px;
-    }
-    
-    .inline-form {
-        display: inline-block;
-        margin-right: 5px;
-    }
-    
-    .btn {
-        padding: 5px 10px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-        text-decoration: none;
-        display: inline-block;
-    }
-    
-    .btn-sm {
-        padding: 3px 8px;
-        font-size: 11px;
-    }
-    
-    .btn-primary {
-        background-color: #007bff;
-        color: white;
-    }
-    
-    .btn-danger {
-        background-color: #dc3545;
-        color: white;
-    }
-    
-    .btn-info {
-        background-color: #17a2b8;
-        color: white;
-    }
-    
-    .cloudflare-badge {
-        display: inline-block;
-        background-color: #f38020;
-        color: white;
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 3px;
-        margin-left: 5px;
-        vertical-align: middle;
-    }
-</style>
+<!-- Using theme-compliant CSS classes instead of page-specific styles -->
 
 <h1>Site Details</h1>
 
@@ -73,14 +21,14 @@
             <form action="/site/delete_domain" method="post" class="inline-form">
                 <input type="hidden" name="domain_id" value="[% site_domain.id %]">
                 <input type="hidden" name="site_id" value="[% site.id %]">
-                <input type="submit" value="Delete" class="btn btn-sm btn-danger">
+                <input type="submit" value="Delete" class="button button-warning">
             </form>
             <form action="/site/edit_domain/[% site_domain.id %]" method="post" class="inline-form">
                 <input type="hidden" name="site_id" value="[% site_domain.site_id %]">
-                <input type="submit" value="Edit" class="btn btn-sm btn-primary">
+                <input type="submit" value="Edit" class="button button-primary">
             </form>
             [% IF site_domain.is_on_cloudflare %]
-                <a href="[% c.uri_for('/cloudflareapi/dns/' _ site_domain.domain) %]" class="btn btn-sm btn-info">Manage DNS</a>
+                <a href="[% c.uri_for('/cloudflareapi/dns/' _ site_domain.domain) %]" class="button button-secondary">Manage DNS</a>
             [% END %]
         </div>
     </li>

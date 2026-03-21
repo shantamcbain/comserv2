@@ -1,12 +1,10 @@
-[%# INCLUDE 'layout.tt' %]
-[% PageVersion = 'accounts.tt,v 0.01 2024/15/30 shanta Exp shanta ' %]
+[% PageVersion = 'accounts.tt,v 0.02 2025/01/27 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-<br>[% PageVersion %] <br>
-[% "Debugging HostName: " _ HostName %]
-[%# INCLUDE 'debug.tt' %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
 [% END %]
 
-<h1>Hosted Sites</h1>
+<h2>Hosted Sites</h2>
 <ul>
     [%# Conditional display based on site name %]
     [% IF SiteName == 'CSC' %]

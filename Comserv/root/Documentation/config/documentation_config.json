@@ -1,0 +1,180 @@
+{
+   "_comment": "This configuration file contains ONLY overrides for auto-discovered documentation files. Most files are automatically discovered by directory scanning.",
+   "pages" : [
+      {
+         "site" : "MCOOP",
+         "title" : "MCOOP Todo Guide",
+         "path" : "Documentation/roles/admin/todo_admin_guide.tt",
+         "id" : "todo_admin_guide",
+         "description" : "Admin Todo guide for MCOOP",
+         "categories" : ["admin_guides", "documentation"],
+         "format" : "template",
+         "roles" : ["admin", "developer"],
+         "site" : "MCOOP"
+      },
+      {
+         "note": "Patch-based incremental addition: this entry demonstrates patch review workflow",
+         "site" : "MCOOP",
+         "title" : "MCOOP User Guide (Preview Patch)",
+         "path" : "Documentation/sites/mcoop/mcoop_user_guide.tt",
+         "id" : "mcoop_user_guide_preview",
+         "description" : "Preview patch for user guide",
+         "categories" : ["user_guides", "site_specific"],
+         "format" : "template",
+         "roles" : ["normal", "editor", "admin", "developer"]
+      },
+      {
+         "id" : "documentation_organization",
+         "title" : "Documentation Organization",
+         "path" : "Documentation/changelog/2025-05-25-documentation-organization.tt",
+         "description" : "Migrated changelog entry about documentation organization, converted from Markdown to Template Toolkit.",
+         "categories" : ["changelog", "documentation"],
+         "format" : "template",
+         "roles" : ["admin", "developer", "normal", "editor"]
+      },
+      {
+         "id" : "documentation_update_summary",
+         "title" : "Documentation Update Summary Template",
+         "path" : "Documentation/documentation_update_summary.tt",
+         "description" : "Template for AI agents to document code changes and maintain documentation synchronization",
+         "categories" : ["documentation", "developer_guides"],
+         "format" : "template",
+         "roles" : ["developer", "admin"]
+      },
+      {
+         "id" : "code_change_documentation",
+         "title" : "Code Change Documentation Analysis",
+         "path" : "Documentation/code_change_documentation.tt",
+         "description" : "Analysis of recent code changes and required documentation updates based on git diff",
+         "categories" : ["changelog", "documentation", "developer_guides"],
+         "format" : "template",
+         "roles" : ["developer", "admin"]
+      }
+   ],
+   "categories" : {
+      "modules" : {
+         "description" : "Documentation for specific system modules",
+         "display_order" : "6",
+         "title" : "Module Documentation",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "icon" : "fas fa-puzzle-piece",
+         "site_specific" : false
+      },
+      "admin_guides" : {
+         "icon" : "fas fa-shield-alt",
+         "description" : "Documentation for system administrators",
+         "display_order" : "2",
+         "site_specific" : false,
+         "title" : "Administrator Guides",
+         "roles" : [
+            "admin",
+            "developer"
+         ]
+      },
+      "user_guides" : {
+         "display_order" : "1",
+         "description" : "Documentation for end users of the system",
+         "icon" : "fas fa-users",
+         "title" : "User Guides",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "developer_guides" : {
+         "site_specific" : false,
+         "icon" : "fas fa-code",
+         "title" : "Developer Documentation",
+         "roles" : [
+            "developer"
+         ],
+         "display_order" : "3",
+         "description" : "Technical documentation for developers"
+      },
+      "tutorials" : {
+         "display_order" : "4",
+         "description" : "Step-by-step tutorials and guides",
+         "icon" : "fas fa-graduation-cap",
+         "title" : "Tutorials",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "site_specific" : {
+         "display_order" : "7",
+         "description" : "Documentation specific to individual sites",
+         "icon" : "fas fa-building",
+         "title" : "Site-Specific Documentation",
+         "roles" : [
+            "normal",
+            "editor",
+            "admin",
+            "developer"
+         ],
+         "site_specific" : true
+      },
+      "proxmox" : {
+         "display_order" : "8",
+         "description" : "Proxmox VE integration and management",
+         "icon" : "fas fa-server",
+         "title" : "Proxmox Documentation",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "changelog" : {
+         "display_order" : "9",
+         "description" : "System changes and version history",
+         "icon" : "fas fa-history",
+         "title" : "Changelog",
+         "roles" : [
+            "admin",
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "controllers" : {
+         "display_order" : "10",
+         "description" : "Controller documentation",
+         "icon" : "fas fa-cogs",
+         "title" : "Controllers",
+         "roles" : [
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "models" : {
+         "display_order" : "11",
+         "description" : "Model and database documentation",
+         "icon" : "fas fa-database",
+         "title" : "Models",
+         "roles" : [
+            "developer"
+         ],
+         "site_specific" : false
+      },
+      "documentation" : {
+         "display_order" : "12",
+         "description" : "Documentation system and meta-documentation",
+         "icon" : "fas fa-book",
+         "title" : "Documentation System",
+         "roles" : [
+            "developer",
+            "admin"
+         ],
+         "site_specific" : false
+      }
+   }
+}

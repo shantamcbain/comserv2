@@ -1,288 +1,205 @@
-[% META title = 'Restart Starman Service' %]
-[% PageVersion = 'admin/restart_starman.tt,v 1.0 2025/01/27 shanta Exp shanta' %]
+[% META title = 'Restart Starman Server' %]
+<!-- File: /home/shanta/PycharmProjects/comserv2/Comserv/root/admin/restart_starman.tt -->
+[% PageVersion = 'admin/restart_starman.tt,v 0.03 2025/01/28 shanta Exp shanta' %]
 
-<div class="admin-container">
-    <div class="admin-header">
-        <h1><i class="fas fa-redo"></i> Restart Starman Service</h1>
-        <p class="admin-description">
-            Restart the Starman web server service. This requires sudo privileges.
-        </p>
-    </div>
+<!-- Include admin-specific CSS -->
+<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
 
-    [% IF success_msg %]
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i> [% success_msg %]
-        </div>
-    [% END %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-    [% IF error_msg %]
-        <div class="alert alert-danger">
-            <i class="fas fa-times-circle"></i> [% error_msg %]
-        </div>
-    [% END %]
+<!-- Quick Navigation -->
+<div class="quick-nav">
+    <a href="[% c.uri_for('/admin') %]" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+    </a>
+    <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-sm btn-primary">
+        <i class="fas fa-code-branch"></i> Git Pull
+    </a>
+    <a href="[% c.uri_for('/admin/start_dev_server') %]" class="btn btn-sm btn-success">
+        <i class="fas fa-play"></i> Start Dev Server
+    </a>
+</div>
 
-    [% IF service_status %]
-    <div class="admin-section">
-        <h2><i class="fas fa-info-circle"></i> Current Service Status</h2>
-        <div class="status-grid">
-            <div class="status-item">
-                <label>Service Status:</label>
-                <span class="status-value [% service_status.status_class %]">
-                    [% service_status.is_active %]
-                </span>
+<div class="apiary-container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Restart Starman Server</h1>
+            
+            <!-- User status banner -->
+            <div class="alert alert-info mb-4">
+                <strong>Welcome [% c.session.username || 'Guest' %][% IF c.session.roles.grep('^admin$').size %] Administrator[% END %] to Computer System Consulting!</strong>
             </div>
-            [% IF service_status.uptime_info %]
-            <div class="status-item">
-                <label>Running Since:</label>
-                <span class="status-value">[% service_status.uptime_info %]</span>
-            </div>
+            
+            [% IF debug_msg || c.session.debug_mode == 1 %]
+                <div class="alert alert-info">
+                    <strong>Debug Information:</strong>
+                    [% IF debug_msg %]
+                        [% FOREACH msg IN debug_msg %]
+                            <p>[% msg %]</p>
+                        [% END %]
+                    [% END %]
+                    <p>Using Catalyst's built-in proxy configuration. Test URL: http://workstation.local:3000/test</p>
+                    <p>User: [% c.session.username || 'Guest' %]</p>
+                    <p>Roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Admin check result: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                    <p>User exists: [% c.session.username && c.session.user_id ? 'Yes' : 'No' %]</p>
+                    <p>Username: [% c.session.username || 'Not logged in' %]</p>
+                    <p>Session roles: [% c.session.roles.join(', ') || 'None' %]</p>
+                    <p>Is admin: [% c.session.roles.grep('^admin$').size ? 'Yes' : 'No' %]</p>
+                    <p>Server: [% c.req.env.SERVER_NAME || 'unknown' %]</p>
+                    <p>Request method: [% c.req.method %]</p>
+                    <p>Show password form: [% show_password_form ? 'Yes' : 'No' %]</p>
+                    <p>Show credentials form param: [% c.req.params.show_credentials_form ? 'Yes' : 'No' %]</p>
+                </div>
             [% END %]
-            [% IF service_status.error %]
-            <div class="status-item">
-                <label>Status Error:</label>
-                <span class="status-value error">[% service_status.error %]</span>
-            </div>
+            
+            [% IF error_msg %]
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
             [% END %]
-        </div>
-    </div>
-    [% END %]
-
-    [% IF show_password_form %]
-    <div class="admin-section">
-        <h2><i class="fas fa-key"></i> Sudo Authentication Required</h2>
-        <p>Please provide your sudo credentials to restart the Starman service:</p>
-        
-        <form method="POST" class="sudo-form">
-            <input type="hidden" name="confirm" value="1">
-            <div class="form-group">
-                <label for="sudo_username">Username:</label>
-                <input type="text" name="sudo_username" id="sudo_username" class="form-control" 
-                       value="[% (c.user ? c.user.username : '') %]" required>
-            </div>
-            <div class="form-group">
-                <label for="sudo_password">Password:</label>
-                <input type="password" name="sudo_password" id="sudo_password" class="form-control" required>
-                <small class="form-text">Your password will not be stored and is only used for this operation.</small>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-warning">
-                    <i class="fas fa-redo"></i> Restart Starman Service
-                </button>
-                <a href="/admin" class="btn btn-secondary">
-                    <i class="fas fa-times"></i> Cancel
-                </a>
-            </div>
-        </form>
-    </div>
-    [% ELSE %]
-    <div class="admin-section">
-        <h2><i class="fas fa-tools"></i> Restart Service</h2>
-        <p>Click the button below to restart the Starman service. You will be prompted for sudo credentials.</p>
-        
-        <form method="POST" style="display: inline;">
-            <input type="hidden" name="show_credentials_form" value="1">
-            <button type="submit" class="btn btn-warning btn-large">
-                <i class="fas fa-redo"></i> Restart Starman Service
-            </button>
-        </form>
-    </div>
-    [% END %]
-
-    [% IF output %]
-        <div class="admin-section">
-            <h2><i class="fas fa-terminal"></i> Restart Output</h2>
-            <div class="output-container">
-                <pre class="command-output">[% output %]</pre>
-            </div>
-        </div>
-    [% END %]
-
-    <div class="admin-section">
-        <h2><i class="fas fa-link"></i> Related Operations</h2>
-        <div class="action-buttons">
-            <a href="/admin/starman_diagnostics" class="btn btn-info">
-                <i class="fas fa-stethoscope"></i> Run Diagnostics
-            </a>
-            <a href="/admin/emergency-restore" class="btn btn-danger">
-                <i class="fas fa-life-ring"></i> Emergency Restore
-            </a>
-            <a href="/admin" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Admin
-            </a>
+            
+            [% IF success_msg %]
+                <div class="alert alert-success">
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+            
+            [% IF warning_msg %]
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> [% warning_msg %]
+                </div>
+            [% END %]
+            
+            [% IF output %]
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="mb-0">Command Output</h3>
+                    </div>
+                    <div class="card-body">
+                        <pre class="command-output">[% output | html %]</pre>
+                    </div>
+                </div>
+            [% END %]
+            
+            [% UNLESS output %]
+                <div class="alert alert-danger">
+                    <strong>DANGER:</strong> This action will restart the production Starman server, causing temporary downtime.
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>Security Notice:</strong> This function is only available:
+                    <ul>
+                        <li>To CSC administrators</li>
+                        <li>When on the install branch</li>
+                        <li>After testing with the development server</li>
+                    </ul>
+                </div>
+                
+                [% # Always show the credentials form when confirming restart or when explicitly requested %]
+                [% IF show_password_form || c.request.params.show_credentials_form || (c.request.params.confirm && (!c.request.params.sudo_username || !c.request.params.sudo_password)) %]
+                    <div class="alert alert-info">
+                        <strong>Credentials Required:</strong> Please enter your system username and password with sudo privileges to restart the Starman server.
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Enter System Credentials</h3>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
+                                <input type="hidden" name="confirm" value="1">
+                                <div class="form-group mb-3">
+                                    <label for="sudo_username">Username:</label>
+                                    <input type="text" class="form-control" id="sudo_username" name="sudo_username" value="[% c.request.params.sudo_username || c.session.username || 'www-data' %]" required autofocus>
+                                    <small class="form-text text-muted">Enter the system username with sudo privileges (usually www-data for production servers).</small>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="sudo_password">Password:</label>
+                                    <input type="password" class="form-control" id="sudo_password" name="sudo_password" required>
+                                    <small class="form-text text-muted">Your password will not be stored and is only used for this restart operation.</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sync"></i> Restart Starman Server
+                                </button>
+                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+                [% ELSE %]
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This action will restart the Starman server. 
+                        The application will be temporarily unavailable during the restart.
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h3 class="mb-0">Confirm Starman Restart</h3>
+                        </div>
+                        <div class="card-body">
+                            <p>
+                                Restarting the Starman server will:
+                            </p>
+                            <ul>
+                                <li>Temporarily interrupt service to all users</li>
+                                <li>Apply any configuration changes</li>
+                                <li>Reload the application code</li>
+                            </ul>
+                            
+                            <p>Are you sure you want to proceed?</p>
+                            
+                            <form method="POST" action="[% c.uri_for('/admin/restart_starman') %]">
+                                <input type="hidden" name="confirm" value="1">
+                                <input type="hidden" name="show_credentials_form" value="1">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sync"></i> Yes, Restart Starman Server
+                                </button>
+                                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </form>
+                        </div>
+                    </div>
+                [% END %]
+            [% ELSE %]
+                <div class="mt-4">
+                    <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-primary">
+                        <i class="fas fa-sync"></i> Restart Again
+                    </a>
+                    <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Admin Dashboard
+                    </a>
+                </div>
+            [% END %]
         </div>
     </div>
 </div>
 
 <style>
-.admin-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.admin-header {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border-left: 4px solid #ffc107;
-}
-
-.admin-section {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-.status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 15px;
-}
-
-.status-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
-.status-value.active {
-    color: #28a745;
-    font-weight: bold;
-}
-
-.status-value.inactive {
-    color: #dc3545;
-    font-weight: bold;
-}
-
-.status-value.failed {
-    color: #dc3545;
-    font-weight: bold;
-}
-
-.status-value.error {
-    color: #dc3545;
-    font-size: 12px;
-}
-
-.sudo-form {
-    max-width: 400px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-.form-control {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.form-text {
-    font-size: 12px;
-    color: #666;
-    margin-top: 5px;
-}
-
-.form-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-large {
-    padding: 12px 24px;
-    font-size: 16px;
-}
-
-.btn-warning {
-    background: #ffc107;
-    color: #212529;
-}
-
-.btn-info {
-    background: #17a2b8;
-    color: white;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: white;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-}
-
-.output-container {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    padding: 15px;
-}
-
-.command-output {
-    margin: 0;
-    font-family: 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 1.4;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-.alert {
-    padding: 12px 16px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.alert-success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-}
-
-.alert-danger {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-}
+    .command-output {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: monospace;
+        margin: 0;
+    }
+    .quick-nav {
+        margin-bottom: 15px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
 </style>

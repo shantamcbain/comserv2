@@ -141,3 +141,17 @@ select {
     background-color: #3366cc;
     color: #ffffff;
 }
+
+/* Layout wrapper styles */
+.content-wrapper {
+    max-width: var(--container-width);
+    margin: 0 auto;
+    padding: var(--spacing-medium);
+    min-height: calc(100vh - 200px);
+}
+
+@media (max-width: 768px) {
+    .content-wrapper {
+        padding: var(--spacing-small);
+    }
+}

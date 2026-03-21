@@ -1,5 +1,13 @@
-[% META title = 'Linux CD Visibility in Proxmox/KVM' %]
 [% PageVersion = 'Documentation/proxmox/Proxmox_CD_Visibility.tt,v 0.03 2024/07/10 Admin Exp admin ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Linux CD Visibility in Proxmox/KVM' %]
+
+<!-- Documentation page for Proxmox_CD_Visibility -->
+<div class="documentation-content">
+
 <h1 id="cd-visibility-top">CD Visibility in Proxmox Linux VMs</h1>
 <nav>
     <a href="#cli-detection">CLI Detection</a> |
@@ -63,9 +71,11 @@ device_add ide-cd,drive=cdrom0,bus=ide.0</pre>
         <td>Mount errors</td>
         <td>
             <pre>sudo dmesg | grep CD-ROM
-# Check for driver issues
+<h1>Check for driver issues</h1>
 sudo modprobe sr_mod</pre>
         </td>
     </tr>
 </table>
 <p><a href="#cd-visibility-top">Back to top</a></p>
+
+</div>

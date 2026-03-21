@@ -1,149 +1,183 @@
-[% META
-    title = "Controllers Index"
-    description = "Complete index of all Comserv controller documentation - core controllers, site-specific, feature controllers, guidelines, and best practices"
-    roles = "all"
-    category = "controllers"
-    page_version = "0.01"
-    last_updated = "Tue Jan 06 2026 15:23:02 UTC"
-    site_specific = "false"
-%]
+[% PageVersion = 'Comserv/root/Documentation/controllers/index.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-[% PageVersion = 'Documentation/controllers/index.tt,v 0.01 2026/01/06 shanta Exp shanta - Markdown to Template Toolkit conversion' %]
+[% META title = 'Controllers Documentation' %]
 
-<div class="container">
-    <div class="row">
-        <div class="col-100">
-            <h1 style="color: var(--primary-color); font-family: var(--header-font);">Controllers Documentation</h1>
-            
-            <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
-                <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
-                <ul style="list-style-position: inside; color: var(--text-color);">
-                    <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">Overview</a></li>
-                    <li><a href="#core-controllers" style="color: var(--link-color); text-decoration: none;">Core Controllers</a></li>
-                    <li><a href="#site-specific-controllers" style="color: var(--link-color); text-decoration: none;">Site-Specific Controllers</a></li>
-                    <li><a href="#feature-controllers" style="color: var(--link-color); text-decoration: none;">Feature Controllers</a></li>
-                    <li><a href="#guidelines" style="color: var(--link-color); text-decoration: none;">Guidelines</a></li>
-                    <li><a href="#common-issues" style="color: var(--link-color); text-decoration: none;">Common Issues</a></li>
-                    <li><a href="#creating-new-controllers" style="color: var(--link-color); text-decoration: none;">Creating New Controllers</a></li>
-                </ul>
-            </div>
+<!-- Documentation page for index -->
+<div class="documentation-content">
 
-            <div id="overview" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Overview</h2>
-                <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
-                    This page provides an index of all controller documentation in the Comserv system. Controllers are responsible for handling requests, processing data, and rendering views.
-                </p>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
 
-            <div id="core-controllers" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Core Controllers</h2>
-                <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><a href="/Documentation/Root_Controller" style="color: var(--link-color);">Root Controller</a> - The main controller that handles the root path and determines which site to display</li>
-                    <li><a href="/Documentation/Documentation_Controller" style="color: var(--link-color);">Documentation Controller</a> - Handles the documentation system</li>
-                    <li><a href="/Documentation/Admin_Controller" style="color: var(--link-color);">Admin Controller</a> - Handles administrative functions</li>
-                    <li><a href="/Documentation/User_Controller" style="color: var(--link-color);">User Controller</a> - Handles user authentication and management</li>
-                </ul>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
 
-            <div id="site-specific-controllers" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Site-Specific Controllers</h2>
-                <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><a href="/Documentation/USBM_Controller" style="color: var(--link-color);">USBM Controller</a> - Universal School of Business Management site</li>
-                    <li><a href="/Documentation/CSC_Controller" style="color: var(--link-color);">CSC Controller</a> - Computer System Consulting site</li>
-                    <li><a href="/Documentation/Shanta_Controller" style="color: var(--link-color);">Shanta Controller</a> - Shanta's personal site</li>
-                </ul>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
 
-            <div id="feature-controllers" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Feature Controllers</h2>
-                <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><a href="/Documentation/HelpDesk_Controller" style="color: var(--link-color);">HelpDesk Controller</a> - Support ticket system</li>
-                    <li><a href="/Documentation/Todo_Controller" style="color: var(--link-color);">Todo Controller</a> - Task management system</li>
-                    <li><a href="/Documentation/Project_Controller" style="color: var(--link-color);">Project Controller</a> - Project management system</li>
-                    <li><a href="/Documentation/Proxy_Controller" style="color: var(--link-color);">Proxy Controller</a> - Proxy management system</li>
-                </ul>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
+<!-- Documentation CSS is now included in the theme system -->
 
-            <div id="guidelines" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Guidelines</h2>
-                <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><a href="/Documentation/controller_routing_guidelines" style="color: var(--link-color);">Controller Routing Guidelines</a> - Best practices for setting up routes</li>
-                    <li><a href="/Documentation/controller_naming_conventions" style="color: var(--link-color);">Controller Naming Conventions</a> - Standards for naming controllers</li>
-                    <li><a href="/Documentation/controller_testing" style="color: var(--link-color);">Controller Testing</a> - How to test controllers</li>
-                </ul>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
+<div class="markdown-content">
 
-            <div id="common-issues" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Common Issues</h2>
-                <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><a href="/Documentation/documentation_filename_issue" style="color: var(--link-color);">Filename/Package Mismatch</a> - Critical issue with controller filenames not matching package names</li>
-                    <li><a href="/Documentation/all_sites_same_content" style="color: var(--link-color);">All Sites Showing Same Content</a> - Issue with controllers capturing the root path incorrectly</li>
-                </ul>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
 
-            <div id="creating-new-controllers" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Creating New Controllers</h2>
-                <p style="color: var(--text-color); font-family: var(--body-font);">When creating a new controller:</p>
-                <ol style="color: var(--text-color); line-height: 1.8;">
-                    <li>Ensure the filename matches the package name</li>
-                    <li>Set the namespace explicitly</li>
-                    <li>Use appropriate action attributes</li>
-                    <li>Include proper logging</li>
-                    <li>Forward to the view explicitly</li>
-                </ol>
-                
-                <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Example</h3>
-                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small); font-family: 'Courier New', monospace;">package Comserv::Controller::NewFeature;
+<h2>Overview</h2>
+
+
+
+This page provides an index of all controller documentation in the Comserv system. Controllers are responsible for handling requests, processing data, and rendering views.
+
+
+
+<h2>Core Controllers</h2>
+
+
+
+<ul><li><a href="Root_Controller.md">Root Controller</a> - The main controller that handles the root path and determines which site to display</li></ul>
+
+<ul><li><a href="Documentation_Controller.md">Documentation Controller</a> - Handles the documentation system</li></ul>
+
+<ul><li><a href="Admin_Controller.md">Admin Controller</a> - Handles administrative functions</li></ul>
+
+<ul><li><a href="User_Controller.md">User Controller</a> - Handles user authentication and management</li></ul>
+
+
+
+<h2>Site-Specific Controllers</h2>
+
+
+
+<ul><li><a href="USBM_Controller.md">USBM Controller</a> - Universal School of Business Management site</li></ul>
+
+<ul><li><a href="CSC_Controller.md">CSC Controller</a> - Computer System Consulting site</li></ul>
+
+<ul><li><a href="Shanta_Controller.md">Shanta Controller</a> - Shanta's personal site</li></ul>
+
+
+
+<h2>Feature Controllers</h2>
+
+
+
+<ul><li><a href="HelpDesk_Controller.md">HelpDesk Controller</a> - Support ticket system</li></ul>
+
+<ul><li><a href="Todo_Controller.md">Todo Controller</a> - Task management system</li></ul>
+
+<ul><li><a href="Project_Controller.md">Project Controller</a> - Project management system</li></ul>
+
+<ul><li><a href="Proxy_Controller.md">Proxy Controller</a> - Proxy management system</li></ul>
+
+
+
+<h2>Guidelines</h2>
+
+
+
+<ul><li><a href="/Documentation/controller_routing_guidelines">Controller Routing Guidelines</a> - Best practices for setting up routes</li></ul>
+
+<ul><li><a href="/Documentation/controller_naming_conventions">Controller Naming Conventions</a> - Standards for naming controllers</li></ul>
+
+<ul><li><a href="/Documentation/controller_testing">Controller Testing</a> - How to test controllers</li></ul>
+
+
+
+<h2>Common Issues</h2>
+
+
+
+<ul><li><a href="/Documentation/documentation_filename_issue">Filename/Package Mismatch</a> - Critical issue with controller filenames not matching package names</li></ul>
+
+<ul><li><a href="/Documentation/all_sites_same_content">All Sites Showing Same Content</a> - Issue with controllers capturing the root path incorrectly</li></ul>
+
+
+
+<h2>Creating New Controllers</h2>
+
+
+
+When creating a new controller:
+
+
+
+<ol><li>Ensure the filename matches the package name</li></ol>
+
+<ol><li>Set the namespace explicitly</li></ol>
+
+<ol><li>Use appropriate action attributes</li></ol>
+
+<ol><li>Include proper logging</li></ol>
+
+<ol><li>Forward to the view explicitly</li></ol>
+
+
+
+Example:
+
+
+
+<code></code>`perl
+
+package Comserv::Controller::NewFeature;
+
 use Moose;
+
 use namespace::autoclean;
+
 use Comserv::Util::Logging;
+
+
 
 BEGIN { extends 'Catalyst::Controller'; }
 
-# Set the namespace
+
+
+<h1>Set the namespace</h1>
+
 __PACKAGE__->config(namespace => 'NewFeature');
 
+
+
 has 'logging' => (
+
     is => 'ro',
+
     default => sub { Comserv::Util::Logging->instance }
+
 );
 
+
+
 sub auto :Private {
+
     my ($self, $c) = @_;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+
         "NewFeature controller auto method called");
+
     return 1;
+
 }
 
+
+
 sub index :Path :Args(0) {
+
     my ($self, $c) = @_;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+
         "NewFeature index action called");
+
     $c->stash(template => 'NewFeature/index.tt');
+
     $c->forward($c->view('TT'));
+
 }
+
+
 
 __PACKAGE__->meta->make_immutable;
 
-1;</pre>
-                <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
-            </div>
 
-            <div id="last-updated" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
-                <h3 style="margin-top: 0; color: var(--primary-color);">Last Updated</h3>
-                <p style="color: var(--muted-color); font-size: var(--font-size-small); margin: 0;">
-                    <strong>Date:</strong> Tue Jan 06 2026 15:23:02 UTC<br>
-                    <strong>Version:</strong> 0.01<br>
-                    <strong>Author:</strong> shanta<br>
-                    <strong>Status:</strong> Template Toolkit Compliance - Markdown to TT conversion with META block, RFC PageVersion, CSS variables, grid layout, TOC
-                </p>
-            </div>
-        </div>
-    </div>
+
+1;
+
+<code></code>`
+
 </div>

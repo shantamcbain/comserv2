@@ -1,4 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/config_based/index.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
 [% META title = 'Documentation' %]
+
+<!-- Documentation page for Documentation -->
+<div class="documentation-content">
+
 
 <div class="documentation-container">
     <h1><i class="fas fa-book"></i> Documentation</h1>
@@ -7,11 +16,11 @@
         <div class="site-info">
             <span class="label">Site:</span>
             <span class="value">[% site_name %]</span>
-        </div>
+        [% END %]</div>
         <div class="role-info">
             <span class="label">User Role:</span>
             <span class="value">[% user_role %]</span>
-        </div>
+        [% END %]</div>
         [% IF user_role == 'admin' || user_role == 'developer' || c.session.debug_mode == 1 %]
         <div class="admin-actions">
             <a href="[% c.uri_for('/Documentation/ConfigBased/reload') %]" class="refresh-button">
@@ -20,7 +29,6 @@
             <a href="[% c.uri_for('/Documentation/Config') %]" class="config-button">
                 <i class="fas fa-cogs"></i> Manage Configuration
             </a>
-            [% IF c.session.debug_mode == 1 %]
                 <a href="[% c.uri_for('/toggle_debug_mode', { value => 0, return_url => c.req.uri }) %]" class="debug-mode-button active">
                     <i class="fas fa-toggle-on"></i> Debug Mode: ON
                 </a>
@@ -28,27 +36,21 @@
                 <a href="[% c.uri_for('/toggle_debug_mode', { value => 1, return_url => c.req.uri }) %]" class="debug-mode-button">
                     <i class="fas fa-toggle-off"></i> Debug Mode: OFF
                 </a>
-            [% END %]
-        </div>
-        [% END %]
-    </div>
+        [% END %]</div>
+    [% END %]</div>
 
     [% IF status_msg %]
     <div class="status-message success">
         <i class="fas fa-check-circle"></i> [% status_msg %]
-    </div>
-    [% END %]
+    [% END %]</div>
     
-    [% IF c.session.debug_mode == 1 && debug_msg.size > 0 %]
     <div class="debug-messages">
         <h3><i class="fas fa-bug"></i> Debug Messages</h3>
         <ul>
             [% FOREACH msg IN debug_msg %]
                 <li>[% msg %]</li>
-            [% END %]
         </ul>
-    </div>
-    [% END %]
+    [% END %]</div>
 
     <p class="intro">Welcome to the documentation. Here you'll find information about the system, its features, and how to use them.</p>
 
@@ -65,14 +67,11 @@
                             <span class="update-title">[% item.title %]</span>
                             <span class="update-description">[% item.description %]</span>
                         </li>
-                    [% END %]
                 </ul>
                 [% IF completed_items.size > 5 %]
                     <a href="[% c.uri_for('/Documentation/completed') %]" class="view-all-link">View All Updates</a>
-                [% END %]
-            </div>
-        </div>
-        [% END %]
+            [% END %]</div>
+        [% END %]</div>
         
         <!-- Loop through categories in display_order -->
         [% FOREACH category_key IN categories.keys.sort_by(categories.$item.display_order) %]
@@ -81,7 +80,6 @@
             <!-- Skip categories with no pages unless they're predefined -->
             [% NEXT IF category.pages.size == 0 && category_key != 'user_guides' && category_key != 'admin_guides' && category_key != 'developer_guides' && category_key != 'tutorials' && category_key != 'site_specific' && category_key != 'modules' %]
             
-            <div class="documentation-section [% IF category_key == 'site_specific' %]site-specific-section[% END %]">
                 <h2 class="section-toggle expanded"><i class="[% category.icon %]"></i> [% category.title %]</h2>
                 <p>[% category.description %]</p>
                 <div class="section-grid expanded">
@@ -94,18 +92,13 @@
                                     <p>[% page.description || 'Documentation for Comserv functionality.' %]</p>
                                     [% IF page.site != 'all' %]
                                         <span class="site-badge">[% page.site %]</span>
-                                    [% END %]
                                 </a>
-                            [% END %]
-                        [% END %]
                     [% ELSE %]
-                        <div class="no-docs">No documentation available in this category.</div>
-                    [% END %]
-                </div>
-            </div>
-        [% END %]
-    </div>
-</div>
+                        <div class="no-docs">No documentation available in this category.[% END %]</div>
+                [% END %]</div>
+            [% END %]</div>
+    [% END %]</div>
+[% END %]</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

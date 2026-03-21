@@ -1,158 +1,331 @@
-# Mail System User Guide
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/mail_user_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-## Overview
+[% META title = 'Mail System User Guide' %]
+
+<!-- Documentation page for mail_user_guide -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
 
 The Comserv Mail System provides email functionality for users, including webmail access and email notifications. This guide explains how to use the mail features available to regular users.
 
-## Accessing Webmail
 
-### Step 1: Navigate to the Mail Page
 
-1. Log in to your account
-2. Click on the "Mail" link in the navigation menu
-3. You will be directed to the mail page
+<h2>Accessing Webmail</h2>
 
-### Step 2: Access Your Webmail
 
-1. On the mail page, you'll see a link to access webmail
-2. Click on the "Mail" link
-3. A new tab will open with the webmail interface
-4. Enter your email credentials:
+
+<h3>Step 1: Navigate to the Mail Page</h3>
+
+
+
+<ol><li>Log in to your account</li></ol>
+
+<ol><li>Click on the "Mail" link in the navigation menu</li></ol>
+
+<ol><li>You will be directed to the mail page</li></ol>
+
+
+
+<h3>Step 2: Access Your Webmail</h3>
+
+
+
+<ol><li>On the mail page, you'll see a link to access webmail</li></ol>
+
+<ol><li>Click on the "Mail" link</li></ol>
+
+<ol><li>A new tab will open with the webmail interface</li></ol>
+
+<ol><li>Enter your email credentials:</li></ol>
+
    - Username: your_username@[domain]
+
    - Password: your email password
 
-### Webmail Features
+
+
+<h3>Webmail Features</h3>
+
+
 
 Once logged in to webmail, you can:
 
-1. **Read Emails**: View your inbox and read messages
-2. **Compose Emails**: Create and send new messages
-3. **Manage Folders**: Organize emails into folders
-4. **Set Filters**: Create rules to automatically sort incoming mail
-5. **Manage Contacts**: Add and organize your contacts
 
-## Email Notifications
+
+<ol><li>**Read Emails**: View your inbox and read messages</li></ol>
+
+<ol><li>**Compose Emails**: Create and send new messages</li></ol>
+
+<ol><li>**Manage Folders**: Organize emails into folders</li></ol>
+
+<ol><li>**Set Filters**: Create rules to automatically sort incoming mail</li></ol>
+
+<ol><li>**Manage Contacts**: Add and organize your contacts</li></ol>
+
+
+
+<h2>Email Notifications</h2>
+
+
 
 The system sends various email notifications:
 
-1. **Welcome Emails**: Sent when you first register
-2. **Password Reset**: Sent when you request a password reset
-3. **Account Updates**: Sent when your account information changes
-4. **System Notifications**: Important announcements from administrators
 
-### Managing Notification Preferences
+
+<ol><li>**Welcome Emails**: Sent when you first register</li></ol>
+
+<ol><li>**Password Reset**: Sent when you request a password reset</li></ol>
+
+<ol><li>**Account Updates**: Sent when your account information changes</li></ol>
+
+<ol><li>**System Notifications**: Important announcements from administrators</li></ol>
+
+
+
+<h3>Managing Notification Preferences</h3>
+
+
 
 To manage your email notification preferences:
 
-1. Go to your Account Settings
-2. Navigate to the "Preferences" or "Notifications" section
-3. Toggle the notification options according to your preferences
-4. Save your changes
 
-## Email Accounts
+
+<ol><li>Go to your Account Settings</li></ol>
+
+<ol><li>Navigate to the "Preferences" or "Notifications" section</li></ol>
+
+<ol><li>Toggle the notification options according to your preferences</li></ol>
+
+<ol><li>Save your changes</li></ol>
+
+
+
+<h2>Email Accounts</h2>
+
+
 
 As a member, you receive one free email address based on your username. For example, if your username is "john", your email address might be "john@[domain]".
 
-### Email Account Features
+
+
+<h3>Email Account Features</h3>
+
+
 
 Your email account includes:
 
-1. **Webmail Access**: Access your email from any web browser
-2. **POP3/IMAP Access**: Configure your desktop or mobile email client
-3. **Spam Filtering**: Basic protection against unwanted emails
-4. **Virus Scanning**: Protection against email-borne threats
 
-### Email Client Configuration
+
+<ol><li>**Webmail Access**: Access your email from any web browser</li></ol>
+
+<ol><li>**POP3/IMAP Access**: Configure your desktop or mobile email client</li></ol>
+
+<ol><li>**Spam Filtering**: Basic protection against unwanted emails</li></ol>
+
+<ol><li>**Virus Scanning**: Protection against email-borne threats</li></ol>
+
+
+
+<h3>Email Client Configuration</h3>
+
+
 
 To set up your email in a desktop or mobile client:
 
-#### IMAP Settings (Recommended)
 
-- **Incoming Server**: mail.[domain]
-- **Port**: 993 (with SSL/TLS)
-- **Username**: your_username@[domain]
-- **Password**: your email password
 
-#### POP3 Settings
+<h4>IMAP Settings (Recommended)</h4>
 
-- **Incoming Server**: mail.[domain]
-- **Port**: 995 (with SSL/TLS)
-- **Username**: your_username@[domain]
-- **Password**: your email password
 
-#### SMTP Settings (Outgoing Mail)
 
-- **Outgoing Server**: mail.[domain]
-- **Port**: 587 (with STARTTLS)
-- **Authentication**: Required
-- **Username**: your_username@[domain]
-- **Password**: your email password
+<ul><li>**Incoming Server**: mail.[domain]</li></ul>
 
-## Troubleshooting
+<ul><li>**Port**: 993 (with SSL/TLS)</li></ul>
 
-### Common Issues
+<ul><li>**Username**: your_username@[domain]</li></ul>
 
-1. **Cannot Access Webmail**
+<ul><li>**Password**: your email password</li></ul>
+
+
+
+<h4>POP3 Settings</h4>
+
+
+
+<ul><li>**Incoming Server**: mail.[domain]</li></ul>
+
+<ul><li>**Port**: 995 (with SSL/TLS)</li></ul>
+
+<ul><li>**Username**: your_username@[domain]</li></ul>
+
+<ul><li>**Password**: your email password</li></ul>
+
+
+
+<h4>SMTP Settings (Outgoing Mail)</h4>
+
+
+
+<ul><li>**Outgoing Server**: mail.[domain]</li></ul>
+
+<ul><li>**Port**: 587 (with STARTTLS)</li></ul>
+
+<ul><li>**Authentication**: Required</li></ul>
+
+<ul><li>**Username**: your_username@[domain]</li></ul>
+
+<ul><li>**Password**: your email password</li></ul>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Common Issues</h3>
+
+
+
+<ol><li>**Cannot Access Webmail**</li></ol>
+
    - Ensure you're using the correct URL
+
    - Verify your username and password
+
    - Check if your account is active
 
-2. **Not Receiving Emails**
+
+
+<ol><li>**Not Receiving Emails**</li></ol>
+
    - Check your spam/junk folder
+
    - Verify your email address is correct in your profile
+
    - Contact an administrator if the issue persists
 
-3. **Cannot Send Emails**
+
+
+<ol><li>**Cannot Send Emails**</li></ol>
+
    - Verify your outgoing mail settings
+
    - Check if you've exceeded your sending quota
+
    - Ensure your account has sending privileges
 
-### Getting Help
+
+
+<h3>Getting Help</h3>
+
+
 
 If you encounter issues with your email:
 
-1. Check the [Mail Troubleshooting Guide](/Documentation/mail_troubleshooting.md)
-2. Contact your site administrator
-3. Submit a support ticket through the help desk
 
-## Best Practices
 
-### Security
+<ol><li>Check the <a href="/Documentation/mail_troubleshooting.md">Mail Troubleshooting Guide</a></li></ol>
 
-1. **Strong Password**: Use a strong, unique password for your email
-2. **Regular Updates**: Change your password periodically
-3. **Suspicious Emails**: Be cautious of unexpected attachments or links
-4. **Logout**: Always log out when using webmail on shared computers
+<ol><li>Contact your site administrator</li></ol>
 
-### Organization
+<ol><li>Submit a support ticket through the help desk</li></ol>
 
-1. **Folders**: Create folders to organize different types of emails
-2. **Filters**: Set up filters to automatically sort incoming mail
-3. **Regular Cleanup**: Delete or archive old emails to manage storage
 
-### Etiquette
 
-1. **Clear Subject Lines**: Use descriptive subject lines
-2. **Concise Messages**: Keep emails brief and to the point
-3. **Proper Formatting**: Use paragraphs and formatting for readability
-4. **Attachments**: Keep attachments small and use appropriate formats
+<h2>Best Practices</h2>
 
-## Site-Specific Information
+
+
+<h3>Security</h3>
+
+
+
+<ol><li>**Strong Password**: Use a strong, unique password for your email</li></ol>
+
+<ol><li>**Regular Updates**: Change your password periodically</li></ol>
+
+<ol><li>**Suspicious Emails**: Be cautious of unexpected attachments or links</li></ol>
+
+<ol><li>**Logout**: Always log out when using webmail on shared computers</li></ol>
+
+
+
+<h3>Organization</h3>
+
+
+
+<ol><li>**Folders**: Create folders to organize different types of emails</li></ol>
+
+<ol><li>**Filters**: Set up filters to automatically sort incoming mail</li></ol>
+
+<ol><li>**Regular Cleanup**: Delete or archive old emails to manage storage</li></ol>
+
+
+
+<h3>Etiquette</h3>
+
+
+
+<ol><li>**Clear Subject Lines**: Use descriptive subject lines</li></ol>
+
+<ol><li>**Concise Messages**: Keep emails brief and to the point</li></ol>
+
+<ol><li>**Proper Formatting**: Use paragraphs and formatting for readability</li></ol>
+
+<ol><li>**Attachments**: Keep attachments small and use appropriate formats</li></ol>
+
+
+
+<h2>Site-Specific Information</h2>
+
+
 
 Different sites have different webmail servers:
 
-- **ENCY/EV/Forager**: webmail.forager.com:20000
-- **CS/LumbyThrift**: webmail.countrystores.ca:20000
-- **Organic/Sky/AltPower**: webmail.computersystemconsulting.ca:20000
-- **CSC/CSCDev/Extropia**: webmail.computersystemconsulting.ca:20000
-- **ECF**: webmail.beemaster.ca:20000
-- **USBM/3d/ENCY**: webmail.usbm.ca:20000
-- **HE**: webmail.helpfullearth.com:20000
-- **Skye**: webmail.skyefarm.com:20000
-- **Apis/BMaster/Shanta/Brew/CSPS/TelMark**: webmail.beemaster.ca:20000
 
-## Related Documentation
 
-- [Account Management](/Documentation/roles/normal/account_management.md)
-- [Getting Started Guide](/Documentation/tutorials/getting_started.md)
-- [Mail System Documentation](/Documentation/mail_system.md) (for administrators)
+<ul><li>**ENCY/EV/Forager**: webmail.forager.com:20000</li></ul>
+
+<ul><li>**CS/LumbyThrift**: webmail.countrystores.ca:20000</li></ul>
+
+<ul><li>**Organic/Sky/AltPower**: webmail.computersystemconsulting.ca:20000</li></ul>
+
+<ul><li>**CSC/CSCDev/Extropia**: webmail.computersystemconsulting.ca:20000</li></ul>
+
+<ul><li>**ECF**: webmail.beemaster.ca:20000</li></ul>
+
+<ul><li>**USBM/3d/ENCY**: webmail.usbm.ca:20000</li></ul>
+
+<ul><li>**HE**: webmail.helpfullearth.com:20000</li></ul>
+
+<ul><li>**Skye**: webmail.skyefarm.com:20000</li></ul>
+
+<ul><li>**Apis/BMaster/Shanta/Brew/CSPS/TelMark**: webmail.beemaster.ca:20000</li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/roles/normal/account_management.md">Account Management</a></li></ul>
+
+<ul><li><a href="/Documentation/tutorials/getting_started.md">Getting Started Guide</a></li></ul>
+
+<ul><li><a href="/Documentation/mail_system.md">Mail System Documentation</a> (for administrators)</li></ul>
+
+</div>

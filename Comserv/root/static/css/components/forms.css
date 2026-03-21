@@ -58,6 +58,18 @@ select:focus {
   margin-right: var(--spacing-small);
 }
 
+.inline-form {
+  display: inline-block;
+  margin-right: var(--spacing-small);
+}
+
+/* Domain actions container */
+.domain-actions {
+  display: flex;
+  gap: var(--spacing-small);
+  margin-top: var(--spacing-small);
+}
+
 /* Form validation */
 .form-error {
   color: var(--warning-color);
@@ -92,4 +104,115 @@ select.error {
   border-style: dashed;
   padding: var(--spacing-medium);
   margin-bottom: var(--spacing-large);
+}
+
+/* Menu link form styles */
+.menu-link-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 153, 51, 0.2);
+}
+
+.form-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+  margin-top: 2rem;
+}
+
+.current-link-info {
+  margin-top: 3rem;
+  padding: 2rem;
+  background-color: var(--background-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.current-link-info h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: var(--primary-color);
+}
+
+.info-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.info-item {
+  padding: 0.75rem;
+  background-color: var(--background-color);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.link-preview {
+  color: var(--primary-color);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.link-preview:hover {
+  text-decoration: underline;
+}
+
+.status-active {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.status-inactive {
+  color: var(--warning-color);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
 }

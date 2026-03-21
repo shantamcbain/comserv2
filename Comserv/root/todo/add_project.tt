@@ -12,15 +12,14 @@
 [% END %]
 
 <form method="POST" action="/project/create_project">
-    [% IF form_data.parent_id %]
-    <input type="hidden" name="parent_id" value="[% form_data.parent_id %]">
-    [% END %]
   [% INCLUDE "todo/site_list.tt" %]<br>
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
 
-[% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=form_data.parent_id %]<br>
+    <label for="parent_id">Parent Project (Optional):</label><br>
+    [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=form_data.parent_id %]<br>
+    <small>Select a parent project to create this as a sub-project, or leave as "None" for a top-level project</small><br><br>
 
     <label for="description">Description:</label><br>
     <textarea id="description" name="description" required>[% form_data.description %]</textarea><br>

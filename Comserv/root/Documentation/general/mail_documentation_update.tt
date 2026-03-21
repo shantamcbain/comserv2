@@ -1,124 +1,74 @@
-[% META title = 'Mail Documentation Update Summary' %]
-[% PageVersion = 'Documentation/general/mail_documentation_update.tt,v 0.01 2025/01/20 shanta Exp shanta ' %]
-[% debug %]
+[% PageVersion = 'Comserv/root/Documentation/general/mail_documentation_update.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
 [% END %]
 
-<h1>Mail Documentation Update Summary</h1>
+[% META title = 'mail_documentation_update' %]
 
-<h2>Overview</h2>
 
-<p>This document summarizes the updates made to the mail system documentation in the Comserv application. The updates include comprehensive documentation for both users and administrators, covering configuration, troubleshooting, and best practices.</p>
+<!-- Documentation CSS is now included in the theme system -->
 
-<h2>Documents Created</h2>
+<div class="markdown-content">
+INFO: Comserv::Util::Logging=HASH(0x5800d4a912f8)
 
-<p>The following documentation files have been created:</p>
+INFO: Comserv::Util::Logging=HASH(0x5800d4a9af68)
 
-<ol>
-<li><strong>Mail System Documentation</strong> (`/Documentation/mail_system.md`)
-<ul>
-<li>Overview of the mail system architecture</li>
-<li>Description of components and their functions</li>
-<li>Explanation of configuration storage</li>
-<li>Webmail access information</li>
-<li>Fallback mechanisms</li>
-<li>Troubleshooting basics</li>
-<li>Best practices</li>
-</ul>
-</li>
+INFO: Comserv::Util::Logging=HASH(0x62fb8955b498)
 
-<li><strong>Mail Configuration Guide</strong> (`/Documentation/mail_configuration_guide.md`)
-<ul>
-<li>Step-by-step configuration instructions</li>
-<li>SMTP settings explanation</li>
-<li>Testing procedures</li>
-<li>Configuration storage details</li>
-<li>Security considerations</li>
-<li>Example configurations for popular email providers</li>
-</ul>
-</li>
+INFO: Comserv::Util::Logging=HASH(0x62fb895a00e0)
 
-3. **Mail Troubleshooting Guide** (`/Documentation/mail_troubleshooting.md`)
-   - Detailed diagnostic procedures
-   - Common issues and solutions
-   - Advanced troubleshooting techniques
-   - Debugging methods
-   - Preventive measures
+INFO: Comserv::Util::Logging=HASH(0x62fb894fdf00)
 
-4. **Mail User Guide** (`/Documentation/roles/normal/mail_user_guide.md`)
-   - Instructions for accessing webmail
-   - Email notification management
-   - Email account features
-   - Client configuration
-   - Troubleshooting for users
-   - Best practices for email usage
+INFO: Comserv::Util::Logging=HASH(0x62fb895074a0)
 
-5. **Mail Admin Guide** (`/Documentation/roles/admin/mail_admin_guide.md`)
-   - Detailed system architecture
-   - Initial setup instructions
-   - SMTP configuration management
-   - Email template customization
-   - Monitoring and maintenance
-   - Security considerations
-   - Advanced configuration options
-   - Best practices for administrators
+INFO: Comserv::Util::Logging=HASH(0x5ef2488dc548)
 
-## Updates to Existing Documentation
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d7b18)
 
-The following existing documentation files have been updated:
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9570)
 
-1. **Documentation System Overview** (`/Documentation/documentation_system_overview.md`)
-   - Added links to the new mail documentation files in the Related Documentation section
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9dd8)
 
-## Implementation Details
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d5910)
 
-The documentation was created based on analysis of the existing codebase, including:
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e5328)
 
-1. **Mail Controller** (`/lib/Comserv/Controller/Mail.pm`)
-   - Routes and actions for mail functionality
-   - Configuration form handling
-   - Welcome email sending
+INFO: Comserv::Util::Logging=HASH(0x5ef2488da378)
 
-2. **Mail Model** (`/lib/Comserv/Model/Mail.pm`)
-   - Email sending functionality
-   - SMTP configuration retrieval
-   - Error handling
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e4050)
 
-3. **Root Controller** (`/lib/Comserv/Controller/Root.pm`)
-   - Fallback email sending mechanism
-   - Error handling for email failures
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e1ce0)
 
-4. **User Template** (`/root/user/mail.tt`)
-   - Webmail access interface
-   - Site-specific mail server configuration
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f6640)
 
-5. **Email Module Fix** (`/EMAIL_MODULE_FIX.md`)
-   - Solutions for email module installation issues
-   - Troubleshooting for missing modules
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f7818)
 
-## Benefits
+INFO: Comserv::Util::Logging=HASH(0x6503253bdc70)
 
-The new documentation provides several benefits:
+INFO: Comserv::Util::Logging=HASH(0x56f5cd5c6060)
 
-1. **Comprehensive Coverage**: Addresses all aspects of the mail system
-2. **Role-Based Access**: Separate guides for users and administrators
-3. **Troubleshooting Support**: Detailed guides for resolving common issues
-4. **Best Practices**: Recommendations for security and efficiency
-5. **Integration**: Links to related documentation for a complete understanding
+INFO: Comserv::Util::Logging=HASH(0x5711abb8dac0)
 
-## Next Steps
+INFO: Comserv::Util::Logging=HASH(0x5bab0ceaf330)
 
-Potential future improvements to the mail documentation:
+INFO: Comserv::Util::Logging=HASH(0x60c4229acb40)
 
-1. **Email Template Gallery**: Add examples of common email templates
-2. **Integration Guides**: Add documentation for integrating with external email services
-3. **Performance Optimization**: Add guidance for optimizing email sending performance
-4. **Localization**: Add information about supporting multiple languages in emails
-5. **Metrics and Analytics**: Add documentation for tracking email metrics
+INFO: Comserv::Util::Logging=HASH(0x5da22ff517e8)
 
-## Conclusion
+INFO: Comserv::Util::Logging=HASH(0x560539529a40)
 
-The mail system documentation now provides comprehensive guidance for both users and administrators. It covers all aspects of the mail system, from basic usage to advanced configuration and troubleshooting, ensuring that users at all levels can effectively use and manage the mail functionality in the Comserv application.
+INFO: Comserv::Util::Logging=HASH(0x63d29fc1b938)
+
+INFO: Comserv::Util::Logging=HASH(0x5ddf6473fbf8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65244df8)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6527e9f0)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65284368)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b65283960)
+
+INFO: Comserv::Util::Logging=HASH(0x5f9b6528b458)
+
+</div>

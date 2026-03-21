@@ -1,53 +1,15 @@
-[% META
-    title = "Controller Documentation"
-    description = "Index and overview of all Comserv controller documentation files and best practices"
-    roles = "all"
-    category = "controllers"
-    page_version = "0.02"
-    last_updated = "Tue Jan 06 2026 15:25:16 UTC"
-    site_specific = "false"
-%]
-
-[% PageVersion = 'Documentation/controllers/README.tt,v 0.02 2026/01/06 shanta Exp shanta - Template refactor with META block and CSS variables' %]
-
-<div class="container">
-    <div class="row">
-        <div class="col-100">
-            <h1 style="color: var(--primary-color); font-family: var(--header-font);">Controller Documentation</h1>
-            
-            <div style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
-                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;">
-                    This directory contains documentation for all Comserv controllers. Each controller has its own documentation file explaining its purpose, methods, and usage patterns.
-                </p>
-            </div>
-            
-            <div id="available-controllers" style="margin-bottom: var(--spacing-large);">
-                <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Available Controller Documentation</h2>
-                <p style="color: var(--text-color); font-family: var(--body-font);">
-                    Each controller has its own documentation file explaining its purpose, methods, and usage patterns. See the <a href="/Documentation/controllers" style="color: var(--link-color);">controllers index</a> for the complete list of available documentation.
-                </p>
-            </div>
-
-            <div id="last-updated" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
-                <h3 style="margin-top: 0; color: var(--primary-color);">Last Updated</h3>
-                <p style="color: var(--muted-color); font-size: var(--font-size-small); margin: 0;">
-                    <strong>Date:</strong> Tue Jan 06 2026 15:25:16 UTC<br>
-                    <strong>Version:</strong> 0.02<br>
-                    <strong>Author:</strong> shanta<br>
-                    <strong>Status:</strong> Template Toolkit Compliance - META block, RFC PageVersion, CSS variables applied
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-[% IF debug_mode == 1 %]
+[% PageVersion = 'Comserv/root/Documentation/controllers/README.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-    [% IF debug_msg.defined && debug_msg.size > 0 %]
-        <div class="debug-messages">
-            [% FOREACH msg IN debug_msg %]
-                <p class="debug">Debug: [% msg %]</p>
-            [% END %]
-        </div>
-    [% END %]
 [% END %]
+
+[% META title = 'Controller Documentation' %]
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+This directory contains documentation for all Comserv controllers.
+</div>

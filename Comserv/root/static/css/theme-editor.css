@@ -66,17 +66,21 @@
     color: var(--footer-text-color, #000000);
 }
 
-/* Button styles in preview */
+/* Button styles in preview - use theme colors */
 #live-preview .btn {
-    background-color: var(--button-bg, #FF9900);
-    color: var(--button-text, #ffffff);
-    border-color: var(--button-border, #FF9900);
-    border-radius: var(--button-radius, 4px);
+    background-color: var(--secondary-color, #f9f9f9);
+    color: var(--text-color, #000000);
+    border: 1px solid var(--border-color, #dddddd);
+    border-radius: 4px;
     padding: 6px 12px;
     cursor: pointer;
     display: inline-block;
     text-align: center;
     text-decoration: none;
+}
+
+#live-preview .btn:hover {
+    background-color: var(--primary-color, #ffffff);
 }
 
 /* Control panel styles */

@@ -1,0 +1,202 @@
+[% PageVersion = 'admin/access_control_help.tt,v 1.0 2025/01/15 shanta Exp shanta - Multi-site access control documentation' %]
+
+<div class="apiary-container">
+    <header class="apiary-header">
+        <h1><i class="fas fa-shield-alt"></i> Multi-Site Access Control System</h1>
+        <div class="apiary-context">
+            <span class="context-item"><strong>Version:</strong> Enhanced v1.0</span>
+            <span class="context-item"><strong>Status:</strong> Active</span>
+        </div>
+    </header>
+
+    <div class="help-content">
+        <div class="overview-section">
+            <h2><i class="fas fa-info-circle"></i> Overview</h2>
+            <p>The enhanced multi-site access control system provides site-specific permissions while maintaining backward compatibility with existing user roles.</p>
+            
+            <div class="key-features">
+                <h3>Key Features</h3>
+                <ul>
+                    <li><strong>Backward Compatible:</strong> All existing roles continue to work unchanged</li>
+                    <li><strong>Site-Specific Permissions:</strong> Users can have different roles on different sites</li>
+                    <li><strong>CSC Protection:</strong> Backup and system management remains CSC-only</li>
+                    <li><strong>Graceful Fallback:</strong> System works even with schema mismatches</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="role-hierarchy">
+            <h2><i class="fas fa-sitemap"></i> Role Hierarchy</h2>
+            
+            <div class="role-section">
+                <h3>Global Roles</h3>
+                <div class="role-grid">
+                    <div class="role-card">
+                        <h4>super_admin</h4>
+                        <p>Full system access across all sites and CSC functions</p>
+                    </div>
+                    <div class="role-card">
+                        <h4>csc_admin</h4>
+                        <p>CSC hosting administrator with backup access and multi-site admin</p>
+                    </div>
+                    <div class="role-card">
+                        <h4>admin</h4>
+                        <p>Legacy admin role (backward compatibility)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="role-section">
+                <h3>Site-Specific Roles</h3>
+                <div class="role-grid">
+                    <div class="role-card">
+                        <h4>site_admin</h4>
+                        <p>Administrative access to a specific site</p>
+                    </div>
+                    <div class="role-card">
+                        <h4>site_user</h4>
+                        <p>Regular user access to a specific site</p>
+                    </div>
+                    <div class="role-card">
+                        <h4>site_viewer</h4>
+                        <p>Read-only access to a specific site</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="role-formats">
+            <h2><i class="fas fa-code"></i> Role Format Examples</h2>
+            
+            <div class="format-examples">
+                <div class="format-card">
+                    <h3>Legacy Format (continues to work)</h3>
+                    <code>admin,user</code>
+                    <p>Simple comma-separated roles</p>
+                </div>
+                
+                <div class="format-card">
+                    <h3>Enhanced Format (new capabilities)</h3>
+                    <code>global:super_admin,site:123:site_admin,site:456:site_user</code>
+                    <p>Supports both global and site-specific roles</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="security-features">
+            <h2><i class="fas fa-lock"></i> Security Features</h2>
+            
+            <div class="security-grid">
+                <div class="security-card">
+                    <h3>CSC Protection</h3>
+                    <ul>
+                        <li>Backup management remains CSC-only</li>
+                        <li>Schema management restricted to CSC admins</li>
+                        <li>Hardcoded CSC user protection</li>
+                    </ul>
+                </div>
+                
+                <div class="security-card">
+                    <h3>Site Isolation</h3>
+                    <ul>
+                        <li>Site admins can only access assigned sites</li>
+                        <li>Role assignments are site-specific</li>
+                        <li>Cross-site access requires explicit permissions</li>
+                    </ul>
+                </div>
+                
+                <div class="security-card">
+                    <h3>Audit Trail</h3>
+                    <ul>
+                        <li>Role changes are logged</li>
+                        <li>Access attempts are tracked</li>
+                        <li>Failed access attempts are monitored</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="migration-strategy">
+            <h2><i class="fas fa-arrow-up"></i> Migration Strategy</h2>
+            
+            <div class="migration-phases">
+                <div class="phase-card">
+                    <h3>Phase 1: Backward Compatible Deployment</h3>
+                    <ul>
+                        <li>Deploy new code with existing database schema</li>
+                        <li>System works in compatibility mode</li>
+                        <li>No disruption to existing functionality</li>
+                        <li>CSC admins can assess schema status</li>
+                    </ul>
+                </div>
+                
+                <div class="phase-card">
+                    <h3>Phase 2: Optional Schema Enhancement</h3>
+                    <ul>
+                        <li>CSC admins can choose migration level</li>
+                        <li>Migration is completely optional</li>
+                        <li>System works with or without migration</li>
+                    </ul>
+                </div>
+                
+                <div class="phase-card">
+                    <h3>Phase 3: Gradual Feature Adoption</h3>
+                    <ul>
+                        <li>Enhanced features become available after migration</li>
+                        <li>Existing users and roles continue to work</li>
+                        <li>New site-specific roles can be assigned incrementally</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="troubleshooting">
+            <h2><i class="fas fa-wrench"></i> Troubleshooting</h2>
+            
+            <div class="troubleshoot-section">
+                <h3>Schema Mismatch Errors</h3>
+                <p><strong>Symptom:</strong> Database errors when accessing user objects</p>
+                <p><strong>Solution:</strong> Visit <a href="[% c.uri_for('/admin/schema_compare') %]">/admin/schema_compare</a> to check status</p>
+                <p><strong>Fallback:</strong> System automatically uses session-based checking</p>
+            </div>
+            
+            <div class="troubleshoot-section">
+                <h3>Role Assignment Problems</h3>
+                <p><strong>Check:</strong> User roles field format</p>
+                <p><strong>Verify:</strong> Site context is properly set</p>
+                <p><strong>Debug:</strong> Enable debug mode to see role parsing</p>
+            </div>
+            
+            <div class="troubleshoot-section">
+                <h3>Access Denied Issues</h3>
+                <p><strong>Verify:</strong> User has appropriate role for the site</p>
+                <p><strong>Check:</strong> CSC admin status for backup functions</p>
+                <p><strong>Review:</strong> Session data for role information</p>
+            </div>
+        </div>
+
+        <div class="admin-links">
+            <h2><i class="fas fa-tools"></i> Administrative Tools</h2>
+            <div class="admin-tools">
+                <a href="[% c.uri_for('/admin/schema_compare') %]" class="tool-link">
+                    <i class="fas fa-database"></i> Schema Status & Migration
+                </a>
+                <a href="[% c.uri_for('/admin') %]" class="tool-link">
+                    <i class="fas fa-tachometer-alt"></i> Admin Dashboard
+                </a>
+                <a href="[% c.uri_for('/admin/view_log') %]" class="tool-link">
+                    <i class="fas fa-file-alt"></i> View Application Log
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+[% IF c.session.debug_mode %]
+    <div class="debug-info">
+        <h5>Debug Information:</h5>
+        <p><strong>Page Version:</strong> [% PageVersion %]</p>
+        <p><strong>User:</strong> [% c.session.username || 'unknown' %]</p>
+        <p><strong>Admin Status:</strong> [% c.check_user_roles('admin') ? 'Yes' : 'No' %]</p>
+    </div>
+[% END %]

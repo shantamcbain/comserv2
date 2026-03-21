@@ -1,210 +1,74 @@
-[% META title = 'Documentation Template' %]
-[% PageVersion = 'Documentation/general/documentation_template.tt,v 0.01 2025/01/20 shanta Exp shanta ' %]
-[% debug %]
+[% PageVersion = 'Comserv/root/Documentation/general/documentation_template.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
 [% END %]
 
-<h1>Documentation Template</h1>
+[% META title = 'documentation_template' %]
 
-<h2>Overview</h2>
 
-<p>This template provides a standardized format for creating new documentation in the Comserv system using the Template Toolkit (.tt) format. Following this template ensures that all documentation is consistent and properly formatted for browser display.</p>
+<!-- Documentation CSS is now included in the theme system -->
 
-<h2>Template Toolkit Header Section</h2>
+<div class="markdown-content">
+INFO: Comserv::Util::Logging=HASH(0x5800d4a912f8)
 
-<p>Every .tt documentation file should begin with a proper Template Toolkit header section. This section contains metadata and debug information:</p>
+INFO: Comserv::Util::Logging=HASH(0x5800d4a9af68)
 
-<pre>
-[% META title = 'Document Title' %]
-[% PageVersion = 'path/to/file.tt,v 0.01 YYYY/MM/DD author Exp author ' %]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-</pre>
+INFO: Comserv::Util::Logging=HASH(0x62fb8955b498)
 
-<h3>Required Header Fields</h3>
+INFO: Comserv::Util::Logging=HASH(0x62fb895a00e0)
 
-<ul>
-<li><strong>META title</strong>: The title of the document (use single quotes, no variable concatenation)</li>
-<li><strong>PageVersion</strong>: File path, version number, date, and author information</li>
-<li><strong>Debug block</strong>: Standard debugging information for Template Toolkit processing</li>
-</ul>
+INFO: Comserv::Util::Logging=HASH(0x62fb894fdf00)
 
-<h2>Document Structure</h2>
+INFO: Comserv::Util::Logging=HASH(0x62fb895074a0)
 
-<h3>HTML Formatting</h3>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488dc548)
 
-<p>Use HTML tags instead of Markdown syntax in .tt files:</p>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d7b18)
 
-<ul>
-<li><strong>Headings</strong>: Use &lt;h1&gt;, &lt;h2&gt;, &lt;h3&gt; tags</li>
-<li><strong>Paragraphs</strong>: Use &lt;p&gt; tags</li>
-<li><strong>Lists</strong>: Use &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt; tags</li>
-<li><strong>Code</strong>: Use &lt;pre&gt; tags for code blocks</li>
-<li><strong>Emphasis</strong>: Use &lt;strong&gt; and &lt;em&gt; tags</li>
-</ul>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9570)
 
-<h3>Main Heading</h3>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d9dd8)
 
-<p>The document should start with a level 1 heading (&lt;h1&gt;) that matches the title in the META section.</p>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488d5910)
 
-<h3>Overview Section</h3>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e5328)
 
-<p>Begin with an overview section that briefly explains the purpose and scope of the document.</p>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488da378)
 
-<h3>Main Sections</h3>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e4050)
 
-<p>Organize the document into logical sections using level 2 headings (&lt;h2&gt;).</p>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488e1ce0)
 
-<h3>Subsections</h3>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f6640)
 
-<p>Use level 3 headings (&lt;h3&gt;) for subsections within main sections.</p>
+INFO: Comserv::Util::Logging=HASH(0x5ef2488f7818)
 
-<h2>Formatting Guidelines</h2>
+INFO: Comserv::Util::Logging=HASH(0x6503253bdc70)
 
-<h3>Code Blocks</h3>
+INFO: Comserv::Util::Logging=HASH(0x56f5cd5c6060)
 
-<p>Use &lt;pre&gt; tags for code examples with proper HTML escaping:</p>
+INFO: Comserv::Util::Logging=HASH(0x5711abb8dac0)
 
-<pre>
-sub example_function {
-    my ($self, $param) = @_;
-    return $param;
-}
-</pre>
+INFO: Comserv::Util::Logging=HASH(0x5bab0ceaf330)
 
-<h3>Lists</h3>
+INFO: Comserv::Util::Logging=HASH(0x60c4229acb40)
 
-<p>Use HTML list tags for unordered items:</p>
+INFO: Comserv::Util::Logging=HASH(0x5da22ff517e8)
 
-<ul>
-<li>Item 1</li>
-<li>Item 2</li>
-<li>Item 3</li>
-</ul>
+INFO: Comserv::Util::Logging=HASH(0x560539529a40)
 
-<p>Use numbered lists for sequential steps:</p>
+INFO: Comserv::Util::Logging=HASH(0x63d29fc1b938)
 
-<ol>
-<li>First step</li>
-<li>Second step</li>
-<li>Third step</li>
-</ol>
+INFO: Comserv::Util::Logging=HASH(0x5ddf6473fbf8)
 
-<h3>Tables</h3>
+INFO: Comserv::Util::Logging=HASH(0x5f9b65244df8)
 
-<p>Use HTML table tags for tabular data:</p>
+INFO: Comserv::Util::Logging=HASH(0x5f9b6527e9f0)
 
-<table border="1">
-<tr>
-<th>Column 1</th>
-<th>Column 2</th>
-<th>Column 3</th>
-</tr>
-<tr>
-<td>Data 1</td>
-<td>Data 2</td>
-<td>Data 3</td>
-</tr>
-<tr>
-<td>Data 4</td>
-<td>Data 5</td>
-<td>Data 6</td>
-</tr>
-</table>
+INFO: Comserv::Util::Logging=HASH(0x5f9b65284368)
 
-<h3>Important Notes and Warnings</h3>
+INFO: Comserv::Util::Logging=HASH(0x5f9b65283960)
 
-<p>Use appropriate HTML formatting for notes and warnings:</p>
+INFO: Comserv::Util::Logging=HASH(0x5f9b6528b458)
 
-<p><strong>Note:</strong> This is an important note that users should be aware of.</p>
-
-<p><strong>Warning:</strong> This is a warning about potential issues.</p>
-
-<h2>Template Examples</h2>
-
-<h3>Example User Guide Template</h3>
-
-<pre>
-[% META title = 'User Profile Management' %]
-[% PageVersion = 'Documentation/guides/user_profile_management.tt,v 0.01 2025/01/20 author Exp author ' %]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-
-&lt;h1&gt;User Profile Management&lt;/h1&gt;
-
-&lt;h2&gt;Overview&lt;/h2&gt;
-
-&lt;p&gt;This guide explains how to manage your user profile in the Comserv system, including updating personal information, changing your password, and configuring notification preferences.&lt;/p&gt;
-
-&lt;h2&gt;Accessing Your Profile&lt;/h2&gt;
-
-&lt;ol&gt;
-&lt;li&gt;Log in to the Comserv system&lt;/li&gt;
-&lt;li&gt;Click on your username in the top-right corner&lt;/li&gt;
-&lt;li&gt;Select "Profile" from the dropdown menu&lt;/li&gt;
-&lt;/ol&gt;
-</pre>
-
-<h3>Example Admin Guide Template</h3>
-
-<pre>
-[% META title = 'User Role Management' %]
-[% PageVersion = 'Documentation/guides/user_role_management.tt,v 0.01 2025/01/20 author Exp author ' %]
-[% debug %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-    [% "Debugging HostName: " _ HostName %]
-    [%# INCLUDE 'debug.tt' %]
-[% END %]
-
-&lt;h1&gt;User Role Management&lt;/h1&gt;
-
-&lt;h2&gt;Overview&lt;/h2&gt;
-
-&lt;p&gt;This guide explains how administrators can manage user roles in the Comserv system, including assigning roles, creating custom roles, and configuring role permissions.&lt;/p&gt;
-
-&lt;h2&gt;Accessing Role Management&lt;/h2&gt;
-
-&lt;ol&gt;
-&lt;li&gt;Log in to the Comserv system as an administrator&lt;/li&gt;
-&lt;li&gt;Navigate to Admin &gt; User Management &gt; Roles&lt;/li&gt;
-&lt;/ol&gt;
-</pre>
-
-<h2>File Placement Guidelines</h2>
-
-<p>Place documentation files in the appropriate subdirectory:</p>
-
-<ul>
-<li><strong>/general/</strong> - General documentation and templates</li>
-<li><strong>/controllers/</strong> - Controller-specific documentation</li>
-<li><strong>/models/</strong> - Model-specific documentation</li>
-<li><strong>/deployment/</strong> - Deployment and server setup guides</li>
-<li><strong>/system/</strong> - System-level documentation</li>
-<li><strong>/themes/</strong> - Theme system documentation</li>
-<li><strong>/tutorials/</strong> - User and developer tutorials</li>
-<li><strong>/changelog/</strong> - Change log entries</li>
-</ul>
-
-<h2>Related Documentation</h2>
-
-<ul>
-<li>AI Documentation Guidelines</li>
-<li>Template Toolkit Reference</li>
-<li>Documentation System Overview</li>
-</ul>
-
-<h2>Conclusion</h2>
-
-<p>Following this template ensures that all documentation is consistent, properly formatted for Template Toolkit processing, and displays correctly in the browser. The .tt format allows for dynamic content and proper integration with the Comserv system.</p>
+</div>

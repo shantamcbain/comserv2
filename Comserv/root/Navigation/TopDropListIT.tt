@@ -1,87 +1,45 @@
-[% PageVersion = 'TopDropListIT.tt,v 1.02 2025/09/03 Shanta Exp Shanta' %]
+[% PageVersion = 'TopDropListIT.tt,v 1.0 2025/05/15 Shanta Exp Shanta' %]
 
 <li class="horizontal-dropdown">
-    <a href="/it" class="dropbtn"><i class="icon-it"></i>IT</a>
+    <a href="/it" class="dropbtn">IT</a>
     <div class="dropdown-content">
-        <!-- Core IT Services -->
-        <a href="/it" class="menu-item"><i class="icon-home"></i>IT Home</a>
-        <a href="/it/resources" class="menu-item"><i class="icon-resources"></i>Resources</a>
-        <a href="/it/documentation" class="menu-item"><i class="icon-docs"></i>Documentation</a>
-        <a href="/it/support" class="menu-item"><i class="icon-support"></i>Support</a>
+        <a href="/it">IT Home</a>
+        <a href="/it/resources">Resources</a>
+        <a href="/it/documentation">Documentation</a>
+        <a href="/it/support">Support</a>
+        <a href="/it/tools">Tools</a>
+        <a href="/it/network">Network</a>
+        <a href="/it/servers">Servers</a>
+        <a href="/it/security">Security</a>
         
-        [% IF c.session.username %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/add_link?menu=IT" class="menu-item"><i class="icon-add"></i>Add IT Link</a>
-        [% END %]
-        
-        <!-- IT Tools & Infrastructure -->
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-tools"></i>IT Tools & Infrastructure</span>
-            <div class="submenu">
-                <a href="/it/tools" class="submenu-link"><i class="icon-tool"></i>Tools</a>
-                <a href="/it/network" class="submenu-link"><i class="icon-network"></i>Network</a>
-                <a href="/it/servers" class="submenu-link"><i class="icon-server"></i>Servers</a>
-                <a href="/it/security" class="submenu-link"><i class="icon-security"></i>Security</a>
-            </div>
-        </div>
-        
-        <!-- Public IT Links added by admin -->
-        [% SET it_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'IT_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-        [% IF it_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-admin-links"></i>IT Services</span>
-            <div class="submenu">
-                [% FOREACH link IN it_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Private IT Links for logged in users -->
-        [% IF c.session.username && c.stash.private_links %]
-            [% SET has_private_it_links = 0 %]
-            [% FOREACH link IN c.stash.private_links %]
-                [% IF link.category == 'IT_links' || link.menu == 'IT' %]
-                    [% SET has_private_it_links = 1 %]
-                [% END %]
-            [% END %]
-            
-            [% IF has_private_it_links %]
+        <!-- Private Links Section - Available to ALL logged-in users -->
+        [% IF c.user_exists && private_links && private_links.size %]
             <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-user-it"></i>My IT Links</span>
-                <div class="submenu">
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'IT_links' || link.menu == 'IT' %]
-                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                        [% END %]
-                    [% END %]
-                </div>
+            <div class="submenu-section">
+                <span class="submenu-section-title">Private Links</span>
+                [% FOREACH link IN private_links %]
+                    <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                        <i class="icon-link"></i> [% link.name %]
+                    </a>
+                [% END %]
             </div>
-            [% END %]
         [% END %]
         
-        [% IF c.session.roles.grep('admin').size %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/manage_links?menu=IT" class="menu-item"><i class="icon-manage"></i>Manage IT Menu</a>
+        <!-- Link Management -->
+        [% IF c.user_exists %]
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
+            <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
+        [% END %]
+        
+        [% IF c.session.group == 'admin' %]
+            <div class="dropdown-divider"></div>
+            <a href="/navigation/add_link?menu=it"><i class="icon-add"></i> Add Menu Link</a>
         [% END %]
     </div>
 </li>
 
 [% IF c.session.debug_mode == 1 %]
-<!-- Debug: TopDropListIT.tt loaded -->
+    <!-- Debug: TopDropListIT.tt loaded -->
+    <!-- Version: [% PageVersion %] -->
 [% END %]
-

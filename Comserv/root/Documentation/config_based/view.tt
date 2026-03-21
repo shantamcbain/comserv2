@@ -1,4 +1,13 @@
-[% META title = page.title %]
+[% PageVersion = 'Comserv/root/Documentation/config_based/view.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'age.titl' %]
+
+<!-- Documentation page for age.titl -->
+<div class="documentation-content">
+
 
 <div class="documentation-view-container">
     <div class="documentation-header">
@@ -6,7 +15,7 @@
             <a href="[% c.uri_for('/Documentation/ConfigBased') %]"><i class="fas fa-home"></i> Documentation Home</a>
             <span class="separator">&raquo;</span>
             <span class="current">[% page.title %]</span>
-        </div>
+        [% END %]</div>
         
         [% IF c.user_exists && (c.user.role == 'admin' || c.user.role == 'developer') %]
         <div class="admin-actions">
@@ -16,9 +25,8 @@
             <a href="[% c.uri_for('/Documentation/Config') %]" class="config-button">
                 <i class="fas fa-cogs"></i> Manage Configuration
             </a>
-        </div>
-        [% END %]
-    </div>
+        [% END %]</div>
+    [% END %]</div>
     
     <div class="documentation-content">
         <h1>[% page.title %]</h1>
@@ -26,26 +34,24 @@
         [% IF page.site != 'all' %]
         <div class="page-meta">
             <span class="site-badge">[% page.site %]</span>
-        </div>
-        [% END %]
+        [% END %]</div>
         
         <div class="page-description">
             [% page.description %]
-        </div>
+        [% END %]</div>
         
         <div class="content-wrapper">
             [% IF page.format == 'markdown' %]
                 <div class="markdown-content">
                     [% content | raw %]
-                </div>
+                [% END %]</div>
             [% ELSIF page.format == 'template' %]
                 [% PROCESS $page.path %]
             [% ELSE %]
                 <pre class="raw-content">[% content | html %]</pre>
-            [% END %]
-        </div>
-    </div>
-</div>
+        [% END %]</div>
+    [% END %]</div>
+[% END %]</div>
 
 <style>
     .documentation-view-container {

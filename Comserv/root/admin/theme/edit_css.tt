@@ -21,7 +21,7 @@
             <h3 class="card-title mb-0">CSS Editor</h3>
         </div>
         <div class="card-body">
-            <form action="[% c.uri_for('/admin/theme/update_css', theme_name) %]" method="POST">
+            <form action="[% c.uri_for('/admin/theme/edit', theme_name) %]" method="POST">
                 <div class="form-group">
                     <textarea name="css_content" id="css_content" class="form-control" rows="20" style="font-family: monospace;">[% css_content %]</textarea>
                 </div>

@@ -27,11 +27,12 @@ __PACKAGE__->add_columns(
     site_id => {
         data_type => 'integer',
         is_foreign_key => 1,
-        is_nullable => 1,
+        is_nullable => 1,  # NULL means global/CSC role
     },
     role => {
         data_type => 'varchar',
         size => 50,
+        # Possible values: 'super_admin', 'site_admin', 'site_user', 'site_viewer'
     },
     granted_by => {
         data_type => 'integer',
@@ -54,19 +55,21 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 
+# Unique constraint: one role per user per site
 __PACKAGE__->add_unique_constraint(
     'user_site_role_unique' => ['user_id', 'site_id', 'role']
 );
 
+# Relationships
 __PACKAGE__->belongs_to(
     user => 'Comserv::Model::Schema::Ency::Result::User',
     'user_id'
 );
 
 __PACKAGE__->belongs_to(
-    site => 'Comserv::Model::Schema::Ency::Result::Site',
+    site => 'Comserv::Model::Schema::Ency::Result::Project',
     'site_id',
-    { join_type => 'left' }
+    { join_type => 'left' }  # Left join since site_id can be NULL for global roles
 );
 
 __PACKAGE__->belongs_to(
