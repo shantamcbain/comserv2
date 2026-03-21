@@ -244,15 +244,14 @@ last_updated = '2026/02/08'
                     <div class="jump-line">
                         <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>
                         <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
-                        <a href="#planning-system-project" class="jump-link">ProjectDetails</a> |
-                        <a href="#all-projects-list" class="jump-link">AllProjects</a> |
-                        <a href="#anchor-phase0-complete" class="jump-link">Phase0✓</a> |
+                        <a href="#group-planning" class="jump-link">ProjectDetails</a> |
+                        <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
                         <a href="#anchor-phase1" class="jump-link">Phase1⏳</a> |
                         <a href="#anchor-phase2" class="jump-link">Phase2🔜</a> |
                         <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
-                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
-                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
-                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
+                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicDailyView↗</a> |
+                        <a href="#anchor-priority-17" class="jump-link">ThemeSync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">PlanController</a> |
                         <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
                     </div>
                     <div class="jump-line">
@@ -1144,6 +1143,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 5: Plan Controller -->
+                    <div id="anchor-priority-5" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 5: Plan Controller (PENDING)
@@ -1168,6 +1168,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 6: Daily Plan Template -->
+                    <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 6: Daily Plan Template (PENDING)
@@ -1280,6 +1281,7 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 11: Todo Controller Integration -->
+                    <div id="anchor-priority-6" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 11: Todo Controller Integration (PENDING)
