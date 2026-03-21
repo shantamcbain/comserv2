@@ -33,14 +33,18 @@ sub send_email {
     unless ($smtp_config) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
             "No SMTP config for site_id $site_id");
-        $c->stash->{debug_msg} = "Missing SMTP configuration";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Missing SMTP configuration";
+        }
         return;
     }
 
-    # Use Net::SMTP for more reliable email sending
+    # Use Net::SMTP with SSL support for more reliable email sending
     require Net::SMTP;
     require MIME::Lite;
     require Authen::SASL;
+    require IO::Socket::SSL;
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
         "Using Net::SMTP for email sending");
@@ -60,12 +64,14 @@ sub send_email {
             "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} . 
             ", SSL: " . ($smtp_config->{ssl} // 'none'));
         
-        # Connect to the SMTP server with debug enabled
+        # Connect to the SMTP server with debug enabled and SSL support
         my $smtp = Net::SMTP->new(
             $smtp_config->{host},
             Port => $smtp_config->{port},
             Debug => 1,
-            Timeout => 30
+            Timeout => 30,
+            SSL_verify_mode => 0,  # Disable certificate verification for now
+            SSL_version => 'TLSv1_2:!SSLv2:!SSLv3'  # Use secure TLS versions only
         );
         
         unless ($smtp) {
@@ -75,12 +81,28 @@ sub send_email {
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
             "Connected to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port});
         
-        # Start TLS if needed
+        # Start TLS if needed with improved error handling
         my $ssl_setting = $smtp_config->{ssl} // '';
         if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "Starting TLS");
-            $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
+                "Starting TLS negotiation");
+            
+            # Use IO::Socket::SSL for better TLS support
+            my $tls_result = $smtp->starttls(
+                SSL_verify_mode => 0,  # Disable certificate verification
+                SSL_version => 'TLSv1_2:!SSLv2:!SSLv3',  # Use secure TLS versions
+                SSL_cipher_list => 'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA'
+            );
+            
+            unless ($tls_result) {
+                my $error_msg = $smtp->message() || "Unknown TLS error";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                    "STARTTLS failed: $error_msg");
+                die "STARTTLS failed: $error_msg";
+            }
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
+                "TLS negotiation successful");
         }
         
         # Authenticate if credentials are provided
@@ -104,7 +126,10 @@ sub send_email {
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
             "Failed to send email to $to: $_");
-        $c->stash->{debug_msg} = "Email sending failed: $_";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Email sending failed: $_";
+        }
         return;
     };
 }
@@ -237,7 +262,10 @@ sub create_mail_account {
     unless ($virtualmin_pass) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
             "Virtualmin password not configured");
-        $c->stash->{debug_msg} = "Virtualmin API credentials not configured";
+        if ($c->session->{debug_mode}) {
+            $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+            push @{$c->stash->{debug_msg}}, "Virtualmin API credentials not configured";
+        }
         return;
     }
 

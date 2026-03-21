@@ -1,8 +1,13 @@
-[% META title = 'KVM ISO File Transfer Documentation' %]
 [% PageVersion = 'Documentation/KVM_ISO_Transfer.tt,v 1.0 2024/06/05 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
+
+[% META title = 'KVM ISO File Transfer Documentation' %]
+
+<!-- Documentation page for KVM_ISO_Transfer -->
+<div class="documentation-content">
+
 
 <div class="documentation-page">
     <h1 id="kvm-iso-top">KVM ISO File Transfer</h1>
@@ -10,7 +15,6 @@
     <div class="doc-metadata">
         <span class="doc-type">Technical Guide</span>
         <span class="doc-updated">Last Updated: June 5, 2024</span>
-    </div>
 
     <nav class="doc-navigation">
         <a href="#kvm-overview">Overview</a> |
@@ -23,12 +27,10 @@
 
     <div class="doc-summary">
         <p>This guide explains how to transfer files between host systems and KVM virtual machines using virtual CD-ROM devices. This method is particularly useful when network connectivity between the host and guest is limited or unavailable.</p>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-overview">Overview</h2>
         <p>The ISO file transfer system provides a reliable method for moving files between host systems and KVM virtual machines. This solution uses virtual CD-ROM devices to create a secure file transfer channel without requiring network connectivity.</p>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-prerequisites">Prerequisites</h2>
@@ -46,7 +48,6 @@
 │   ├── create_shared_iso.sh
 │   └── detach_shared_iso.sh
 └── data/</code></pre>
-                </div>
             </li>
             <li>Access to the Proxmox host system with root privileges</li>
             <li>A running KVM virtual machine</li>
@@ -54,8 +55,6 @@
 
         <div class="code-block">
             <pre><code>apt-get install genisoimage</code></pre>
-        </div>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-workflow">File Transfer Process</h2>
@@ -64,19 +63,16 @@
         <p>Create a directory on the host system to store the files you want to transfer:</p>
         <div class="code-block">
             <pre><code>mkdir -p /tmp/transfer-files</code></pre>
-        </div>
 
         <h3>Step 2: Copy Files to the Transfer Directory</h3>
         <p>Copy the files you want to transfer to the directory:</p>
         <div class="code-block">
             <pre><code>cp /path/to/your/files/* /tmp/transfer-files/</code></pre>
-        </div>
 
         <h3>Step 3: Create an ISO Image</h3>
         <p>Create an ISO image from the directory:</p>
         <div class="code-block">
             <pre><code>genisoimage -o /tmp/transfer.iso -r -J /tmp/transfer-files</code></pre>
-        </div>
         <p>Options explained:</p>
         <ul>
             <li><code>-o /tmp/transfer.iso</code>: Output file name</li>
@@ -88,7 +84,6 @@
         <p>Attach the ISO image to the virtual machine as a CD-ROM device:</p>
         <div class="code-block">
             <pre><code>qm set VMID --ide2 local:iso/transfer.iso</code></pre>
-        </div>
         <p>Replace <code>VMID</code> with your virtual machine ID.</p>
 
         <h3>Step 5: Mount the ISO in the Guest VM</h3>
@@ -96,13 +91,11 @@
         <div class="code-block">
             <pre><code>mkdir -p /mnt/cdrom
 mount /dev/cdrom /mnt/cdrom</code></pre>
-        </div>
 
         <h3>Step 6: Copy Files from the ISO</h3>
         <p>Copy the files from the mounted CD-ROM to the desired location in the guest VM:</p>
         <div class="code-block">
             <pre><code>cp -r /mnt/cdrom/* /destination/path/</code></pre>
-        </div>
 
         <h3>Step 7: Unmount and Detach</h3>
         <p>Unmount the CD-ROM in the guest VM and detach it from the VM:</p>
@@ -110,10 +103,8 @@ mount /dev/cdrom /mnt/cdrom</code></pre>
             <pre><code># In the guest VM:
 umount /mnt/cdrom
 
-# On the host:
+<h1>On the host:</h1>
 qm set VMID --ide2 none</code></pre>
-        </div>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-automation">Automation Scripts</h2>
@@ -127,18 +118,16 @@ ISO_PATH="$HOME/kvm_shared.iso"
 
 mkisofs -V "KVM_TRANSFER" -J -r -o "$ISO_PATH" "$SOURCE_DIR"
 [ -f "$ISO_PATH" ] && echo "ISO created" || exit 1</code></pre>
-        </div>
 
         <h3>detach_shared_iso.sh</h3>
         <div class="code-block">
             <pre><code>#!/bin/bash
 virsh detach-disk &lt;vm-name&gt; hda --type cdrom</code></pre>
-        </div>
 
         <h3>Complete Transfer Script</h3>
         <div class="code-block">
             <pre><code>#!/bin/bash
-# Usage: ./transfer-to-vm.sh VMID /path/to/source/directory
+<h1>Usage: ./transfer-to-vm.sh VMID /path/to/source/directory</h1>
 
 if [ $# -lt 2 ]; then
     echo "Usage: $0 VMID /path/to/source/directory"
@@ -149,15 +138,15 @@ VMID=$1
 SOURCE_DIR=$2
 ISO_FILE="/tmp/transfer-${VMID}.iso"
 
-# Create ISO
+<h1>Create ISO</h1>
 echo "Creating ISO from $SOURCE_DIR..."
 genisoimage -o $ISO_FILE -r -J $SOURCE_DIR
 
-# Copy to ISO storage
+<h1>Copy to ISO storage</h1>
 echo "Copying ISO to Proxmox storage..."
 cp $ISO_FILE /var/lib/vz/template/iso/
 
-# Attach to VM
+<h1>Attach to VM</h1>
 echo "Attaching ISO to VM $VMID..."
 qm set $VMID --ide2 local:iso/transfer-${VMID}.iso
 
@@ -167,8 +156,6 @@ echo "  mount /dev/cdrom /mnt/cdrom"
 echo ""
 echo "When finished, detach with:"
 echo "  qm set $VMID --ide2 none"</code></pre>
-        </div>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-troubleshooting">Troubleshooting</h2>
@@ -192,7 +179,6 @@ echo "  qm set $VMID --ide2 none"</code></pre>
                 <td>
                     <div class="code-block">
                         <pre><code>sudo chmod 644 ~/kvm_shared.iso</code></pre>
-                    </div>
                 </td>
             </tr>
             <tr>
@@ -206,7 +192,6 @@ echo "  qm set $VMID --ide2 none"</code></pre>
                 </td>
             </tr>
         </table>
-    </div>
 
     <div class="doc-section">
         <h2 id="kvm-limitations">System Limitations</h2>
@@ -216,7 +201,6 @@ echo "  qm set $VMID --ide2 none"</code></pre>
             <li>Requires VM reboot for new ISO attachments in some cases</li>
             <li>For transferring files from the guest to the host, you would need to create a new ISO or use another method</li>
         </ul>
-    </div>
 
     <div class="doc-section">
         <h2>Related Documentation</h2>
@@ -224,10 +208,8 @@ echo "  qm set $VMID --ide2 none"</code></pre>
             <li><a href="/proxmox">Proxmox VM Management</a></li>
             <li><a href="https://pve.proxmox.com/wiki/Manual:_qm.conf">Proxmox VM Configuration Reference</a></li>
         </ul>
-    </div>
 
     <p class="back-to-top"><a href="#kvm-iso-top">Back to top</a></p>
-</div>
 
 <style>
     .documentation-page {
@@ -363,3 +345,5 @@ echo "  qm set $VMID --ide2 none"</code></pre>
         background-color: #0055aa;
     }
 </style>
+
+</div>

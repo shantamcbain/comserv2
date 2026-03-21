@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_migration_to_tt.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Documentation Migration to Template Toolkit (.tt) Files' %]
+
+<!-- Documentation page for     Documentation Migration to Template Toolkit (.tt) Files -->
+<div class="documentation-content">
+
 [% META 
    title = "Documentation Migration to Template Toolkit (.tt) Files"
    description = "Guide explaining the transition from Markdown (.md) to Template Toolkit (.tt) files for improved browser navigation"

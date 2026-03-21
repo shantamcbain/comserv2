@@ -1,140 +1,295 @@
-# Account Management Guide
+[% PageVersion = 'Comserv/root/Documentation/roles/normal/account_management.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Account Management Guide' %]
+
+<!-- Documentation page for account_management -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
 
 **Version:** 1.0  
+
 **Last Updated:** May 31, 2024  
+
 **Author:** User Support Team
 
-## Overview
+
+
+<h2>Overview</h2>
+
+
 
 This guide will help you manage your Comserv account, including how to log in, log out, update your profile information, and change your account settings.
 
-## Logging In
 
-1. Click on the "Login" link in the top navigation bar
-2. Enter your username and password
-3. Click the "Login" button
+
+<h2>Logging In</h2>
+
+
+
+<ol><li>Click on the "Login" link in the top navigation bar</li></ol>
+
+<ol><li>Enter your username and password</li></ol>
+
+<ol><li>Click the "Login" button</li></ol>
+
+
 
 If you've forgotten your password, click the "Forgot Password" link on the login page to reset it.
 
-## Logging Out
+
+
+<h2>Logging Out</h2>
+
+
 
 To securely end your session:
 
-1. Click on your username in the top navigation bar
-2. Select "Logout" from the dropdown menu
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "Logout" from the dropdown menu</li></ol>
+
+
 
 **Important:** Always log out when using a shared or public computer to protect your account.
 
-## Viewing Your Profile
+
+
+<h2>Viewing Your Profile</h2>
+
+
 
 Your profile contains your personal information and account details:
 
-1. Click on your username in the top navigation bar
-2. Select "My Profile" from the dropdown menu
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "My Profile" from the dropdown menu</li></ol>
+
+
 
 The profile page displays:
-- Your name and username
-- Email address
-- Account roles and permissions
-- Recent activity (if enabled)
 
-## Managing Account Settings
+<ul><li>Your name and username</li></ul>
 
-### Accessing Settings
+<ul><li>Email address</li></ul>
 
-1. Click on your username in the top navigation bar
-2. Select "Account Settings" from the dropdown menu
+<ul><li>Account roles and permissions</li></ul>
 
-### Updating Personal Information
+<ul><li>Recent activity (if enabled)</li></ul>
+
+
+
+<h2>Managing Account Settings</h2>
+
+
+
+<h3>Accessing Settings</h3>
+
+
+
+<ol><li>Click on your username in the top navigation bar</li></ol>
+
+<ol><li>Select "Account Settings" from the dropdown menu</li></ol>
+
+
+
+<h3>Updating Personal Information</h3>
+
+
 
 To update your name or email address:
 
-1. Go to Account Settings
-2. In the "Personal Information" section, modify the relevant fields
-3. Click "Save Changes"
 
-### Changing Your Password
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>In the "Personal Information" section, modify the relevant fields</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h3>Changing Your Password</h3>
+
+
 
 For security reasons, you should change your password periodically:
 
-1. Go to Account Settings
-2. Click "Change Password" in the Danger Zone section
-3. Enter your current password
-4. Enter and confirm your new password
-5. Click "Update Password"
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>Click "Change Password" in the Danger Zone section</li></ol>
+
+<ol><li>Enter your current password</li></ol>
+
+<ol><li>Enter and confirm your new password</li></ol>
+
+<ol><li>Click "Update Password"</li></ol>
+
+
 
 Password requirements:
-- Minimum 8 characters
-- At least one uppercase letter
-- At least one number
-- At least one special character
 
-### Appearance Preferences
+<ul><li>Minimum 8 characters</li></ul>
+
+<ul><li>At least one uppercase letter</li></ul>
+
+<ul><li>At least one number</li></ul>
+
+<ul><li>At least one special character</li></ul>
+
+
+
+<h3>Appearance Preferences</h3>
+
+
 
 Customize your experience with theme settings:
 
-1. Go to Account Settings
-2. In the "Preferences" section, select your preferred theme
-3. Click "Save Changes"
+
+
+<ol><li>Go to Account Settings</li></ol>
+
+<ol><li>In the "Preferences" section, select your preferred theme</li></ol>
+
+<ol><li>Click "Save Changes"</li></ol>
+
+
 
 Available themes:
-- Default
-- Dark
-- Light
 
-### Notification Preferences
+<ul><li>Default</li></ul>
+
+<ul><li>Dark</li></ul>
+
+<ul><li>Light</li></ul>
+
+
+
+<h3>Notification Preferences</h3>
+
+
 
 Control how and when you receive notifications:
 
-1. Go to Account Settings
-2. In the "Preferences" section, toggle "Receive email notifications"
-3. Click "Save Changes"
 
-## Account Security Best Practices
 
-1. **Strong Passwords**: Use unique, complex passwords
-2. **Regular Updates**: Change your password every 3-6 months
-3. **Secure Access**: Avoid logging in from public or unsecured networks
-4. **Session Management**: Always log out when finished
-5. **Email Verification**: Keep your email address current for account recovery
+<ol><li>Go to Account Settings</li></ol>
 
-## Troubleshooting
+<ol><li>In the "Preferences" section, toggle "Receive email notifications"</li></ol>
 
-### Login Issues
+<ol><li>Click "Save Changes"</li></ol>
+
+
+
+<h2>Account Security Best Practices</h2>
+
+
+
+<ol><li>**Strong Passwords**: Use unique, complex passwords</li></ol>
+
+<ol><li>**Regular Updates**: Change your password every 3-6 months</li></ol>
+
+<ol><li>**Secure Access**: Avoid logging in from public or unsecured networks</li></ol>
+
+<ol><li>**Session Management**: Always log out when finished</li></ol>
+
+<ol><li>**Email Verification**: Keep your email address current for account recovery</li></ol>
+
+
+
+<h2>Troubleshooting</h2>
+
+
+
+<h3>Login Issues</h3>
+
+
 
 If you cannot log in:
 
-1. Verify you're using the correct username and password
-2. Check if Caps Lock is enabled
-3. Clear your browser cookies and cache
-4. Try using a different browser
-5. Contact support if problems persist
 
-### Profile Update Problems
+
+<ol><li>Verify you're using the correct username and password</li></ol>
+
+<ol><li>Check if Caps Lock is enabled</li></ol>
+
+<ol><li>Clear your browser cookies and cache</li></ol>
+
+<ol><li>Try using a different browser</li></ol>
+
+<ol><li>Contact support if problems persist</li></ol>
+
+
+
+<h3>Profile Update Problems</h3>
+
+
 
 If you encounter errors when updating your profile:
 
-1. Ensure all required fields are completed
-2. Verify your email address is in the correct format
-3. Check that your password meets all requirements
-4. Try again after a few minutes
 
-## Getting Help
+
+<ol><li>Ensure all required fields are completed</li></ol>
+
+<ol><li>Verify your email address is in the correct format</li></ol>
+
+<ol><li>Check that your password meets all requirements</li></ol>
+
+<ol><li>Try again after a few minutes</li></ol>
+
+
+
+<h2>Getting Help</h2>
+
+
 
 If you need assistance with your account:
 
-1. Check the FAQ section for common questions
-2. Click the "Help" link in the footer
-3. Contact support at support@comserv.example.com
-4. Use the live chat feature during business hours
 
-## Privacy Information
+
+<ol><li>Check the FAQ section for common questions</li></ol>
+
+<ol><li>Click the "Help" link in the footer</li></ol>
+
+<ol><li>Contact support at support@comserv.example.com</li></ol>
+
+<ol><li>Use the live chat feature during business hours</li></ol>
+
+
+
+<h2>Privacy Information</h2>
+
+
 
 We take your privacy seriously:
 
-- Your personal information is stored securely
-- Passwords are encrypted and never stored in plain text
-- We do not share your information with third parties
-- You can request a copy of your data at any time
+
+
+<ul><li>Your personal information is stored securely</li></ul>
+
+<ul><li>Passwords are encrypted and never stored in plain text</li></ul>
+
+<ul><li>We do not share your information with third parties</li></ul>
+
+<ul><li>You can request a copy of your data at any time</li></ul>
+
+
 
 For more details, please review our Privacy Policy.
+
+</div>

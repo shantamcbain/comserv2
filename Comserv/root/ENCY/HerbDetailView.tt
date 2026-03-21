@@ -1,47 +1,9 @@
 
-
-[% IF c.session.roles == 'admin' %]
-    <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
-[% END %]
-[% IF c.session.roles == 'admin' %]
+[% IF c.session.roles.grep('admin').size %]
     <a href="[% c.uri_for('/ENCY/edit_herb', herb.record_id) %]">Edit Herb</a>
 [% END %]
 
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
 <h1>[% herb.botanical_name %]</h1>
-<p>Common Names: [% herb.common_names %]</p>
-[% ency_img_tag(herb.image, 300, 325) %]
-<p>Pollinator Forage [% herb.apis %]
-<p>Nectar [% herb.nectar %]</p>
-<p>Pollen [% herb.pollen %]</p>
-<p>key name [% herb.key_name %] </p>
-<p>Idententifing Character [% herb.ident_character %] </p>
-<p>Stem[% herb.stem %]</p>
-    <p>Leaves[% herb.leaves %] </p>
-<p>Flowers [% herb.flowers %]</p>
-<p>Fruit [% herb.fruit %] </p>
-<p>Taste [% herb.taste %] </p>
-<p>Odour [% herb.odour %] </p>
-<p>Root [% herb.root %] </p>
-<p>Distribution [% herb.distribution %] </p>
-<p>Medical Uses [% herb.medical_uses%] </p>
-<p>Constituents [% herb.constituents %] </p>
-<p>Solvents [% herb.solvents %] </p>
-<p>Dosage [% herb.dosage %]  </p>
-<p>administration [% herb.administration %]  </p>
-<p>Formulas [% herb.formulas %]  </p>
-<p>Contra Indications [% herb.contra_indications %]  </p>
-<p>Chinese [% herb.chinese %]  </p>
-<p>Veterinary [% herb.vetrinary %]  </p>
-<p> [% herb.cultivation %]  </p>
-<p>Harvest [% herb.harvest %] </p>
-<p>Non Med [% herb.non_med %]</p>
-<p>History [% herb.history %] </p>
-<p>Reference [% herb.reference %]</p>
-<!-- Display the Add Herb button only for admin users -->
-[% IF user.role == 'admin' %]
-    <button onclick="window.location.href='/ENCY/add_herb';">Add Herb</button>
-[% END %]
 <table>
     <tr>
         <th colspan="2"><h2>Naming</h2></th>

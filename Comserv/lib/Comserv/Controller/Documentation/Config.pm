@@ -27,7 +27,19 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user has admin or developer role
-    unless ($c->user_exists && ($c->user->role eq 'admin' || $c->user->role eq 'developer')) {
+    my $has_admin_role = 0;
+    
+    # Check session roles first
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}};
+    }
+    # Fallback to user roles if available
+    elsif ($c->user_exists && $c->user->can('roles')) {
+        my @user_roles = ref($c->user->roles) eq 'ARRAY' ? @{$c->user->roles} : ($c->user->roles);
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @user_roles;
+    }
+    
+    unless ($c->user_exists && $has_admin_role) {
         $c->stash(error_msg => "You don't have permission to access this page");
         $c->detach('/error/access_denied');
         return;
@@ -58,7 +70,19 @@ sub reload :Local :Args(0) {
     my ($self, $c) = @_;
     
     # Check if user has admin or developer role
-    unless ($c->user_exists && ($c->user->role eq 'admin' || $c->user->role eq 'developer')) {
+    my $has_admin_role = 0;
+    
+    # Check session roles first
+    if ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY') {
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}};
+    }
+    # Fallback to user roles if available
+    elsif ($c->user_exists && $c->user->can('roles')) {
+        my @user_roles = ref($c->user->roles) eq 'ARRAY' ? @{$c->user->roles} : ($c->user->roles);
+        $has_admin_role = grep { $_ eq 'admin' || $_ eq 'developer' } @user_roles;
+    }
+    
+    unless ($c->user_exists && $has_admin_role) {
         $c->stash(error_msg => "You don't have permission to access this page");
         $c->detach('/error/access_denied');
         return;

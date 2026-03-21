@@ -1,3 +1,13 @@
+[% PageVersion = 'Comserv/root/Documentation/Installation.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Installation Guide' %]
+
+<!-- Documentation page for Installation Guide -->
+<div class="documentation-content">
+
 <h1>Installation Guide</h1>
 
 <nav>
@@ -80,3 +90,5 @@ listed.
 $Module::Name::VERSION'</code></pre>
     </li>
 </ol>
+
+</div>

@@ -25,7 +25,10 @@
         "nav-hover-bg": "rgba(0, 0, 0, 0.1)",
         "border-color": "#cccccc",
         "table-header-bg": "#f2f2f2",
-        "background-color": "#ffffff"
+        "background-color": "#ffffff",
+        "spacing-small": "10px",
+        "spacing-medium": "20px",
+        "spacing-large": "30px"
       },
       "name": "Default Theme",
       "description": "The default system theme"

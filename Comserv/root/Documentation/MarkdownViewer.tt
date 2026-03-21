@@ -7,9 +7,9 @@
 
 <!-- Include Font Awesome for icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-<!-- Include documentation CSS -->
+
 <link rel="stylesheet" href="/static/css/components/documentation.css">
-<link rel="stylesheet" href="/static/css/documentation.css">
+<!-- Documentation CSS is now included in the theme system -->
 <link rel="stylesheet" href="/static/css/markdown-viewer.css">
 
 <!-- Include additional CSS files if specified -->

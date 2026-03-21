@@ -1,5 +1,5 @@
 [%# INCLUDE 'layout.tt' %]
-[% PageVersion	= 'home.tt,v 0.01 2023/08/30 shanta Exp shanta '	%]
+[% PageVersion = 'home.tt,v 0.02 2025/01/28 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
  [%	PageVersion %]
     [% "Debugging HostName: " _ HostName %]

@@ -1,737 +1,81 @@
 [% META title = 'Admin Dashboard' %]
-[% PageVersion = 'admin/index.tt,v 0.02 2025/09/10 shanta Exp shanta ' %]
+[% PageVersion = 'admin/index.tt,v 0.03 2025/01/15 shanta Exp shanta ' %]
 
-<div class="admin-dashboard">
-    <div class="dashboard-header">
-        <h1>Admin Dashboard</h1>
-        [% IF c.session.debug_mode == 1 %]
-            <div class="debug-info">[% PageVersion %]</div>
-        [% END %]
+<!-- Include admin-specific CSS -->
+<!--<link rel="stylesheet" type="text/css" href="[% c.uri_for('/static/css/themes/admin.css') %]">
+-->
+
+[% IF is_admin %]
+<h1>Admin Dashboard</h1>
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    <div class="debug">
+        <p>Admin access confirmed: is_admin=[% is_admin %], user=[% c.session.username || 'unknown' %]</p>
     </div>
+[% END %]
 
-    <!-- Software Management Status - Prominent Section -->
-    <div class="software-management-section theme-section">
-        <div class="section-header">
-            <h2><i class="fas fa-cogs"></i> Software Management</h2>
-            <div class="section-subtitle">Deploy, update, and manage your application</div>
-        </div>
+<div class="admin-menu">
+  <h2>Admin Menu</h2>
 
-        <!-- Status Overview Cards -->
-        <div class="status-cards">
-            <div class="status-card git-status">
-                <div class="card-header">
-                    <i class="fas fa-code-branch"></i>
-                    <h3>Git Repository</h3>
-                </div>
-                <div class="card-content">
-                    <div class="status-item">
-                        <label>Current Branch:</label>
-                        <span class="value">[% software_status.git_status.current_branch || 'Unknown' %]</span>
-                    </div>
-                    <div class="status-item">
-                        <label>Last Commit:</label>
-                        <span class="value commit-info">[% software_status.git_status.last_commit || 'No commits' %]</span>
-                    </div>
-                    [% IF software_status.git_status.commits_behind > 0 %]
-                    <div class="status-item warning">
-                        <label>Behind Origin:</label>
-                        <span class="value">[% software_status.git_status.commits_behind %] commit(s)</span>
-                    </div>
-                    [% END %]
-                    [% IF software_status.git_status.has_uncommitted_changes %]
-                    <div class="status-item warning">
-                        <label>Uncommitted Changes:</label>
-                        <span class="value">Changes need to be committed</span>
-                    </div>
-                    [% END %]
-                    [% IF software_status.git_status.has_untracked_files %]
-                    <div class="status-item info">
-                        <label>Untracked Files:</label>
-                        <span class="value">[% software_status.git_status.untracked_files.size %] file(s) not in Git</span>
-                    </div>
-                    [% END %]
-                </div>
-            </div>
+  <div class="admin-section">
+    <h3>Database Management</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/database_mode') %]"><i class="icon-database"></i>Database Backend Selection</a></li>
+      <li><a href="[% c.uri_for('/admin/schema_manager') %]">Schema Manager</a></li>
+      <li><a href="[% c.uri_for('/admin/compare_schema') %]">Compare Schema</a></li>
+      <li><a href="[% c.uri_for('/admin/migrate_schema') %]">Migrate Schema</a></li>
+    </ul>
+  </div>
 
-            <div class="status-card service-status">
-                <div class="card-header">
-                    <i class="fas fa-server"></i>
-                    <h3>Starman Service</h3>
-                </div>
-                <div class="card-content">
-                    <div class="status-item">
-                        <label>Service Status:</label>
-                        <span class="value service-indicator [% software_status.starman_status.status_class %]">
-                            [% software_status.starman_status.is_active || 'Unknown' %]
-                        </span>
-                    </div>
-                    [% IF software_status.starman_status.uptime_info %]
-                    <div class="status-item">
-                        <label>Running Since:</label>
-                        <span class="value">[% software_status.starman_status.uptime_info %]</span>
-                    </div>
-                    [% END %]
-                </div>
-            </div>
-        </div>
+  <div class="admin-section">
+    <h3>System Management</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/theme') %]">Theme Management</a></li>
+      <li><a href="[% c.uri_for('/admin/logging') %]"><i class="icon-log"></i>Logging Administration</a></li>
+      <li><a href="[% c.uri_for('/admin/view_log') %]">View Application Log</a></li>
+      <li><a href="[% c.uri_for('/admin/network_diagnostics') %]">Network Diagnostics</a></li>
+      <li><a href="[% c.uri_for('/admin/access_control_help') %]">Access Control Help</a></li>
+      [% IF has_csc_access %]
+      <li><a href="[% c.uri_for('/admin/backup') %]">Backup Management</a> <span class="csc-only">(CSC Only)</span></li>
+      [% END %]
+    </ul>
+  </div>
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <a href="[% c.uri_for('/admin/production_deploy') %]" class="btn btn-primary btn-large">
-                <i class="fas fa-rocket"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Production Deploy</div>
-                    <div class="btn-subtitle">Full deployment with backup & restart</div>
-                </div>
-            </a>
-            
-            <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-secondary">
-                <i class="fas fa-download"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Git Pull</div>
-                    <div class="btn-subtitle">Update code only</div>
-                </div>
-            </a>
-            
-            <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-warning">
-                <i class="fas fa-redo"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Restart Service</div>
-                    <div class="btn-subtitle">Restart Starman only</div>
-                </div>
-            </a>
+  <div class="admin-section">
+    <h3>Git Operations</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/git_pull') %]">Pull from Git Repository</a></li>
+    </ul>
+  </div>
 
-            <a href="[% c.uri_for('/admin/docker-containers') %]" class="btn btn-info">
-                <i class="fas fa-docker"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Docker Containers</div>
-                    <div class="btn-subtitle">Manage Docker containers</div>
-                </div>
-            </a>
-        </div>
+  <div class="admin-section">
+    <h3>Production Deployment (CSC Admin + Install Branch Only)</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/admin/software_upgrade') %]" class="upgrade-link"><strong>Software Upgrade Manager</strong></a> - Complete step-by-step upgrade process</li>
+      <li><a href="[% c.uri_for('/admin/start_dev_server') %]">Start Development Server for Testing</a></li>
+      <li><a href="[% c.uri_for('/admin/restart_starman') %]">Restart Production Server (Starman)</a></li>
+      [% IF c.session.dev_server %]
+      <li><a href="[% c.session.dev_server.url %]" target="_blank" class="dev-server-link">Open Development Server</a> | <a href="[% c.uri_for('/admin/stop_dev_server') %]">Stop Dev Server</a></li>
+      [% END %]
+    </ul>
+  </div>
 
-        <!-- Recommendations -->
-        [% IF software_status.recommendations.size > 0 %]
-        <div class="recommendations">
-            <h3><i class="fas fa-lightbulb"></i> Recommendations</h3>
-            [% FOREACH rec IN software_status.recommendations %]
-            <div class="recommendation [% rec.type %]">
-                <div class="rec-icon">
-                    <i class="[% rec.icon %]"></i>
-                </div>
-                <div class="rec-content">
-                    <div class="rec-message">[% rec.message %]</div>
-                    <div class="rec-action">[% rec.action %]</div>
-                </div>
-                [% IF rec.link %]
-                <div class="rec-button">
-                    <a href="[% rec.link %]" class="btn btn-sm">Take Action</a>
-                </div>
-                [% END %]
-            </div>
-            [% END %]
-        </div>
-        [% END %]
-    </div>
-
-    <!-- Traditional Admin Sections -->
-    <div class="admin-sections">
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-database"></i> Database Management</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/schema_manager') %]" class="admin-link">
-                        <i class="fas fa-table"></i>
-                        <span>Schema Manager</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/compare_schema') %]" class="admin-link">
-                        <i class="fas fa-balance-scale"></i>
-                        <span>Compare Schema</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/migrate_schema') %]" class="admin-link">
-                        <i class="fas fa-exchange-alt"></i>
-                        <span>Migrate Schema</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
-                        <i class="fas fa-file-export"></i>
-                        <span>Migrate Pages (Forager → Ency)</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-robot"></i> AI Configuration</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/ai/configure') %]" class="admin-link">
-                        <i class="fas fa-cogs"></i>
-                        <span>AI Model Configuration</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-cog"></i> Environment Configuration</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
-                        <i class="fas fa-sliders-h"></i>
-                        <span>Environment Variables</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/environment_variables/audit_log') %]" class="admin-link">
-                        <i class="fas fa-history"></i>
-                        <span>Environment Audit Log</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/environment_variables/export') %]" class="admin-link">
-                        <i class="fas fa-download"></i>
-                        <span>Export Environment</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-tools"></i> System Management</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/theme') %]" class="admin-link">
-                        <i class="fas fa-palette"></i>
-                        <span>Theme Management</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/view_log') %]" class="admin-link">
-                        <i class="fas fa-file-alt"></i>
-                        <span>View Application Log</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/system_info') %]" class="admin-link">
-                        <i class="fas fa-info-circle"></i>
-                        <span>System Information</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/network_diagnostics') %]" class="admin-link">
-                        <i class="fas fa-network-wired"></i>
-                        <span>Network Diagnostics</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/emergency-restore') %]" class="admin-link emergency-restore">
-                        <i class="fas fa-life-ring"></i>
-                        <span>Emergency Restore</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/backup') %]" class="admin-link backup-management">
-                        <i class="fas fa-archive"></i>
-                        <span>Backup Management</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-cloud"></i> Infrastructure</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/infrastructure') %]" class="admin-link">
-                        <i class="fas fa-dharmachakra"></i>
-                        <span>Kubernetes Clusters</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
-                        <i class="fas fa-docker"></i>
-                        <span>Docker Containers</span>
-                    </a>
-                    <a href="[% c.uri_for('/proxmox') %]" class="admin-link">
-                        <i class="fas fa-server"></i>
-                        <span>Proxmox VM Management</span>
-                    </a>
-                    <a href="[% c.uri_for('/proxmox_servers') %]" class="admin-link">
-                        <i class="fas fa-hdd"></i>
-                        <span>Proxmox Server Management</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="admin-section theme-section">
-            <div class="section-header">
-                <h3><i class="fas fa-folder-open"></i> File Management</h3>
-            </div>
-            <div class="section-content">
-                <div class="admin-links">
-                    <a href="[% c.uri_for('/file/admin_browser') %]" class="admin-link">
-                        <i class="fas fa-sitemap"></i>
-                        <span>Admin Browser</span>
-                    </a>
-                    <a href="[% c.uri_for('/file/list') %]" class="admin-link">
-                        <i class="fas fa-list"></i>
-                        <span>File List</span>
-                    </a>
-                    <a href="[% c.uri_for('/file/upload_file') %]" class="admin-link">
-                        <i class="fas fa-upload"></i>
-                        <span>Upload File</span>
-                    </a>
-                    <a href="[% c.uri_for('/file/duplicates') %]" class="admin-link">
-                        <i class="fas fa-copy"></i>
-                        <span>Duplicate Files</span>
-                    </a>
-                    [% IF c.session.SiteName == 'CSC' %]
-                    <a href="[% c.uri_for('/file/nfs_allocations') %]" class="admin-link">
-                        <i class="fas fa-network-wired"></i>
-                        <span>NFS Allocations</span>
-                    </a>
-                    [% END %]
-                    <a href="[% c.uri_for('/admin/planning') %]" class="admin-link">
-                        <i class="fas fa-tasks"></i>
-                        <span>Implementation Plan</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Stats (if available) -->
-    [% IF stats %]
-    <div class="system-stats theme-section">
-        <div class="section-header">
-            <h3><i class="fas fa-chart-bar"></i> System Statistics</h3>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-value">[% stats.user_count || 0 %]</div>
-                <div class="stat-label">Users</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.content_count || 0 %]</div>
-                <div class="stat-label">Content Items</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.disk_usage || 'Unknown' %]</div>
-                <div class="stat-label">Disk Usage</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">[% stats.uptime || 'Unknown' %]</div>
-                <div class="stat-label">System Uptime</div>
-            </div>
-        </div>
-    </div>
-    [% END %]
+  <div class="admin-section">
+    <h3>Infrastructure</h3>
+    <ul>
+      <li><a href="[% c.uri_for('/proxmox') %]">Proxmox VM Management</a></li>
+      <li><a href="[% c.uri_for('/proxmox_servers') %]">Proxmox Server Management</a></li>
+    </ul>
+  </div>
 </div>
 
-<style>
-/* Theme-compatible base styles */
-.admin-dashboard {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-    font-family: var(--theme-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-}
+[% ELSE %]
+<div class="access-denied">
+    <h1>Access Denied</h1>
+    <p>You need administrator privileges to access this area.</p>
+    <p><a href="[% c.uri_for('/user/login') %]">Please log in</a> with an administrator account.</p>
+</div>
+[% END %]
 
-.dashboard-header {
-    margin-bottom: 30px;
-    text-align: center;
-}
-
-.dashboard-header h1 {
-    color: var(--theme-primary-color, #2c3e50);
-    margin-bottom: 10px;
-}
-
-.debug-info {
-    font-size: 12px;
-    color: var(--theme-muted-color, #6c757d);
-}
-
-/* Theme-compatible sections */
-.theme-section {
-    background: var(--theme-card-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 8px);
-    box-shadow: var(--theme-card-shadow, 0 2px 4px rgba(0,0,0,0.1));
-    margin-bottom: 25px;
-    overflow: hidden;
-}
-
-.section-header {
-    background: var(--theme-header-background, #f8f9fa);
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--theme-border-color, #dee2e6);
-}
-
-.section-header h2, .section-header h3 {
-    margin: 0;
-    color: var(--theme-heading-color, #2c3e50);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.section-subtitle {
-    font-size: 14px;
-    color: var(--theme-muted-color, #6c757d);
-    margin-top: 5px;
-}
-
-/* Software Management Section - Prominent */
-.software-management-section {
-    border: 2px solid var(--theme-primary-color, #007bff);
-}
-
-.software-management-section .section-header {
-    background: linear-gradient(135deg, var(--theme-primary-color, #007bff), var(--theme-secondary-color, #6c757d));
-    color: white;
-}
-
-.software-management-section .section-header h2 {
-    color: white;
-}
-
-/* Status Cards */
-.status-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.status-card {
-    background: var(--theme-card-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 6px);
-    overflow: hidden;
-}
-
-.status-card .card-header {
-    background: var(--theme-secondary-background, #f8f9fa);
-    padding: 12px 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 1px solid var(--theme-border-color, #dee2e6);
-}
-
-.status-card .card-header h3 {
-    margin: 0;
-    font-size: 16px;
-    color: var(--theme-heading-color, #2c3e50);
-}
-
-.card-content {
-    padding: 15px;
-}
-
-.status-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--theme-light-border, #f1f3f4);
-}
-
-.status-item:last-child {
-    border-bottom: none;
-}
-
-.status-item label {
-    font-weight: 600;
-    color: var(--theme-text-color, #495057);
-}
-
-.status-item .value {
-    font-family: var(--theme-mono-font, 'Courier New', monospace);
-    font-size: 13px;
-}
-
-.status-item.warning .value {
-    color: var(--theme-warning-color, #ffc107);
-    font-weight: bold;
-}
-
-.status-item.info .value {
-    color: var(--theme-info-color, #17a2b8);
-    font-weight: bold;
-}
-
-.service-indicator.success {
-    color: var(--theme-success-color, #28a745);
-    font-weight: bold;
-}
-
-.service-indicator.danger {
-    color: var(--theme-danger-color, #dc3545);
-    font-weight: bold;
-}
-
-/* Action Buttons */
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    padding: 20px;
-    background: var(--theme-light-background, #f8f9fa);
-    flex-wrap: wrap;
-}
-
-.btn {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    border: none;
-    border-radius: var(--theme-border-radius, 6px);
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    min-width: 200px;
-}
-
-.btn-large {
-    padding: 20px 25px;
-    min-width: 250px;
-}
-
-.btn-primary {
-    background: var(--theme-primary-color, #007bff);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: var(--theme-primary-hover, #0056b3);
-    transform: translateY(-2px);
-}
-
-.btn-secondary {
-    background: var(--theme-secondary-color, #6c757d);
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: var(--theme-secondary-hover, #545b62);
-}
-
-.btn-warning {
-    background: var(--theme-warning-color, #ffc107);
-    color: var(--theme-dark-text, #212529);
-}
-
-.btn-warning:hover {
-    background: var(--theme-warning-hover, #e0a800);
-}
-
-.btn-content {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.btn-title {
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.btn-subtitle {
-    font-size: 12px;
-    opacity: 0.8;
-    margin-top: 2px;
-}
-
-/* Recommendations */
-.recommendations {
-    padding: 20px;
-    background: var(--theme-light-background, #f8f9fa);
-    border-top: 1px solid var(--theme-border-color, #dee2e6);
-}
-
-.recommendations h3 {
-    margin: 0 0 15px 0;
-    color: var(--theme-heading-color, #2c3e50);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.recommendation {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 12px;
-    margin-bottom: 10px;
-    border-radius: var(--theme-border-radius, 4px);
-    border-left: 4px solid;
-}
-
-.recommendation.success {
-    background: var(--theme-success-light, #d4edda);
-    border-left-color: var(--theme-success-color, #28a745);
-}
-
-.recommendation.warning {
-    background: var(--theme-warning-light, #fff3cd);
-    border-left-color: var(--theme-warning-color, #ffc107);
-}
-
-.recommendation.danger {
-    background: var(--theme-danger-light, #f8d7da);
-    border-left-color: var(--theme-danger-color, #dc3545);
-}
-
-.recommendation.info {
-    background: var(--theme-info-light, #d1ecf1);
-    border-left-color: var(--theme-info-color, #17a2b8);
-}
-
-.rec-icon {
-    font-size: 20px;
-    width: 30px;
-    text-align: center;
-}
-
-.rec-content {
-    flex: 1;
-}
-
-.rec-message {
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.rec-action {
-    font-size: 14px;
-    opacity: 0.8;
-}
-
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 12px;
-    min-width: auto;
-}
-
-/* Traditional Admin Sections */
-.admin-sections {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 20px;
-}
-
-.section-content {
-    padding: 20px;
-}
-
-.admin-links {
-    display: grid;
-    gap: 10px;
-}
-
-.admin-link {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 15px;
-    background: var(--theme-link-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 4px);
-    text-decoration: none;
-    color: var(--theme-text-color, #495057);
-    transition: all 0.2s ease;
-}
-
-.admin-link:hover {
-    background: var(--theme-hover-background, #f8f9fa);
-    border-color: var(--theme-primary-color, #007bff);
-    color: var(--theme-primary-color, #007bff);
-    transform: translateX(5px);
-}
-
-.admin-link i {
-    width: 20px;
-    text-align: center;
-    color: var(--theme-icon-color, #6c757d);
-}
-
-.admin-link:hover i {
-    color: var(--theme-primary-color, #007bff);
-}
-
-/* System Stats */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.stat-item {
-    text-align: center;
-    padding: 20px;
-    background: var(--theme-stat-background, #ffffff);
-    border: 1px solid var(--theme-border-color, #dee2e6);
-    border-radius: var(--theme-border-radius, 6px);
-}
-
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--theme-primary-color, #007bff);
-    margin-bottom: 8px;
-}
-
-.stat-label {
-    font-size: 14px;
-    color: var(--theme-muted-color, #6c757d);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .action-buttons {
-        flex-direction: column;
-    }
-    
-    .btn {
-        min-width: 100%;
-        justify-content: center;
-    }
-    
-    .admin-sections {
-        grid-template-columns: 1fr;
-    }
-    
-    .status-cards {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
-
-<script>
-// Add some interactivity
-document.addEventListener('DOMContentLoaded', function() {
-    // Add loading states to action buttons
-    const actionButtons = document.querySelectorAll('.action-buttons .btn');
-    actionButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-            this.style.pointerEvents = 'none';
-            
-            // Reset after a short delay (in case of quick redirects)
-            setTimeout(() => {
-                this.innerHTML = originalText;
-                this.style.pointerEvents = 'auto';
-            }, 3000);
-        });
-    });
-    
-    // Auto-refresh status every 30 seconds (optional)
-    if (window.location.pathname === '/admin') {
-        setInterval(() => {
-            // Could implement AJAX refresh of status cards here
-            console.log('Status refresh interval (implement AJAX if needed)');
-        }, 30000);
-    }
-});
-</script>
+<!-- CSS now handled by admin.css theme file -->

@@ -2,9 +2,6 @@ package Comserv::View::Email;
 use Moose;
 use namespace::autoclean;
 
-# Flag to track if we have the real Catalyst::View::Email
-our $HAS_REAL_EMAIL_VIEW = 0;
-
 BEGIN {
     # Try to load the real module
     eval {
@@ -15,11 +12,9 @@ BEGIN {
         # If we can't load the module, we'll create a minimal implementation
         warn "Cannot load Catalyst::View::Email: $@\n";
         warn "Using minimal implementation instead.\n";
-        $HAS_REAL_EMAIL_VIEW = 0;
     } else {
         # If we can load the module, extend it
         extends 'Catalyst::View::Email';
-        $HAS_REAL_EMAIL_VIEW = 1;
     }
 }
 
@@ -53,85 +48,86 @@ sub log_with_details {
     }
 }
 
-# Process method - only use 'around' if we have a parent class
-if ($HAS_REAL_EMAIL_VIEW) {
-    # We have Catalyst::View::Email, so wrap the parent's process method
-    around 'process' => sub {
-        my ($orig, $self, $c, $args) = @_;
-        
-        # Store debug messages in stash for debugging
-        $c->stash->{debug_msg} = $self->_debug_msgs;
-        
-        # Log with details for debugging
-        $self->log_with_details($c, "Processing email request", {
-            to => $args->{to},
-            subject => $args->{subject},
-        });
-        
-        eval {
-            $self->add_debug_msg("Attempting to send email using Catalyst::View::Email");
-            return $self->$orig($c, $args);
+# Process method - either override or create new depending on base class availability
+BEGIN {
+    # Only create the around method if we have the base class
+    if (__PACKAGE__->isa('Catalyst::View::Email')) {
+        around 'process' => sub {
+            my ($orig, $self, $c, $args) = @_;
+            
+            # Store debug messages in stash for debugging
+            $c->stash->{debug_msg} = $self->_debug_msgs;
+            
+            # Log with details for debugging
+            $self->log_with_details($c, "Processing email request", {
+                to => $args->{to},
+                subject => $args->{subject},
+            });
+            
+            # Try to use the original method
+            eval {
+                $self->add_debug_msg("Attempting to send email using Catalyst::View::Email");
+                return $self->$orig($c, $args);
+            };
+            if ($@) {
+                my $error = $@;
+                $c->log->warn("Failed to send email using Catalyst::View::Email: $error");
+                $self->add_debug_msg("Failed to send email: $error");
+                # Fall through to the fallback implementation
+            } else {
+                # If it worked, return success
+                return 1;
+            }
+            
+            # Fallback implementation - just log the email details
+            $c->log->info("Email would be sent (fallback mode):");
+            $c->log->info("  To: " . ($args->{to} || 'not specified'));
+            $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
+            $c->log->info("  Body: " . substr(($args->{body} || ''), 0, 100) . "...");
+            
+            return 1;  # Return success even if sending failed
         };
-        if ($@) {
-            my $error = $@;
-            $c->log->warn("Failed to send email using Catalyst::View::Email: $error");
-            $self->add_debug_msg("Failed to send email: $error");
-            # Fall through to the fallback implementation
-        } else {
-            # If it worked, return success
-            return 1;
-        }
-        
-        # Fallback implementation - just log the email details
-        $c->log->info("Email would be sent (fallback mode):");
-        $c->log->info("  To: " . ($args->{to} || 'not specified'));
-        $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
-        $c->log->info("  Body: " . substr(($args->{body} || ''), 0, 100) . "...");
-        
-        return 1;  # Return success even if sending failed
-    };
-} else {
-    # We don't have Catalyst::View::Email, so define a simple process method
-    sub process {
-        my ($self, $c, $args) = @_;
-        
-        # Store debug messages in stash for debugging
-        $c->stash->{debug_msg} = $self->_debug_msgs;
-        
-        # Log with details for debugging
-        $self->log_with_details($c, "Processing email request (fallback mode)", {
-            to => $args->{to},
-            subject => $args->{subject},
-        });
-        
-        $self->add_debug_msg("Email functionality not available: Catalyst::View::Email not installed");
-        
-        # Fallback implementation - just log the email details
-        $c->log->info("Email would be sent (fallback mode):");
-        $c->log->info("  To: " . ($args->{to} || 'not specified'));
-        $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
-        $c->log->info("  Body: " . substr(($args->{body} || ''), 0, 100) . "...");
-        
-        return 1;  # Return success even if sending failed
     }
 }
 
-# Configuration - only set if we have the real Email view
-if ($HAS_REAL_EMAIL_VIEW) {
-    __PACKAGE__->config(
-        sender => {
-            mailer => 'SMTP',
-            mailer_args => {
-                host => 'localhost',
-                port => 25,
-            }
-        },
-        default => {
-            content_type => 'text/plain',
-            charset => 'UTF-8',
-        }
-    );
+# Fallback process method for when Catalyst::View::Email is not available
+sub process {
+    my ($self, $c, $args) = @_;
+    
+    # Store debug messages in stash for debugging
+    $c->stash->{debug_msg} = $self->_debug_msgs;
+    
+    # Log with details for debugging
+    $self->log_with_details($c, "Processing email request (fallback mode)", {
+        to => $args->{to},
+        subject => $args->{subject},
+    });
+    
+    $self->add_debug_msg("Email functionality not available: Catalyst::View::Email not installed");
+    
+    # Fallback implementation - just log the email details
+    $c->log->info("Email would be sent (fallback mode):");
+    $c->log->info("  To: " . ($args->{to} || 'not specified'));
+    $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
+    $c->log->info("  Body: " . substr(($args->{body} || ''), 0, 100) . "...");
+    
+    return 1;  # Return success even if sending failed
 }
+
+# Configuration
+__PACKAGE__->config(
+    sender => {
+        mailer => 'SMTP',
+        mailer_args => {
+            host => 'localhost',
+            port => 25,
+        }
+    },
+    default => {
+        content_type => 'text/plain',
+        charset => 'UTF-8',
+    }
+);
 
 __PACKAGE__->meta->make_immutable;
 

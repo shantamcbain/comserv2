@@ -1,0 +1,119 @@
+[% PageVersion = 'Documentation/workshops/index.tt,v 0.01 2024/06/10 shanta Exp shanta ' %]
+[% IF debug_mode == 1 %]
+ [% PageVersion %]
+[% END %]
+
+<div class="documentation-container">
+    <h1>Workshop System Documentation</h1>
+    
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#vision">Future Vision</a></li>
+            <li><a href="#documentation">Documentation Structure</a></li>
+            <li><a href="#usage">Current Functionality</a></li>
+            <li><a href="#future">Future Development</a></li>
+        </ul>
+    </div>
+    
+    <div id="overview" class="section">
+        <h2>Overview</h2>
+        <p>The Workshop System is a comprehensive component of the Comserv application designed to manage educational workshops, presentations, and related materials. It currently supports advertising workshops, but will evolve into a complete platform where users can create and manage their own workshops.</p>
+    </div>
+    
+    <div id="vision" class="section">
+        <h2>Future Vision</h2>
+        <p>The Workshop System will evolve from its current state as an advertising platform into a full-featured workshop management system where:</p>
+        <ul>
+            <li>Registered users can create their own workshops</li>
+            <li>Workshop creators can upload and manage presentation materials</li>
+            <li>Users can register for workshops and receive notifications</li>
+            <li>Presenters can track attendance and participation</li>
+            <li>Interactive workshops can be conducted directly through the platform</li>
+            <li>Workshop materials can be organized in a searchable database</li>
+        </ul>
+    </div>
+    
+    <div id="documentation" class="section">
+        <h2>Documentation Structure</h2>
+        <p>Workshop System documentation is organized into the following sections:</p>
+        <ul>
+            <li><a href="/documentation/workshops/user_guide">User Guide</a> - How to use the Workshop System</li>
+            <li><a href="/documentation/workshops/admin_guide">Administrator Guide</a> - Managing workshops and presentations</li>
+            <li><a href="/documentation/workshops/technical">Technical Documentation</a> - Implementation details</li>
+            <li><a href="/documentation/workshops/presentations">Presentation System</a> - Working with presentation materials</li>
+            <li><a href="/documentation/workshops/development_plan">Development Plan</a> - Future roadmap</li>
+        </ul>
+    </div>
+    
+    <div id="usage" class="section">
+        <h2>Current Functionality</h2>
+        <p>The current version of the Workshop System provides the following features:</p>
+        <ul>
+            <li>Workshop listing and details</li>
+            <li>Administrative tools for creating and managing workshops</li>
+            <li>Support for downloadable presentation materials</li>
+            <li>Basic presentation viewer</li>
+        </ul>
+        <p>For detailed instructions on using these features, see the <a href="/documentation/workshops/user_guide">User Guide</a>.</p>
+    </div>
+    
+    <div id="future" class="section">
+        <h2>Future Development</h2>
+        <p>Development of the Workshop System will follow the roadmap outlined in the <a href="/documentation/workshops/development_plan">Development Plan</a>. Key priorities include:</p>
+        <ul>
+            <li>User-created workshops</li>
+            <li>Workshop registration and attendance tracking</li>
+            <li>Enhanced presentation management</li>
+            <li>Interactive workshop capabilities</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .documentation-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .toc {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    .section {
+        margin-bottom: 40px;
+    }
+    
+    h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 5px;
+    }
+    
+    a {
+        color: #3498db;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

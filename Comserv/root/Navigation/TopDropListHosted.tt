@@ -1,145 +1,59 @@
-[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.03 2025/09/03 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListHosted.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-
-<!-- Hosted menu -->
-<li class="horizontal-dropdown">
-    <a href="/hosted" class="dropbtn"><i class="icon-hosted"></i>Hosted</a>
-    <div class="dropdown-content">
-        <!-- Core Hosted Services -->
-        <a href="/hosted" class="menu-item"><i class="icon-home"></i>Hosted Services</a>
-        <a href="/apply" class="menu-item"><i class="icon-apply"></i>Apply for Hosted Account</a>
-        <a href="/accounts" class="menu-item"><i class="icon-accounts"></i>Hosted Accounts</a>
-        
-        [% IF c.session.username %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/add_link?menu=Hosted" class="menu-item"><i class="icon-add"></i>Add Hosted Link</a>
-        [% END %]
-        
-        <!-- Production Hosted Sites -->
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-production"></i>Production Sites</span>
-            <div class="submenu">
-                <a href="https://shamanbotanicals.ca" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>shamanbotanicals.ca
-                </a>
-                <a href="https://3d.usbm.ca" target="_blank" class="submenu-link">
-                    <i class="icon-3d"></i>3D Printing (USBM)
-                </a>
-                <a href="https://ve7tit.com" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>ve7tit.com
-                </a>
-                <a href="https://altpowerstore.com" target="_blank" class="submenu-link">
-                    <i class="icon-store"></i>altpowerstore.com
-                </a>
-            </div>
-        </div>
-        
-        <!-- Development/Local Sites -->
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-development"></i>Development Sites</span>
-            <div class="submenu">
-                <a href="https://3d.local:3000" target="_blank" class="submenu-link">
-                    <i class="icon-3d"></i>3D Printing (Local)
-                </a>
-                <!-- Add more development sites here -->
-            </div>
-        </div>
-        
-        <!-- Public Hosted Links from database -->
-        [% SET hosted_db_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Hosted_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-        [% IF hosted_db_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-admin-links"></i>Additional Hosted Services</span>
-            <div class="submenu">
-                [% FOREACH link IN hosted_db_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.roles.grep('admin').size %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Legacy Hosted Links Support -->
-        [% IF hosted_links.defined && hosted_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-legacy"></i>Legacy Hosted Links</span>
-            <div class="submenu">
-                [% FOREACH link IN hosted_links %]
-                    <a href="[% link.url %]" name="Contact" target="[% link.target %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Session-based Hosted Links -->
-        [% IF c.session.hosted_links && c.session.hosted_links.size %]
-        <div class="dropdown-divider"></div>
-        <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-session"></i>Session Hosted Links</span>
-            <div class="submenu">
-                [% FOREACH link IN c.session.hosted_links %]
-                    <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.name %]
-                    </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
-                    [% END %]
-                [% END %]
-            </div>
-        </div>
-        [% END %]
-        
-        <!-- Private Hosted Links for logged in users -->
-        [% IF c.session.username && c.stash.private_links %]
-            [% SET has_private_hosted_links = 0 %]
-            [% FOREACH link IN c.stash.private_links %]
-                [% IF link.category == 'Hosted_links' || link.menu == 'Hosted' %]
-                    [% SET has_private_hosted_links = 1 %]
-                [% END %]
-            [% END %]
-            
-            [% IF has_private_hosted_links %]
-            <div class="dropdown-divider"></div>
-            <div class="submenu-item">
-                <span class="submenu-header"><i class="icon-user-hosted"></i>My Hosted Links</span>
-                <div class="submenu">
-                    [% FOREACH link IN c.stash.private_links %]
-                        [% IF link.category == 'Hosted_links' || link.menu == 'Hosted' %]
-                            <a href="[% link.url %]" target="[% link.target || '_blank' %]" title="[% link.name %]" class="submenu-link">
-                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                                [% link.name %]
-                            </a>
-                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+        <!-- Hosted menu -->
+        <li class="horizontal-dropdown">
+            <a href="/hosted" class="dropbtn">Hosted</a>
+            <div class="dropdown-content">
+                <a href="/apply">Apply for Hosted Account</a>
+                <a href="/accounts">Hosted Accounts</a>
+                <a href="https://shamanbotanicals.ca" target="_blank">shamanbotanicals.ca </a>
+                <a href="https://3d.usbm.ca" target="_blank">3d Printing </a>
+               <a href="https://3d.local:3000" target="_blank">local 3d Printing </a>                <a href="https://ve7tit.com" target="_blank">ve7tit.com   </a>
+                <a href="https://altpowerstore.com" target="_blank">altpowerstore.com</a>
+[% IF hosted_links.defined %]
+    [% FOREACH link IN hosted_links %]
+       <a href="[% link.url %]" name="Contact" target="[%link.target %]"title="[% link.name %] "><font   class="LeftSideBarNavStyle">[% link.name %]</font></a>
+      [% IF c.session.group == 'admin' %]
+        <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+      [% END %]
+    [% END %]
+[% END %]
+                <!-- Add more hosted options -->
+                [% IF c.session.hosted_links.size %]
+                    [% FOREACH link IN c.session.hosted_links %]
+                        <a href="[% link.url %]">[% link.name %]</a>
+                        [% IF c.session.group == 'admin' %]
+                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
                         [% END %]
                     [% END %]
-                </div>
+                [% END %]
+                <!-- Private Links Section - Available to ALL logged-in users -->
+                [% IF c.user_exists && private_links && private_links.size %]
+                    <div class="dropdown-divider"></div>
+                    <div class="submenu-section">
+                        <span class="submenu-section-title">Private Links</span>
+                        [% FOREACH link IN private_links %]
+                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
+                                <i class="icon-link"></i> [% link.name %]
+                            </a>
+                        [% END %]
+                    </div>
+                [% END %]
+                
+                <!-- Link Management -->
+                [% IF c.user_exists %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
+                    <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
+                [% END %]
+                
+                [% IF c.session.group == 'admin' %]
+                    <div class="dropdown-divider"></div>
+                    <a href="/navigation/add_link?menu=hosted"><i class="icon-add"></i> Add Menu Link</a>
+                [% END %]
             </div>
-            [% END %]
-        [% END %]
-        
-        [% IF c.session.roles.grep('admin').size %]
-        <div class="dropdown-divider"></div>
-        <a href="/navigation/manage_links?menu=Hosted" class="menu-item"><i class="icon-manage"></i>Manage Hosted Menu</a>
-        [% END %]
-    </div>
-</li>
-
+        </li>

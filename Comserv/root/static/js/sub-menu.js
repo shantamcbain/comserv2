@@ -1,5 +1,8 @@
 function activateSite(site) {
+    // Code to be executed when a site is clicked
     console.log('Site activated:', site);
+    // Replace the console.log statement with your desired code for site activation
+    // Perform the necessary action based on the site clicked (e.g., redirect, perform an operation, etc.)
 }
 
 function toggleDebugMode() {
@@ -9,119 +12,98 @@ function toggleDebugMode() {
 }
 
 function setSessionDebugMode(debugMode) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/update_debug_mode', true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhr.onload = function() {
-        if (xhr.status === 200) {
+    // Update the debug mode value on the server-side
+    $.ajax({
+        url: '/update_debug_mode',
+        method: 'POST',
+        data: { debug_mode: debugMode },
+        success: function(response) {
             console.log('Debug mode updated successfully');
+            // Reload the page or perform any necessary action after updating the debug mode
             location.reload();
+        },
+        error: function(xhr, status, error) {
+            console.error('Error updating debug mode:', error);
         }
-    };
-    xhr.onerror = function() {
-        console.error('Error updating debug mode');
-    };
-    xhr.send('debug_mode=' + debugMode);
+    });
 }
 
 function getSessionDebugMode() {
-    const debugMode = document.documentElement.getAttribute('data-debug-mode');
-    return debugMode ? parseInt(debugMode) : (sessionStorage.getItem('debug_mode') ? parseInt(sessionStorage.getItem('debug_mode')) : 0);
+    // Retrieve the debug mode value from the session via AJAX
+    // Since this is a static JS file, we can't use Template Toolkit syntax
+    // We'll return 0 as default and let the server handle the actual state
+    return 0;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+// Add dropdown menu functionality when the document is ready
+$(document).ready(function() {
     console.log('Menu initialization starting...');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Found dropbtn elements:', $('.dropbtn').length);
 
-    var horizontalMenus = document.querySelectorAll('.horizontal-menu');
-    horizontalMenus.forEach(function(menu) {
-        menu.style.display = 'flex';
-        menu.style.flexDirection = 'row';
-        menu.style.listStyleType = 'none';
-        menu.style.margin = '0';
-        menu.style.padding = '0';
-        menu.style.width = '100%';
+    // Force horizontal menu layout
+    $('.horizontal-menu').css({
+        'display': 'flex',
+        'flex-direction': 'row',
+        'list-style-type': 'none',
+        'margin': '0',
+        'padding': '0',
+        'width': '100%'
     });
 
-    var dropdowns = document.querySelectorAll('.horizontal-dropdown');
-    dropdowns.forEach(function(dropdown) {
-        dropdown.style.position = 'relative';
-        dropdown.style.display = 'inline-block';
-        dropdown.style.marginRight = '5px';
-
-        dropdown.addEventListener('mouseenter', function() {
-            var content = this.querySelector('.dropdown-content');
-            if (content) {
-                content.style.display = 'block';
-                content.style.opacity = '1';
-                content.style.visibility = 'visible';
-                console.log('Dropdown shown');
-            }
-        });
-
-        dropdown.addEventListener('mouseleave', function() {
-            var content = this.querySelector('.dropdown-content');
-            if (content) {
-                content.style.display = 'none';
-                content.style.opacity = '0';
-                content.style.visibility = 'hidden';
-                console.log('Dropdown hidden');
-            }
-        });
+    // Force horizontal dropdown layout
+    $('.horizontal-dropdown').css({
+        'position': 'relative',
+        'display': 'inline-block',
+        'margin-right': '5px'
     });
 
-    var submenus = document.querySelectorAll('.submenu-item');
-    submenus.forEach(function(submenu) {
-        submenu.addEventListener('mouseenter', function() {
-            var submenuContent = this.querySelector('.submenu');
-            if (submenuContent) {
-                submenuContent.style.display = 'block';
-                submenuContent.style.opacity = '1';
-                submenuContent.style.visibility = 'visible';
-                console.log('Submenu shown');
-            }
-        });
+    // Add hover event handlers for dropdown menus
+    $('.horizontal-dropdown').hover(
+        function() {
+            $(this).find('.dropdown-content').css('display', 'block');
+            console.log('Dropdown shown');
+        },
+        function() {
+            $(this).find('.dropdown-content').css('display', 'none');
+            console.log('Dropdown hidden');
+        }
+    );
 
-        submenu.addEventListener('mouseleave', function() {
-            var submenuContent = this.querySelector('.submenu');
-            if (submenuContent) {
-                submenuContent.style.display = 'none';
-                submenuContent.style.opacity = '0';
-                submenuContent.style.visibility = 'hidden';
-                console.log('Submenu hidden');
-            }
-        });
-    });
+    // Add hover event handlers for submenus
+    $('.submenu-item').hover(
+        function() {
+            $(this).find('.submenu').css('display', 'block');
+            console.log('Submenu shown');
+        },
+        function() {
+            $(this).find('.submenu').css('display', 'none');
+            console.log('Submenu hidden');
+        }
+    );
 
-    var dropbtns = document.querySelectorAll('.dropbtn');
-    dropbtns.forEach(function(dropbtn) {
-        dropbtn.addEventListener('click', function(e) {
-            var href = this.getAttribute('href');
+    // Add click handlers - very simple approach
+    $('.dropbtn').on('click', function(e) {
+        var href = $(this).attr('href');
+        var isDropdownOnly = $(this).hasClass('dropdown-only') || href === 'javascript:void(0)' || href === '#';
+
+        console.log('Dropdown clicked, href:', href, 'isDropdownOnly:', isDropdownOnly);
+
+        // Only prevent default for dropdown-only buttons
+        if (isDropdownOnly) {
+            e.preventDefault();
+            var $dropdown = $(this).closest('.horizontal-dropdown');
+            var $content = $dropdown.find('.dropdown-content');
             
-            if (!href || href === '#') {
-                e.preventDefault();
-                
-                var dropdown = this.closest('.horizontal-dropdown');
-                var content = dropdown.querySelector('.dropdown-content');
-                
-                if (content.style.display === 'block') {
-                    content.style.display = 'none';
-                    content.style.opacity = '0';
-                    content.style.visibility = 'hidden';
-                } else {
-                    document.querySelectorAll('.dropdown-content').forEach(function(dc) {
-                        dc.style.display = 'none';
-                        dc.style.opacity = '0';
-                        dc.style.visibility = 'hidden';
-                    });
-                    content.style.display = 'block';
-                    content.style.opacity = '1';
-                    content.style.visibility = 'visible';
-                }
-                console.log('Dropdown toggled');
+            if ($content.is(':visible')) {
+                $content.hide();
             } else {
-                console.log('Navigating to: ' + href);
+                // Hide all other dropdowns first
+                $('.dropdown-content').hide();
+                $content.show();
             }
-        });
+        }
+        // For all other buttons, let the browser handle the navigation normally
     });
 
     console.log('Menu dropdown functionality initialized');

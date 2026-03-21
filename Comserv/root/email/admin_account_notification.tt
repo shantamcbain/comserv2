@@ -8,6 +8,17 @@
     <li><strong>Email:</strong> [% email %]</li>
     <li><strong>Role(s):</strong> [% roles %]</li>
     <li><strong>Created at:</strong> [% created_at %]</li>
+    [% IF mailing_lists && mailing_lists.size > 0 %]
+    <li><strong>Mailing List Subscriptions:</strong>
+        <ul>
+            [% FOREACH list_name IN mailing_lists %]
+            <li>[% list_name | html %]</li>
+            [% END %]
+        </ul>
+    </li>
+    [% ELSE %]
+    <li><strong>Mailing List Subscriptions:</strong> None selected</li>
+    [% END %]
 </ul>
 
 <p>This is an automated notification. No action is required.</p>

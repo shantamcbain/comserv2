@@ -1,6 +1,7 @@
 package Comserv::Model::ApiaryModel;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 
 extends 'Catalyst::Model';
 
@@ -128,6 +129,147 @@ sub get_queens_for_hive {
     }
 
     return \@queens;
+}
+
+=head2 get_hive_statistics
+
+Retrieves statistics about hives (total count, healthy count, etc.)
+
+=cut
+
+sub get_hive_statistics {
+    my ($self) = @_;
+    
+    my $stats = { total => 0, healthy => 0 };
+    
+    eval {
+        # Get a DBIx::Class::Schema object
+        my $schema = $self->schema;
+        
+        # Get a DBIx::Class::ResultSet object for the 'Hive' table
+        my $rs = $schema->resultset('Hive');
+        
+        # Count total hives
+        $stats->{total} = $rs->count();
+        
+        # Count healthy hives (assuming there's a status field)
+        $stats->{healthy} = $rs->search({ status => 'healthy' })->count();
+    };
+    
+    if ($@) {
+        warn "An error occurred while fetching hive statistics: $@";
+        return undef;
+    }
+    
+    return $stats;
+}
+
+=head2 get_recent_inspections
+
+Retrieves recent inspections within the specified number of days
+
+=cut
+
+sub get_recent_inspections {
+    my ($self, $days) = @_;
+    $days ||= 7; # Default to 7 days
+    
+    my @inspections;
+    
+    eval {
+        # Get a DBIx::Class::Schema object
+        my $schema = $self->schema;
+        
+        # Calculate date threshold
+        my $date_threshold = DateTime->now->subtract(days => $days)->ymd;
+        
+        # Get a DBIx::Class::ResultSet object for the 'Inspection' table
+        my $rs = $schema->resultset('Inspection');
+        
+        # Fetch recent inspections
+        @inspections = $rs->search({
+            inspection_date => { '>=' => $date_threshold }
+        });
+    };
+    
+    if ($@) {
+        warn "An error occurred while fetching recent inspections: $@";
+        return undef;
+    }
+    
+    return \@inspections;
+}
+
+=head2 get_todo_statistics
+
+Retrieves statistics about todos (pending count, overdue count, etc.)
+
+=cut
+
+sub get_todo_statistics {
+    my ($self) = @_;
+    
+    my $stats = { pending => 0, overdue => 0 };
+    
+    eval {
+        # Get a DBIx::Class::Schema object
+        my $schema = $self->schema;
+        
+        # Get a DBIx::Class::ResultSet object for the 'Todo' table
+        my $rs = $schema->resultset('Todo');
+        
+        # Count pending todos
+        $stats->{pending} = $rs->search({ status => 'pending' })->count();
+        
+        # Count overdue todos (assuming there's a due_date field)
+        my $today = DateTime->now->ymd;
+        $stats->{overdue} = $rs->search({
+            status => 'pending',
+            due_date => { '<' => $today }
+        })->count();
+    };
+    
+    if ($@) {
+        warn "An error occurred while fetching todo statistics: $@";
+        return undef;
+    }
+    
+    return $stats;
+}
+
+=head2 get_low_stock_items
+
+Retrieves inventory items that are low in stock
+
+=cut
+
+sub get_low_stock_items {
+    my ($self) = @_;
+    
+    my @low_stock_items;
+    
+    eval {
+        # Get a DBIx::Class::Schema object
+        my $schema = $self->schema;
+        
+        # Get a DBIx::Class::ResultSet object for the 'Inventory' table
+        my $rs = $schema->resultset('Inventory');
+        
+        # Fetch items where current stock is below minimum threshold
+        @low_stock_items = $rs->search({
+            -or => [
+                { current_stock => { '<' => \'minimum_stock' } },
+                { current_stock => { '<=' => 5 } } # Default threshold
+            ]
+        });
+    };
+    
+    if ($@) {
+        warn "An error occurred while fetching low stock items: $@";
+        return undef;
+    }
+    
+    return \@low_stock_items;
 }
 
 __PACKAGE__->meta->make_immutable;

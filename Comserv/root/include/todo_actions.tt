@@ -1,0 +1,53 @@
+[%# 
+  Reusable Todo Actions Component
+  
+  Parameters:
+  - todo: The todo record object
+  - action_type: 'links' (default) or 'forms'
+  - target: Optional target for forms (e.g., '_blank')
+  - css_classes: Additional CSS classes for the container
+  - site_name: Site name for theme styling (defaults to c.session.SiteName)
+%]
+
+[% 
+  # Set defaults
+  action_type = action_type || 'links';
+  site_name = site_name || c.session.SiteName || 'default';
+  css_classes = css_classes || 'todo-actions';
+%]
+
+<span class="[% css_classes %]" data-site="[% site_name %]" style="display: inline-flex; gap: 5px; align-items: center;">
+  [% IF action_type == 'forms' %]
+    <!-- Form-based actions -->
+    <form action="/log/log_form" method="POST" [% IF target %]target="[% target %]"[% END %] class="inline-form" style="display: inline-block; margin: 0;">
+      <input type="hidden" name="todo_record_id" value="[% todo.get_column('record_id') || todo.record_id %]">
+      <input type="hidden" name="site_name" value="[% todo.get_column('sitename') || site_name %]">
+      <input type="hidden" name="start_date" value="[% todo.get_column('start_date') || todo.start_date %]">
+      <input type="hidden" name="due_date" value="[% todo.get_column('due_date') || todo.due_date %]">
+      <input type="hidden" name="abstract" value="[% todo.get_column('subject') || todo.subject %]">
+      <input type="hidden" name="details" value="[% todo.get_column('description') || todo.description %]">
+      <input type="hidden" name="priority" value="[% todo.get_column('priority') || todo.priority %]">
+      <input type="hidden" name="status" value="[% todo.get_column('status') || todo.status %]">
+      <input type="hidden" name="comments" value="[% todo.get_column('comments') || todo.comments %]">
+      <button type="submit" class="btn btn-success btn-sm" data-site="[% site_name %]">Log Time</button>
+    </form>
+    
+    <form action="/todo/details" method="POST" class="inline-form" style="display: inline-block; margin: 0;">
+      <input type="hidden" name="record_id" value="[% todo.get_column('record_id') || todo.record_id %]">
+      <button type="submit" class="btn btn-info btn-sm" data-site="[% site_name %]">View</button>
+    </form>
+    
+    <form action="/todo/edit/[% todo.get_column('record_id') || todo.record_id %]" method="POST" class="inline-form" style="display: inline-block; margin: 0;">
+      <input type="hidden" name="record_id" value="[% todo.get_column('record_id') || todo.record_id %]">
+      <button type="submit" class="btn btn-warning btn-sm" data-site="[% site_name %]">Edit</button>
+    </form>
+  [% ELSE %]
+    <!-- Link-based actions (default) -->
+    <a href="/todo/details?record_id=[% todo.get_column('record_id') || todo.record_id %]" 
+       class="btn btn-info btn-sm" data-site="[% site_name %]">View</a>
+    <a href="/todo/edit/[% todo.get_column('record_id') || todo.record_id %]" 
+       class="btn btn-warning btn-sm" data-site="[% site_name %]">Edit</a>
+    <a href="/log/log_form?todo_record_id=[% todo.get_column('record_id') || todo.record_id %]" 
+       class="btn btn-success btn-sm" data-site="[% site_name %]" [% IF target %]target="[% target %]"[% END %]>Log Time</a>
+  [% END %]
+</span>

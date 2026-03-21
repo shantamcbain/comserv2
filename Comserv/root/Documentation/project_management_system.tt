@@ -1,0 +1,333 @@
+[% PageVersion = 'Comserv/root/Documentation/project_management_system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Project Management System' %]
+
+<!-- Documentation page for project_management_system -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+<h2>Overview</h2>
+
+
+
+The Project Management System in Comserv provides a comprehensive solution for creating, organizing, and tracking projects and their sub-projects. It supports hierarchical project structures, priority levels, status tracking, and integration with the Todo system.
+
+
+
+<h2>Features</h2>
+
+
+
+<h3>Project Hierarchy</h3>
+
+
+
+<ul><li>**Parent Projects**: Top-level projects that can contain sub-projects</li></ul>
+
+<ul><li>**Sub-Projects**: Projects that belong to a parent project, creating a hierarchical structure</li></ul>
+
+<ul><li>**Multi-Level Hierarchy**: Support for multiple levels of sub-projects (up to 3 levels deep)</li></ul>
+
+
+
+<h3>Project Properties</h3>
+
+
+
+<ul><li>**Name and Description**: Basic project identification</li></ul>
+
+<ul><li>**Priority Levels**: High, Medium, Low priorities with color-coded badges</li></ul>
+
+<ul><li>**Status Tracking**: New, In Progress, Completed status indicators</li></ul>
+
+<ul><li>**Dates**: Start date and end date tracking</li></ul>
+
+<ul><li>**Personnel**: Developer and client information</li></ul>
+
+<ul><li>**Project Code**: Unique identifier for the project</li></ul>
+
+
+
+<h3>Project Display and Navigation</h3>
+
+
+
+<ul><li>**Vertical Card Layout**: Projects displayed as collapsible cards in a vertical layout</li></ul>
+
+<ul><li>**Collapsible Interface**: Projects are collapsed by default and can be expanded to show details</li></ul>
+
+<ul><li>**Sub-Project Nesting**: Sub-projects displayed within their parent project cards</li></ul>
+
+<ul><li>**Visual Hierarchy**: Clear visual indicators for project relationships</li></ul>
+
+
+
+<h3>Filtering and Organization</h3>
+
+
+
+<ul><li>**Project/Sub-Project Filter**: Filter the display to show a specific project or sub-project</li></ul>
+
+<ul><li>**Priority Filter**: Filter projects by their priority level</li></ul>
+
+<ul><li>**Hierarchical Awareness**: When filtering by a sub-project, relevant parent projects remain visible</li></ul>
+
+<ul><li>**Clear Filters**: Option to reset all filters and view the complete project list</li></ul>
+
+
+
+<h3>Project Management</h3>
+
+
+
+<ul><li>**Add New Projects**: Create new top-level projects</li></ul>
+
+<ul><li>**Create Sub-Projects**: Add sub-projects to existing projects</li></ul>
+
+<ul><li>**Edit Projects**: Modify project details (admin users only)</li></ul>
+
+<ul><li>**View Project Details**: Access comprehensive project information</li></ul>
+
+
+
+<h3>Integration with Todo System</h3>
+
+
+
+<ul><li>**Project-Todo Association**: Todos can be associated with specific projects</li></ul>
+
+<ul><li>**Project Details View**: View all todos associated with a project</li></ul>
+
+<ul><li>**Todo Filtering**: Filter todos by project in the Todo system</li></ul>
+
+
+
+<h2>User Interface</h2>
+
+
+
+<h3>Project List Page</h3>
+
+
+
+The main project list page (<code>/project/project</code>) displays all projects and provides filtering capabilities:
+
+
+
+<ol><li>**Filter Panel**: Located at the top of the page</li></ol>
+
+   - Project/sub-project dropdown
+
+   - Priority filter dropdown
+
+   - Apply and Clear buttons
+
+
+
+<ol><li>**Project Cards**: Vertical list of collapsible project cards</li></ol>
+
+   - Card header with project name and priority badge
+
+   - Collapse/expand toggle
+
+   - Project details when expanded (description, status, dates, personnel)
+
+   - Action buttons (Details, Edit)
+
+   - Sub-projects section (if applicable)
+
+
+
+<ol><li>**Add New Project**: Button at the bottom of the page</li></ol>
+
+
+
+<h3>Project Details Page</h3>
+
+
+
+The project details page (<code>/project/details</code>) provides comprehensive information about a specific project:
+
+
+
+<ol><li>**Project Information**: Complete project details</li></ol>
+
+<ol><li>**Associated Todos**: List of todos linked to the project</li></ol>
+
+<ol><li>**Sub-Projects**: List of sub-projects (if any)</li></ol>
+
+<ol><li>**Action Buttons**: Edit project, add sub-project, etc.</li></ol>
+
+
+
+<h2>Technical Implementation</h2>
+
+
+
+<h3>Templates</h3>
+
+
+
+<ul><li>**project.tt**: Main project list template with filtering and collapsible cards</li></ul>
+
+<ul><li>**projectdetails.tt**: Project details display</li></ul>
+
+<ul><li>**add_project.tt**: Form for adding new projects</li></ul>
+
+<ul><li>**editproject.tt**: Form for editing existing projects</li></ul>
+
+<ul><li>**project_list.tt**: Reusable component for project selection dropdowns</li></ul>
+
+
+
+<h3>Controller</h3>
+
+
+
+The <code>Project.pm</code> controller handles all project-related actions:
+
+
+
+<ul><li>**project**: Displays the main project list with filtering</li></ul>
+
+<ul><li>**details**: Shows detailed information for a specific project</li></ul>
+
+<ul><li>**add_project**: Displays the form for adding a new project</li></ul>
+
+<ul><li>**create_project**: Processes the form submission for a new project</li></ul>
+
+<ul><li>**editproject**: Displays the form for editing a project</li></ul>
+
+<ul><li>**update_project**: Processes the form submission for editing a project</li></ul>
+
+
+
+<h3>Database Schema</h3>
+
+
+
+Projects are stored in the <code>project</code> table with the following key fields:
+
+
+
+<ul><li>**id**: Unique identifier</li></ul>
+
+<ul><li>**name**: Project name</li></ul>
+
+<ul><li>**description**: Project description</li></ul>
+
+<ul><li>**parent_id**: Reference to parent project (null for top-level projects)</li></ul>
+
+<ul><li>**status**: Project status (1=New, 2=In Progress, 3=Completed)</li></ul>
+
+<ul><li>**priority**: Project priority (1=High, 2=Medium, 3=Low)</li></ul>
+
+<ul><li>**start_date**: Project start date</li></ul>
+
+<ul><li>**end_date**: Project end date</li></ul>
+
+<ul><li>**developer_name**: Name of the developer</li></ul>
+
+<ul><li>**client_name**: Name of the client</li></ul>
+
+<ul><li>**project_code**: Unique project code</li></ul>
+
+
+
+<h2>Usage Examples</h2>
+
+
+
+<h3>Filtering Projects</h3>
+
+
+
+<ol><li>Navigate to the Projects page (<code>/project/project</code>)</li></ol>
+
+<ol><li>Use the Project dropdown to select a specific project or sub-project</li></ol>
+
+<ol><li>Use the Priority dropdown to filter by priority level</li></ol>
+
+<ol><li>Click "Apply Filters" to update the display</li></ol>
+
+<ol><li>Click "Clear Filters" to reset and show all projects</li></ol>
+
+
+
+<h3>Adding a New Project</h3>
+
+
+
+<ol><li>Click the "Add New Project" button on the Projects page</li></ol>
+
+<ol><li>Fill in the project details in the form</li></ol>
+
+<ol><li>Select a parent project if creating a sub-project</li></ol>
+
+<ol><li>Click "Create Project" to save</li></ol>
+
+
+
+<h3>Viewing Project Details</h3>
+
+
+
+<ol><li>Find the project in the list</li></ol>
+
+<ol><li>Click the "Details" button on the project card</li></ol>
+
+<ol><li>View comprehensive project information and associated todos</li></ol>
+
+
+
+<h3>Editing a Project</h3>
+
+
+
+<ol><li>Find the project in the list</li></ol>
+
+<ol><li>Click the "Edit" button on the project card (admin users only)</li></ol>
+
+<ol><li>Modify the project details in the form</li></ol>
+
+<ol><li>Click "Update Project" to save changes</li></ol>
+
+
+
+<h2>Recent Updates</h2>
+
+
+
+<ul><li>**August 25, 2025**: Implemented vertical card layout with filtering capabilities</li></ul>
+
+<ul><li>**July 2024**: Fixed project ID issue in Todo system</li></ul>
+
+<ul><li>**June 2024**: Fixed project edit functionality</li></ul>
+
+
+
+<h2>Future Enhancements</h2>
+
+
+
+<ul><li>Project archiving functionality</li></ul>
+
+<ul><li>Enhanced reporting and analytics</li></ul>
+
+<ul><li>Project templates for quick creation</li></ul>
+
+<ul><li>Resource allocation and tracking</li></ul>
+
+<ul><li>Timeline visualization</li></ul>
+
+</div>

@@ -175,6 +175,75 @@ git commit -m "Update completed_items.json with commit reference"</code></pre>
         
         <p>By following this structured approach, you'll maintain high-quality documentation that evolves with your system while keeping a clear record of all changes.</p>
     </section>
+
+    <section id="ongoing-challenges">
+        <h2>Ongoing Documentation Challenges & Solutions</h2>
+        
+        <p>As the application grows, several challenges have been identified that need systematic addressing:</p>
+        
+        <h3>Navigation Consistency Issues</h3>
+        <ul>
+            <li><strong>Problem:</strong> Keeping AI assistants consistent with navigation changes across sessions</li>
+            <li><strong>Impact:</strong> Navigation templates and controller routes can become inconsistent</li>
+            <li><strong>Solution Needed:</strong> 
+                <ul>
+                    <li>Standardized navigation update checklist</li>
+                    <li>Cross-reference validation between templates and controllers</li>
+                    <li>Navigation change documentation requirements</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>File Growth & Organization</h3>
+        <ul>
+            <li><strong>Problem:</strong> As file numbers grow, navigation becomes increasingly complex</li>
+            <li><strong>Impact:</strong> Users and developers struggle to find related files</li>
+            <li><strong>Solution Needed:</strong>
+                <ul>
+                    <li>Improved file categorization system</li>
+                    <li>Better search functionality</li>
+                    <li>Automated file relationship detection</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>Related File Linking</h3>
+        <ul>
+            <li><strong>Problem:</strong> Related files need better cross-linking within the files themselves</li>
+            <li><strong>Impact:</strong> Users miss important related information</li>
+            <li><strong>Solution Needed:</strong>
+                <ul>
+                    <li>Standardized "Related Files" sections in documentation</li>
+                    <li>Automated relationship detection and suggestion</li>
+                    <li>Cross-reference validation during documentation updates</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>AI Session Consistency</h3>
+        <ul>
+            <li><strong>Problem:</strong> Maintaining consistency across AI assistant sessions</li>
+            <li><strong>Impact:</strong> Changes made in one session may not be properly carried forward</li>
+            <li><strong>Solution Needed:</strong>
+                <ul>
+                    <li>Enhanced handoff documentation protocols</li>
+                    <li>Session state tracking improvements</li>
+                    <li>Better context preservation between sessions</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>Action Items for Future Development</h3>
+        <ol>
+            <li><strong>Create Navigation Change Protocol:</strong> Document required steps when navigation changes</li>
+            <li><strong>Implement File Relationship Tracking:</strong> System to track and display related files</li>
+            <li><strong>Enhance AutoDiscovery Tool:</strong> Add relationship detection capabilities</li>
+            <li><strong>Improve AI Handoff Process:</strong> Better context preservation between sessions</li>
+            <li><strong>Add Cross-Reference Validation:</strong> Automated checking of file links and references</li>
+        </ol>
+        
+        <p><strong>Note:</strong> These challenges should be addressed incrementally as part of ongoing development work. Each AI session should consider these issues when making changes to the documentation system.</p>
+    </section>
 </div>
 
 <style>

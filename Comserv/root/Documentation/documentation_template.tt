@@ -1,0 +1,411 @@
+[% PageVersion = 'Comserv/root/Documentation/documentation_template.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Documentation Template' %]
+
+<!-- Documentation page for documentation_template -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+title: "Documentation Template"
+
+description: "Template for creating new documentation using the metadata-driven approach"
+
+author: "System Administrator"
+
+date: "2025-05-30"
+
+status: "Active"
+
+roles: ["normal", "editor", "admin", "developer"]
+
+sites: ["all"]
+
+categories: ["user_guides", "tutorials"]
+
+tags: ["template", "documentation", "metadata"]
+
+version: "1.0"
+
+---
+
+
+
+<h1>Documentation Template</h1>
+
+
+
+<h2>Overview</h2>
+
+
+
+This template provides a standardized format for creating new documentation in the Comserv system using the metadata-driven approach. Following this template ensures that all documentation is consistent and properly categorized.
+
+
+
+<h2>Metadata Section</h2>
+
+
+
+Every documentation file should begin with a metadata section enclosed in triple dashes (<code>---</code>). This section contains key information about the document that is used for categorization, filtering, and display.
+
+
+
+<code></code>`markdown
+
+---
+
+title: "Document Title"
+
+description: "Brief description of the document"
+
+author: "Your Name"
+
+date: "YYYY-MM-DD"
+
+status: "Active"
+
+roles: ["normal", "admin", "developer"]
+
+sites: ["all", "MCOOP"]
+
+categories: ["user_guides", "tutorials"]
+
+tags: ["feature1", "feature2"]
+
+---
+
+<code></code>`
+
+
+
+<h3>Required Metadata Fields</h3>
+
+
+
+<ul><li>**title**: The title of the document (should match the H1 heading)</li></ul>
+
+<ul><li>**description**: A brief description of the document content (1-2 sentences)</li></ul>
+
+<ul><li>**author**: Your name or username</li></ul>
+
+<ul><li>**date**: The creation date in YYYY-MM-DD format</li></ul>
+
+<ul><li>**status**: One of "Active", "Draft", or "Deprecated"</li></ul>
+
+<ul><li>**roles**: Array of roles that can access this document (normal, editor, admin, developer)</li></ul>
+
+<ul><li>**sites**: Array of sites this document applies to ("all" for all sites, or specific site names)</li></ul>
+
+<ul><li>**categories**: Array of categories this document belongs to (from the configuration file)</li></ul>
+
+
+
+<h3>Optional Metadata Fields</h3>
+
+
+
+<ul><li>**tags**: Array of tags for additional categorization</li></ul>
+
+<ul><li>**version**: Document version number</li></ul>
+
+<ul><li>**related**: Array of related document filenames</li></ul>
+
+
+
+<h2>Document Structure</h2>
+
+
+
+<h3>Main Heading</h3>
+
+
+
+The document should start with a level 1 heading (<code>#</code>) that matches the title in the metadata section.
+
+
+
+<h3>Overview Section</h3>
+
+
+
+Begin with an overview section that briefly explains the purpose and scope of the document.
+
+
+
+<h3>Main Sections</h3>
+
+
+
+Organize the document into logical sections using level 2 headings (<code>##</code>).
+
+
+
+<h3>Subsections</h3>
+
+
+
+Use level 3 headings (<code>###</code>) for subsections within main sections.
+
+
+
+<h2>Formatting Guidelines</h2>
+
+
+
+<h3>Code Blocks</h3>
+
+
+
+Use fenced code blocks with language specification for code examples:
+
+
+
+<code></code>`perl
+
+sub example_function {
+
+    my ($self, $param) = @_;
+
+    return $param;
+
+}
+
+<code></code>`
+
+
+
+<h3>Lists</h3>
+
+
+
+Use bulleted lists for unordered items:
+
+
+
+<ul><li>Item 1</li></ul>
+
+<ul><li>Item 2</li></ul>
+
+<ul><li>Item 3</li></ul>
+
+
+
+Use numbered lists for sequential steps:
+
+
+
+<ol><li>First step</li></ol>
+
+<ol><li>Second step</li></ol>
+
+<ol><li>Third step</li></ol>
+
+
+
+<h3>Tables</h3>
+
+
+
+Use markdown tables for tabular data:
+
+
+
+| Column 1 | Column 2 | Column 3 |
+
+|----------|----------|----------|
+
+| Data 1   | Data 2   | Data 3   |
+
+| Data 4   | Data 5   | Data 6   |
+
+
+
+<h3>Images</h3>
+
+
+
+Include images with descriptive alt text:
+
+
+
+<code></code>`markdown
+
+!<a href="path/to/image.png "Optional title"">Alt text for the image</a>
+
+<code></code>`
+
+
+
+<h3>Notes and Warnings</h3>
+
+
+
+Use blockquotes for notes and warnings:
+
+
+
+> **Note:** This is an important note that users should be aware of.
+
+
+
+> **Warning:** This is a warning about potential issues.
+
+
+
+<h2>Examples</h2>
+
+
+
+<h3>Example User Guide</h3>
+
+
+
+<code></code>`markdown
+
+---
+
+title: "User Profile Management"
+
+description: "Guide for managing user profiles in the Comserv system"
+
+author: "John Doe"
+
+date: "2025-06-15"
+
+status: "Active"
+
+roles: ["normal", "editor", "admin", "developer"]
+
+sites: ["all"]
+
+categories: ["user_guides"]
+
+tags: ["profile", "user management", "settings"]
+
+---
+
+
+
+<h1>User Profile Management</h1>
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how to manage your user profile in the Comserv system, including updating personal information, changing your password, and configuring notification preferences.
+
+
+
+<h2>Accessing Your Profile</h2>
+
+
+
+<ol><li>Log in to the Comserv system</li></ol>
+
+<ol><li>Click on your username in the top-right corner</li></ol>
+
+<ol><li>Select "Profile" from the dropdown menu</li></ol>
+
+
+
+<h2>Updating Personal Information</h2>
+
+
+
+...
+
+<code></code>`
+
+
+
+<h3>Example Admin Guide</h3>
+
+
+
+<code></code>`markdown
+
+---
+
+title: "User Role Management"
+
+description: "Guide for administrators on managing user roles"
+
+author: "Jane Smith"
+
+date: "2025-06-20"
+
+status: "Active"
+
+roles: ["admin", "developer"]
+
+sites: ["all"]
+
+categories: ["admin_guides"]
+
+tags: ["roles", "permissions", "user management"]
+
+---
+
+
+
+<h1>User Role Management</h1>
+
+
+
+<h2>Overview</h2>
+
+
+
+This guide explains how administrators can manage user roles in the Comserv system, including assigning roles, creating custom roles, and configuring role permissions.
+
+
+
+<h2>Accessing Role Management</h2>
+
+
+
+<ol><li>Log in to the Comserv system as an administrator</li></ol>
+
+<ol><li>Navigate to Admin > User Management > Roles</li></ol>
+
+
+
+<h2>Available Roles</h2>
+
+
+
+...
+
+<code></code>`
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/docs/developer/documentation_system.md">Documentation System Overview</a></li></ul>
+
+<ul><li><a href="/Documentation/docs/developer/documentation_workflow.md">Documentation Workflow</a></li></ul>
+
+<ul><li><a href="/Documentation/docs/developer/metadata_reference.md">Metadata Reference</a></li></ul>
+
+
+
+<h2>Conclusion</h2>
+
+
+
+Following this template ensures that all documentation is consistent, properly categorized, and easily accessible through the documentation system. The metadata-driven approach allows for flexible filtering and organization of documentation based on various criteria.
+
+</div>

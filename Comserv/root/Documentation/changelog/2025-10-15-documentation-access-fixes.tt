@@ -1,3 +1,17 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-10-15-documentation-access-fixes.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = '    Documentation Access and Display Fixes' %]
+
+<!-- Documentation page for 2025-10-15-documentation-access-fixes -->
+<div class="documentation-content">
+
+
+
+<!-- Documentation page for     Documentation Access and Display Fixes -->
+
 [% META 
    title = "Documentation Access and Display Fixes"
    description = "Fixes for documentation access control and display issues"
@@ -20,7 +34,6 @@
             <strong>Type:</strong> Bug Fix<br>
             <strong>Priority:</strong> High
         </p>
-    </div>
     
     <div class="doc-section">
         <h2>Issues Fixed</h2>
@@ -48,21 +61,20 @@
             <li>Enhanced display of documentation metadata (last updated, roles, etc.)</li>
             <li>Fixed styling inconsistencies across different documentation types</li>
         </ul>
-    </div>
     
     <div class="doc-section">
         <h2>Technical Changes</h2>
         
         <h3>Controller Updates</h3>
         <pre class="code-block">
-# Enhanced role-based access control logic
+<h1>Enhanced role-based access control logic</h1>
 if (lc($role) eq lc($user_role)) {
     $has_role = 1;
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
         "Role match: user role $user_role matches required role $role for page $page");
     last;
 }
-# Special case for normal role - any authenticated user can access normal content
+<h1>Special case for normal role - any authenticated user can access normal content</h1>
 elsif (lc($role) eq 'normal' && $user_role) {
     $has_role = 1;
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'view',
@@ -73,14 +85,14 @@ elsif (lc($role) eq 'normal' && $user_role) {
         
         <h3>Path Resolution Logic</h3>
         <pre class="code-block">
-# Check if there's a default path defined in the documentation_config.json file
+<h1>Check if there's a default path defined in the documentation_config.json file</h1>
 if ($config->{default_paths} && $config->{default_paths}{$page}) {
     $default_path = $config->{default_paths}{$page};
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
         "Found default path for $page: $default_path");
 }
 
-# If a default path is defined, try to use it
+<h1>If a default path is defined, try to use it</h1>
 if ($default_path) {
     my $full_default_path = $c->path_to('root', $default_path);
     
@@ -93,7 +105,6 @@ if ($default_path) {
     }
 }
         </pre>
-    </div>
     
     <div class="doc-section">
         <h2>User Impact</h2>
@@ -107,7 +118,6 @@ if ($default_path) {
             <li>Navigation between documentation pages is more reliable</li>
             <li>Role-based access control works correctly for all user types</li>
         </ul>
-    </div>
     
     <div class="doc-section">
         <h2>Related Documentation</h2>
@@ -115,5 +125,5 @@ if ($default_path) {
             <li><a href="[% c.uri_for('/Documentation/documentation_migration_to_tt') %]">Documentation Migration to Template Toolkit</a></li>
             <li><a href="[% c.uri_for('/Documentation/documentation_tt_template') %]">Documentation Template Toolkit Template</a></li>
         </ul>
-    </div>
+
 </div>

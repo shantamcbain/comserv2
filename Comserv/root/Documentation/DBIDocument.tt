@@ -1,17 +1,23 @@
 [% PageVersion = 'Documentation/DBIDocument.tt,v 0.03 2024/08/15 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
+[% END %]
+
+[% META title = 'Try to load the config file using Catalyst::Utils if the application is initialized' %]
+
+<!-- Documentation page for DBIDocument -->
+<div class="documentation-content">
+
     [%# "Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
-[% END %]
 <h1>DBI Setup</h1>
 <p>DBI (Database Independent Interface) is a database access module for the Perl programming language. It defines a set of methods, variables, and conventions that provide a consistent database interface, independent of the actual database being used.</p>
 
 <h2>Overview</h2>
-<p>The `Comserv::Model::DBEncy` and `Comserv::Model::DBForager` modules are used to access the 'Ency' and 'Forager' MySQL databases, respectively. These modules are designed to be used as models in a Catalyst application.</p>
+<p>The <code>Comserv::Model::DBEncy</code> and <code>Comserv::Model::DBForager</code> modules are used to access the 'Ency' and 'Forager' MySQL databases, respectively. These modules are designed to be used as models in a Catalyst application.</p>
 
 <h2>Database Configuration</h2>
-<p>The database configuration for each module is loaded from a JSON file named `db_config.json`. This file contains details such as the database name, host, port, username, and password. The structure of the `db_config.json` file is as follows:</p>
+<p>The database configuration for each module is loaded from a JSON file named <code>db_config.json</code>. This file contains details such as the database name, host, port, username, and password. The structure of the <code>db_config.json</code> file is as follows:</p>
 <pre><code>{
     "shanta_ency": {
         "database": "ency_db",
@@ -41,12 +47,12 @@
 <p>This approach ensures that the configuration file can be found regardless of which directory the application is started from, without relying on hard-coded relative paths.</p>
 
 <pre><code>
-# Try to load the config file using Catalyst::Utils if the application is initialized
+<h1>Try to load the config file using Catalyst::Utils if the application is initialized</h1>
 eval {
     $config_file = Catalyst::Utils::path_to('db_config.json');
 };
 
-# Fallback to smart detection if Catalyst::Utils fails (during application initialization)
+<h1>Fallback to smart detection if Catalyst::Utils fails (during application initialization)</h1>
 if ($@ || !defined $config_file) {
     use FindBin;
     use File::Basename;
@@ -81,7 +87,7 @@ if ($@ || !defined $config_file) {
 </code></pre>
 
 <h2>Database Connection</h2>
-<p>The database connection is established using the DBI->connect method. The `schema_class` and `connect_info` attributes are set in each module to specify the database schema and connection details. It is important to note that `DBEncy` and `DBForager` provide the database connections, and no other controller or model needs to know the connection details.</p>
+<p>The database connection is established using the DBI->connect method. The <code>schema_class</code> and <code>connect_info</code> attributes are set in each module to specify the database schema and connection details. It is important to note that <code>DBEncy</code> and <code>DBForager</code> provide the database connections, and no other controller or model needs to know the connection details.</p>
 <pre><code>__PACKAGE__->config(
     schema_class => 'Comserv::Model::Schema::Ency',
     connect_info => {
@@ -115,7 +121,7 @@ if ($@ || !defined $config_file) {
 <p>The improved configuration file loading mechanism also includes enhanced error handling to provide more detailed information when issues occur:</p>
 
 <pre><code>
-# Load the configuration file
+<h1>Load the configuration file</h1>
 eval {
     local $/; # Enable 'slurp' mode
     open my $fh, "<", $config_file or die "Could not open $config_file: $!";
@@ -134,6 +140,8 @@ if ($@) {
 <p>The code employs security measures such as hashing passwords using the Digest::SHA module to ensure secure password storage.</p>
 
 <h2>Catalyst Integration</h2>
-<p>The `DBEncy` and `DBForager` modules are designed to be used as models in a Catalyst application. They utilize the Catalyst context object ($c) to access session data and other Catalyst features.</p>
+<p>The <code>DBEncy</code> and <code>DBForager</code> modules are designed to be used as models in a Catalyst application. They utilize the Catalyst context object ($c) to access session data and other Catalyst features.</p>
 
 <p>For more information on how AI can enhance the functionalities of the DBI module, refer to the <a href="#AI">AI Integration Plan</a>.</p>
+
+</div>
