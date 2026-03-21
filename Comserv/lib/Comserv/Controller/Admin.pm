@@ -1289,6 +1289,9 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
         exit 1;
     }
 
+    # Reap child automatically so it doesn't become a zombie
+    local $SIG{CHLD} = 'IGNORE';
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_start',
         "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages");
 
@@ -1330,7 +1333,8 @@ sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
     my $results = undef;
 
     if (-f $out_file) {
-        my $content = do { local $/; open(my $f, '<', $out_file) or ''; <$f> // '' };
+        my $content = '';
+        if (open(my $f, '<', $out_file)) { local $/; $content = <$f> // ''; close($f); }
         if ($content =~ /Full report written/) {
             $done = 1;
             if (-f $json_file) {
