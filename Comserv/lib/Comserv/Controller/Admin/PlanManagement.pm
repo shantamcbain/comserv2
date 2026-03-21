@@ -21,28 +21,21 @@ sub begin :Private {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', 
         "User accessing path: " . $c->req->uri);
     
-    my $roles = $c->session->{roles} || [];
+    # Use stash roles (set by Root::auto — includes site-specific admin detection)
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
+    $roles = [] unless ref $roles eq 'ARRAY';
     
-    if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', 
-            "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
-    }
-    
-    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
+    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', 
             "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $c->res->redirect($c->uri_for('/'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
     # Store SiteName-based visibility context in stash:
     # CSC admins can see all sites; non-CSC admins/developers only see their own site.
-    my $session_sitename = $c->session->{SiteName} || 'CSC';
-    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && (grep { lc($_) eq 'admin' } @$roles);
+    my $session_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc_admin = (uc($session_sitename) eq 'CSC') && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @$roles);
     $c->stash->{plan_sitename}   = $session_sitename;
     $c->stash->{is_csc_admin}    = $is_csc_admin;
 
