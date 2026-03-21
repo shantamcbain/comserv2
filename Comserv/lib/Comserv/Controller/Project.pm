@@ -513,7 +513,7 @@ sub editproject :Path('editproject') :Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'editproject', 'Missing project_id parameter');
         $c->stash(
             error_msg => "Project ID is required to edit a project.",
-            template => 'todo/error.tt'
+            template => 'error.tt'
         );
         $c->forward($c->view('TT'));
         return;
@@ -541,7 +541,7 @@ sub editproject :Path('editproject') :Args(0) {
             "Error finding project with ID $project_id: $error_msg");
         $c->stash(
             error_msg => "Project with ID $project_id not found. Please check the application.log for more Details.",
-            template => 'todo/error.tt'
+            template => 'error.tt'
         );
         $c->forward($c->view('TT'));
         return;
