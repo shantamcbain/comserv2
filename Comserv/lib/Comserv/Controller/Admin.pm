@@ -1238,15 +1238,15 @@ sub security_scan :Path('/admin/security-scan') :Args(0) {
         "Completed security_scan action");
 }
 
-# Security scan — SSE streaming endpoint (GET)
-sub security_scan_stream :Path('/admin/security-scan-stream') :Args(0) {
+# Security scan — start background scan (POST), returns JSON immediately
+sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     my ($self, $c) = @_;
 
+    $c->response->content_type('application/json');
+
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'security_scan_stream')) {
-        $c->response->status(403);
-        $c->response->content_type('text/plain');
-        $c->response->body('Access denied');
+    unless ($admin_auth->check_admin_access($c, 'security_scan_start')) {
+        $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
 
@@ -1261,49 +1261,90 @@ sub security_scan_stream :Path('/admin/security-scan-stream') :Args(0) {
     $max_pages  = 500 if $max_pages > 500;
 
     unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
-        $c->response->status(400);
-        $c->response->body('Invalid URL');
+        $c->response->body(encode_json({ error => 'Invalid URL' }));
         return;
     }
 
-    my $report_file = File::Spec->catfile($c->path_to(''), 'security_crawl_report.json');
-    my $script      = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+    my $script    = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_stream',
-        "Streaming security scan: url=$target_url site=$site_name max=$max_pages");
+    unlink $out_file, $json_file;
 
-    $c->response->content_type('text/event-stream');
-    $c->response->header('Cache-Control'     => 'no-cache');
-    $c->response->header('X-Accel-Buffering' => 'no');
-    $c->response->header('Connection'        => 'keep-alive');
-
-    open(my $pipe, '-|', 'perl', $script,
-        '--url',    $target_url,
-        '--site',   $site_name,
-        '--max',    $max_pages,
-        '--output', $report_file,
-    ) or do {
-        $c->response->write("data: ERROR: Cannot launch scan script: $!\n\n");
-        $c->response->write("data: __DONE__\n\n");
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ error => "fork failed: $!" }));
         return;
-    };
-
-    while (my $line = <$pipe>) {
-        chomp $line;
-        $line =~ s/\r//g;
-        $c->response->write("data: $line\n\n");
-    }
-    close($pipe);
-
-    if (-f $report_file) {
-        eval {
-            my $json_text = do { local $/; open(my $fh, '<', $report_file) or die $!; <$fh> };
-            $json_text =~ s/\n/ /g;
-            $c->response->write("data: __JSON__$json_text\n\n");
-        };
     }
 
-    $c->response->write("data: __DONE__\n\n");
+    if ($pid == 0) {
+        open(STDOUT, '>', $out_file) or exit 1;
+        open(STDERR, '>&STDOUT');
+        exec('perl', $script,
+            '--url',    $target_url,
+            '--site',   $site_name,
+            '--max',    $max_pages,
+            '--output', $json_file,
+        );
+        exit 1;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_start',
+        "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages");
+
+    $c->response->body(encode_json({ started => 1, pid => $pid }));
+}
+
+# Security scan — poll for new output lines (GET)
+sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_poll')) {
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $offset    = int($c->req->param('offset') // 0);
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+
+    my @new_lines;
+    my $new_offset = $offset;
+
+    if (-f $out_file) {
+        open(my $fh, '<', $out_file);
+        seek($fh, $offset, 0);
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            push @new_lines, $line;
+        }
+        $new_offset = tell($fh);
+        close($fh);
+    }
+
+    my $done    = 0;
+    my $results = undef;
+
+    if (-f $out_file) {
+        my $content = do { local $/; open(my $f, '<', $out_file) or ''; <$f> // '' };
+        if ($content =~ /Full report written/) {
+            $done = 1;
+            if (-f $json_file) {
+                eval {
+                    my $jt = do { local $/; open(my $f, '<', $json_file) or die; <$f> };
+                    $results = decode_json($jt);
+                };
+            }
+        }
+    }
+
+    my %resp = (lines => \@new_lines, offset => $new_offset, done => $done);
+    $resp{results} = $results if $done && $results;
+    $c->response->body(encode_json(\%resp));
 }
 
 # Admin backup and restore
