@@ -5,19 +5,8 @@
 
 [% META title = 'Cloudflare API Authentication' %]
 
-<!-- Documentation page for cloudflare_api_authentication -->
-<div class="documentation-content">
-
-
-
-<div class="apiary-container">
-    <header class="apiary-header">
-        <h1><i class="fas fa-shield-alt"></i> Cloudflare API Authentication</h1>
-        <div class="apiary-context">
-            <span class="context-item"><strong>Category:</strong> API Documentation</span>
-            <span class="context-item"><strong>Type:</strong> Authentication Guide</span>
-        </div>
-    </header>
+<div class="documentation-container">
+    <h1>Cloudflare API Authentication</h1>
     
     <div class="toc">
         <h2>Table of Contents</h2>
@@ -29,6 +18,7 @@
             <li><a href="#api-token">Creating a New API Token</a></li>
             <li><a href="#troubleshooting">Troubleshooting</a></li>
         </ul>
+    </div>
     
     <section id="overview">
         <h2>Overview</h2>
@@ -106,10 +96,10 @@
         <p>You can test the Cloudflare API authentication using the provided test scripts:</p>
         
         <pre>
-<h1>Test API token authentication</h1>
+# Test API token authentication
 perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_token.pl
 
-<h1>Test domain-specific operations</h1>
+# Test domain-specific operations
 perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain.pl
         </pre>
         
@@ -135,7 +125,44 @@ perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain
             </dd>
         </dl>
     </section>
-
-<!-- Now uses standard apiary-container styles from base-containers.css -->
-
 </div>
+
+<style>
+    .documentation-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .toc {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 30px;
+    }
+    
+    .toc ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    
+    section {
+        margin-bottom: 40px;
+    }
+    
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    dt {
+        font-weight: bold;
+        margin-top: 15px;
+    }
+    
+    dd {
+        margin-left: 20px;
+    }
+</style>

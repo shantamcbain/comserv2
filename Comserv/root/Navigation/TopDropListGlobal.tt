@@ -1,67 +1,99 @@
-[% PageVersion = 'Navigation/TopDropLisGlobal.tt,v 0.01 2024/01/01hanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListGlobal.tt,v 0.02 2025/09/03 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [% #"Debugging HostName: " _ HostName %]
     [%# INCLUDE 'debug.tt' %]
 [% END %]
-        <li class="horizontal-dropdown">
-            <a href="javascript:void(0)" class="dropbtn dropdown-only"><i class="icon-global"></i>Global</a>
-            <div class="dropdown-content">
-                <a href="/mail"><i class="icon-mail"></i>Mail</a>
-                <a href="/jobs"><i class="icon-file"></i>Jobs</a>
-                <a href="/join"><i class="icon-user-plus"></i>Join</a>
-               <!-- Add more global options -->
 
-    <a href="/cgi-bin/index.cgi?[% session_string %]&amp;site=[% SiteName%]&amp;view=JobView" Target
-="_Blank">
-         <font   class="LeftSideBarNavStyle">Jobs</font></a>
-    [% embed('AffiliateLinkView') %]
-   <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register&amp;aff=[% data.affiliate_number %]"  target="_blank"title="Domain registration services."><font   class="LeftSideBarNavStyle">Register Domains</font></a>
-[% IF group == 'Dev_admin' OR
-         group == 'CSC_Developer'OR
-         username  == 'Shanta' %]
-
-
-
-    [% IF firstname %]
-    <a href="http://dev.[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite"
-       title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">What we are working on.</font></a>
-    [% END %]
-    <a href="http://[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_Blank" name="DevSite" title="DevSite See what we are working on."><font   class="HeaderBarNavStyle">What we are working on.</font></a>
-    [% END %]
-               [% IF c.session.global_links.size %]
-                    [% FOREACH link IN c.session.global_links %]
-                        <a href="[% link.url %]">[% link.name %]</a>
-                        [% IF c.session.group == 'admin' %]
-                            <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+<li class="horizontal-dropdown">
+    <a href="#" class="dropbtn"><i class="icon-global"></i>Global</a>
+    <div class="dropdown-content">
+        <!-- Core Global Services -->
+        <a href="/mail"><i class="icon-mail"></i>Mail</a>
+        <a href="/jobs"><i class="icon-briefcase"></i>Jobs</a>
+        <a href="/join"><i class="icon-user-plus"></i>Join</a>
+        
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=Global" class="menu-item"><i class="icon-add"></i>Add Global Link</a>
+        [% END %]
+        
+        <!-- Development Links (for authorized users) -->
+        [% IF c.session.group == 'Dev_admin' OR c.session.group == 'CSC_Developer' OR c.session.username == 'Shanta' %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-dev"></i>Development</span>
+            <div class="submenu">
+                [% IF c.session.firstname %]
+                <a href="http://dev.[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_blank" title="Development Site">
+                    <i class="icon-dev"></i>What we are working on
+                </a>
+                [% END %]
+                <a href="http://[% HostName %]/cgi-bin/index.cgi?site=[% SiteName %]" target="_blank" title="Production Site">
+                    <i class="icon-prod"></i>Production Site
+                </a>
+            </div>
+        </div>
+        [% END %]
+        
+        <!-- Public Global Links added by admin -->
+        [% FOREACH link = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Global_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+        <div class="dropdown-divider"></div>
+            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="menu-item">
+                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                [% link.name %]
+            </a>
+            [% IF c.session.roles.grep('admin').size %]
+                <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
+            [% END %]
+        [% END %]
+        
+        <!-- Private Global Links for logged in users -->
+        [% IF c.session.username && c.stash.private_links %]
+            [% SET has_private_global_links = 0 %]
+            [% FOREACH link IN c.stash.private_links %]
+                [% IF link.category == 'Global_links' || link.menu == 'Global' %]
+                    [% SET has_private_global_links = 1 %]
+                [% END %]
+            [% END %]
+            
+            [% IF has_private_global_links %]
+            <div class="dropdown-divider"></div>
+            <div class="submenu-item">
+                <span class="submenu-header"><i class="icon-user-global"></i>My Global Links</span>
+                <div class="submenu">
+                    [% FOREACH link IN c.stash.private_links %]
+                        [% IF link.category == 'Global_links' || link.menu == 'Global' %]
+                            <a href="[% link.url %]" target="[% link.target || '_self' %]" title="[% link.name %]" class="submenu-link">
+                                [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
+                                [% link.name %]
+                            </a>
+                            <a href="/navigation/edit_link?link_id=[% link.id %]" class="edit-link">Edit</a>
                         [% END %]
                     [% END %]
+                </div>
+            </div>
+            [% END %]
+        [% END %]
+        
+        <!-- Services & Registration -->
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-services"></i>Services</span>
+            <div class="submenu">
+                [% IF data.affiliate_number %]
+                <a href="http://www.computersystemconsulting.ca/whmcs/cart.php?a=add&domain=register&aff=[% data.affiliate_number %]" target="_blank" title="Domain registration services">
+                    <i class="icon-domain"></i>Register Domains
+                </a>
                 [% END %]
-                
-                <!-- Private Links Section - Available to ALL logged-in users -->
-                [% IF c.user_exists && private_links && private_links.size %]
-                    <div class="dropdown-divider"></div>
-                    <div class="submenu-section">
-                        <span class="submenu-section-title">Private Links</span>
-                        [% FOREACH link IN private_links %]
-                            <a href="[% link.url %]" target="[% link.target %]" title="[% link.name %]">
-                                <i class="icon-link"></i> [% link.name %]
-                            </a>
-                        [% END %]
-                    </div>
-                [% END %]
-                
-                <!-- Link Management -->
-                [% IF c.user_exists %]
-                    <div class="dropdown-divider"></div>
-                    <a href="/navigation/add_private_link"><i class="icon-plus"></i> Add Private Link</a>
-                    <a href="/navigation/manage_private_links"><i class="icon-link"></i> Manage Private Links</a>
-                [% END %]
-                
-                [% IF c.session.group == 'admin' %]
-                    <div class="dropdown-divider"></div>
-                    <a href="/navigation/add_link?menu=global"><i class="icon-plus"></i> Add Menu Link</a>
-                [% END %]
-        <!-- Global menu -->
-             </div>
-        </li>
+                <!-- Additional service links can be added here -->
+            </div>
+        </div>
+        
+        [% IF c.session.roles.grep('admin').size %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/manage_links?menu=Global" class="menu-item"><i class="icon-manage"></i>Manage Global Menu</a>
+        [% END %]
+    </div>
+</li>
+

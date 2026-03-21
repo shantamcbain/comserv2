@@ -1,15 +1,29 @@
-[% PageVersion = 'Comserv/root/Documentation/models/README.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
+[% PageVersion = 'README.tt,v 1.00 2025/01/10 shanta Exp shanta' %]
 
-[% META title = 'Model Documentation' %]
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-This directory contains documentation for all Comserv models.
+<div class="documentation-content">
+    <h1>Model Documentation</h1>
+    
+    <p>This directory contains documentation for all Comserv models.</p>
+    
+    <div class="model-overview">
+        <h2>Database Models</h2>
+        <p>Each model represents a database table or relationship and includes documentation on:</p>
+        <ul>
+            <li>Table structure and relationships</li>
+            <li>Available methods and their usage</li>
+            <li>Data validation rules</li>
+            <li>Example usage patterns</li>
+        </ul>
+    </div>
 </div>
+
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+    [% IF debug_msg.defined && debug_msg.size > 0 %]
+        <div class="debug-messages">
+            [% FOREACH msg IN debug_msg %]
+                <p class="debug">Debug: [% msg %]</p>
+            [% END %]
+        </div>
+    [% END %]
+[% END %]

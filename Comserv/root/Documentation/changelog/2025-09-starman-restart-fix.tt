@@ -1,157 +1,71 @@
-[% PageVersion = 'Comserv/root/Documentation/changelog/2025-09-starman-restart-fix.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
+# Starman Restart Functionality Improvements - September 2025
 
-[% META title = 'Starman Restart Functionality Improvements - September 2025' %]
-
-<!-- Documentation page for 2025-09-starman-restart-fix -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-<h2>Overview</h2>
-
-
+## Overview
 
 The Starman server restart functionality in the admin interface has been enhanced to improve usability, security, and cross-server compatibility.
 
+## Changes
 
+### Added Features
 
-<h2>Changes</h2>
-
-
-
-<h3>Added Features</h3>
-
-
-
-<ol><li>**System Username Field**: </li></ol>
-
+1. **System Username Field**: 
    - Added a username field to the restart form
-
    - This allows the feature to work across different servers with various user accounts
-
    - The form now pre-fills with the current user's username when available
 
-
-
-<ol><li>**Improved User Interface**:</li></ol>
-
+2. **Improved User Interface**:
    - Updated form labels and instructions for clarity
-
    - Added more detailed error messages
-
    - Enhanced the confirmation workflow
 
+### Bug Fixes
 
-
-<h3>Bug Fixes</h3>
-
-
-
-<ol><li>**Authentication Issues**:</li></ol>
-
+1. **Authentication Issues**:
    - Fixed user authentication verification
-
    - Properly checks for admin role in session
-
    - Added additional checks for is_admin flag
 
-
-
-<ol><li>**Template Rendering**:</li></ol>
-
+2. **Template Rendering**:
    - Removed dependency on the 'dump' filter which was causing template errors
-
    - Improved template conditional logic
-
    - Fixed debug information display
 
-
-
-<ol><li>**Command Execution**:</li></ol>
-
+3. **Command Execution**:
    - Updated restart command to use the specified username with sudo
-
    - Improved error handling for failed commands
-
    - Enhanced security with better input sanitization
 
+### Technical Improvements
 
-
-<h3>Technical Improvements</h3>
-
-
-
-<ol><li>**Enhanced Logging**:</li></ol>
-
+1. **Enhanced Logging**:
    - Added more detailed debug messages
-
    - Improved logging of user authentication status
-
    - Better tracking of command execution
 
-
-
-<ol><li>**Security Enhancements**:</li></ol>
-
+2. **Security Enhancements**:
    - Improved credential handling
-
    - Better protection against command injection
-
    - Removed password from logs and debug output
 
-
-
-<ol><li>**Code Organization**:</li></ol>
-
+3. **Code Organization**:
    - Refactored controller code for better readability
-
    - Improved error handling and user feedback
-
    - Better session management
 
+## Files Modified
 
+- `/Comserv/lib/Comserv/Controller/Admin.pm`
+- `/Comserv/root/admin/restart_starman.tt`
 
-<h2>Files Modified</h2>
-
-
-
-<ul><li><code>/Comserv/lib/Comserv/Controller/Admin.pm</code></li></ul>
-
-<ul><li><code>/Comserv/root/admin/restart_starman.tt</code></li></ul>
-
-
-
-<h2>Documentation</h2>
-
-
+## Documentation
 
 New documentation has been created to explain the updated functionality:
 
+- [Starman Restart Guide](/Documentation/roles/admin/starman_restart_guide.md)
 
+The main [Administrator Guide](/Documentation/roles/admin/admin_guide.md) has also been updated to include information about the Starman restart functionality.
 
-<ul><li><a href="/Documentation/roles/admin/starman_restart_guide.md">Starman Restart Guide</a></li></ul>
+## Contributors
 
-
-
-The main <a href="/Documentation/roles/admin/admin_guide.md">Administrator Guide</a> has also been updated to include information about the Starman restart functionality.
-
-
-
-<h2>Contributors</h2>
-
-
-
-<ul><li>System Development Team</li></ul>
-
-<ul><li>Administrator Support Team</li></ul>
-
-</div>
+- System Development Team
+- Administrator Support Team

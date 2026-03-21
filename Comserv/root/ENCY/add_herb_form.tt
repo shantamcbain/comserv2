@@ -3,7 +3,7 @@
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
  [% END %]
-[% INCLUDE 'ENCY/ImageHelper.tt' %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
 
 
 [% IF error_message %]

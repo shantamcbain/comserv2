@@ -1,45 +1,218 @@
 
-<!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/pagetop.tt -->
-[% PageVersion = 'pagetop.tt,v 0.024.0 2025/05/31 shanta Exp shanta ' %]
-[%# PageVersion = 'pagetop.tt,v 0.023.0 2025/04/09 shanta Exp shanta ' %]
 
-[% SET roles = c.session.roles || [] %]
-[%# is_admin is now set globally in Navigation controller %]
-
-[% IF is_admin || c.session.debug_mode == 1 %]
-<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
-    Domain: <strong>[% c.req.uri.host %]</strong> | 
-    Client IP: <strong>[% c.req.address %]</strong> | 
-    Server: <strong>[% server_hostname %]</strong> | 
-    Server IP: <strong>[% server_ip %]</strong>
-    [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]
-</div>
+[% PageVersion = 'root/pagetop.tt,v 0.030.0 2026/02/09 shanta Exp shanta - Fixed sticky nav menu with higher specificity (header nav#main-menu). Set header position:relative, h1 margin/padding.' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
 [% END %]
+[% SET roles = c.stash.user_roles || c.session.roles || [] %]
+[% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
 
-[% IF c.session.debug_mode == 1 %]
-<div class="debug">
-    [% INCLUDE 'debug.tt' %]
-</div>
+<!-- Add Font Awesome for the paint brush icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-[% IF c.stash.debug_msg.defined && c.stash.debug_msg.size > 0 %]
-    <div class="debug-messages" style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
-        <h4>Debug Messages</h4>
-        [% FOREACH msg IN c.stash.debug_msg %]
-            <p class="debug" style="margin: 2px 0; font-family: monospace;">Debug [% loop.index %]: [% msg %]</p>
+<!-- Theme-aware stylesheet -->
+<style>
+.server-info {
+    background-color: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--text-color);
+}
+
+.db-env-indicator {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+    font-size: 11px;
+    margin-left: 5px;
+}
+
+.db-env-production {
+    background-color: #dc3545;
+    color: white;
+}
+
+.db-env-staging {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.db-env-dev {
+    background-color: #28a745;
+    color: white;
+}
+
+.k8s-migration-banner {
+    background-color: var(--schema-alert-warning-bg, #fff3cd);
+    border-bottom: 2px solid var(--accent-color);
+    padding: 12px 15px;
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+}
+
+.k8s-migration-banner a {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 8px 12px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 13px;
+    display: inline-block;
+}
+
+#css-edit-toggle {
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--button-border);
+    border-radius: 3px;
+    padding: 2px 10px;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+#css-edit-toggle:hover {
+    background: var(--button-hover-bg);
+}
+
+#css-edit-toggle.edit-mode {
+    background: var(--warning-color);
+    color: white;
+    border: 1px solid var(--warning-color);
+}
+
+#css-edit-toggle.edit-mode:hover {
+    opacity: 0.9;
+}
+
+
+.css-edit-mode * {
+    outline: 2px solid rgba(52, 152, 219, 0.3) !important;
+    position: relative;
+}
+
+.css-edit-mode *:hover {
+    outline: 2px solid var(--warning-color) !important;
+    cursor: crosshair;
+}
+
+/* Sticky/Floating Main Navigation Menu - Only the nav, not the header */
+header {
+    position: relative !important;
+}
+
+header nav#main-menu {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2000 !important;
+    background-color: var(--nav-bg, white) !important;
+    border-bottom: 2px solid var(--border-color, #ddd) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    margin: 0 !important;
+}
+
+header h1 {
+    margin: 0 !important;
+    padding: 10px !important;
+}
+</style>
+
+<!-- CRITICAL: Debug Bar UI - DO NOT REMOVE (lines 7-22)
+     This debug bar section displays server info (hostname, IP, database connections)
+     to admins and users in debug mode. Removing this breaks diagnostic visibility
+     and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
+[% IF is_admin || c.session.debug_mode == 1 %]
+<div class="server-info">
+    [% IF is_admin || c.session.debug_mode == 1 %]
+    <div style="text-align: right;">
+        Domain: <strong>[% c.req.uri.host %]</strong> | 
+        Client IP: <strong>[% c.req.address %]</strong> | 
+        Server: <strong>[% system_identifier || app_workflow %]</strong> | Branch: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
+        Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
+        DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
+        [% IF c.session.debug_mode == 1 %] | [% END %] |
+        [% IF is_admin %]
+        <button id="css-edit-toggle"
+                data-theme-name="[% theme_name || 'default' %]"
+                title="Click any page element to edit its styles and save to the [% theme_name || 'default' %] theme">
+            <i class="fas fa-paint-brush"></i> Theme Editor
+        </button>
         [% END %]
     </div>
+    [% END %]
+</div>
 [% END %]
+
+<!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->
+[% IF k8s_migration_needed && is_admin %]
+<div class="k8s-migration-banner">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong style="font-size: 14px;">⚠️ K8s Migration Ready</strong>
+            <p style="margin: 5px 0 0 0; font-size: 13px;">
+                [% k8s_migration_message %]
+            </p>
+        </div>
+        <div style="margin-left: 15px;">
+            <a href="[% k8s_setup_url %]">
+                Migrate to K8s Secrets
+            </a>
+        </div>
+    </div>
+</div>
 [% END %]
+
+<!-- Include Debug Template - shows session/stash when debug_mode=1 -->
+[% IF c.session.debug_mode == 1 %]
+[% INCLUDE 'debug.tt' %]
+[% END %]
+
+<!-- Include Theme Editor JavaScript -->
+[% IF is_admin %]
+<script src="[% c.uri_for('/static/js/theme-editor.js') %]"></script>
+[% END %]
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('css-edit-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (typeof ThemeEditor === 'undefined') {
+                alert('Theme Editor script failed to load. Please reload the page.');
+                return;
+            }
+
+            if (!window.themeEditor) {
+                window.themeEditor = new ThemeEditor();
+                window.themeEditor.init();
+            }
+
+            window.themeEditor.toggleInspector();
+
+            const isActive = window.themeEditor.isInspectorActive;
+            document.body.classList.toggle('css-edit-mode', isActive);
+            this.innerHTML = isActive
+                ? '<i class="fas fa-times"></i> Close Editor'
+                : '<i class="fas fa-paint-brush"></i> Theme Editor';
+            this.classList.toggle('edit-mode', isActive);
+        });
+    }
+});
+</script>
 
 <header>
     <h1>
-        Welcome [% IF roles.grep('admin').size %]
-[% c.session.first_name %] [% c.session.last_name %] Administrator
-[% ELSIF roles.grep('user').size %]
- [% c.session.first_name %] [% c.session.last_name %] User
+        Welcome [% IF c.session.username %]
+[% c.session.first_name || c.session.username %] [% c.session.last_name %][% IF is_admin %] Administrator[% END %]
 [% ELSE %]
  Guest
-[% END %] to [% c.stash.ScriptDisplayName %]!
+[% END %] to [% site_display_name || SiteDisplayName || c.stash.site_display_name || c.stash.SiteDisplayName || c.session.site_display_name || SiteName || c.session.SiteName || 'this site' %]!
     </h1>
 
 
@@ -47,10 +220,31 @@
 
 
 
-    [% INCLUDE 'Navigation/navigation.tt' %]
+    <!-- Main Menu -->
+    <nav id="main-menu">
+        <ul class="horizontal-menu">
+            <li class="horizontal-dropdown">
+                <a href="[% c.session.return_url %]" class="dropbtn">Back</a>
+            </li>
+        [% INCLUDE 'Navigation/TopDropListMain.tt' %]
+        [% INCLUDE 'Navigation/TopDropListLogin.tt' %]
+        [% INCLUDE 'Navigation/TopDropListGlobal.tt' %]
+        [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% INCLUDE 'Navigation/TopDropListMember.tt' %]
+        [% INCLUDE 'Navigation/TopDropListIT.tt' %]
+        [% INCLUDE 'Navigation/TopDropListENCY.tt' %]
+        <!-- TopDropListCoop.tt has been removed and merged into admintopmenu.tt -->
+
+        [% IF is_admin %]
+            [% INCLUDE 'Navigation/admintopmenu.tt' %]
+        [% END %]
+        [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
+        [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+        </ul>
+    </nav>
+
+
 </header>
-[% IF error_msg %]<div class="alert error">[% error_msg %]</div>[% END %]
-[% IF success_msg %]<div class="alert success">[% success_msg %]</div>[% END %]
 [% IF error_msg %]
 <p class="error">Error: [% error_msg %]</p>
 [% END %]
@@ -58,8 +252,8 @@
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
 [% END %]
-    [% IF c.stash.success_msg %]
-        [% FOREACH msg IN c.stash.success_msg %]
+    [% IF is_admin && c.stash.debug_msg %]
+        [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>
         [% END %]
     [% END %]

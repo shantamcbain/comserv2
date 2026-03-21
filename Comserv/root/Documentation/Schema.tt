@@ -1,227 +1,350 @@
-[% PageVersion  = 'Comserv/root/Documentation/Schema.tt,v 0.2 2025/01/15 Shanta Exp Shanta - Fixed dynamic table creation system'; %]
-[% IF debug_mode == 1 %]
-    <p>Error: [% error_msg %]</p>
+[% META
+   title = "Database Schema Management - Result Classes Approach"
+   description = "Comprehensive guide to managing Comserv database schema using DBIx::Class Result classes and DBSchemaManager. Learn how to create, update, and maintain database tables through code-first approach."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database,schema-management"
+   page_version = "0.01"
+   last_updated = "Thu Dec 25 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Schema.tt,v 0.01 2025/12/25 shanta Exp - Database schema management using Result classes (NOT SQL files)' %]
+[% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1 id="schema-top"><a href="#top">Database Schema Installation</a></h1>
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Database Schema Management</h1>
+    <h2 style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-large); margin-top: 0;">Using DBIx::Class Result Classes (Code-First Approach)</h2>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-25 | 
+        Version: 0.01 |
+        Status: Code-First Schema Management |
+        Target Audience: Developers, Database Administrators
+    </div>
 
-<nav>
-    <a href="#schema-prerequisites">Prerequisites</a> |
-    <a href="#schema-installation">Installation</a>
-</nav>
-
-<h3 id="schema-prerequisites"><a href="#schema-top">Back to top</a> </h3>
-<p>Before you begin, make sure you have the following:</p>
-<ul>
-    <li>MySQL Server installed on your server</li>
-    <li>Access to the command line on your server</li>
-    <li>The `ency.sql` backup file</li>
-</ul>
-
-<h3 id="schema-installation"><a href="#schema-top">Back to top</a></h3>
-
-<h1 id="schemam-top">Database Schema Management Guide</h1>
-
-<nav>
-    <a href="#schemam-overview">1. Overview</a> |
-    <a href="#current-schemam">2. Current Schema Structure</a> |
-    <a href="#schemam-evolution">3. Schema Evolution Plan</a> |
-    <a href="#schemam-database-synchronization">4. Database Synchronization</a> |
-    <a href="#schemam-best-practices">5. Best Practices</a> |
-    <a href="#schemam-versioning">6. Schema Versioning</a> |
-    <a href="#schemam-documentation-updates">7. Schema Documentation Updates</a> |
-    <a href="#schemam-troubleshooting">8. Troubleshooting and Common Issues</a> |
-    <a href="#schemam-references">9. References</a>
-</nav>
-
-<h2 id="schemam-overview"><a href="#schemam-top">1. Overview</a></h2>
-<p>Brief introduction to the purpose of the schema and its importance in the application.</p>
-
-<h2 id="current-schemam"><a href="#schemam-top">2. Current Schema Structure</a></h2>
-<p>Detailed description of the existing tables and their relationships in both the Ency and Forager databases.</p>
-
-<h2 id="schemam-evolution"><a href="#schemam-top">3. Schema Evolution Plan</a></h2>
-<p>Step-by-step guide on how to update the schema to accommodate changes in the application requirements:</p>
-<ol>
-    <li>Identify required schema changes based on application updates.</li>
-    <li>Create SQL migration scripts to implement schema changes.</li>
-    <li>Test migration scripts in a development environment.</li>
-    <li>Execute migration scripts in production, ensuring proper backups are in place.</li>
-    <li>Verify schema changes and test application functionality.</li>
-</ol>
-
-<h2 id="schemam-database-synchronization"><a href="#schemam-top">4. Database Synchronization</a></h2>
-<p>Strategies and tools for keeping schema and data synchronized across multiple servers:</p>
-<ol>
-    <li>Implement automated database synchronization tools.</li>
-    <li>Establish replication or clustering for high availability and data redundancy.</li>
-    <li>Regularly monitor synchronization status and resolve any discrepancies.</li>
-</ol>
-
-<h2 id="schemam-best-practices"><a href="#schemam-top">5. Best Practices</a></h2>
-<p>Recommendations for maintaining a well-organized and efficient database schema:</p>
-<ol>
-    <li>Follow naming conventions for tables, columns, and relationships.</li>
-    <li>Document schema changes and rationale for future reference.</li>
-    <li>Regularly optimize database performance and indexes.</li>
-    <li>Implement application-level caching for frequently accessed data to reduce database load.</li>
-</ol>
-
-<h3 id="navigation-caching-optimization">Navigation Performance Optimization</h3>
-<p><strong>Issue Resolved:</strong> Navigation queries causing 18-20 second delays on /auto action due to repeated database calls.</p>
-
-<p><strong>Solution Implemented:</strong> Application-level caching system in Navigation.pm controller with the following features:</p>
-<ul>
-    <li><strong>5-minute TTL:</strong> Cache expires every 5 minutes to ensure fresh data</li>
-    <li><strong>Per-site/user cache keys:</strong> Separate cache entries for different sites and users</li>
-    <li><strong>Automatic cache invalidation:</strong> Cache clears when navigation data is modified</li>
-    <li><strong>Fallback mechanism:</strong> Direct database queries if cache fails</li>
-</ul>
-
-<p><strong>Performance Impact:</strong></p>
-<ul>
-    <li>Reduced /auto action response time from 18-20 seconds to under 1 second</li>
-    <li>Decreased database load for navigation queries by ~95%</li>
-    <li>Improved overall page load times across the application</li>
-</ul>
-
-<p><strong>Implementation Details:</strong></p>
-<ul>
-    <li><strong>Cache Storage:</strong> In-memory hash with timestamp tracking</li>
-    <li><strong>Cache Keys:</strong> Format: "navigation_[method]_[site]_[user]_[params]"</li>
-    <li><strong>Affected Methods:</strong> get_internal_links, get_pages, get_admin_pages, get_admin_links, get_private_links</li>
-    <li><strong>Auto-restart Compatible:</strong> Cache survives application restarts via persistent storage</li>
-</ul>
-
-<h2 id="schemam-versioning"><a href="#schemam-top">6. Schema Versioning</a></h2>
-<p>Implementation of version control for the schema to track changes and ensure consistency:</p>
-<ol>
-    <li>Use version control systems (e.g., Git) to track schema changes.</li>
-    <li>Tag schema versions for easy reference and rollback if needed.</li>
-</ol>
-
-<h2 id="schemam-documentation-updates"><a href="#schemam-top">7. Schema Documentation Updates</a></h2>
-<p>Procedures for keeping the schema documentation up-to-date with any changes made to the database structure:</p>
-<ol>
-    <li>Automate documentation generation from schema metadata.</li>
-    <li>Include schema change logs in documentation updates.</li>
-</ol>
-
-<h2 id="schemam-troubleshooting"><a href="#schemam-top">8. Troubleshooting and Common Issues</a></h2>
-<p>Solutions for common problems encountered during schema management and synchronization:</p>
-
-<h3 id="dynamic-table-creation-not-working">Dynamic Table Creation Not Working</h3>
-<p><strong>Problem:</strong> Schema comparison shows Result files without corresponding database tables, but clicking "Create" buttons shows "functionality not yet implemented" alerts instead of creating tables.</p>
-
-<p><strong>Root Cause:</strong> JavaScript functions in <code>/admin/schema_compare.tt</code> template are showing placeholder alerts instead of calling backend endpoints.</p>
-
-<p><strong>Solution:</strong> Update JavaScript functions to call proper backend endpoints:</p>
-
-<h4>Files to Check:</h4>
-<ul>
-    <li><strong>Template:</strong> <code>Comserv/root/admin/schema_compare.tt</code></li>
-    <li><strong>Backend:</strong> <code>Comserv/lib/Comserv/Controller/Admin.pm</code></li>
-    <li><strong>Model:</strong> <code>Comserv/lib/Comserv/Model/DBEncy.pm</code></li>
-</ul>
-
-<h4>JavaScript Functions to Fix:</h4>
-<ol>
-    <li><strong>createTableFromResult(resultName, database)</strong>
-        <ul>
-            <li>Should call: <code>/admin/create_table_from_result</code></li>
-            <li>Method: POST with JSON body: <code>{"result_name": resultName, "database": database}</code></li>
-            <li>If showing alert instead of AJAX call, replace with proper fetch() implementation</li>
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" style="background: var(--light-color); padding: var(--spacing-medium); border-radius: 5px; margin: var(--spacing-large) 0;">
+        <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Table of Contents</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><a href="#overview">1. Overview</a></li>
+            <li><a href="#architecture">2. Architecture</a></li>
+            <li><a href="#result-classes">3. Result Classes</a></li>
+            <li><a href="#creating-tables">4. Creating Tables from Result Classes</a></li>
+            <li><a href="#modifying-schema">5. Modifying Schema</a></li>
+            <li><a href="#best-practices">6. Best Practices</a></li>
+            <li><a href="#troubleshooting">7. Troubleshooting</a></li>
+            <li><a href="#related-docs">8. Related Documentation</a></li>
         </ul>
-    </li>
-    <li><strong>createResultFromTable(tableName, database)</strong>
-        <ul>
-            <li>Should call: <code>/admin/create_result_from_table</code></li>
-            <li>Method: POST with JSON body: <code>{"table_name": tableName, "database": database}</code></li>
-            <li>If showing alert instead of AJAX call, replace with proper fetch() implementation</li>
-        </ul>
-    </li>
-</ol>
+    </div>
 
-<h4>Backend Endpoints (should exist):</h4>
-<ul>
-    <li><code>sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0)</code> in Admin.pm</li>
-    <li><code>sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0)</code> in Admin.pm</li>
-    <li><code>sub create_table_from_result</code> method in DBEncy.pm model</li>
-</ul>
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            
+            <div style="background: var(--info-color, #d1ecf1); border-left: 4px solid var(--info-border, #17a2b8); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 0;"><strong>🔑 Key Principle:</strong> Comserv uses a <strong>code-first schema management approach</strong>. Database tables are defined as <strong>DBIx::Class Result classes</strong> in your source code, NOT as SQL files.</p>
+            </div>
 
-<h4>How the System Works:</h4>
-<ol>
-    <li><strong>Schema Comparison:</strong> Admin controller compares database tables with Result files</li>
-    <li><strong>Missing Tables Identified:</strong> Result files without corresponding database tables are flagged</li>
-    <li><strong>Dynamic Creation:</strong> "Create" buttons call backend endpoints</li>
-    <li><strong>Table Generation:</strong> DBEncy model uses SQL::Translator to generate CREATE TABLE SQL from Result class definitions</li>
-    <li><strong>Database Update:</strong> Generated SQL is executed to create missing tables</li>
-</ol>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Why Result Classes, Not SQL Files?</h3>
+            <table style="width: 100%; color: var(--text-color); font-family: var(--body-font); border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background: var(--secondary-color, #0066cc); color: white;">
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Aspect</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">Result Classes ✅</th>
+                        <th style="padding: var(--spacing-small); text-align: left; border: 1px solid var(--border-color);">SQL Files ❌</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Version Control</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Tracked in Git with full change history</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Difficult to track incremental changes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Relationships</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Defined in code with helper methods</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Only foreign keys, no ORM integration</td>
+                    </tr>
+                    <tr style="background: var(--light-color);">
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Type Safety</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Perl Moose types enforce constraints</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">No compile-time type checking</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Code Integration</strong></td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Native to Catalyst, full ORM support</td>
+                        <td style="padding: var(--spacing-small); border: 1px solid var(--border-color);">Requires manual schema-to-code sync</td>
+                    </tr>
+                </tbody>
+            </table>
 
-<h4>Testing the Fix:</h4>
-<ol>
-    <li>Go to <code>/admin/schema_compare</code></li>
-    <li>Look for Result files without corresponding tables (red "Create" buttons)</li>
-    <li>Click "Create" button - should show confirmation dialog, not "not implemented" alert</li>
-    <li>Confirm creation - should show loading spinner and success message</li>
-    <li>Page should refresh showing the new table in the comparison</li>
-</ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-<h3 id="log-file-error-optimization">Log File Error Optimization</h3>
-<p><strong>Issue Resolved:</strong> Log file errors were significantly impacting request load times across the application.</p>
+    <!-- ARCHITECTURE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">2. Architecture</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">File Organization</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 3px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>Comserv/
+├── lib/Comserv/
+│   ├── Model/
+│   │   ├── DBSchemaManager.pm          ← Schema management engine
+│   │   └── Schema/
+│   │       └── Ency/
+│   │           └── Result/             ← Result class definitions
+│   │               ├── Todo.pm
+│   │               ├── User.pm
+│   │               ├── DocumentationMetadataIndex.pm
+│   │               └── ... (60+ Result classes)
+│   └── Util/
+│       └── DBSchemaManager.pm          ← Helper utilities
+└── sql/
+    ├── 20251216_ai_chat_feature_phase1_tables.sql (archived reference only)
+    └── ... (historical SQL files - reference only, not used for creation)</code></pre>
+            </div>
 
-<p><strong>Problem Symptoms:</strong></p>
-<ul>
-    <li>Increased response times for all page requests</li>
-    <li>Excessive log file growth</li>
-    <li>Performance degradation during peak usage</li>
-    <li>Server resource consumption spikes</li>
-</ul>
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">How It Works at Application Startup</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>1. Application starts (script/comserv_server.pl)
+   ↓
+2. Catalyst loads all Result classes from lib/Comserv/Model/Schema/Ency/Result/
+   ↓
+3. DBSchemaManager.initialize_schema() called
+   ↓
+4. For each Result class:
+   - Check if table exists
+   - If not: Create table from Result class definition
+   - If exists: Compare schema vs Result definition (optional upgrade)
+   ↓
+5. Application ready to serve requests
+</code></pre>
+            </div>
 
-<p><strong>Root Causes Identified:</strong></p>
-<ul>
-    <li>Redundant error logging in multiple controllers</li>
-    <li>Inefficient log file handling mechanisms</li>
-    <li>Missing error suppression for non-critical warnings</li>
-    <li>Log rotation issues causing file system bottlenecks</li>
-</ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-<p><strong>Solutions Implemented:</strong></p>
-<ul>
-    <li><strong>Log Level Optimization:</strong> Adjusted log levels to reduce verbose output in production</li>
-    <li><strong>Error Suppression:</strong> Added proper error handling to suppress non-critical warnings</li>
-    <li><strong>Log Rotation:</strong> Implemented proper log rotation to prevent file system issues</li>
-    <li><strong>Performance Monitoring:</strong> Added monitoring to track log-related performance impacts</li>
-</ul>
+    <!-- RESULT CLASSES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="result-classes" style="color: var(--text-color); font-family: var(--header-font);">3. Result Classes</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Anatomy of a Result Class</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 3px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>package Comserv::Model::Schema::Ency::Result::DocumentationMetadataIndex;
 
-<p><strong>Performance Impact:</strong></p>
-<ul>
-    <li>Reduced average request response time by eliminating log-related delays</li>
-    <li>Decreased server I/O load from excessive logging</li>
-    <li>Improved overall application stability</li>
-    <li>Reduced disk space usage from log file optimization</li>
-</ul>
+use Moose;
+use MooseX::Types::Moose qw(Str Int);
+use DateTime;
 
-<h3 id="other-schema-issues">Other Common Schema Issues</h3>
-<ol>
-    <li>Identify and resolve database conflicts during schema synchronization.</li>
-    <li>Address performance issues resulting from schema changes.</li>
-    <li>Result file loading errors - check Perl syntax and package names</li>
-    <li>Database connection issues - verify credentials in db_config.json</li>
-    <li>Log file errors impacting request performance - see Log File Error Optimization section above</li>
-</ol>
+__PACKAGE__->table('documentation_metadata_index');
+__PACKAGE__->add_columns(
+    id => {
+        data_type => 'integer',
+        is_auto_increment => 1,
+        is_nullable => 0,
+    },
+    file_path => {
+        data_type => 'varchar',
+        size => 512,
+        is_nullable => 0,
+    },
+    title => {
+        data_type => 'varchar',
+        size => 512,
+    },
+    searchable_text => {
+        data_type => 'longtext',
+    },
+    indexed_at => {
+        data_type => 'datetime',
+        set_on_create => 1,
+    },
+);
 
-<h2 id="schemam-references"><a href="#schemam-top">9. References</a></h2>
-<p>Additional resources and tools for further reading on database schema management.</p>
+__PACKAGE__->set_primary_key('id');
+__PACKAGE__->add_unique_constraint(['file_path']);
 
-<p>Follow these steps to install the MySQL backup on your server:</p>
-<ol>
-    <li>Open the command line on your server.</li>
-    <li>Navigate to the directory where the `ency.sql` file is located.</li>
-    <li>Log in to the MySQL server with the following command: `mysql -u username -p`. Replace `username` with your MySQL username. You will be prompted to enter your password.</li>
-    <li>Create a new database with the following command: `CREATE DATABASE new_database;`. Replace `new_database` with the name of your new database.</li>
-    <li>Select the new database with the following command: `USE new_database;`.</li>
-    <li>Import the `ency.sql` file with the following command: `source ency.sql;`.</li>
-</ol>
-<p>Your MySQL database should now be installed on your server.</p>
+1;</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Key Components</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Package Declaration</strong>: Follows pattern <code>Comserv::Model::Schema::{DatabaseName}::Result::{TableName}</code></li>
+                <li><strong>__PACKAGE__->table()</strong>: Maps Perl class to database table name</li>
+                <li><strong>add_columns()</strong>: Defines all table columns with types and constraints</li>
+                <li><strong>set_primary_key()</strong>: Designates the primary key column</li>
+                <li><strong>add_unique_constraint()</strong>: Adds unique indexes on specified columns</li>
+                <li><strong>Relationships</strong>: Define foreign keys and ORM relationships (optional)</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CREATING TABLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="creating-tables" style="color: var(--text-color); font-family: var(--header-font);">4. Creating Tables from Result Classes</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 1: Create the Result Class</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Write your Result class in <code>lib/Comserv/Model/Schema/Ency/Result/YourTableName.pm</code></p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 2: Start Application</h3>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Development
+perl script/comserv_server.pl
+
+# Production
+starman -p 5000 script/comserv_server.psgi</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Verify Table Creation</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Check application logs or use admin interface:</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Via admin interface
+/admin/database_schema
+
+# Via MySQL CLI
+USE ency;
+SHOW TABLES LIKE 'your_table_name';
+DESCRIBE your_table_name;</code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MODIFYING SCHEMA SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="modifying-schema" style="color: var(--text-color); font-family: var(--header-font);">5. Modifying Schema</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Adding a Column</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Edit the Result class file, add to <code>add_columns()</code>:</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: var(--font-size-small);"><code>new_field => {
+    data_type => 'varchar',
+    size => 255,
+    is_nullable => 1,
+    default_value => 'some_value',
+},</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Save file, restart application. DBSchemaManager detects the difference and creates the column.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Renaming a Column</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">ℹ️ <strong>Note:</strong> Direct column renames require careful migration. Consider:</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Create new column with correct name</li>
+                <li>Copy data from old column</li>
+                <li>Test thoroughly</li>
+                <li>Remove old column in next release</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Adding an Index</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Use <code>add_index()</code> in Result class:</p>
+            <div style="background: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>__PACKAGE__->add_index(['file_path', 'user_id']);</code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- BEST PRACTICES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="best-practices" style="color: var(--text-color); font-family: var(--header-font);">6. Best Practices</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">✅ DO</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Define all schema changes in Result classes</strong> - Keep Result classes as single source of truth</li>
+                <li><strong>Use meaningful table and column names</strong> - Follow snake_case for database, CamelCase for classes</li>
+                <li><strong>Add comments in Result classes</strong> - Document complex column definitions</li>
+                <li><strong>Create indexed relationships</strong> - Ensure foreign key columns are indexed</li>
+                <li><strong>Test schema changes in development first</strong> - Always test before production deployment</li>
+                <li><strong>Track Result classes in Git</strong> - Version control is your audit trail</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">❌ DON'T</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Manually edit database tables</strong> - Always update Result class first</li>
+                <li><strong>Create SQL files for schema creation</strong> - Use Result classes instead</li>
+                <li><strong>Import raw SQL dumps</strong> - Use Result class definitions + data-only backups</li>
+                <li><strong>Leave Result classes out of sync with database</strong> - Run comparison checks regularly</li>
+                <li><strong>Forget to test relationships</strong> - Many bugs come from incorrect foreign key definitions</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
+            
+            <div style="background: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-table-not-created" style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Table Not Created After Restart</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Result class not properly loaded by Catalyst</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check file is in correct directory: <code>lib/Comserv/Model/Schema/Ency/Result/</code></li>
+                    <li>Verify package name matches file name</li>
+                    <li>Check application logs for errors</li>
+                    <li>Run <code>perl -c lib/Comserv/Model/Schema/Ency/Result/YourClass.pm</code> to check syntax</li>
+                </ol>
+            </div>
+
+            <div style="background: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-column-mismatch" style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Schema Mismatch After Code Change</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Database hasn't been updated to match Result class changes</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Use admin interface: <code>/admin/compare_schema</code></li>
+                    <li>Review differences</li>
+                    <li>Use <code>/admin/migrate_schema</code> to apply changes</li>
+                    <li>Test application functionality thoroughly</li>
+                </ol>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RELATED DOCUMENTATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="related-docs" style="color: var(--text-color); font-family: var(--header-font);">8. Related Documentation</h2>
+            
+            <div style="background: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--link-color);">DBSchemaManager Usage Guide</a> - Complete API reference and usage patterns</li>
+                    <li><a href="/Documentation/AI_Chat_Schema_Documentation" style="color: var(--link-color);">AI Chat Schema Documentation</a> - Real-world example of Result class implementation</li>
+                    <li><a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" style="color: var(--link-color);">AI Chat Feature Specification</a> - Complete architecture including schema design</li>
+                    <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--link-color);">Result Class Development Guide</a> - Detailed patterns and examples</li>
+                    <li><a href="/Documentation/DATABASE_CONNECTION_STRATEGY" style="color: var(--link-color);">Database Connection Strategy</a> - Multi-database configuration</li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a> - Schema management tools (/admin/database_schema, /admin/compare_schema, /admin/migrate_schema)</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row" style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+                For questions or contributions, see the Developer Guidelines in the in-app documentation.
+            </p>
+        </div>
+    </div>
+</div>

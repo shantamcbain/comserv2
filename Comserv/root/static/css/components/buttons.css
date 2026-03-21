@@ -1,17 +1,17 @@
-/* Button styles - use theme colors instead of overridden variables */
+/* Button styles */
 button, 
 .button,
 input[type="submit"],
 input[type="button"] {
   display: inline-block;
-  padding: var(--spacing-small, 8px) var(--spacing-medium, 12px);
-  background-color: var(--secondary-color, #f9f9f9);
-  color: var(--text-color, #000000);
-  border: 1px solid var(--border-color, #dddddd);
+  padding: var(--spacing-small) var(--spacing-medium);
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
   border-radius: 4px;
   cursor: pointer;
-  font-family: var(--body-font, inherit);
-  font-size: var(--font-size-base, 14px);
+  font-family: var(--body-font);
+  font-size: var(--font-size-base);
   text-align: center;
   text-decoration: none;
   transition: background-color 0.3s ease;
@@ -21,8 +21,7 @@ button:hover,
 .button:hover,
 input[type="submit"]:hover,
 input[type="button"]:hover {
-  background-color: var(--primary-color, #ffffff);
-  border-color: var(--primary-color, #ffffff);
+  background-color: var(--button-hover-bg);
 }
 
 /* Primary button */

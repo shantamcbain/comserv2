@@ -1,215 +1,100 @@
-[% PageVersion = 'Comserv/root/Documentation/roles/admin/starman_restart_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-[% META title = 'Starman Server Restart Guide' %]
-
-<!-- Documentation page for starman_restart_guide -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
+# Starman Server Restart Guide
 
 This document provides instructions for administrators on how to safely restart the Starman server through the admin interface.
 
-
-
-<h2>Overview</h2>
-
-
+## Overview
 
 The Starman restart functionality allows administrators to restart the Starman web server when necessary, such as after configuration changes or to resolve performance issues. This feature is accessible only to users with admin privileges.
 
-
-
-<h2>Recent Updates (September 2025)</h2>
-
-
+## Recent Updates (September 2025)
 
 The Starman restart functionality has been enhanced with the following improvements:
 
+1. **Added Username Field**: The restart form now requires both username and password, allowing the feature to work across different servers with various user accounts.
 
+2. **Improved Authentication**: The system now properly verifies admin privileges before allowing server restarts.
 
-<ol><li>**Added Username Field**: The restart form now requires both username and password, allowing the feature to work across different servers with various user accounts.</li></ol>
+3. **Enhanced Debugging**: More detailed logging has been added to help troubleshoot any issues.
 
+4. **Better Error Handling**: Clear error messages are displayed when credentials are missing or incorrect.
 
+5. **Security Enhancements**: Improved input sanitization and credential handling for better security.
 
-<ol><li>**Improved Authentication**: The system now properly verifies admin privileges before allowing server restarts.</li></ol>
+## Accessing the Restart Feature
 
+1. Log in to the Comserv platform with an administrator account
+2. Navigate to the Admin Dashboard
+3. Click on "Restart Starman Server" in the System Maintenance section
 
+## Using the Restart Feature
 
-<ol><li>**Enhanced Debugging**: More detailed logging has been added to help troubleshoot any issues.</li></ol>
-
-
-
-<ol><li>**Better Error Handling**: Clear error messages are displayed when credentials are missing or incorrect.</li></ol>
-
-
-
-<ol><li>**Security Enhancements**: Improved input sanitization and credential handling for better security.</li></ol>
-
-
-
-<h2>Accessing the Restart Feature</h2>
-
-
-
-<ol><li>Log in to the Comserv platform with an administrator account</li></ol>
-
-<ol><li>Navigate to the Admin Dashboard</li></ol>
-
-<ol><li>Click on "Restart Starman Server" in the System Maintenance section</li></ol>
-
-
-
-<h2>Using the Restart Feature</h2>
-
-
-
-<h3>Prerequisites</h3>
-
-
+### Prerequisites
 
 Before restarting the Starman server, ensure:
 
+- You have administrator privileges on the Comserv platform
+- You know the system username with sudo privileges
+- You know the password for that system user
+- No critical operations are in progress
 
+### Restart Procedure
 
-<ul><li>You have administrator privileges on the Comserv platform</li></ul>
-
-<ul><li>You know the system username with sudo privileges</li></ul>
-
-<ul><li>You know the password for that system user</li></ul>
-
-<ul><li>No critical operations are in progress</li></ul>
-
-
-
-<h3>Restart Procedure</h3>
-
-
-
-<ol><li>On the Restart Starman Server page, review the warning message about service interruption</li></ol>
-
-<ol><li>Click the "Yes, Restart Starman Server" button to proceed</li></ol>
-
-<ol><li>Enter your system credentials:</li></ol>
-
+1. On the Restart Starman Server page, review the warning message about service interruption
+2. Click the "Yes, Restart Starman Server" button to proceed
+3. Enter your system credentials:
    - **Username**: The system username with sudo privileges
-
    - **Password**: The password for that system user
+4. Click "Restart Starman Server" to execute the restart
 
-<ol><li>Click "Restart Starman Server" to execute the restart</li></ol>
-
-
-
-<h3>Understanding the Results</h3>
-
-
+### Understanding the Results
 
 After the restart command executes:
 
+- A success message will appear if the restart was successful
+- The system will automatically check and display the status of the Starman service
+- Any errors or warnings will be displayed with relevant details
+- Command output will be shown for troubleshooting purposes
 
+## Troubleshooting
 
-<ul><li>A success message will appear if the restart was successful</li></ul>
+### Common Issues
 
-<ul><li>The system will automatically check and display the status of the Starman service</li></ul>
-
-<ul><li>Any errors or warnings will be displayed with relevant details</li></ul>
-
-<ul><li>Command output will be shown for troubleshooting purposes</li></ul>
-
-
-
-<h2>Troubleshooting</h2>
-
-
-
-<h3>Common Issues</h3>
-
-
-
-<ol><li>**Authentication Failure**: </li></ol>
-
+1. **Authentication Failure**: 
    - Ensure you're using the correct system username and password
-
    - Verify the user has sudo privileges
-
    - Check that the user is allowed to run systemctl commands
 
-
-
-<ol><li>**Service Fails to Restart**:</li></ol>
-
+2. **Service Fails to Restart**:
    - Check the command output for specific error messages
-
    - Verify the Starman service is properly configured
-
    - Check system logs for additional information
 
-
-
-<ol><li>**Access Denied**:</li></ol>
-
+3. **Access Denied**:
    - Confirm you have admin privileges in the Comserv platform
-
    - Ensure your session hasn't expired
-
    - Try logging out and back in
 
-
-
-<h3>Debug Information</h3>
-
-
+### Debug Information
 
 When troubleshooting, enable debug mode to see additional information:
 
-
-
-<ol><li>Set <code>debug_mode = 1</code> in your session</li></ol>
-
-<ol><li>The restart page will display detailed information about:</li></ol>
-
+1. Set `debug_mode = 1` in your session
+2. The restart page will display detailed information about:
    - User authentication status
-
    - Role verification
-
    - Command execution
-
    - Service status
 
+## Security Considerations
 
+- The Starman restart feature requires both system username and password
+- Passwords are never stored and are only used for the current restart operation
+- All input is sanitized to prevent command injection
+- The feature is restricted to users with admin privileges
+- All restart attempts are logged for security auditing
 
-<h2>Security Considerations</h2>
+## Related Documentation
 
-
-
-<ul><li>The Starman restart feature requires both system username and password</li></ul>
-
-<ul><li>Passwords are never stored and are only used for the current restart operation</li></ul>
-
-<ul><li>All input is sanitized to prevent command injection</li></ul>
-
-<ul><li>The feature is restricted to users with admin privileges</li></ul>
-
-<ul><li>All restart attempts are logged for security auditing</li></ul>
-
-
-
-<h2>Related Documentation</h2>
-
-
-
-<ul><li><a href="admin_guide.md">Administrator Guide</a></li></ul>
-
-<ul><li><a href="system_maintenance.md">System Maintenance Procedures</a></li></ul>
-
-<ul><li><a href="troubleshooting.md">Troubleshooting Common Issues</a></li></ul>
-
-</div>
+- [Administrator Guide](admin_guide.md)
+- [System Maintenance Procedures](system_maintenance.md)
+- [Troubleshooting Common Issues](troubleshooting.md)

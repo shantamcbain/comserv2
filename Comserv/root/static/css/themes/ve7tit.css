@@ -1,64 +1,26 @@
-/* Theme: ve7tit - Amateur Radio Blue Theme */
-:root {
-  /* Core Universal Container Variables - Amateur Radio Blue */
-  --primary-color: #3498db;        /* Radio blue */
-  --secondary-color: #2980b9;      /* Darker blue */
-  --accent-color: #e74c3c;         /* Red accent (emergency/alert) */
-  --text-color: #1a5276;           /* Dark blue text */
-  --background-color: #f8f9fa;     /* Light background */
-  --warning-color: #f39c12;        /* Orange warning */
-  --success-color: #27ae60;        /* Green success */
-  --link-color: #2980b9;           /* Blue links */
-  --link-hover-color: #1a5276;     /* Darker blue on hover */
-  --border-color: #bdc3c7;         /* Light gray border */
-  --table-header-bg: #eaf2f8;      /* Light blue header */
-  
-  /* Additional variables for complete theme support */
-  --error-color: #e74c3c;          /* Red for errors */
-  --muted-text-color: #7f8c8d;     /* Muted gray text */
-  --primary-color-rgb: 52, 152, 219; /* RGB values for rgba usage */
-  
-  /* Navigation and UI specific */
-  --nav-bg: #3498db;
-  --nav-link-color: #ffffff;
-  --nav-text: #ffffff;
-  --nav-hover-bg: #2980b9;
-  --dropdown-bg: #eaf2f8;
-  
-  /* Header and Footer */
-  --header-bg: #3498db;
-  --footer-bg: #3498db;
-  --footer-text-color: #ffffff;
-  
-  /* Button theming */
-  --button-bg: #3498db;
-  --button-text: #ffffff;
-  --button-border: #2980b9;
-  --button-hover-bg: #2980b9;
-}
+/* CSS for VE7TIT Amateur Radio Equipment Pages */
 
-/* Equipment Details - Now using universal container system */
 .equipment-details {
     max-width: 900px;
     margin: 0 auto;
     padding: 20px;
-    background-color: var(--background-color);
+    background-color: #f9f9f9;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .equipment-details h2 {
-    color: var(--text-color);
-    border-bottom: 2px solid var(--primary-color);
+    color: #1a5276;
+    border-bottom: 2px solid #3498db;
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
 
 .equipment-details h3 {
-    color: var(--secondary-color);
+    color: #2874a6;
     margin-top: 25px;
     margin-bottom: 15px;
-    border-left: 4px solid var(--primary-color);
+    border-left: 4px solid #3498db;
     padding-left: 10px;
 }
 
@@ -78,39 +40,35 @@
 .equipment-details li {
     margin-bottom: 8px;
     line-height: 1.5;
-    color: var(--text-color);
 }
 
 .equipment-details p {
     line-height: 1.6;
     margin-bottom: 15px;
-    color: var(--text-color);
 }
 
 .equipment-details a {
-    color: var(--link-color);
+    color: #2980b9;
     text-decoration: none;
     font-weight: 500;
     transition: color 0.2s;
 }
 
 .equipment-details a:hover {
-    color: var(--link-hover-color);
+    color: #1a5276;
     text-decoration: underline;
 }
 
 /* Resource section styling */
 .equipment-details .resources {
-    background-color: var(--table-header-bg);
+    background-color: #eaf2f8;
     padding: 15px;
     border-radius: 5px;
     margin: 20px 0;
-    border: 1px solid var(--border-color);
 }
 
 .equipment-details .resources h3 {
     margin-top: 0;
-    color: var(--primary-color);
 }
 
 /* Responsive adjustments */

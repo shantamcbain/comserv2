@@ -1,183 +1,348 @@
-[% PageVersion = 'Comserv/root/Documentation/controllers/controller_list.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% META
+        title = "Controller Documentation Status"
+   description = "Index of all Comserv controllers and their documentation status"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "controllers"
+   page_version = "0.01"
+   last_updated = "Tue Jan 06 2026"
+%]
+
+[% PageVersion = 'controllers/controller_list.tt,v 0.01 2026/01/06 admin Exp admin - Converted from Markdown to DocumentationTtTemplate standards with HTML table and TOC navigation' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'Controller Documentation Status' %]
-
-<!-- Documentation page for controller_list -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-This document lists all controllers in the Comserv application and their documentation status.
-
-
-
-<h2>Controllers</h2>
-
-
-
-| Controller | Documentation Status | Path |
-
-|------------|---------------------|------|
-
-| 3d | ❌ Missing | <code>/lib/Comserv/Controller/3d.pm</code> |
-
-| Admin | ❌ Missing | <code>/lib/Comserv/Controller/Admin.pm</code> |
-
-| Admin/Theme | ❌ Missing | <code>/lib/Comserv/Controller/Admin/Theme.pm</code> |
-
-| Apiary | ❌ Missing | <code>/lib/Comserv/Controller/Apiary.pm</code> |
-
-| Base | ❌ Missing | <code>/lib/Comserv/Controller/Base.pm</code> |
-
-| BMaster | ❌ Missing | <code>/lib/Comserv/Controller/BMaster.pm</code> |
-
-| CSC | ❌ Missing | <code>/lib/Comserv/Controller/CSC.pm</code> |
-
-| Documentation | ✅ Documented | <code>/lib/Comserv/Controller/Documentation.pm</code> |
-
-| Documentation/Config | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/Config.pm</code> |
-
-| Documentation/ConfigBased | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/ConfigBased.pm</code> |
-
-| Documentation/ScanMethods | ❌ Missing | <code>/lib/Comserv/Controller/Documentation/ScanMethods.pm</code> |
-
-| ENCY | ❌ Missing | <code>/lib/Comserv/Controller/ENCY.pm</code> |
-
-| File | ❌ Missing | <code>/lib/Comserv/Controller/File.pm</code> |
-
-| Forager | ❌ Missing | <code>/lib/Comserv/Controller/Forager.pm</code> |
-
-| HelpDesk | ✅ Documented | <code>/lib/Comserv/Controller/HelpDesk.pm</code> |
-
-| Hosting | ❌ Missing | <code>/lib/Comserv/Controller/Hosting.pm</code> |
-
-| Log | ❌ Missing | <code>/lib/Comserv/Controller/Log.pm</code> |
-
-| Mail | ❌ Missing | <code>/lib/Comserv/Controller/Mail.pm</code> |
-
-| MCoop | ❌ Missing | <code>/lib/Comserv/Controller/MCoop.pm</code> |
-
-| Project | ❌ Missing | <code>/lib/Comserv/Controller/Project.pm</code> |
-
-| Proxmox | ❌ Missing | <code>/lib/Comserv/Controller/Proxmox.pm</code> |
-
-| ProxmoxServers | ❌ Missing | <code>/lib/Comserv/Controller/ProxmoxServers.pm</code> |
-
-| Root | ✅ Documented | <code>/lib/Comserv/Controller/Root.pm</code> |
-
-| Site | ❌ Missing | <code>/lib/Comserv/Controller/Site.pm</code> |
-
-| TestRoute | ❌ Missing | <code>/lib/Comserv/Controller/TestRoute.pm</code> |
-
-| ThemeAdmin | ❌ Missing | <code>/lib/Comserv/Controller/ThemeAdmin.pm</code> |
-
-| ThemeAdmin/update_theme_with_variables | ❌ Missing | <code>/lib/Comserv/Controller/ThemeAdmin/update_theme_with_variables.pm</code> |
-
-| ThemeEditor | ❌ Missing | <code>/lib/Comserv/Controller/ThemeEditor.pm</code> |
-
-| ThemeTest | ❌ Missing | <code>/lib/Comserv/Controller/ThemeTest.pm</code> |
-
-| Todo | ❌ Missing | <code>/lib/Comserv/Controller/Todo.pm</code> |
-
-| USBM | ❌ Missing | <code>/lib/Comserv/Controller/USBM.pm</code> |
-
-| User | ✅ Documented | <code>/lib/Comserv/Controller/User.pm</code> |
-
-| Ve7tit | ✅ Documented | <code>/lib/Comserv/Controller/Ve7tit.pm</code> |
-
-| Voip | ❌ Missing | <code>/lib/Comserv/Controller/Voip.pm</code> |
-
-| WorkShop | ❌ Missing | <code>/lib/Comserv/Controller/WorkShop.pm</code> |
-
-
-
-<h2>How to Add Documentation</h2>
-
-
-
-To add documentation for a controller:
-
-
-
-<ol><li>Create a Markdown file in the <code>/root/Documentation/controllers/</code> directory</li></ol>
-
-<ol><li>Name the file after the controller (e.g., <code>Root.md</code> for the Root controller)</li></ol>
-
-<ol><li>Include the following sections:</li></ol>
-
-   - Overview
-
-   - Key Features
-
-   - Methods
-
-   - Access Control
-
-   - Related Files
-
-
-
-<h2>Documentation Template</h2>
-
-
-
-<code></code>`markdown
-
-<h1>[Controller Name] Controller</h1>
-
-
-
-<h2>Overview</h2>
-
-Brief description of the controller's purpose.
-
-
-
-<h2>Key Features</h2>
-
-<ul><li>Feature 1</li></ul>
-
-<ul><li>Feature 2</li></ul>
-
-<ul><li>Feature 3</li></ul>
-
-
-
-<h2>Methods</h2>
-
-<ul><li><code>method1</code>: Description</li></ul>
-
-<ul><li><code>method2</code>: Description</li></ul>
-
-<ul><li><code>method3</code>: Description</li></ul>
-
-
-
-<h2>Access Control</h2>
-
-This controller is accessible to users with the following roles:
-
-<ul><li>role1</li></ul>
-
-<ul><li>role2</li></ul>
-
-
-
-<h2>Related Files</h2>
-
-<ul><li>Related file 1</li></ul>
-
-<ul><li>Related file 2</li></ul>
-
-<code></code>`
-
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Controller Documentation Status</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-06 | 
+        Version: 0.01 |
+        Author: admin | 
+        Status: Active
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#controllers" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Controllers</a>
+                <a href="#status-legend" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Status Legend</a>
+                <a href="#add-docs" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Add Documentation</a>
+                <a href="#template" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Template</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This document provides a comprehensive index of all controllers in the Comserv application and tracks their documentation status. Use this reference to understand which controllers have been documented and which require additional documentation work.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- STATUS LEGEND SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="status-legend" style="color: var(--text-color); font-family: var(--header-font);">2. Status Legend</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>✅ Documented</strong>: Controller has comprehensive documentation in the controllers directory</li>
+                <li><strong>❌ Missing</strong>: Controller requires documentation to be created</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CONTROLLERS LIST SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="controllers" style="color: var(--text-color); font-family: var(--header-font);">3. Controller List</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <thead>
+                    <tr style="background-color: var(--table-header-bg);">
+                        <th style="color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Controller</th>
+                        <th style="color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">Status</th>
+                        <th style="color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: left;">Path</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3d</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/3d.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Admin.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin/Theme</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Admin/Theme.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Apiary</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Apiary.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Base</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Base.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">BMaster</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/BMaster.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">CSC</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/CSC.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">✅ Documented</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Documentation.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation/Config</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Documentation/Config.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation/ConfigBased</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Documentation/ConfigBased.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation/ScanMethods</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Documentation/ScanMethods.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ENCY</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ENCY.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">File</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/File.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Forager</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Forager.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">HelpDesk</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">✅ Documented</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/HelpDesk.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Hosting</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Hosting.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Log</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Log.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Mail</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Mail.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">MCoop</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/MCoop.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Project</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Project.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Proxmox</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Proxmox.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ProxmoxServers</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ProxmoxServers.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Root</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">✅ Documented</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Root.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Site</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Site.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">TestRoute</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/TestRoute.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ThemeAdmin</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ThemeAdmin.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ThemeAdmin/update_theme_with_variables</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ThemeAdmin/update_theme_with_variables.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ThemeEditor</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ThemeEditor.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ThemeTest</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/ThemeTest.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Todo</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Todo.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">USBM</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/USBM.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">User</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">✅ Documented</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/User.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Ve7tit</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">✅ Documented</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Ve7tit.pm</code></td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Voip</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/Voip.pm</code></td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">WorkShop</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color); text-align: center;">❌ Missing</td>
+                        <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/lib/Comserv/Controller/WorkShop.pm</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- HOW TO ADD DOCUMENTATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="add-docs" style="color: var(--text-color); font-family: var(--header-font);">4. How to Add Documentation</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">To add documentation for a controller that is marked as "Missing":</p>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Create a Template Toolkit file in the <code>/root/Documentation/controllers/</code> directory</li>
+                <li>Name the file after the controller (e.g., <code>Root.tt</code> for the Root controller)</li>
+                <li>Use the <code>DocumentationTtTemplate.tt</code> as your structural base</li>
+                <li>Include the following standard sections:
+                    <ul>
+                        <li>Overview</li>
+                        <li>Current Implemented Features</li>
+                        <li>Methods Documentation</li>
+                        <li>Access Control</li>
+                        <li>Related Files</li>
+                    </ul>
+                </li>
+                <li>Ensure META block contains all required fields</li>
+                <li>Add CSS variables instead of inline styles</li>
+                <li>Include TOC (Table of Contents) navigation</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DOCUMENTATION TEMPLATE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="template" style="color: var(--text-color); font-family: var(--header-font);">5. Documentation Template</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Use this template as a starting point for new controller documentation:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>[% META
+        title = "[Controller Name] Controller Documentation"
+   description = "Description of controller purpose"
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "controllers"
+   page_version = "0.01"
+   last_updated = "Mon Jan 06 2026"
+%]
+
+[% PageVersion = 'controllers/[ControllerName].tt,v 0.01 2026/01/06 author Exp author - Initial documentation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+&lt;div class="container"&gt;
+    &lt;h1 style="color: var(--text-color); font-family: var(--header-font);"&gt;[Controller Name] Controller Documentation&lt;/h1&gt;
+    
+    &lt;div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);"&gt;
+        Last Updated: 2026-01-06 | Version: 0.01 | Author: [Your Name] | Status: Active
+    &lt;/div&gt;
+
+    &lt;!-- TABLE OF CONTENTS SECTION --&gt;
+    &lt;div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;"&gt;
+        &lt;div class="col-100"&gt;
+            &lt;h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;"&gt;Quick Navigation&lt;/h2&gt;
+            &lt;div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);"&gt;
+                &lt;a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;"&gt;Overview&lt;/a&gt;
+                &lt;a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;"&gt;Features&lt;/a&gt;
+                &lt;a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;"&gt;Methods&lt;/a&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- OVERVIEW SECTION --&gt;
+    &lt;div class="row"&gt;
+        &lt;div class="col-100"&gt;
+            &lt;h2 id="overview"&gt;1. Overview&lt;/h2&gt;
+            &lt;p&gt;Description of controller purpose and functionality.&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
 </div>

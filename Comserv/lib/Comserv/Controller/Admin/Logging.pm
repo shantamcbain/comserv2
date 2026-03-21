@@ -2,348 +2,318 @@ package Comserv::Controller::Admin::Logging;
 
 use Moose;
 use namespace::autoclean;
-use Try::Tiny;
-use File::Slurp;
-use Data::Dumper;
+use File::Spec;
+use File::Basename;
 use Comserv::Util::Logging;
-use JSON qw(encode_json decode_json);
 
-BEGIN { extends 'Catalyst::Controller'; }
-
-__PACKAGE__->config(namespace => 'admin/logging');
+BEGIN { extends 'Comserv::Controller::Base'; }
 
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
 
-# Main logging administration interface
 sub index :Path('/admin/logging') :Args(0) {
     my ($self, $c) = @_;
 
-    # Log that we've entered the logging admin interface
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "***** ENTERED LOGGING ADMIN INTERFACE *****");
+    $c->stash(template => 'admin/Logging/AdminLoggingIndex.tt');
 
-    # Check if the user is logged in
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-            "User not logged in, redirecting to login page");
-        $c->flash->{error} = 'You must be logged in to access this page';
-        $c->response->redirect($c->uri_for('/'));
-        return;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+        'Loading logging administration interface');
+    
+    # Refresh settings from DB
+    $self->logging->refresh_settings($c);
+
+    my $log_file = $self->logging->{LOG_FILE} || $ENV{COMSERV_LOG_FILE};
+    
+    # If not found, try to find it where we expect
+    unless ($log_file && -e $log_file) {
+         my $base_dir = $ENV{'COMSERV_NFS_LOG_DIR'} // $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($c->config->{home}, '..');
+         $log_file = File::Spec->catfile($base_dir, "logs", "application.log") unless $ENV{'COMSERV_NFS_LOG_DIR'};
+         $log_file = File::Spec->catfile($base_dir, "application.log") if $ENV{'COMSERV_NFS_LOG_DIR'};
     }
 
-    # Check if the user has the admin role
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
-            "User does not have admin role, redirecting to home page. Roles: " .
-            (defined $roles ? (ref $roles eq 'ARRAY' ? join(", ", @$roles) : ref($roles)) : "undefined"));
-        $c->flash->{error} = 'You do not have permission to access this page. Required role: admin.';
-        $c->response->redirect($c->uri_for('/'));
-        return;
+    my @archived_logs;
+    if ($log_file && -e $log_file) {
+        my ($filename, $directories, $suffix) = fileparse($log_file);
+        my $archive_dir = File::Spec->catdir($directories, 'archive');
+        
+        if (-d $archive_dir) {
+            opendir(my $dh, $archive_dir);
+            while (my $file = readdir($dh)) {
+                next if $file =~ /^\./;
+                my $path = File::Spec->catfile($archive_dir, $file);
+                push @archived_logs, {
+                    name => $file,
+                    path => $path,
+                    size => sprintf("%.2f KB", (-s $path) / 1024),
+                    mtime => (stat($path))[9]
+                };
+            }
+            closedir($dh);
+            @archived_logs = sort { $b->{mtime} <=> $a->{mtime} } @archived_logs;
+        }
     }
 
-    # Get current debug mode status
-    my $debug_mode = $c->session->{debug_mode} || 0;
-    
-    # Get current site
-    my $site_name = $c->session->{SiteName} || 'default';
-    
-    # PHASE 3: Get application log level settings
-    my $app_log_level = Comserv::Util::Logging->get_application_log_level();
-    my @available_log_levels = Comserv::Util::Logging->get_available_log_levels();
-    
-    # PHASE 2: Enhanced Error Reporting - Get error summary for dashboard
-    my $error_summary = $self->logging->get_error_summary();
-    my $recent_errors = $self->logging->get_stored_errors();
-    
-    # Get critical errors from session
-    my $critical_errors = $c->session->{critical_errors} || [];
-    my $has_critical_errors = $c->session->{has_critical_errors} || 0;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Site name: $site_name, Debug mode: $debug_mode, Total errors: " . $error_summary->{total_errors});
+    # Fetch recent logs from database with filtering
+    my @db_logs;
+    my $search_params = {};
+    my $filter_level = $c->req->param('filter_level');
+    my $filter_sitename = $c->req->param('filter_sitename');
+    my $filter_username = $c->req->param('filter_username');
+    my $search_text = $c->req->param('search_text');
 
-    # Set up stash for template
+    $search_params->{level} = $filter_level if $filter_level;
+    $search_params->{sitename} = $filter_sitename if $filter_sitename;
+    $search_params->{username} = $filter_username if $filter_username;
+    $search_params->{message} = { -like => "%$search_text%" } if $search_text;
+
+    my $db_error = '';
+    my $total_count = 0;
+    my @base_cols = qw(id timestamp level file line subroutine message sitename username);
+    my @all_cols  = (@base_cols, 'system_identifier');
+
+    my $fetch_logs = sub {
+        my ($schema, $cols) = @_;
+        my %opts = ( order_by => { -desc => 'id' }, rows => 100 );
+        $opts{columns} = $cols if $cols;
+        my $rs = $schema->resultset('SystemLog')->search($search_params, \%opts);
+        my @rows;
+        while (my $log = $rs->next) {
+            my $instance = eval { $log->system_identifier } // '';
+            if (!$instance && ($log->message // '') =~ /^\[HEALTH\]\[[^\]]+\]\[([^\]]+)\]/) {
+                $instance = $1;
+            }
+            push @rows, {
+                timestamp         => $log->timestamp,
+                level             => $log->level,
+                subroutine        => $log->subroutine,
+                message           => $log->message,
+                file              => basename($log->file),
+                line              => $log->line,
+                username          => $log->username,
+                sitename          => $log->sitename,
+                system_identifier => $instance,
+            };
+        }
+        return @rows;
+    };
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my $dbh    = $schema->storage->dbh;
+        if (%$search_params) {
+            # Filtered count — still needs WHERE clause
+            eval { $total_count = $schema->resultset('SystemLog')->search($search_params)->count };
+            $total_count //= 0;
+        } else {
+            # Unfiltered: use table row-count estimate from information_schema (instant)
+            ($total_count) = $dbh->selectrow_array(
+                "SELECT TABLE_ROWS FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
+            );
+            $total_count //= 0;
+        }
+        @db_logs = $fetch_logs->($schema, undef);  # try with all result-class columns
+    };
+    if ($@) {
+        # Retry selecting only the base columns (system_identifier not yet in DB)
+        eval {
+            my $schema = $c->model('DBEncy');
+            @db_logs = $fetch_logs->($schema, \@base_cols);
+        };
+        if ($@) {
+            $db_error = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                "Failed to fetch system_log records: $db_error");
+        }
+    }
+
+    # Health evaluation status from HealthLogger
+    my $health_status = {};
+    eval {
+        require Comserv::Util::HealthLogger;
+        my $schema = $c->model('DBEncy');
+        $health_status = Comserv::Util::HealthLogger->compute_health_score($schema, 30);
+        my $eval_summary = Comserv::Util::HealthLogger->evaluate_records($schema, 30);
+        $health_status->{eval_summary} = $eval_summary;
+    };
+
+    # Hardware Monitor — latest reading per metric/host for HealthDash include
+    my @hardware_latest;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        my @rows = $rs->search(
+            {},
+            { order_by => { -asc => 'timestamp' }, rows => 500 }
+        );
+        my %seen;
+        for my $m (reverse @rows) {
+            my $key = $m->hostname . '|' . $m->metric_name;
+            next if $seen{$key}++;
+            push @hardware_latest, {
+                hostname     => $m->hostname,
+                metric_name  => $m->metric_name,
+                metric_value => $m->metric_value,
+                metric_text  => $m->metric_text,
+                unit         => $m->unit,
+                level        => $m->level,
+                timestamp    => $m->timestamp,
+            };
+        }
+        @hardware_latest = sort { $a->{hostname} cmp $b->{hostname}
+                               || $a->{metric_name} cmp $b->{metric_name} } @hardware_latest;
+    };
+
+    # Get available levels for filter
+    my @levels = sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY;
+
     $c->stash(
-        template => 'admin/logging/index.tt',
-        page_title => 'Logging Administration',
-        debug_mode => $debug_mode,
-        site_name => $site_name,
-        app_log_level => $app_log_level,
-        available_log_levels => \@available_log_levels,
-        error_summary => $error_summary,
-        recent_errors => $recent_errors,
-        critical_errors => $critical_errors,
-        has_critical_errors => $has_critical_errors,
+        current_log => {
+            path => $log_file,
+            size => $log_file && -e $log_file ? sprintf("%.2f KB", (-s $log_file) / 1024) : '0 KB',
+            exists => $log_file && -e $log_file ? 1 : 0
+        },
+        archived_logs   => \@archived_logs,
+        db_logs         => \@db_logs,
+        db_error        => $db_error,
+        total_count     => $total_count,
+        health_status    => $health_status,
+        hardware_latest  => \@hardware_latest,
+        levels           => \@levels,
+        filter_level    => $filter_level,
+        filter_sitename => $filter_sitename,
+        filter_username => $filter_username,
+        search_text     => $search_text,
+        email_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
+        nfs_dir         => $ENV{COMSERV_NFS_LOG_DIR} || 'Not Set',
+        template        => 'admin/Logging/AdminLoggingIndex.tt'
     );
 }
 
-# Toggle debug mode
-sub toggle_debug :Path('/admin/logging/toggle_debug') :Args(0) {
+sub view_log :Path('/admin/logging/view') :Args(0) {
     my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
+    
+    my $path = $c->req->param('path');
+    unless ($path && -e $path && -r $path) {
+        $c->flash->{error_msg} = "Invalid log file path or file not readable.";
+        return $c->res->redirect($c->uri_for($self->action_for('index')));
     }
 
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
+    # Security check: ensure path is within allowed log directories
+    # (Simplified for now, but should be robust)
+    
+    my $content = "";
+    eval {
+        open my $fh, '<', $path or die "Could not open $path: $!";
+        # Read last 500 lines for performance
+        my @lines = <$fh>;
+        $content = join('', splice(@lines, -500));
+        close $fh;
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Error reading log file: $@";
+        return $c->res->redirect($c->uri_for($self->action_for('index')));
     }
 
-    # Toggle debug mode
-    my $current_debug_mode = $c->session->{debug_mode} || 0;
-    my $new_debug_mode = $current_debug_mode ? 0 : 1;
-    
-    $c->session->{debug_mode} = $new_debug_mode;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'toggle_debug',
-        "Debug mode toggled from $current_debug_mode to $new_debug_mode by user: " . 
-        ($c->session->{username} || 'unknown'));
-
-    # Return JSON response
-    $c->response->content_type('application/json');
-    $c->response->body(encode_json({
-        success => 1,
-        debug_mode => $new_debug_mode,
-        message => "Debug mode " . ($new_debug_mode ? "enabled" : "disabled")
-    }));
+    $c->stash(
+        log_path => $path,
+        log_name => basename($path),
+        content => $content,
+        template => 'admin/Logging/AdminViewLogs.tt'
+    );
 }
 
-# PHASE 3: Change application log level (separate from browser debug_mode)
-sub set_app_log_level :Path('/admin/logging/set_app_log_level') :Args(0) {
+sub rotate :Path('/admin/logging/rotate') :Args(0) {
     my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
-    }
-
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
-    }
-
-    # Get the requested log level from parameters
-    my $new_level = $c->request->params->{level};
     
-    if (!$new_level) {
-        $c->response->status(400);
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 0,
-            message => "No log level specified"
-        }));
-        return;
-    }
-
-    # Set the new application log level
-    my $old_level = Comserv::Util::Logging->get_application_log_level();
-    my $success = Comserv::Util::Logging->set_application_log_level($new_level);
-    
-    if ($success) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_app_log_level',
-            "Application log level changed from $old_level to $new_level by user: " . 
-            ($c->session->{username} || 'unknown'));
-
-        # Return JSON response
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 1,
-            old_level => $old_level,
-            new_level => $new_level,
-            message => "Application log level changed to $new_level"
-        }));
+    eval {
+        $self->logging->force_log_rotation();
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Failed to rotate log: $@";
     } else {
-        $c->response->status(400);
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 0,
-            message => "Invalid log level: $new_level"
-        }));
+        $c->flash->{success_msg} = "Log rotated successfully.";
     }
-}
-
-# Force log rotation
-sub rotate_logs :Path('/admin/logging/rotate') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
-    }
-
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
-    }
-
-    # Force log rotation
-    try {
-        Comserv::Util::Logging->force_log_rotation();
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'rotate_logs',
-            "Manual log rotation triggered by user: " . ($c->session->{username} || 'unknown'));
-
-        # Return JSON response
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 1,
-            message => "Log rotation completed successfully"
-        }));
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'rotate_logs',
-            "Log rotation failed: $error");
-
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 0,
-            message => "Log rotation failed: $error"
-        }));
-    };
-}
-
-# PHASE 2: Enhanced Error Reporting - Get error details
-sub get_errors :Path('/admin/logging/errors') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
-    }
-
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
-    }
-
-    # Get filter parameters
-    my $level_filter = $c->request->param('level');
-    my $limit = $c->request->param('limit') || 50;
-
-    # Get errors
-    my $errors = $self->logging->get_stored_errors($level_filter);
     
-    # Apply limit
-    if ($limit && @$errors > $limit) {
-        $errors = [ splice(@$errors, 0, $limit) ];
-    }
-
-    # Return JSON response
-    $c->response->content_type('application/json');
-    $c->response->body(encode_json({
-        success => 1,
-        errors => $errors,
-        total_count => scalar(@$errors),
-        filter => $level_filter || 'all',
-    }));
+    $c->res->redirect($c->uri_for($self->action_for('index')));
 }
 
-# PHASE 2: Enhanced Error Reporting - Clear errors
-sub clear_errors :Path('/admin/logging/clear_errors') :Args(0) {
+sub settings :Path('/admin/logging/settings') :Args(0) {
     my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
-    }
-
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
-    }
-
-    # Get level filter
-    my $level_filter = $c->request->param('level');
-
-    try {
-        # Clear errors
-        $self->logging->clear_stored_errors($level_filter);
+    
+    if ($c->req->method eq 'POST') {
+        my $threshold = $c->req->param('email_threshold');
+        my $nfs_dir = $c->req->param('nfs_dir');
         
-        # Clear critical errors from session if clearing all or critical
-        if (!$level_filter || $level_filter eq 'CRITICAL') {
-            $c->session->{critical_errors} = [];
-            $c->session->{has_critical_errors} = 0;
+        # Persist to DB
+        eval {
+            # Try to get site from SiteName or default to 'CSC'
+            my $sitename = $c->stash->{SiteName} || 'CSC';
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $sitename });
+            
+            # If site doesn't exist, try to find ANY site
+            unless ($site) {
+                $site = $c->model('DBEncy')->resultset('Site')->first;
+            }
+
+            if ($site) {
+                # Save threshold
+                if ($threshold && exists $Comserv::Util::Logging::LEVEL_PRIORITY{uc($threshold)}) {
+                    $c->model('DBEncy')->resultset('SiteConfig')->update_or_create({
+                        site_id => $site->id,
+                        config_key => 'logging_email_threshold',
+                        config_value => uc($threshold)
+                    }, { key => 'site_config_site_id_config_key' });
+                }
+
+                # Save NFS dir
+                if (defined $nfs_dir) {
+                    $c->model('DBEncy')->resultset('SiteConfig')->update_or_create({
+                        site_id => $site->id,
+                        config_key => 'logging_nfs_dir',
+                        config_value => $nfs_dir
+                    }, { key => 'site_config_site_id_config_key' });
+                }
+                
+                $self->logging->refresh_settings($c);
+                $c->flash->{success_msg} = "Logging settings updated and persisted for " . $site->name;
+            } else {
+                # If no sites at all, just update in memory
+                $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD = uc($threshold) if $threshold;
+                $c->flash->{warn_msg} = "Settings updated in memory only (no sites found in DB).";
+            }
+        };
+        if ($@) {
+            my $err = "$@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'settings', 
+                "Failed to persist settings: $err");
+            $c->flash->{error_msg} = "Failed to persist settings: $err";
         }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'clear_errors',
-            "Errors cleared" . ($level_filter ? " (level: $level_filter)" : " (all levels)") . 
-            " by user: " . ($c->session->{username} || 'unknown'));
-
-        # Return JSON response
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 1,
-            message => "Errors cleared successfully" . ($level_filter ? " for level: $level_filter" : "")
-        }));
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'clear_errors',
-            "Failed to clear errors: $error");
-
-        $c->response->content_type('application/json');
-        $c->response->body(encode_json({
-            success => 0,
-            message => "Failed to clear errors: $error"
-        }));
-    };
-}
-
-# PHASE 2: Enhanced Error Reporting - Dismiss critical error notifications
-sub dismiss_critical_errors :Path('/admin/logging/dismiss_critical') :Args(0) {
-    my ($self, $c) = @_;
-
-    # Check admin permissions
-    if (!$c->user_exists && !$c->session->{user_id}) {
-        $c->response->status(401);
-        $c->response->body('Unauthorized');
-        return;
+        return $c->res->redirect($c->uri_for($self->action_for('index')));
     }
-
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Forbidden');
-        return;
-    }
-
-    # Clear critical error notifications from session
-    $c->session->{has_critical_errors} = 0;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'dismiss_critical_errors',
-        "Critical error notifications dismissed by user: " . ($c->session->{username} || 'unknown'));
+    # Get current NFS dir from DB if available
+    my $db_nfs_dir = "";
+    eval {
+        my $sitename = $c->stash->{SiteName} || 'CSC';
+        my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $sitename });
+        if ($site) {
+            my $nfs_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id => $site->id,
+                config_key => 'logging_nfs_dir'
+            });
+            $db_nfs_dir = $nfs_cfg->config_value if $nfs_cfg;
+        }
+    };
 
-    # Return JSON response
-    $c->response->content_type('application/json');
-    $c->response->body(encode_json({
-        success => 1,
-        message => "Critical error notifications dismissed"
-    }));
+    $c->stash(
+        levels => [sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY],
+        current_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
+        current_nfs_dir => $db_nfs_dir,
+        env_nfs_dir => $ENV{COMSERV_NFS_LOG_DIR} || 'None',
+        template => 'admin/Logging/AdminLoggingSettings.tt'
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

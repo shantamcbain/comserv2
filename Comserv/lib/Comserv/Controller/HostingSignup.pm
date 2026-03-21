@@ -58,6 +58,8 @@ sub index :Path :Args(0) {
 sub process_signup :Path('process') :Args(0) {
     my ($self, $c) = @_;
     
+    
+    
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', "Processing hosting signup form");
     push @{$c->stash->{debug_errors}}, "Processing hosting signup form";
     
@@ -139,7 +141,7 @@ sub process_signup :Path('process') :Args(0) {
             roles => 'normal', # Default role for new users
         };
         
-        my $user = $c->model('User')->create_user($c, $user_data);
+        my $user = $c->model('User')->create_user($user_data);
         
         # Check if user creation was successful
         if (!ref $user) {

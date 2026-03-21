@@ -1,137 +1,61 @@
-[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-31-linux-commands-reference.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-[% META title = 'Linux Commands Reference Implementation' %]
-
-<!-- Documentation page for 2025-05-31-linux-commands-reference -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
+# Linux Commands Reference Implementation
 
 **Last Updated:** May 31, 2025  
-
 **Author:** Shanta  
-
 **Status:** Active
 
-
-
-<h2>Overview</h2>
-
-
+## Overview
 
 This update adds a comprehensive Linux Commands Reference to the HelpDesk Knowledge Base. The reference provides detailed information about common Linux commands, their options, and examples of how to use them.
 
+## Changes
 
+### Added Documentation
 
-<h2>Changes</h2>
+- Created a new template file: `CSC/HelpDesk/linux_commands.tt`
+- Added a new route in the HelpDesk controller: `linux_commands`
+- Created a documentation file: `Documentation/linux_commands_reference.md`
+- Added the HelpDesk category to the documentation configuration
+- Added the Linux Commands Reference to the HelpDesk category
+- Updated the Knowledge Base template to include a link to the Linux Commands Reference
 
-
-
-<h3>Added Documentation</h3>
-
-
-
-<ul><li>Created a new template file: <code>CSC/HelpDesk/linux_commands.tt</code></li></ul>
-
-<ul><li>Added a new route in the HelpDesk controller: <code>linux_commands</code></li></ul>
-
-<ul><li>Created a documentation file: <code>Documentation/linux_commands_reference.md</code></li></ul>
-
-<ul><li>Added the HelpDesk category to the documentation configuration</li></ul>
-
-<ul><li>Added the Linux Commands Reference to the HelpDesk category</li></ul>
-
-<ul><li>Updated the Knowledge Base template to include a link to the Linux Commands Reference</li></ul>
-
-
-
-<h3>Documentation Content</h3>
-
-
+### Documentation Content
 
 The Linux Commands Reference includes:
 
+- File System Commands (ls, cd, pwd, mkdir, rmdir, find)
+- File Operations (cp, mv, rm, touch)
+- Text Processing (cat, less, head, tail, grep, sed, awk)
+- System Information (uname, df, du, free, top, htop)
+- Process Management (ps, kill, bg, fg, jobs, nohup)
+- User Management (useradd, usermod, userdel, passwd, who, id)
+- Networking (ping, ifconfig, ip, netstat, ss, wget, curl)
+- Package Management (apt, yum, dnf)
+- Permissions (chmod, chown, chgrp)
+- Compression (tar, gzip, zip)
 
+### Benefits
 
-<ul><li>File System Commands (ls, cd, pwd, mkdir, rmdir, find)</li></ul>
+- Provides a comprehensive reference for system administrators and developers
+- Improves the HelpDesk Knowledge Base with technical content
+- Offers practical examples for common Linux commands
+- Serves as a quick reference for troubleshooting and system administration tasks
+- Enhances the documentation system with technical content
 
-<ul><li>File Operations (cp, mv, rm, touch)</li></ul>
-
-<ul><li>Text Processing (cat, less, head, tail, grep, sed, awk)</li></ul>
-
-<ul><li>System Information (uname, df, du, free, top, htop)</li></ul>
-
-<ul><li>Process Management (ps, kill, bg, fg, jobs, nohup)</li></ul>
-
-<ul><li>User Management (useradd, usermod, userdel, passwd, who, id)</li></ul>
-
-<ul><li>Networking (ping, ifconfig, ip, netstat, ss, wget, curl)</li></ul>
-
-<ul><li>Package Management (apt, yum, dnf)</li></ul>
-
-<ul><li>Permissions (chmod, chown, chgrp)</li></ul>
-
-<ul><li>Compression (tar, gzip, zip)</li></ul>
-
-
-
-<h3>Benefits</h3>
-
-
-
-<ul><li>Provides a comprehensive reference for system administrators and developers</li></ul>
-
-<ul><li>Improves the HelpDesk Knowledge Base with technical content</li></ul>
-
-<ul><li>Offers practical examples for common Linux commands</li></ul>
-
-<ul><li>Serves as a quick reference for troubleshooting and system administration tasks</li></ul>
-
-<ul><li>Enhances the documentation system with technical content</li></ul>
-
-
-
-<h2>Technical Implementation</h2>
-
-
+## Technical Implementation
 
 The implementation involved:
 
+1. Creating a new Template Toolkit file with detailed command information
+2. Adding a new route in the HelpDesk controller to serve the template
+3. Updating the Knowledge Base template to include a link to the reference
+4. Creating a documentation file to describe the reference
+5. Updating the documentation configuration to include the new documentation
 
+## Related Files
 
-<ol><li>Creating a new Template Toolkit file with detailed command information</li></ol>
-
-<ol><li>Adding a new route in the HelpDesk controller to serve the template</li></ol>
-
-<ol><li>Updating the Knowledge Base template to include a link to the reference</li></ol>
-
-<ol><li>Creating a documentation file to describe the reference</li></ol>
-
-<ol><li>Updating the documentation configuration to include the new documentation</li></ol>
-
-
-
-<h2>Related Files</h2>
-
-
-
-<ul><li><code>/CSC/HelpDesk/linux_commands.tt</code> - The Linux Commands Reference template</li></ul>
-
-<ul><li><code>/lib/Comserv/Controller/HelpDesk.pm</code> - Updated controller with the new route</li></ul>
-
-<ul><li><code>/CSC/HelpDesk/kb.tt</code> - Updated Knowledge Base template with a link to the reference</li></ul>
-
-<ul><li><code>/Documentation/linux_commands_reference.md</code> - Documentation about the reference</li></ul>
-
-<ul><li><code>/Documentation/documentation_config.json</code> - Updated configuration file</li></ul>
-
-</div>
+- `/CSC/HelpDesk/linux_commands.tt` - The Linux Commands Reference template
+- `/lib/Comserv/Controller/HelpDesk.pm` - Updated controller with the new route
+- `/CSC/HelpDesk/kb.tt` - Updated Knowledge Base template with a link to the reference
+- `/Documentation/linux_commands_reference.md` - Documentation about the reference
+- `/Documentation/documentation_config.json` - Updated configuration file

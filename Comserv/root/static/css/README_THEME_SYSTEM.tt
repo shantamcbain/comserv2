@@ -1,161 +1,114 @@
-[% PageVersion = 'Comserv/root/static/css/README_THEME_SYSTEM.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% META title = 'Theme System Documentation' %]
+[% PageVersion = 'static/css/README_THEME_SYSTEM.tt,v 0.01 2025/01/19 shanta Exp shanta ' %]
+[% debug %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+    [%# INCLUDE 'debug.tt' %]
 [% END %]
 
-[% META title = 'Theme System Documentation' %]
-
-<!-- Include documentation CSS -->
-<link rel="stylesheet" href="/static/css/documentation.css">
-
-<div class="markdown-content">
-
-
-## Overview
-
-
-
-The theme system has been refactored to use CSS variables and a centralized approach. This allows for easier customization and maintenance of themes.
-
-
-
-## Files Structure
-
-
-
-- `/static/css/base.css` - Contains base styles and CSS variables
-
-- `/static/css/menu-theme.css` - Contains menu styles using theme variables
-
-- `/static/css/theme-overrides.css` - Contains theme-specific overrides
-
-- `/static/css/themes/` - Directory containing theme-specific CSS files:
-
-  - `default.css`
-
-  - `csc.css`
-
-  - `apis.css`
-
-  - `usbm.css`
-
-  - etc.
-
-
-
-## How It Works
-
-
-
-1. The `Header.tt` file includes:
-
-   - `base.css` - Base styles with variables
-
-   - Theme-specific CSS file (e.g., `themes/csc.css`)
-
-   - `menu-theme.css` - Menu styles using theme variables
-
-   - `theme-overrides.css` - Additional theme overrides
-
-
-
-2. Each theme CSS file defines CSS variables and theme-specific styles.
-
-
-
-3. The body element gets a theme-specific class (e.g., `theme-csc`) to allow for theme-specific styling.
-
-
-
-## Adding a New Theme
-
-
-
-1. Create a new CSS file in `/static/css/themes/` (e.g., `mytheme.css`)
-
-2. Define CSS variables and theme-specific styles
-
-3. Add the theme to the list of valid themes in `ThemeManager.pm`
-
-
-
-## Migrating from Old CSS System
-
-
-
-The old CSS system used separate CSS files for each site:
-
-- `CSCCSSView.css`
-
-- `menu.css`
-
-- etc.
-
-
-
-These have been replaced with the theme system. If you need to add styles from the old system:
-
-
-
-1. Extract the relevant styles
-
-2. Convert them to use CSS variables where appropriate
-
-3. Add them to the appropriate theme CSS file
-
-
-
-## Background Images
-
-
-
-To add a background image to a theme:
-
-
-
-1. Place the image in `/static/images/[THEME_NAME]/`
-
-2. In the theme CSS file, add:
-
-   ```css
-
-   body {
-
-     background-image: url('../../images/[THEME_NAME]/background.jpg');
-
-     background-size: cover;
-
-     background-repeat: no-repeat;
-
-     background-attachment: fixed;
-
-   }
-
-   ```
-
-
-
-## Menu Styling
-
-
-
-Menu styles are now in `menu-theme.css` and use theme variables. To customize menu styles for a specific theme, add overrides in the theme CSS file or in `theme-overrides.css`.
-
-
-
-## Troubleshooting
-
-
-
-If styles are not applying correctly:
-
-
-
-1. Check browser developer tools to see which CSS files are being loaded
-
-2. Verify that the theme class is being added to the body element
-
-3. Check for CSS specificity issues (use `!important` sparingly if needed)
-
-4. Clear browser cache
+<div class="documentation-content theme-system-docs">
+    <h1>Theme System Documentation</h1>
+
+    <section class="overview">
+        <h2>Overview</h2>
+        <p>The theme system has been refactored to use CSS variables and a centralized approach. This allows for easier customization and maintenance of themes.</p>
+        
+        <div class="alert alert-info">
+            <strong>Latest Updates</strong>: See <a href="/Documentation/changelog/2025-01-19-css-theme-system-enhancements.tt">CSS Theme System Enhancements - January 2025</a> for recent improvements including interactive CSS editor and enhanced theme management.
+        </div>
+    </section>
+
+    <section class="file-structure">
+        <h2>Files Structure</h2>
+        <ul class="file-list">
+            <li><code>/static/css/base.css</code> - Contains base styles and CSS variables</li>
+            <li><code>/static/css/menu-theme.css</code> - Contains menu styles using theme variables</li>
+            <li><code>/static/css/theme-overrides.css</code> - Contains theme-specific overrides</li>
+            <li><code>/static/css/themes/</code> - Directory containing theme-specific CSS files:
+                <ul class="theme-files">
+                    <li><code>default.css</code></li>
+                    <li><code>csc.css</code></li>
+                    <li><code>apis.css</code></li>
+                    <li><code>usbm.css</code></li>
+                    <li>etc.</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+
+    <section class="how-it-works">
+        <h2>How It Works</h2>
+        <ol>
+            <li>The <code>Header.tt</code> file includes:
+                <ul>
+                    <li><code>base.css</code> - Base styles with variables</li>
+                    <li>Theme-specific CSS file (e.g., <code>themes/csc.css</code>)</li>
+                    <li><code>menu-theme.css</code> - Menu styles using theme variables</li>
+                    <li><code>theme-overrides.css</code> - Additional theme overrides</li>
+                </ul>
+            </li>
+            <li>Each theme CSS file defines CSS variables and theme-specific styles.</li>
+            <li>The body element gets a theme-specific class (e.g., <code>theme-csc</code>) to allow for theme-specific styling.</li>
+        </ol>
+    </section>
+
+    <section class="adding-new-theme">
+        <h2>Adding a New Theme</h2>
+        <ol>
+            <li>Create a new CSS file in <code>/static/css/themes/</code> (e.g., <code>mytheme.css</code>)</li>
+            <li>Define CSS variables and theme-specific styles</li>
+            <li>Add the theme to the list of valid themes in <code>ThemeManager.pm</code></li>
+        </ol>
+    </section>
+
+    <section class="migration">
+        <h2>Migrating from Old CSS System</h2>
+        <p>The old CSS system used separate CSS files for each site:</p>
+        <ul>
+            <li><code>CSCCSSView.css</code></li>
+            <li><code>menu.css</code></li>
+            <li>etc.</li>
+        </ul>
+        
+        <p>These have been replaced with the theme system. If you need to add styles from the old system:</p>
+        <ol>
+            <li>Extract the relevant styles</li>
+            <li>Convert them to use CSS variables where appropriate</li>
+            <li>Add them to the appropriate theme CSS file</li>
+        </ol>
+    </section>
+
+    <section class="background-images">
+        <h2>Background Images</h2>
+        <p>To add a background image to a theme:</p>
+        <ol>
+            <li>Place the image in <code>/static/images/[THEME_NAME]/</code></li>
+            <li>In the theme CSS file, add:</li>
+        </ol>
+        <div class="code-example">
+            <pre><code>body {
+    background-image: url('../../images/[THEME_NAME]/background.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}</code></pre>
+        </div>
+    </section>
+
+    <section class="menu-styling">
+        <h2>Menu Styling</h2>
+        <p>Menu styles are now in <code>menu-theme.css</code> and use theme variables. To customize menu styles for a specific theme, add overrides in the theme CSS file or in <code>theme-overrides.css</code>.</p>
+    </section>
+
+    <section class="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <p>If styles are not applying correctly:</p>
+        <ol>
+            <li>Check browser developer tools to see which CSS files are being loaded</li>
+            <li>Verify that the theme class is being added to the body element</li>
+            <li>Check for CSS specificity issues (use <code>!important</code> sparingly if needed)</li>
+            <li>Clear browser cache</li>
+        </ol>
+    </section>
 </div>
