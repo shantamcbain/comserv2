@@ -142,6 +142,19 @@ last_updated = '2026/02/08'
 <div class="container">
     <h1>Planning (CSC — Legacy Text View)</h1>
 
+    <!-- YOU ARE HERE banner -->
+    <div style="background:#cce5ff;border:1px solid #004085;border-radius:6px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.9em;">
+            <strong>📍 YOU ARE HERE:</strong>
+            Step 2 of 7 — <em>Migrate DailyPlan.tt to DB coordinator</em> &nbsp;·&nbsp;
+            <a href="#anchor-planning-system-project" style="color:#004085;font-weight:bold;">View full plan status ↓</a>
+        </span>
+        <span style="font-size:0.82em;color:#004085;">
+            Branch: <code>planningsystem-59ae</code> &nbsp;·&nbsp;
+            <a href="/Documentation/DailyPlan#planning" style="color:#004085;">Back to DB view</a>
+        </span>
+    </div>
+
     <!-- ═══════════════════════════════════════════════════════════════
          MIGRATION STATUS — March 2026
          This section is ONLY visible to CSC users. All other sites now
