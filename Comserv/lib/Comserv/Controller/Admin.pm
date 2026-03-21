@@ -1238,6 +1238,74 @@ sub security_scan :Path('/admin/security-scan') :Args(0) {
         "Completed security_scan action");
 }
 
+# Security scan — SSE streaming endpoint (GET)
+sub security_scan_stream :Path('/admin/security-scan-stream') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_stream')) {
+        $c->response->status(403);
+        $c->response->content_type('text/plain');
+        $c->response->body('Access denied');
+        return;
+    }
+
+    my $target_url = $c->req->param('target_url') // '';
+    my $site_name  = $c->req->param('site_name')  // 'none';
+    my $max_pages  = $c->req->param('max_pages')  // 100;
+
+    $target_url =~ s/\s+//g;
+    $site_name  =~ s/[^a-zA-Z0-9._-]//g;
+    $max_pages  = int($max_pages);
+    $max_pages  = 50  if $max_pages < 1;
+    $max_pages  = 500 if $max_pages > 500;
+
+    unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
+        $c->response->status(400);
+        $c->response->body('Invalid URL');
+        return;
+    }
+
+    my $report_file = File::Spec->catfile($c->path_to(''), 'security_crawl_report.json');
+    my $script      = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_stream',
+        "Streaming security scan: url=$target_url site=$site_name max=$max_pages");
+
+    $c->response->content_type('text/event-stream');
+    $c->response->header('Cache-Control'     => 'no-cache');
+    $c->response->header('X-Accel-Buffering' => 'no');
+    $c->response->header('Connection'        => 'keep-alive');
+
+    open(my $pipe, '-|', 'perl', $script,
+        '--url',    $target_url,
+        '--site',   $site_name,
+        '--max',    $max_pages,
+        '--output', $report_file,
+    ) or do {
+        $c->response->write("data: ERROR: Cannot launch scan script: $!\n\n");
+        $c->response->write("data: __DONE__\n\n");
+        return;
+    };
+
+    while (my $line = <$pipe>) {
+        chomp $line;
+        $line =~ s/\r//g;
+        $c->response->write("data: $line\n\n");
+    }
+    close($pipe);
+
+    if (-f $report_file) {
+        eval {
+            my $json_text = do { local $/; open(my $fh, '<', $report_file) or die $!; <$fh> };
+            $json_text =~ s/\n/ /g;
+            $c->response->write("data: __JSON__$json_text\n\n");
+        };
+    }
+
+    $c->response->write("data: __DONE__\n\n");
+}
+
 # Admin backup and restore
 sub backup :Path('/admin/backup') :Args(0) {
     my ($self, $c) = @_;

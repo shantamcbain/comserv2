@@ -4,187 +4,129 @@
    roles = "admin"
    TemplateType = "Application"
    category = "Admin"
-   page_version = "0.01"
+   page_version = "0.02"
    last_updated = "2026-03-21"
 %]
 
 <style>
-    .finding-PROTECTED            { background-color: #d4edda; }
-    .finding-FORBIDDEN            { background-color: #d4edda; }
-    .finding-OK_PUBLIC            { background-color: #f8f9fa; }
-    .finding-EXPOSED_SENSITIVE    { background-color: #f8d7da; font-weight: bold; }
-    .finding-EXPOSED_POST_ACCEPTED{ background-color: #f8d7da; font-weight: bold; }
-    .finding-LEAK_STACK_TRACE     { background-color: #f5c6cb; font-weight: bold; }
-    .finding-LINK_LEAK            { background-color: #fff3cd; font-weight: bold; }
-    .finding-SERVER_ERROR         { background-color: #ffeeba; }
-    .finding-NOT_FOUND            { background-color: #e2e3e5; color: #6c757d; }
-    .scan-output { font-family: monospace; font-size: 0.78em; background: #1a1a1a; color: #00ff00; padding: 1em; border-radius: 4px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
-    .badge-EXPOSED_SENSITIVE     { background-color: #dc3545; color: #fff; }
-    .badge-EXPOSED_POST_ACCEPTED { background-color: #dc3545; color: #fff; }
-    .badge-LEAK_STACK_TRACE      { background-color: #c82333; color: #fff; }
-    .badge-LINK_LEAK             { background-color: #e0a800; color: #212529; }
-    .badge-SERVER_ERROR          { background-color: #fd7e14; color: #fff; }
-    .badge-PROTECTED             { background-color: #28a745; color: #fff; }
-    .badge-FORBIDDEN             { background-color: #28a745; color: #fff; }
-    .badge-OK_PUBLIC             { background-color: #6c757d; color: #fff; }
-    .badge-NOT_FOUND             { background-color: #adb5bd; color: #fff; }
+    .finding-PROTECTED             { background-color: #d4edda; }
+    .finding-FORBIDDEN             { background-color: #d4edda; }
+    .finding-OK_PUBLIC             { background-color: #f8f9fa; }
+    .finding-EXPOSED_SENSITIVE     { background-color: #f8d7da; font-weight: bold; }
+    .finding-EXPOSED_POST_ACCEPTED { background-color: #f8d7da; font-weight: bold; }
+    .finding-LEAK_STACK_TRACE      { background-color: #f5c6cb; font-weight: bold; }
+    .finding-LINK_LEAK             { background-color: #fff3cd; font-weight: bold; }
+    .finding-SERVER_ERROR          { background-color: #ffeeba; }
+    .finding-NOT_FOUND             { background-color: #e2e3e5; color: #6c757d; }
+    .scan-terminal {
+        font-family: monospace;
+        font-size: 0.78em;
+        background: #1a1a1a;
+        color: #00ff00;
+        padding: 1em;
+        border-radius: 4px;
+        height: 420px;
+        overflow-y: scroll;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    .badge-result { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; }
+    .badge-EXPOSED_SENSITIVE, .badge-EXPOSED_POST_ACCEPTED { background-color: #dc3545; color: #fff; }
+    .badge-LEAK_STACK_TRACE  { background-color: #c82333; color: #fff; }
+    .badge-LINK_LEAK         { background-color: #e0a800; color: #212529; }
+    .badge-SERVER_ERROR      { background-color: #fd7e14; color: #fff; }
+    .badge-PROTECTED, .badge-FORBIDDEN { background-color: #28a745; color: #fff; }
+    .badge-OK_PUBLIC         { background-color: #6c757d; color: #fff; }
+    .badge-NOT_FOUND         { background-color: #adb5bd; color: #fff; }
+    #scan-progress { display: none; }
+    #scan-results  { display: none; }
+    .stat-card { text-align: center; padding: 0.75rem; border-radius: 4px; color: #fff; }
+    .stat-card h3 { margin: 0; font-size: 2rem; }
+    .stat-card small { font-size: 0.8rem; }
 </style>
 
 <div class="container">
     <h1>Security Scan</h1>
-    <p class="text-muted">Run the Comserv security crawler as an unauthenticated visitor to find exposed endpoints, link leaks, and stack trace disclosures.</p>
+    <p class="text-muted">Crawls the site as an unauthenticated visitor and probes known sensitive endpoints. Links and results appear live as the scan runs.</p>
 
-    [% IF error_msg %]
-    <div class="alert alert-danger">[% error_msg | html %]</div>
-    [% END %]
-
-    <div class="card mb-4">
+    <!-- Config form -->
+    <div class="card mb-3" id="scan-form-card">
         <div class="card-header"><strong>Configure Scan Target</strong></div>
         <div class="card-body">
-            <form method="post" action="[% c.uri_for('/admin/security-scan') %]">
-                <div class="form-group mb-3">
-                    <label for="preset"><strong>Quick Select Target</strong></label>
-                    <select class="form-control" id="preset" onchange="applyPreset(this)">
-                        <option value="">-- choose a preset --</option>
-                        [% FOREACH t IN known_targets %]
-                        <option value="[% t.url | html %]" data-site="[% t.site | html %]">[% t.label | html %]</option>
-                        [% END %]
-                    </select>
+            <div class="form-group mb-3">
+                <label><strong>Quick Select</strong></label>
+                <select class="form-control" id="preset" onchange="applyPreset(this)">
+                    <option value="">-- choose a preset --</option>
+                    [% FOREACH t IN known_targets %]
+                    <option value="[% t.url | html %]" data-site="[% t.site | html %]">[% t.label | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label><strong>Target URL</strong></label>
+                    <input type="text" class="form-control" id="target_url" placeholder="http://localhost:3001">
                 </div>
-                <div class="form-row row">
-                    <div class="col-md-6 mb-3">
-                        <label for="target_url"><strong>Target URL</strong></label>
-                        <input type="text" class="form-control" id="target_url" name="target_url"
-                            placeholder="http://localhost:3001"
-                            value="[% scan_target | html %]" required>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="site_name"><strong>Site Name</strong></label>
-                        <input type="text" class="form-control" id="site_name" name="site_name"
-                            placeholder="none"
-                            value="[% scan_site | html %]">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="max_pages"><strong>Max Pages</strong></label>
-                        <input type="number" class="form-control" id="max_pages" name="max_pages"
-                            value="[% max_pages || 100 %]" min="10" max="500">
-                    </div>
+                <div class="col-md-3 mb-3">
+                    <label><strong>Site Name</strong></label>
+                    <input type="text" class="form-control" id="site_name" placeholder="none" value="none">
                 </div>
-                <button type="submit" class="btn btn-warning" onclick="this.disabled=true; this.form.submit();">
-                    Run Security Scan
-                </button>
-                <small class="text-muted ml-2">Scan may take 1–3 minutes. Page will reload when done.</small>
-            </form>
+                <div class="col-md-3 mb-3">
+                    <label><strong>Max Pages</strong></label>
+                    <input type="number" class="form-control" id="max_pages" value="100" min="10" max="500">
+                </div>
+            </div>
+            <button class="btn btn-warning" id="start-btn" onclick="startScan()">Run Security Scan</button>
+            <button class="btn btn-danger" id="stop-btn" style="display:none" onclick="stopScan()">Stop</button>
         </div>
     </div>
 
-    [% IF scan_results %]
-    <div class="card mb-4">
-        <div class="card-header">
-            <strong>Scan Results</strong> &mdash;
-            Target: <code>[% scan_target | html %]</code>
-            &nbsp;Site: <code>[% scan_site | html %]</code>
-        </div>
-        <div class="card-body">
-            [% SET critical = 0; SET warning = 0; SET ok = 0; SET scanned = 0 %]
-            [% FOREACH f IN scan_results %]
-                [% IF f.result == 'EXPOSED_SENSITIVE' || f.result == 'LEAK_STACK_TRACE' || f.result == 'EXPOSED_POST_ACCEPTED' %][% critical = critical + 1 %][% END %]
-                [% IF f.result == 'LINK_LEAK' || f.result == 'SERVER_ERROR' %][% warning = warning + 1 %][% END %]
-                [% IF f.result == 'PROTECTED' || f.result == 'FORBIDDEN' %][% ok = ok + 1 %][% END %]
-                [% IF f.result == 'OK_PUBLIC' || f.result == 'NOT_FOUND' %][% scanned = scanned + 1 %][% END %]
-            [% END %]
-
-            <div class="row mb-3">
-                <div class="col-md-3">
-                    <div class="card text-white bg-danger text-center p-2">
-                        <h3>[% critical %]</h3><small>Critical</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-white bg-warning text-center p-2">
-                        <h3>[% warning %]</h3><small>Warnings</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-white bg-success text-center p-2">
-                        <h3>[% ok %]</h3><small>Protected</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-white bg-secondary text-center p-2">
-                        <h3>[% scanned %]</h3><small>Scanned OK / 404</small>
-                    </div>
-                </div>
+    <!-- Live progress -->
+    <div id="scan-progress">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Live Output</strong>
+                <span id="scan-status" class="text-muted" style="font-size:0.85em">Starting...</span>
             </div>
-
-            <div class="mb-2">
-                <strong>Filter:</strong>
-                <button class="btn btn-sm btn-danger ml-1"    onclick="filterTable('EXPOSED')">Exposed</button>
-                <button class="btn btn-sm btn-danger ml-1"    onclick="filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
-                <button class="btn btn-sm btn-warning ml-1"   onclick="filterTable('LINK_LEAK')">Link Leak</button>
-                <button class="btn btn-sm btn-warning ml-1"   onclick="filterTable('SERVER_ERROR')">Server Error</button>
-                <button class="btn btn-sm btn-success ml-1"   onclick="filterTable('PROTECTED')">Protected</button>
-                <button class="btn btn-sm btn-secondary ml-1" onclick="filterTable('OK_PUBLIC')">Scanned OK</button>
-                <button class="btn btn-sm btn-light ml-1"     onclick="filterTable('NOT_FOUND')">404</button>
-                <button class="btn btn-sm btn-dark ml-1"      onclick="filterTable('')">All</button>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered" id="findings-table">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Result</th>
-                            <th>URL</th>
-                            <th>Status</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH f IN scan_results %]
-                        <tr class="finding-[% f.result | html %]" data-result="[% f.result | html %]">
-                            <td>
-                                <span class="badge badge-[% f.result | html %]">[% f.result | html %]</span>
-                            </td>
-                            <td><code style="font-size:0.8em">[% f.url | html %]</code></td>
-                            <td>[% f.status | html %]</td>
-                            <td>
-                                [% IF f.snippet %]
-                                <details><summary>snippet</summary><pre style="font-size:0.7em;max-height:100px;overflow:auto">[% f.snippet | html %]</pre></details>
-                                [% END %]
-                                [% IF f.final_url && f.final_url != f.url %]
-                                <small class="text-muted">→ [% f.final_url | html %]</small>
-                                [% END %]
-                                [% IF f.context %]
-                                <small class="text-muted d-block">Found in: [% f.context | html %]</small>
-                                [% END %]
-                            </td>
-                        </tr>
-                        [% END %]
-                    </tbody>
-                </table>
+            <div class="card-body p-0">
+                <div class="scan-terminal" id="live-output"></div>
             </div>
         </div>
     </div>
-    [% END %]
 
-    [% IF scan_error %]
-    <div class="alert alert-danger">
-        <strong>Scan Error:</strong>
-        <pre style="font-size:0.8em">[% scan_error | html %]</pre>
-    </div>
-    [% END %]
-
-    [% IF scan_output %]
-    <div class="card mb-4">
-        <div class="card-header"><strong>Raw Scan Output</strong></div>
-        <div class="card-body p-0">
-            <div class="scan-output">[% scan_output | html %]</div>
+    <!-- Results table (shown after scan completes) -->
+    <div id="scan-results">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Results</strong> &mdash; <span id="results-target"></span></div>
+            <div class="card-body">
+                <div class="row mb-3" id="stat-row"></div>
+                <div class="mb-2" id="filter-bar">
+                    <strong>Filter:</strong>
+                    <button class="btn btn-sm btn-danger   ml-1" onclick="filterTable('EXPOSED')">Exposed</button>
+                    <button class="btn btn-sm btn-danger   ml-1" onclick="filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
+                    <button class="btn btn-sm btn-warning  ml-1" onclick="filterTable('LINK_LEAK')">Link Leak</button>
+                    <button class="btn btn-sm btn-warning  ml-1" onclick="filterTable('SERVER_ERROR')">Server Error</button>
+                    <button class="btn btn-sm btn-success  ml-1" onclick="filterTable('PROTECTED')">Protected</button>
+                    <button class="btn btn-sm btn-secondary ml-1" onclick="filterTable('OK_PUBLIC')">Scanned OK</button>
+                    <button class="btn btn-sm btn-light    ml-1" onclick="filterTable('NOT_FOUND')">404</button>
+                    <button class="btn btn-sm btn-dark     ml-1" onclick="filterTable('')">All</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered" id="findings-table">
+                        <thead class="thead-dark">
+                            <tr><th>Phase</th><th>Result</th><th>Status</th><th>URL</th><th>Detail</th></tr>
+                        </thead>
+                        <tbody id="findings-body"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
-    [% END %]
 </div>
 
 <script>
+var evtSource = null;
+
 function applyPreset(sel) {
     var opt = sel.options[sel.selectedIndex];
     if (opt.value) {
@@ -192,9 +134,122 @@ function applyPreset(sel) {
         document.getElementById('site_name').value  = opt.getAttribute('data-site') || 'none';
     }
 }
+
+function startScan() {
+    var targetUrl = document.getElementById('target_url').value.trim();
+    var siteName  = document.getElementById('site_name').value.trim() || 'none';
+    var maxPages  = document.getElementById('max_pages').value || 100;
+
+    if (!targetUrl.match(/^https?:\/\/[\w.\-]+(:\d+)?(\/.*)?$/)) {
+        alert('Please enter a valid http:// or https:// URL');
+        return;
+    }
+
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('stop-btn').style.display  = '';
+    document.getElementById('scan-progress').style.display = 'block';
+    document.getElementById('scan-results').style.display  = 'none';
+    document.getElementById('live-output').textContent = '';
+    document.getElementById('scan-status').textContent = 'Running...';
+    document.getElementById('results-target').textContent = targetUrl + '  site=' + siteName;
+
+    var params = new URLSearchParams({ target_url: targetUrl, site_name: siteName, max_pages: maxPages });
+    evtSource = new EventSource('/admin/security-scan-stream?' + params.toString());
+
+    evtSource.onmessage = function(e) {
+        var data = e.data;
+
+        if (data === '__DONE__') {
+            evtSource.close();
+            evtSource = null;
+            document.getElementById('scan-status').textContent = 'Scan complete.';
+            document.getElementById('stop-btn').style.display  = 'none';
+            document.getElementById('start-btn').style.display = '';
+            return;
+        }
+
+        if (data.startsWith('__JSON__')) {
+            try {
+                var report = JSON.parse(data.substring(8));
+                renderResults(report.findings || []);
+            } catch(ex) {
+                appendLine('ERROR parsing results JSON: ' + ex);
+            }
+            return;
+        }
+
+        appendLine(data);
+    };
+
+    evtSource.onerror = function() {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        document.getElementById('scan-status').textContent = 'Connection closed.';
+        document.getElementById('stop-btn').style.display  = 'none';
+        document.getElementById('start-btn').style.display = '';
+    };
+}
+
+function stopScan() {
+    if (evtSource) { evtSource.close(); evtSource = null; }
+    document.getElementById('scan-status').textContent = 'Stopped by user.';
+    document.getElementById('stop-btn').style.display  = 'none';
+    document.getElementById('start-btn').style.display = '';
+}
+
+function appendLine(text) {
+    var el = document.getElementById('live-output');
+    el.textContent += text + '\n';
+    el.scrollTop = el.scrollHeight;
+}
+
+function renderResults(findings) {
+    var counts = { critical:0, warning:0, ok:0, neutral:0 };
+    findings.forEach(function(f) {
+        var r = f.result || '';
+        if (r.indexOf('EXPOSED') === 0 || r === 'LEAK_STACK_TRACE') counts.critical++;
+        else if (r === 'LINK_LEAK' || r === 'SERVER_ERROR')          counts.warning++;
+        else if (r === 'PROTECTED' || r === 'FORBIDDEN')             counts.ok++;
+        else                                                          counts.neutral++;
+    });
+
+    document.getElementById('stat-row').innerHTML =
+        statCard('bg-danger',    counts.critical, 'Critical') +
+        statCard('bg-warning',   counts.warning,  'Warnings') +
+        statCard('bg-success',   counts.ok,        'Protected') +
+        statCard('bg-secondary', counts.neutral,   'Scanned / 404');
+
+    var tbody = document.getElementById('findings-body');
+    tbody.innerHTML = '';
+    findings.forEach(function(f) {
+        var r   = f.result || '';
+        var url = f.url || f.leaked_link || '';
+        var detail = '';
+        if (f.snippet)   detail += '<details><summary>snippet</summary><pre style="font-size:0.7em;max-height:80px;overflow:auto">' + esc(f.snippet) + '</pre></details>';
+        if (f.final_url && f.final_url !== url) detail += '<small class="text-muted">→ ' + esc(f.final_url) + '</small>';
+        if (f.leaked_link) detail += '<small class="text-muted d-block">leaked: ' + esc(f.leaked_link) + '</small>';
+        var tr = '<tr class="finding-' + esc(r) + '" data-result="' + esc(r) + '">' +
+            '<td><small>' + esc(f.phase||'') + '</small></td>' +
+            '<td><span class="badge-result badge-' + esc(r) + '">' + esc(r) + '</span></td>' +
+            '<td>' + esc(String(f.status||'')) + '</td>' +
+            '<td><code style="font-size:0.75em;word-break:break-all">' + esc(url) + '</code></td>' +
+            '<td>' + detail + '</td>' +
+            '</tr>';
+        tbody.insertAdjacentHTML('beforeend', tr);
+    });
+
+    document.getElementById('scan-results').style.display = 'block';
+}
+
+function statCard(cls, n, label) {
+    return '<div class="col-6 col-md-3 mb-2"><div class="stat-card ' + cls + '"><h3>' + n + '</h3><small>' + label + '</small></div></div>';
+}
+
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function filterTable(result) {
-    var rows = document.querySelectorAll('#findings-table tbody tr');
-    rows.forEach(function(row) {
+    document.querySelectorAll('#findings-table tbody tr').forEach(function(row) {
         var r = row.getAttribute('data-result');
         var show = !result
             || r === result
