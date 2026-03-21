@@ -44,8 +44,12 @@
 
     [% IF !docker_available %]
     <div class="alert alert-warning" role="alert">
-        <strong>Notice:</strong> Docker container management is not available from within a Docker container. 
-        This feature must be accessed from the host system.
+        <strong>Notice:</strong> Docker container management is not available from within a Docker container.
+        Use the host development server:
+        <a href="http://workstation.local:3001/admin/docker-containers" style="font-weight:bold;">
+            Open Docker Management on port 3001 →
+        </a>
+        <br><small style="color:#666;">You will need to log in separately at port 3001 (sessions are per-port).</small>
     </div>
     [% ELSE %]
     
@@ -362,16 +366,16 @@
                         </div>
 
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 3: Verify Local Image Tag + Capture Image ID (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker image inspect comserv2-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
-                            docker image inspect comserv2-web-prod:latest --format "{{.Id}}"
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker image inspect comserv-web-prod:latest --format &quot;{{.Id}}&quot;')" title="Click to copy">
+                            docker image inspect comserv-web-prod:latest --format "{{.Id}}"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
-                            ✅ Keep this image ID to compare on the production server after docker load.
+                            ✅ Image is named <strong>comserv-web-prod:latest</strong> (built from Comserv/docker-compose.prod.yml). Keep ID to verify on production after load.
                         </div>
 
                         <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Step 4: Transfer Image via SSH Pipe (Run from Workstation Terminal)</div>
-                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
-                            docker save comserv2-web-prod:latest | ssh ubuntu@192.168.1.126 "docker load"
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker save comserv-web-prod | ssh ubuntu@192.168.1.126 &quot;docker load&quot;')" title="Click to copy">
+                            docker save comserv-web-prod | ssh ubuntu@192.168.1.126 "docker load"
                         </div>
                         <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
                             ⚠ Run from WORKSTATION terminal — not on production server. No sudo needed for docker load.

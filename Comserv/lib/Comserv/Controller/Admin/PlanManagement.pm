@@ -179,17 +179,26 @@ sub details :Path('/admin/plan') :Args(1) {
         }
         
         $plan_data{projects} = \@projects;
-        
-        $c->stash->{json} = { 
-            success => 1, 
-            plan => \%plan_data 
-        };
-        $c->forward('View::JSON');
+
+        my $accept = $c->req->header('Accept') || '';
+        if ($accept =~ m{application/json}) {
+            $c->stash->{json} = { success => 1, plan => \%plan_data };
+            $c->forward('View::JSON');
+        } else {
+            $c->stash(
+                plan         => \%plan_data,
+                is_admin     => $c->stash->{is_admin},
+                is_csc_admin => $c->stash->{is_csc_admin},
+                plan_sitename => $c->stash->{plan_sitename},
+                template     => 'admin/plan/view.tt',
+            );
+            $c->forward($c->view('TT'));
+        }
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 
             "Error fetching plan details: $_");
-        $c->stash->{json} = { success => 0, error => "Error fetching plan: $_" };
-        $c->forward('View::JSON');
+        $c->stash(error_msg => "Error loading plan: $_", template => 'admin/plan/view.tt');
+        $c->forward($c->view('TT'));
     };
 }
 
