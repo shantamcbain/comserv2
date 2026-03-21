@@ -1,13 +1,4 @@
-[% PageVersion = 'Comserv/root/Documentation/config/index.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
 [% META title = 'Documentation Configuration' %]
-
-<!-- Documentation page for Documentation Configuration -->
-<div class="documentation-content">
-
 
 <div class="documentation-config-container">
     <h1><i class="fas fa-cogs"></i> Documentation Configuration</h1>
@@ -15,12 +6,14 @@
     [% IF status_msg %]
     <div class="status-message success">
         <i class="fas fa-check-circle"></i> [% status_msg %]
-    [% END %]</div>
+    </div>
+    [% END %]
     
     [% IF error_msg %]
     <div class="status-message error">
         <i class="fas fa-exclamation-circle"></i> [% error_msg %]
-    [% END %]</div>
+    </div>
+    [% END %]
     
     <div class="admin-actions">
         <a href="[% c.uri_for('/Documentation/Config/reload') %]" class="action-button reload-button">
@@ -32,7 +25,7 @@
         <a href="[% c.uri_for('/Documentation/Config/scan') %]" class="action-button scan-button">
             <i class="fas fa-search"></i> Scan Documentation
         </a>
-    [% END %]</div>
+    </div>
     
     <div class="config-sections">
         <!-- Categories Section -->
@@ -47,7 +40,7 @@
                         <div class="category-header">
                             <i class="[% category.icon %]"></i>
                             <h3>[% category.title %]</h3>
-                        [% END %]</div>
+                        </div>
                         <div class="category-details">
                             <p>[% category.description %]</p>
                             <div class="category-meta">
@@ -55,11 +48,12 @@
                                 <span class="category-roles"><strong>Roles:</strong> [% category.roles.join(', ') %]</span>
                                 <span class="category-site-specific"><strong>Site-specific:</strong> [% category.site_specific ? 'Yes' : 'No' %]</span>
                                 <span class="category-order"><strong>Display Order:</strong> [% category.display_order %]</span>
-                            [% END %]</div>
-                        [% END %]</div>
-                    [% END %]</div>
-            [% END %]</div>
-        [% END %]</div>
+                            </div>
+                        </div>
+                    </div>
+                [% END %]
+            </div>
+        </div>
         
         <!-- Pages Section -->
         <div class="config-section">
@@ -90,12 +84,13 @@
                                 <td>[% page.site %]</td>
                                 <td>[% page.format %]</td>
                             </tr>
+                        [% END %]
                     </tbody>
                 </table>
-            [% END %]</div>
-        [% END %]</div>
-    [% END %]</div>
-[% END %]</div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
     .documentation-config-container {

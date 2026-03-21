@@ -15,6 +15,7 @@
   --info-color: #17a2b8;
   --light-color: #f8f9fa;
   --text-muted-color: #6c757d;
+  --background-image: none;
   
   /* Spacing variables */
   --spacing-small: 0.5rem;
@@ -140,18 +141,4 @@ select {
 .theme-preview-box.apis {
     background-color: #3366cc;
     color: #ffffff;
-}
-
-/* Layout wrapper styles */
-.content-wrapper {
-    max-width: var(--container-width);
-    margin: 0 auto;
-    padding: var(--spacing-medium);
-    min-height: calc(100vh - 200px);
-}
-
-@media (max-width: 768px) {
-    .content-wrapper {
-        padding: var(--spacing-small);
-    }
 }

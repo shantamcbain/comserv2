@@ -73,9 +73,6 @@
     <!-- Theme CSS: [% theme_name %] -->
     <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
 
-    <!-- Universal Container System (loads after theme variables are defined) -->
-    <link rel="stylesheet" type="text/css" href="/static/css/themes/base-containers.css">
-
     <!-- Theme overrides to ensure proper application -->
     <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
 
@@ -92,11 +89,10 @@
 
     <!-- Menu CSS (part of theme system) -->
     <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
-    <link rel="stylesheet" type="text/css" href="/static/css/components/navigation.css">
 
-    <!-- Debug: Using theme system only, removed old CSS references -->
-    [% IF c.session.debug_mode == 1 %]
-    <!-- Removed old CSS references: css_view_name, log_css, menu_css, todo_css -->
+    <!-- Site-specific CSS (background images, site branding) -->
+    [% IF css_view_name %]
+    <link rel="stylesheet" type="text/css" href="[% css_view_name %]">
     [% END %]
 
     <!-- Local SVG icon solution (no external dependencies) -->
@@ -106,16 +102,26 @@
     <link rel="stylesheet" type="text/css" href="/static/css/icon-fix.css">
     
     <!-- Component-specific CSS -->
-    [% IF template.match('ApiCredentials/') %]
+    [% IF c.stash.template.match('ApiCredentials/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/themes/api_credentials.css">
     [% END %]
     
+    [% IF c.stash.template.match('todo/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
+    [% END %]
 
-    
-
+    [% IF c.stash.template.match('membership/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
+    [% END %]
 
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
+
+    [% IF is_admin %]
+    <!-- Admin-only Health Monitoring -->
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <script src="/static/js/HealthMonitor.js"></script>
+    [% END %]
 
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>
@@ -133,47 +139,7 @@
                 }
             }
         }
-        
-        // Newsletter modal functions - defined early to be available for navigation
-        function showNewsletterModal() {
-            var modal = document.getElementById('newsletterModal');
-            if (modal) {
-                modal.style.display = 'block';
-                // Track modal opens for analytics
-                trackNewsletterModalOpen();
-            } else {
-                console.warn('Newsletter modal not found');
-            }
-        }
-
-        function hideNewsletterModal() {
-            var modal = document.getElementById('newsletterModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        // Enhanced tracking with domain-specific localStorage
-        function trackNewsletterModalOpen() {
-            var domain = window.location.hostname;
-            var storageKey = 'newsletter_modal_opens_' + domain;
-            var opens = parseInt(localStorage.getItem(storageKey) || '0') + 1;
-            localStorage.setItem(storageKey, opens.toString());
-            
-            // Log for debugging if available
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('Newsletter modal opened ' + opens + ' times on ' + domain);
-            }
-        }
-        
-        // Close modal when clicking outside of it
-        document.addEventListener('DOMContentLoaded', function() {
-            window.onclick = function(event) {
-                var modal = document.getElementById('newsletterModal');
-                if (event.target == modal) {
-                    hideNewsletterModal();
-                }
-            }
-        });
     </script>
+    <!-- AI utilities - loaded globally so the chat widget works on all pages -->
+    <script src="/static/js/ai-common.js"></script>
 </head>

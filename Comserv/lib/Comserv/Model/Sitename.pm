@@ -15,32 +15,14 @@ has 'logging' => (
 
 has 'schema' => (
     is => 'ro',
-    lazy => 1,
-    builder => '_build_schema',
+    required => 1,
 );
 
 # Component initialization
 sub COMPONENT {
     my ($class, $app, $args) = @_;
-    return $class->new($args);
-}
-
-# Schema builder
-sub _build_schema {
-    my ($self) = @_;
-    # This will be set via ACCEPT_CONTEXT
-    return undef;
-}
-
-# Accept context to get schema dynamically
-sub ACCEPT_CONTEXT {
-    my ($self, $c) = @_;
-    
-    # Get schema from DBEncy model
-    my $schema = $c->model('DBEncy')->schema;
-    
-    # Return a new instance with the schema
-    return $self->new(schema => $schema);
+    my $schema = $app->model('DBEncy')->schema;
+    return $class->new({ %$args, schema => $schema });
 }
 
 # Sitename operations

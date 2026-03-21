@@ -26,6 +26,33 @@ Dedicated controller for schema comparison and bidirectional synchronization bet
 
 =cut
 
+sub begin :Private {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles}    || [];
+    my @role_list = ref($roles) eq 'ARRAY' ? @$roles : split /,/, $roles;
+    my $has_admin = grep { lc($_) eq 'admin' } @role_list;
+
+    return 1 if $has_admin;
+    return 1 if $username && $username ne 'Guest';
+
+    my $is_ajax = ($c->req->header('X-Requested-With') // '') eq 'XMLHttpRequest'
+               || ($c->req->content_type // '') =~ m{application/json}i;
+
+    if ($is_ajax || $c->req->method ne 'GET') {
+        $c->response->status(401);
+        $c->stash(json => { success => 0, error => 'Not authenticated. Please log in first.' });
+        $c->forward('View::JSON');
+        $c->detach;
+        return;
+    }
+
+    $c->flash->{error_msg} = 'Please log in as an administrator to access schema comparison.';
+    $c->res->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+    $c->detach;
+}
+
 sub admin_auth {
     my ($self) = @_;
     return Comserv::Util::AdminAuth->new();
@@ -78,24 +105,18 @@ sub sync_table_to_result :Path('/schema-comparison/sync_table_to_result') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_table_to_result');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -525,24 +546,18 @@ sub sync_result_to_table :Path('/schema-comparison/sync_result_to_table') :Args(
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'sync_result_to_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -627,24 +642,18 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    # Check admin auth with fallback
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i) ||
-            (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) ||
-            ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i)) {
-            $is_auth = 1;
+    {
+        my $ok    = $self->admin_auth->check_admin_access($c, 'create_result_from_table');
+        my $roles = $c->session->{roles} || [];
+        $ok ||= (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles);
+        $ok ||= (!ref($roles) && $roles =~ /\badmin\b/i);
+        $ok ||= $c->session->{is_admin};
+        unless ($ok) {
+            $c->response->status(403);
+            $c->stash(json => { success => 0, error => 'Access denied' });
+            $c->forward('View::JSON');
+            return;
         }
-    } elsif ($c->user && $c->user->check_roles(qw/admin/)) {
-        $is_auth = 1;
-    }
-    
-    unless ($is_auth) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
     }
     
     my $json_data;
@@ -738,40 +747,30 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
         "Starting create_table_from_result action");
     
-    # Debug logging for authentication check
-    my $username = $c->session->{username} || 'undefined';
-    my $user_id = $c->session->{user_id} || 'undefined';
-    my $is_admin_flag = $c->session->{is_admin} || 'undefined';
-    my $roles = $c->session->{roles} || 'undefined';
-    my $user_groups = $c->session->{user_groups} || 'undefined';
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Auth debug - username: $username, user_id: $user_id, is_admin: $is_admin_flag, roles: $roles, user_groups: $user_groups");
-    
-    # Check auth - use both session-based and Catalyst user
-    my $is_auth = 0;
-    if ($c->session->{username} && $c->session->{user_id}) {
-        # Session-based auth
-        if ($c->session->{is_admin} || (ref($c->session->{roles}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{roles}})) || 
-            ($c->session->{roles} && $c->session->{roles} =~ /\badmin\b/i)) {
-            $is_auth = 1;
-        } elsif (ref($c->session->{user_groups}) eq 'ARRAY' && grep(/admin/i, @{$c->session->{user_groups}})) {
-            $is_auth = 1;
-        } elsif ($c->session->{user_groups} && $c->session->{user_groups} =~ /\badmin\b/i) {
-            $is_auth = 1;
-        }
+    my $is_auth = $self->admin_auth->check_admin_access($c, 'create_table_from_result');
+    if (!$is_auth) {
+        my $roles = $c->session->{roles} || [];
+        $is_auth = 1 if ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles;
+        $is_auth = 1 if !ref($roles) && $roles =~ /\badmin\b/i;
+        $is_auth = 1 if $c->session->{is_admin};
     }
-    
-    # Fallback: check Catalyst user object if available
-    if (!$is_auth && $c->user) {
-        $is_auth = $c->user->check_roles(qw/admin/);
-    }
-    
     unless ($is_auth) {
+        my $roles     = $c->session->{roles} || [];
+        my $roles_str = ref($roles) eq 'ARRAY' ? join(',', @$roles) : ($roles // '');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result',
-            "Access denied - authentication failed. Session: username=$username, is_admin=$is_admin_flag, roles=$roles");
+            "Access denied: username=" . ($c->session->{username} // 'UNSET')
+            . " roles=$roles_str is_admin=" . ($c->session->{is_admin} // 'UNSET'));
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
+        $c->stash(json => {
+            success  => 0,
+            error    => 'Access denied - admin role required',
+            debug    => {
+                username  => $c->session->{username} // 'UNSET',
+                roles     => $roles_str,
+                is_admin  => $c->session->{is_admin} // 'UNSET',
+                sitename  => $c->session->{SiteName} // 'UNSET',
+            },
+        });
         $c->forward('View::JSON');
         return;
     }

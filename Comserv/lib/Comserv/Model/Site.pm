@@ -16,16 +16,16 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+has 'schema' => (
+    is => 'ro',
+    required => 1,
+);
+
 # Component initialization
 sub COMPONENT {
     my ($class, $app, $args) = @_;
-    return $class->new($args);
-}
-
-# Get schema dynamically at request time to use proper priority system
-sub get_schema {
-    my ($self, $c) = @_;
-    return $c->model('DBEncy')->schema;
+    my $schema = $app->model('DBEncy')->schema;
+    return $class->new({ %$args, schema => $schema });
 }
 
 # Site operations
@@ -42,7 +42,7 @@ sub get_all_sites {
 
     try {
         # Try to get the site resultset
-        my $site_rs = $self->get_schema($c)->resultset('Site');
+        my $site_rs = $self->schema->resultset('Site');
 
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'get_all_sites',
@@ -96,7 +96,7 @@ sub get_site_details {
     );
 
     try {
-        my $site = $self->get_schema($c)->resultset('Site')->find($site_id);
+        my $site = $self->schema->resultset('Site')->find($site_id);
         return $site if $site;
 
         $self->logging->log_with_details(
@@ -127,7 +127,7 @@ sub get_site_details_by_name {
     my $result;
 
     try {
-        my $site = $self->get_schema($c)->resultset('Site')->find({ name => $site_name });
+        my $site = $self->schema->resultset('Site')->find({ name => $site_name });
 
         if ($site) {
             $self->logging->log_with_details(
@@ -179,20 +179,20 @@ sub get_site_domain {
 
         # First try with the original table name
         eval {
-            $site_domain = $self->get_schema($c)->resultset('SiteDomain')->find({ domain => $domain });
+            $site_domain = $self->schema->resultset('SiteDomain')->find({ domain => $domain });
         };
 
         # If that fails, try with lowercase table name
         if ($@ || !$site_domain) {
             eval {
-                $site_domain = $self->get_schema($c)->resultset('sitedomain')->find({ domain => $domain });
+                $site_domain = $self->schema->resultset('sitedomain')->find({ domain => $domain });
             };
         }
 
         # If still not found, try case-insensitive match on domain name
         if (!$site_domain) {
             # Try with search instead of find for case-insensitive comparison
-            my $rs = $self->get_schema($c)->resultset('SiteDomain')->search(
+            my $rs = $self->schema->resultset('SiteDomain')->search(
                 \[ 'LOWER(domain) = ?', lc($domain) ]
             );
             $site_domain = $rs->first if $rs && $rs->count > 0;
@@ -200,7 +200,7 @@ sub get_site_domain {
             # If still not found, try with lowercase table name
             if (!$site_domain) {
                 eval {
-                    my $rs = $self->get_schema($c)->resultset('sitedomain')->search(
+                    my $rs = $self->schema->resultset('sitedomain')->search(
                         \[ 'LOWER(domain) = ?', lc($domain) ]
                     );
                     $site_domain = $rs->first if $rs && $rs->count > 0;
@@ -242,7 +242,7 @@ sub add_site {
     );
 
     try {
-        my $site = $self->get_schema($c)->resultset('Site')->create($site_details);
+        my $site = $self->schema->resultset('Site')->create($site_details);
         return $site if $site;
 
         $self->logging->log_with_details(
@@ -271,7 +271,7 @@ sub update_site {
     );
 
     try {
-        my $site = $self->get_schema($c)->resultset('Site')->find($site_id);
+        my $site = $self->schema->resultset('Site')->find($site_id);
         return unless $site;
 
         $site->update($site_details);
@@ -297,7 +297,7 @@ sub delete_site {
     );
 
     try {
-        my $site = $self->get_schema($c)->resultset('Site')->find($site_id);
+        my $site = $self->schema->resultset('Site')->find($site_id);
         return unless $site;
 
         $site->delete;

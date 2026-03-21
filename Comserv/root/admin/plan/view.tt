@@ -1,0 +1,89 @@
+[% META title = "Plan Details" %]
+[% PageVersion = 'admin/plan/view.tt v1.0 2026/03/21' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container" style="max-width:900px;margin:0 auto;padding:20px;">
+
+[% IF error_msg %]
+<div style="background:#fee;border:1px solid #f88;color:#c00;padding:12px 16px;border-radius:4px;margin-bottom:16px;">[% error_msg %]</div>
+[% ELSIF plan %]
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div>
+        <h1 style="margin:0 0 4px;font-size:1.4em;">[% plan.plan_name %]</h1>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">
+            Site: <strong>[% plan.sitename %]</strong>
+            [% IF plan.created_by %]&nbsp;·&nbsp; Created by [% plan.created_by %][% END %]
+            [% IF plan.created_at %]&nbsp;·&nbsp; [% plan.created_at %][% END %]
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        [% IF plan.priority %]<span style="font-size:0.85em;color:var(--text-muted-color);">P[% plan.priority %]</span>[% END %]
+        <span style="padding:3px 10px;border-radius:4px;font-size:0.85em;font-weight:bold;
+            [% IF plan.status == 'active' %]background:#28a745;color:#fff[% ELSIF plan.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+            [% plan.status || 'active' %]
+        </span>
+        [% IF is_admin %]
+        <a href="/admin/plan/[% plan.id %]/edit" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">Edit</a>
+        [% END %]
+        <a href="/Documentation/DailyPlan#planning" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">← Back to Plans</a>
+    </div>
+</div>
+
+[% IF plan.plan_description %]
+<div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:14px;margin-bottom:20px;font-size:0.95em;">
+    [% plan.plan_description %]
+</div>
+[% END %]
+
+<div style="display:flex;gap:16px;margin-bottom:20px;font-size:0.9em;">
+    [% IF plan.start_date %]<span>📅 Start: <strong>[% plan.start_date %]</strong></span>[% END %]
+    [% IF plan.due_date %]<span>⏰ Due: <strong>[% plan.due_date %]</strong></span>[% END %]
+    <span>📊 Progress: <strong>[% plan.progress_percentage || 0 %]%</strong></span>
+</div>
+
+<div style="background:var(--border-color);border-radius:4px;height:8px;margin-bottom:24px;">
+    <div style="background:var(--primary-color);height:8px;border-radius:4px;width:[% plan.progress_percentage || 0 %]%;transition:width 0.3s;"></div>
+</div>
+
+[% IF plan.projects && plan.projects.size %]
+<h2 style="font-size:1.1em;margin-bottom:12px;border-bottom:1px solid var(--border-color);padding-bottom:6px;">📁 Projects</h2>
+[% FOREACH proj IN plan.projects %]
+<div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:14px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+            <div style="font-weight:bold;">[% proj.name %]
+                [% IF proj.project_code %]<span style="font-size:0.8em;font-weight:normal;color:var(--text-muted-color);">([% proj.project_code %])</span>[% END %]
+            </div>
+            [% IF proj.description %]<div style="font-size:0.85em;color:var(--text-color);margin-top:3px;">[% proj.description %]</div>[% END %]
+        </div>
+        <div style="display:flex;gap:6px;">
+            <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.82em;color:var(--primary-color);">View Project</a>
+        </div>
+    </div>
+    [% IF proj.todos && proj.todos.size %]
+    <div style="margin-top:10px;">
+        [% FOREACH todo IN proj.todos %]
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border-color);font-size:0.85em;">
+            [% IF todo.status == 'Completed' %]✅[% ELSIF todo.status == 'In-Process' %]⏳[% ELSE %]📌[% END %]
+            <span style="flex:1;">[% todo.subject %]</span>
+            <span style="color:var(--text-muted-color);font-size:0.8em;">[% todo.status %]</span>
+            <a href="/todo/showtodo?record_id=[% todo.record_id %]" style="color:var(--primary-color);font-size:0.8em;">View</a>
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+[% END %]
+[% ELSE %]
+<div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:20px;margin-bottom:20px;text-align:center;color:var(--text-muted-color);font-size:0.9em;">
+    No projects linked to this plan yet.
+    [% IF is_admin %]<br><a href="/project" style="color:var(--primary-color);">Browse Projects</a> to link one.[% END %]
+</div>
+[% END %]
+
+[% ELSE %]
+<div style="text-align:center;padding:40px;color:var(--text-muted-color);">Plan not found. <a href="/Documentation/DailyPlan#planning">Back to Plans</a></div>
+[% END %]
+
+</div>

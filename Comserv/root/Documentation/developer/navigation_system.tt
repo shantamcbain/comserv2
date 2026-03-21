@@ -1,628 +1,209 @@
-[% PageVersion = 'Comserv/root/Documentation/developer/navigation_system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+[% WRAPPER layout.tt title="Navigation System Documentation" %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>Navigation System Documentation</h1>
+            
+            <div class="alert alert-info">
+                <strong>Version:</strong> 2.0<br>
+                <strong>Last Updated:</strong> 2025-01-25<br>
+                <strong>Author:</strong> Development Team
+            </div>
+
+            <h2>Overview</h2>
+            <p>The Comserv navigation system has been updated to support both public and private navigation items through a database-driven approach. The system now properly distinguishes between links that should be visible to all users and those that should only be visible to logged-in users.</p>
+
+            <h2>Database Schema</h2>
+            
+            <h3>Navigation Table</h3>
+            <p>The main <code>navigation</code> table stores hierarchical navigation structure:</p>
+            
+            <pre class="bg-light p-3"><code>CREATE TABLE `navigation` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `page_id` int(11) NOT NULL,
+  `menu` varchar(255) NOT NULL,
+  `parent_id` int(11) DEFAULT NULL,
+  `order` int(11) NOT NULL,
+  `is_private` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_navigation_privacy` (`is_private`),
+  KEY `idx_navigation_menu_privacy` (`menu`, `is_private`),
+  CONSTRAINT `navigation_page_fk` FOREIGN KEY (`page_id`) REFERENCES `page_tb` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `navigation_parent_fk` FOREIGN KEY (`parent_id`) REFERENCES `navigation` (`id`)
+) COMMENT='Navigation structure with hierarchical support and public/private visibility';</code></pre>
+
+            <h4>Fields</h4>
+            <ul>
+                <li><strong>id</strong>: Primary key</li>
+                <li><strong>page_id</strong>: Foreign key to <code>page_tb</code> table</li>
+                <li><strong>menu</strong>: Menu category (Main, Member, Admin, etc.)</li>
+                <li><strong>parent_id</strong>: Parent navigation item for hierarchical structure (NULL for top-level)</li>
+                <li><strong>order</strong>: Sort order within the same level</li>
+                <li><strong>is_private</strong>: Flag indicating if item should only be shown to logged-in users (0=public, 1=private)</li>
+            </ul>
+
+            <h3>Related Tables</h3>
+            <ul>
+                <li><strong>page_tb</strong>: Contains page information (name, URL, description, etc.)</li>
+                <li><strong>internal_links_tb</strong>: Contains internal link information for categories</li>
+            </ul>
+
+            <h2>Privacy Logic</h2>
+            
+            <h3>Public vs Private Items</h3>
+            <ul>
+                <li><strong>Public items</strong> (<code>is_private = 0</code>): Always displayed to all users</li>
+                <li><strong>Private items</strong> (<code>is_private = 1</code>): Only displayed to logged-in users</li>
+            </ul>
+
+            <h3>Implementation</h3>
+            <p>The filtering logic is implemented in the Navigation controller:</p>
+            
+            <pre class="bg-light p-3"><code># Get navigation items filtered by privacy settings
+my $rs = $c->model('DBEncy')->resultset('Navigation')->search(
+    { 
+        menu => $menu_name,
+        -or => [
+            { is_private => 0 },                    # Public items always shown
+            { is_private => 1, -and => $user_logged_in ? () : ('0=1') } # Private items only if logged in
+        ]
+    },
+    { order_by => ['parent_id', 'order'] }
+);</code></pre>
+
+            <h2>Controller Methods</h2>
+            
+            <h3>Navigation::Controller</h3>
+            
+            <h4>New Methods for Privacy Support</h4>
+            <ul>
+                <li><strong><code>get_navigation_items($c, $menu_name, $user_logged_in)</code></strong>: Gets filtered navigation items</li>
+                <li><strong><code>get_navigation_tree($c, $menu_name, $user_logged_in)</code></strong>: Gets hierarchical navigation structure</li>
+                <li><strong><code>add_navigation_item()</code></strong>: Admin interface to add navigation items</li>
+                <li><strong><code>manage()</code></strong>: Admin interface to manage navigation items</li>
+            </ul>
+
+            <h4>Helper Methods</h4>
+            <ul>
+                <li><strong><code>is_public()</code></strong>: Model helper method to check if item is public</li>
+                <li><strong><code>should_display_for_user($user_logged_in)</code></strong>: Model helper to check if item should display</li>
+                <li><strong><code>column_exists($c, $table_name, $column_name)</code></strong>: Utility to check column existence</li>
+                <li><strong><code>run_navigation_migration($c)</code></strong>: Runs database migration to add <code>is_private</code> column</li>
+            </ul>
+
+            <h3>Root Controller Updates</h3>
+            <p>The Root controller now loads both the legacy navigation data and the new navigation structure:</p>
+            
+            <pre class="bg-light p-3"><code># Get navigation items from the new navigation system
+my $user_logged_in = $c->stash->{user_logged_in} || 0;
+$c->stash->{navigation_main} = $nav_controller->get_navigation_tree($c, 'Main', $user_logged_in);
+$c->stash->{navigation_member} = $nav_controller->get_navigation_tree($c, 'Member', $user_logged_in);
+# ... etc for other menus</code></pre>
+
+            <h2>Template Integration</h2>
+            <p>Templates can now access the new navigation structure via stash variables:</p>
+            <ul>
+                <li><code>c.stash.navigation_main</code></li>
+                <li><code>c.stash.navigation_member</code></li>
+                <li><code>c.stash.navigation_admin</code></li>
+                <li>etc.</li>
+            </ul>
+
+            <p>Each navigation item includes:</p>
+            <pre class="bg-light p-3"><code>{
+    id => $nav_item->id,
+    page_id => $nav_item->page_id,
+    menu => $nav_item->menu,
+    parent_id => $nav_item->parent_id,
+    order => $nav_item->order,
+    is_private => $nav_item->is_private,
+    page => {
+        name => $page->name,
+        url => $page->url,
+        target => $page->target,
+        description => $page->description,
+    }
+}</code></pre>
+
+            <h2>Migration</h2>
+            <p>The system automatically migrates existing navigation tables when the application starts:</p>
+            <ol>
+                <li>Checks if <code>navigation</code> table exists</li>
+                <li>If it exists but lacks the <code>is_private</code> column, runs migration to add it</li>
+                <li>Creates necessary indexes for performance</li>
+                <li>Updates table comment</li>
+            </ol>
+            
+            <p>The migration is handled automatically in code - no manual SQL files are needed.</p>
+
+            <h2>Admin Interface</h2>
+            <p>New admin routes for managing navigation:</p>
+            <ul>
+                <li><strong><code>/navigation/manage</code></strong>: View and manage all navigation items</li>
+                <li><strong><code>/navigation/add</code></strong>: Add new navigation items</li>
+            </ul>
+            <p>Access requires admin role (<code>admin</code> in user's roles array).</p>
+
+            <h2>Legacy Support</h2>
+            <p>The system maintains backward compatibility:</p>
+            <ul>
+                <li>Existing <code>get_pages()</code>, <code>get_internal_links()</code>, and <code>get_private_links()</code> methods continue to work</li>
+                <li>Templates can still use existing stash variables</li>
+                <li>New navigation structure is available alongside legacy data</li>
+            </ul>
+
+            <h2>Usage Examples</h2>
+            
+            <h3>Adding a Private Navigation Item</h3>
+            <pre class="bg-light p-3"><code>$c->model('DBEncy')->resultset('Navigation')->create({
+    page_id => $page_id,
+    menu => 'Member',
+    parent_id => undef,     # Top-level item
+    order => 10,
+    is_private => 1,        # Only for logged-in users
+});</code></pre>
+
+            <h3>Template Usage</h3>
+            <pre class="bg-light p-3"><code>[% FOREACH nav_item IN c.stash.navigation_main %]
+    &lt;li&gt;
+        &lt;a href="[% nav_item.page.url %]" target="[% nav_item.page.target || '_self' %]"&gt;
+            [% nav_item.page.name %]
+        &lt;/a&gt;
+        [% IF nav_item.children.size > 0 %]
+            &lt;ul&gt;
+            [% FOREACH child IN nav_item.children %]
+                &lt;li&gt;&lt;a href="[% child.page.url %]"&gt;[% child.page.name %]&lt;/a&gt;&lt;/li&gt;
+            [% END %]
+            &lt;/ul&gt;
+        [% END %]
+    &lt;/li&gt;
+[% END %]</code></pre>
+
+            <h2>Troubleshooting</h2>
+            
+            <h3>Common Issues</h3>
+            <ol>
+                <li><strong>Migration not running</strong>: Check database permissions and log files</li>
+                <li><strong>Private items not showing</strong>: Verify user login status and session data</li>
+                <li><strong>Performance issues</strong>: Ensure indexes on <code>is_private</code> and <code>menu</code> columns exist</li>
+            </ol>
+
+            <h3>Debugging</h3>
+            <p>Enable debug logging to see navigation loading details:</p>
+            <pre class="bg-light p-3"><code>$c->log->debug("Getting navigation items for menu: $menu_name, user_logged_in: " . ($user_logged_in ? 'yes' : 'no'));</code></pre>
+
+            <h2>Future Enhancements</h2>
+            <p>Potential improvements for future versions:</p>
+            <ol>
+                <li>Role-based navigation (show items based on specific user roles)</li>
+                <li>Time-based navigation (show/hide items based on date/time)</li>
+                <li>Site-specific private navigation items</li>
+                <li>Navigation caching improvements</li>
+                <li>Drag-and-drop navigation management interface</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
 [% END %]
-
-[% META title = 'Navigation System Documentation' %]
-
-<!-- Documentation page for navigation_system -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-**File:** /home/shanta/PycharmProjects/comserv/Comserv/root/Documentation/developer/navigation_system.md  
-
-**Version:** 1.1  
-
-**Last Updated:** June 1, 2025  
-
-**Author:** Development Team
-
-
-
-> **Important Note:** This document has been expanded with more detailed guides:
-
-> - <a href="menu_system_guide.md">Menu System Guide</a> - Comprehensive guide to the entire menu system
-
-> - <a href="admintopmenu_guide.md">Admin Top Menu Guide</a> - Specific guide for the admin menu structure
-
-
-
-<h2>Overview</h2>
-
-
-
-The Comserv application uses a modular navigation system with dropdown menus to provide access to different parts of the application. This document provides comprehensive information about the navigation structure, components, and best practices for working with the navigation system.
-
-
-
-<h2>Navigation Structure</h2>
-
-
-
-<h3>Directory Organization</h3>
-
-
-
-Navigation templates are organized in the following directory structure:
-
-
-
-<code></code>`
-
-Comserv/root/Navigation/
-
-├── TopDropListMain.tt       # Main navigation menu
-
-├── TopDropListLogin.tt      # Login/logout options
-
-├── TopDropListGlobal.tt     # Global site links
-
-├── TopDropListHosted.tt     # Hosted services links
-
-├── TopDropListMember.tt     # Member-specific links
-
-├── TopDropListHelpDesk.tt   # Help and support links
-
-├── admintopmenu.tt          # Admin-specific navigation
-
-└── ... other navigation components
-
-<code></code>`
-
-
-
-<h3>Navigation Hierarchy</h3>
-
-
-
-The navigation system follows this hierarchy:
-
-
-
-<ol><li>Main horizontal menu bar (defined in <code>pagetop.tt</code>)</li></ol>
-
-<ol><li>Dropdown menus for each main section</li></ol>
-
-<ol><li>Submenu items within each dropdown</li></ol>
-
-<ol><li>Nested submenus for complex sections (like Admin)</li></ol>
-
-
-
-<h2>Main Navigation Components</h2>
-
-
-
-<h3>Main Menu (<code>TopDropListMain.tt</code>)</h3>
-
-
-
-The main menu provides access to the primary sections of the application:
-
-
-
-<ul><li>Home</li></ul>
-
-<ul><li>About</li></ul>
-
-<ul><li>Services</li></ul>
-
-<ul><li>Products</li></ul>
-
-<ul><li>Contact</li></ul>
-
-
-
-<h3>Login Menu (<code>TopDropListLogin.tt</code>)</h3>
-
-
-
-The login menu provides authentication options:
-
-
-
-<ul><li>Login/Logout</li></ul>
-
-<ul><li>Profile</li></ul>
-
-<ul><li>Account Settings</li></ul>
-
-<ul><li>Registration</li></ul>
-
-
-
-<h3>HelpDesk Menu (<code>TopDropListHelpDesk.tt</code>)</h3>
-
-
-
-The HelpDesk menu provides access to support resources:
-
-
-
-<ul><li>HelpDesk</li></ul>
-
-<ul><li>Documentation</li></ul>
-
-<ul><li>FAQ</li></ul>
-
-<ul><li>Knowledge Base</li></ul>
-
-<ul><li>Support Ticket Submission</li></ul>
-
-
-
-<h3>Admin Menu (<code>admintopmenu.tt</code>)</h3>
-
-
-
-The Admin menu provides access to administrative functions, organized into logical sections:
-
-
-
-<h4>Admin Dashboard</h4>
-
-<ul><li>View Log</li></ul>
-
-<ul><li>Open Log</li></ul>
-
-
-
-<h4>Projects</h4>
-
-<ul><li>Project Dashboard</li></ul>
-
-<ul><li>Add New Project</li></ul>
-
-<ul><li>Project List (dynamically generated)</li></ul>
-
-
-
-<h4>Documentation</h4>
-
-<ul><li>All Documentation</li></ul>
-
-<ul><li>User Guides</li></ul>
-
-<ul><li>Admin Guides</li></ul>
-
-<ul><li>Tutorials</li></ul>
-
-<ul><li>Changelog</li></ul>
-
-<ul><li>Edit Documentation (admin/developer only)</li></ul>
-
-
-
-<h4>ToDo System</h4>
-
-<ul><li>All Todos</li></ul>
-
-<ul><li>Add New Todo</li></ul>
-
-<ul><li>Time-based Views (Today, Week, Month)</li></ul>
-
-<ul><li>Recent Todos</li></ul>
-
-
-
-<h4>File Management</h4>
-
-<ul><li>File Dashboard</li></ul>
-
-<ul><li>Upload Files</li></ul>
-
-<ul><li>Files in Database</li></ul>
-
-<ul><li>File Type Search</li></ul>
-
-
-
-<h4>User Management</h4>
-
-<ul><li>List All Users</li></ul>
-
-<ul><li>User Administration</li></ul>
-
-<ul><li>Add New User (admin only)</li></ul>
-
-
-
-<h4>System Setup</h4>
-
-<ul><li>Site Management</li></ul>
-
-<ul><li>System Configuration</li></ul>
-
-
-
-<h4>Domain Selection</h4>
-
-<ul><li>Production Sites</li></ul>
-
-<ul><li>Local Development</li></ul>
-
-<ul><li>Other Options</li></ul>
-
-
-
-<h4>System Links</h4>
-
-<ul><li>Admin Notes</li></ul>
-
-<ul><li>Dynamic Admin Links</li></ul>
-
-<ul><li>TTML Links</li></ul>
-
-
-
-<h4>MCOOP Admin (site-specific)</h4>
-
-<ul><li>MCOOP Home</li></ul>
-
-<ul><li>Server Room Plan</li></ul>
-
-<ul><li>Network Infrastructure</li></ul>
-
-<ul><li>COOP Services</li></ul>
-
-
-
-<h4>Debug Options</h4>
-
-<ul><li>Toggle Debug Mode</li></ul>
-
-<ul><li>Debug Console</li></ul>
-
-
-
-<h2>CSS Styling</h2>
-
-
-
-The navigation system styling is defined in:
-
-
-
-<code></code>`
-
-Comserv/root/static/css/components/navigation.css
-
-<code></code>`
-
-
-
-Key styling components include:
-
-
-
-<h3>Horizontal Menu</h3>
-
-<ul><li>Top-level menu bar styling</li></ul>
-
-<ul><li>Dropdown button appearance</li></ul>
-
-<ul><li>Hover effects</li></ul>
-
-
-
-<h3>Dropdown Content</h3>
-
-<ul><li>Dropdown menu containers</li></ul>
-
-<ul><li>Link styling within dropdowns</li></ul>
-
-<ul><li>Hover effects for dropdown items</li></ul>
-
-
-
-<h3>Submenu System</h3>
-
-<ul><li>Submenu positioning</li></ul>
-
-<ul><li>Submenu headers</li></ul>
-
-<ul><li>Nested submenu display</li></ul>
-
-
-
-<h3>Enhanced Components</h3>
-
-<ul><li>Project list styling</li></ul>
-
-<ul><li>File search form styling</li></ul>
-
-<ul><li>Recent todos styling</li></ul>
-
-<ul><li>Domain list styling</li></ul>
-
-
-
-<h2>JavaScript Functionality</h2>
-
-
-
-The navigation system includes JavaScript for:
-
-
-
-<ul><li>Dropdown menu toggling</li></ul>
-
-<ul><li>Submenu expansion/collapse</li></ul>
-
-<ul><li>Active state management</li></ul>
-
-<ul><li>Mobile responsiveness</li></ul>
-
-
-
-<h2>Role-Based Navigation</h2>
-
-
-
-The navigation system adapts based on user roles:
-
-
-
-<h3>Guest Users</h3>
-
-<ul><li>Limited access to basic navigation</li></ul>
-
-<ul><li>Login/registration options</li></ul>
-
-<ul><li>Public documentation</li></ul>
-
-
-
-<h3>Regular Users</h3>
-
-<ul><li>Access to user-specific features</li></ul>
-
-<ul><li>Profile and account management</li></ul>
-
-<ul><li>User-level documentation</li></ul>
-
-
-
-<h3>Administrators</h3>
-
-<ul><li>Full access to all navigation options</li></ul>
-
-<ul><li>Admin-specific menus and submenus</li></ul>
-
-<ul><li>System configuration options</li></ul>
-
-
-
-<h2>Best Practices</h2>
-
-
-
-<h3>1. Consistent Structure</h3>
-
-
-
-Maintain consistent structure across navigation components:
-
-
-
-<code></code>`html
-
-<li class="horizontal-dropdown">
-
-    <a href="/section" class="dropbtn"><i class="icon-section"></i>Section Name</a>
-
-    <div class="dropdown-content">
-
-        <!-- Dropdown items -->
-
-
-</li>
-
-<code></code>`
-
-
-
-<h3>2. Icon Usage</h3>
-
-
-
-Use consistent icons for navigation items:
-
-
-
-<code></code>`html
-
-<a href="/path"><i class="icon-name"></i>Link Text</a>
-
-<code></code>`
-
-
-
-<h3>3. Role-Based Visibility</h3>
-
-
-
-Control visibility based on user roles:
-
-
-
-<code></code>`html
-
-[% IF c.session.roles.grep('admin').size %]
-
-    <!-- Admin-only navigation -->
-
-
-<code></code>`
-
-
-
-<h3>4. Section Organization</h3>
-
-
-
-Organize complex dropdowns into logical sections:
-
-
-
-<code></code>`html
-
-<div class="submenu-section">
-
-    <span class="submenu-section-title">Section Title</span>
-
-    <!-- Section links -->
-
-
-<code></code>`
-
-
-
-<h3>5. Landing Pages</h3>
-
-
-
-Ensure section headers link to appropriate landing pages:
-
-
-
-<code></code>`html
-
-<span class="submenu-header">
-
-    <a href="/section" class="dropbtn"><i class="icon-section"></i>Section Name</a>
-
-</span>
-
-<code></code>`
-
-
-
-<h2>Extending the Navigation System</h2>
-
-
-
-<h3>Adding New Navigation Items</h3>
-
-
-
-To add a new navigation item:
-
-
-
-<ol><li>Identify the appropriate navigation component</li></ol>
-
-<ol><li>Add the new item following the established pattern</li></ol>
-
-<ol><li>Include appropriate role-based access control</li></ol>
-
-<ol><li>Update CSS if new styling is needed</li></ol>
-
-
-
-<h3>Adding New Dropdown Sections</h3>
-
-
-
-To add a new dropdown section:
-
-
-
-<ol><li>Create a new dropdown in the appropriate navigation component</li></ol>
-
-<ol><li>Follow the established structure for dropdowns</li></ol>
-
-<ol><li>Add appropriate submenu items</li></ol>
-
-<ol><li>Update CSS for any new styling needs</li></ol>
-
-
-
-<h2>Troubleshooting</h2>
-
-
-
-<h3>Common Navigation Issues</h3>
-
-
-
-<ol><li>**Dropdown Not Appearing**</li></ol>
-
-   - Check CSS class names
-
-   - Verify HTML structure matches established pattern
-
-   - Check for JavaScript errors
-
-   - Ensure proper nesting of elements
-
-   - Check for missing closing tags
-
-
-
-<ol><li>**Role-Based Access Not Working**</li></ol>
-
-   - Verify role check syntax
-
-   - Check session role values
-
-   - Test with different user accounts
-
-
-
-<ol><li>**Styling Inconsistencies**</li></ol>
-
-   - Ensure CSS classes are applied correctly
-
-   - Check for CSS conflicts
-
-   - Verify theme compatibility
-
-
-
-<ol><li>**Submenus Not Working**</li></ol>
-
-   - Check the HTML structure of submenu items
-
-   - Verify that submenu items are properly contained within the dropdown-content div
-
-   - Check for JavaScript errors
-
-   - Ensure proper nesting of elements
-
-
-
-<h3>Debugging Navigation</h3>
-
-
-
-<ol><li>Enable debug mode to see template versions</li></ol>
-
-<ol><li>Check browser developer tools for CSS/JS issues</li></ol>
-
-<ol><li>Test navigation with different user roles</li></ol>
-
-<ol><li>Review application logs for errors</li></ol>
-
-<ol><li>Use browser developer tools to inspect the HTML structure</li></ol>
-
-
-
-<h3>Recent Fixes</h3>
-
-
-
-For information about recent fixes to the navigation system, see:
-
-<ul><li><a href="menu_system_guide.md#recent-fixes">Menu System Guide</a></li></ul>
-
-<ul><li><a href="admintopmenu_guide.md#common-issues-and-solutions">Admin Top Menu Guide</a></li></ul>
-
-[% END %]</div>

@@ -1,223 +1,263 @@
-[% PageVersion = 'Comserv/root/Documentation/controllers/HelpDesk.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% META
+        title = "HelpDesk Controller"
+   description = "Support ticketing system with knowledge base and administrative interface"
+   roles = "developer,admin"
+   TemplateType = "Documentation"
+   category = "controllers"
+   page_version = "0.01"
+   last_updated = "Tue Jan 06 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/HelpDesk.tt,v 0.01 2026/01/06 shanta Exp shanta - Initial refactor to DocumentationTtTemplate standards' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-[% META title = 'HelpDesk Controller' %]
-
-<!-- Documentation page for HelpDesk -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
-
-**Last Updated:** April 24, 2024  
-
-**Author:** Shanta  
-
-**Status:** Active
-
-
-
-<h2>Overview</h2>
-
-The HelpDesk controller manages the support ticketing system and knowledge base for Computer System Consulting. It provides a centralized interface for users to submit support tickets, check ticket status, browse the knowledge base, and contact support directly.
-
-
-
-<h2>Key Features</h2>
-
-<ul><li>Support ticket submission and management</li></ul>
-
-<ul><li>Ticket status tracking</li></ul>
-
-<ul><li>Knowledge base access with Linux commands reference</li></ul>
-
-<ul><li>Administrative interface for HelpDesk management</li></ul>
-
-<ul><li>Direct contact with support team</li></ul>
-
-<ul><li>Chained dispatch system for consistent URL structure</li></ul>
-
-<ul><li>Debug message handling for troubleshooting</li></ul>
-
-<ul><li>Integration with Documentation and FAQ systems</li></ul>
-
-
-
-<h2>Methods</h2>
-
-
-
-<h3>Base Methods</h3>
-
-<ul><li><code>auto</code>: Common setup for all HelpDesk actions, initializes debug messages</li></ul>
-
-<ul><li><code>base</code>: Base method for chained actions, sets up common stash variables</li></ul>
-
-<ul><li><code>default</code>: Fallback for HelpDesk URLs that don't match any actions</li></ul>
-
-
-
-<h3>Page Methods</h3>
-
-<ul><li><code>index</code>: Main HelpDesk landing page with support options</li></ul>
-
-<ul><li><code>kb</code>: Knowledge Base page with categorized support articles</li></ul>
-
-<ul><li><code>contact</code>: Contact Support page with various contact methods</li></ul>
-
-<ul><li><code>admin</code>: Administrative interface for managing the HelpDesk system (admin-only)</li></ul>
-
-<ul><li><code>linux_commands</code>: Reference page for common Linux commands (admin-only)</li></ul>
-
-
-
-<h3>Ticket Methods</h3>
-
-<ul><li><code>ticket_base</code>: Base method for all ticket-related actions</li></ul>
-
-<ul><li><code>ticket_new</code>: Form for creating new support tickets</li></ul>
-
-<ul><li><code>ticket_status</code>: Page for viewing existing ticket status</li></ul>
-
-
-
-<h2>URL Structure</h2>
-
-<ul><li><code>/HelpDesk</code> - Main HelpDesk landing page</li></ul>
-
-<ul><li><code>/HelpDesk/admin</code> - HelpDesk administration (admin-only)</li></ul>
-
-<ul><li><code>/HelpDesk/ticket/new</code> - Create new support ticket</li></ul>
-
-<ul><li><code>/HelpDesk/ticket/status</code> - View ticket status</li></ul>
-
-<ul><li><code>/HelpDesk/kb</code> - Knowledge base</li></ul>
-
-<ul><li><code>/HelpDesk/kb/linux_commands</code> - Linux commands reference</li></ul>
-
-<ul><li><code>/HelpDesk/contact</code> - Contact support</li></ul>
-
-
-
-<h2>Access Control</h2>
-
-This controller implements role-based access control:
-
-<ul><li>Anonymous users can view the HelpDesk and submit tickets</li></ul>
-
-<ul><li>Authenticated users see personalized content and their ticket history</li></ul>
-
-<ul><li>Admin users have additional management capabilities through the admin interface</li></ul>
-
-
-
-<h2>Navigation Integration</h2>
-
-The HelpDesk system is integrated into the main navigation through the <code>TopDropListHelpDesk.tt</code> template, providing easy access to all HelpDesk components:
-
-<ul><li>HelpDesk Home</li></ul>
-
-<ul><li>Submit a Ticket</li></ul>
-
-<ul><li>Check Ticket Status</li></ul>
-
-<ul><li>Documentation</li></ul>
-
-<ul><li>Knowledge Base</li></ul>
-
-<ul><li>Linux Commands (admin-only)</li></ul>
-
-<ul><li>FAQ</li></ul>
-
-<ul><li>Contact Support</li></ul>
-
-
-
-<h2>Related Files</h2>
-
-<ul><li>Template files:</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk.tt</code> - Main HelpDesk template</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/admin.tt</code> - HelpDesk administration interface</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/new_ticket.tt</code> - New ticket form</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/ticket_status.tt</code> - Ticket status page</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/kb.tt</code> - Knowledge base</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/linux_commands.tt</code> - Linux commands reference</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDesk/contact.tt</code> - Contact page</li></ul>
-
-<ul><li>Support content:</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpdeskContents.tt</code> - Shared content included in the main template</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/CSC/HelpDeskHomePagesql.tt</code> - SQL-based dynamic content</li></ul>
-
-<ul><li>Navigation:</li></ul>
-
-<ul><li style="margin-left: 20px"><code>/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu</li></ul>
-
-
-
-<h2>Logging and Debugging</h2>
-
-The HelpDesk controller uses comprehensive logging with <code>log_with_details</code>:
-
-
-
-<code></code>`perl
-
-$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
-
-    "Detailed message with relevant information");
-
-<code></code>`
-
-
-
-Debug messages are stored in the stash for display in templates when debug mode is enabled:
-
-
-
-<code></code>`perl
-
-push @{$c->stash->{debug_msg}}, "Debug message";
-
-<code></code>`
-
-
-
-<h2>Implementation Notes</h2>
-
-<ul><li>Uses the chained dispatch system for consistent URL structure</li></ul>
-
-<ul><li>Explicitly forwards to the TT view to ensure template rendering</li></ul>
-
-<ul><li>Maintains debug messages in an array for troubleshooting</li></ul>
-
-<ul><li>Designed to work without explicit loading in Comserv.pm</li></ul>
-
-<ul><li>Integrates with the Documentation and FAQ systems for comprehensive support</li></ul>
-
-
-
-<h2>Related Documentation</h2>
-
-<ul><li><a href="/Documentation/HelpDeskSystem">HelpDesk System Documentation</a></li></ul>
-
-<ul><li><a href="/Documentation/controllers/FAQ">FAQ Controller Documentation</a></li></ul>
-
-<ul><li><a href="/Documentation/documentation_config_guide">Documentation System Guide</a></li></ul>
-
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">HelpDesk Controller</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-06 | 
+        Version: 0.01 |
+        Author: Shanta | 
+        Status: Active
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#urls" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">URL Structure</a>
+                <a href="#access" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access Control</a>
+                <a href="#navigation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Navigation</a>
+                <a href="#files" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Related Files</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
+                <a href="#implementation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Implementation</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The HelpDesk controller manages the support ticketing system and knowledge base for Computer System Consulting. It provides a centralized interface for users to submit support tickets, check ticket status, browse the knowledge base, and contact support directly.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">2. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Support Ticket Management</strong>: Submit, track, and manage support tickets</li>
+                <li><strong>Ticket Status Tracking</strong>: Real-time status updates for submitted tickets</li>
+                <li><strong>Knowledge Base</strong>: Access to categorized support articles and Linux commands reference</li>
+                <li><strong>Administrative Interface</strong>: Dedicated admin tools for HelpDesk system management</li>
+                <li><strong>Direct Support Contact</strong>: Multiple contact methods to reach support team</li>
+                <li><strong>Chained Dispatch System</strong>: Consistent and predictable URL structure</li>
+                <li><strong>Debug Message Handling</strong>: Comprehensive debugging capabilities for troubleshooting</li>
+                <li><strong>System Integration</strong>: Seamless integration with Documentation and FAQ systems</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">3. Methods</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Base Methods</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">auto</code>: Common setup for all HelpDesk actions, initializes debug messages</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">base</code>: Base method for chained actions, sets up common stash variables</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">default</code>: Fallback for HelpDesk URLs that don't match any actions</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.2 Page Methods</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">index</code>: Main HelpDesk landing page with support options</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">kb</code>: Knowledge Base page with categorized support articles</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">contact</code>: Contact Support page with various contact methods</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">admin</code>: Administrative interface for managing the HelpDesk system (admin-only)</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">linux_commands</code>: Reference page for common Linux commands (admin-only)</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.3 Ticket Methods</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">ticket_base</code>: Base method for all ticket-related actions</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">ticket_new</code>: Form for creating new support tickets</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">ticket_status</code>: Page for viewing existing ticket status</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- URL STRUCTURE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="urls" style="color: var(--text-color); font-family: var(--header-font);">4. URL Structure</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Endpoint</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Main HelpDesk landing page</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/admin</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">HelpDesk administration (admin-only)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/ticket/new</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Create new support ticket</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/ticket/status</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">View ticket status</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/kb</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Knowledge base</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/kb/linux_commands</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Linux commands reference</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/HelpDesk/contact</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Contact support</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ACCESS CONTROL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="access" style="color: var(--text-color); font-family: var(--header-font);">5. Access Control</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The HelpDesk controller implements role-based access control:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Anonymous Users</strong>: Can view the HelpDesk and submit tickets</li>
+                <li><strong>Authenticated Users</strong>: See personalized content and their ticket history</li>
+                <li><strong>Admin Users</strong>: Have additional management capabilities through the admin interface</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- NAVIGATION INTEGRATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="navigation" style="color: var(--text-color); font-family: var(--header-font);">6. Navigation Integration</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The HelpDesk system is integrated into the main navigation through the <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">TopDropListHelpDesk.tt</code> template, providing easy access to all HelpDesk components:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>HelpDesk Home</li>
+                <li>Submit a Ticket</li>
+                <li>Check Ticket Status</li>
+                <li>Documentation</li>
+                <li>Knowledge Base</li>
+                <li>Linux Commands (admin-only)</li>
+                <li>FAQ</li>
+                <li>Contact Support</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RELATED FILES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="files" style="color: var(--text-color); font-family: var(--header-font);">7. Related Files</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.1 Template Files</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk.tt</code> - Main HelpDesk template</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/admin.tt</code> - HelpDesk administration interface</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/new_ticket.tt</code> - New ticket form</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/ticket_status.tt</code> - Ticket status page</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/kb.tt</code> - Knowledge base</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/linux_commands.tt</code> - Linux commands reference</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDesk/contact.tt</code> - Contact page</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.2 Support Content</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpdeskContents.tt</code> - Shared content included in the main template</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/HelpDeskHomePagesql.tt</code> - SQL-based dynamic content</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.3 Navigation</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px;">/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- LOGGING AND DEBUGGING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="logging" style="color: var(--text-color); font-family: var(--header-font);">8. Logging and Debugging</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The HelpDesk controller uses comprehensive logging with <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">log_with_details</code>:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
+    "Detailed message with relevant information");</code></pre>
+            </div>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);">Debug messages are stored in the stash for display in templates when debug mode is enabled:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>push @{$c->stash->{debug_msg}}, "Debug message";</code></pre>
+            </div>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- IMPLEMENTATION NOTES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="implementation" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">9. Implementation Notes</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Uses the <strong>chained dispatch system</strong> for consistent and predictable URL structure</li>
+                    <li>Explicitly forwards to the TT view to ensure template rendering</li>
+                    <li>Maintains debug messages in an array for comprehensive troubleshooting</li>
+                    <li>Designed to work without explicit loading in Comserv.pm</li>
+                    <li>Integrates seamlessly with the Documentation and FAQ systems for comprehensive support</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Related Documentation</strong>:</p>
+                <ul style="color: var(--text-muted-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/HelpDeskSystem" style="color: var(--link-color);">HelpDesk System Documentation</a></li>
+                    <li><a href="/Documentation/controllers/FAQ" style="color: var(--link-color);">FAQ Controller Documentation</a></li>
+                    <li><a href="/Documentation/documentation_config_guide" style="color: var(--link-color);">Documentation System Guide</a></li>
+                </ul>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
 </div>

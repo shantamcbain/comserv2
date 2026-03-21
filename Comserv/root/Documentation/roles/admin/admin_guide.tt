@@ -1,339 +1,162 @@
-[% PageVersion = 'Comserv/root/Documentation/roles/admin/admin_guide.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-[% META title = 'Administrator Guide' %]
-
-<!-- Documentation page for admin_guide -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
+# Administrator Guide
 
 This comprehensive guide is intended for system administrators of the Comserv platform.
 
-
-
-<h2>Administrator Responsibilities</h2>
-
-
+## Administrator Responsibilities
 
 As a Comserv administrator, you are responsible for:
 
+- User management (creating, modifying, and deactivating accounts)
+- Site configuration and customization
+- Content management and organization
+- System monitoring and maintenance
+- Security oversight and access control
+- Backup and recovery procedures
 
+## User Management
 
-<ul><li>User management (creating, modifying, and deactivating accounts)</li></ul>
+### Creating New Users
 
-<ul><li>Site configuration and customization</li></ul>
+1. Navigate to Admin > User Management > New User
+2. Fill in the required fields (username, email, password)
+3. Assign appropriate roles and permissions
+4. Click "Create User"
+5. The system will automatically send a welcome email with login instructions
 
-<ul><li>Content management and organization</li></ul>
+### Managing Existing Users
 
-<ul><li>System monitoring and maintenance</li></ul>
+- **Edit User**: Modify user details, roles, or permissions
+- **Deactivate User**: Temporarily disable account access
+- **Delete User**: Permanently remove a user (use with caution)
+- **Reset Password**: Generate a new temporary password for a user
 
-<ul><li>Security oversight and access control</li></ul>
-
-<ul><li>Backup and recovery procedures</li></ul>
-
-
-
-<h2>User Management</h2>
-
-
-
-<h3>Creating New Users</h3>
-
-
-
-<ol><li>Navigate to Admin > User Management > New User</li></ol>
-
-<ol><li>Fill in the required fields (username, email, password)</li></ol>
-
-<ol><li>Assign appropriate roles and permissions</li></ol>
-
-<ol><li>Click "Create User"</li></ol>
-
-<ol><li>The system will automatically send a welcome email with login instructions</li></ol>
-
-
-
-<h3>Managing Existing Users</h3>
-
-
-
-<ul><li>**Edit User**: Modify user details, roles, or permissions</li></ul>
-
-<ul><li>**Deactivate User**: Temporarily disable account access</li></ul>
-
-<ul><li>**Delete User**: Permanently remove a user (use with caution)</li></ul>
-
-<ul><li>**Reset Password**: Generate a new temporary password for a user</li></ul>
-
-
-
-<h3>User Roles</h3>
-
-
+### User Roles
 
 The system supports the following roles:
 
+- **Normal**: Basic access to public content and personal features
+- **Editor**: Can create and edit content but not system settings
+- **Developer**: Has access to development tools and API features
+- **Admin**: Full system access and configuration capabilities
 
+## Site Configuration
 
-<ul><li>**Normal**: Basic access to public content and personal features</li></ul>
-
-<ul><li>**Editor**: Can create and edit content but not system settings</li></ul>
-
-<ul><li>**Developer**: Has access to development tools and API features</li></ul>
-
-<ul><li>**Admin**: Full system access and configuration capabilities</li></ul>
-
-
-
-<h2>Site Configuration</h2>
-
-
-
-<h3>General Settings</h3>
-
-
+### General Settings
 
 Access site configuration through Admin > Site Settings, where you can:
 
+- Update site name, description, and contact information
+- Configure email settings for system notifications
+- Set default language and timezone
+- Customize the site logo and favicon
 
+### Theme Management
 
-<ul><li>Update site name, description, and contact information</li></ul>
+1. Go to Admin > Appearance > Themes
+2. Browse available themes or upload a custom theme
+3. Preview themes before activating
+4. Customize theme settings (colors, fonts, layouts)
 
-<ul><li>Configure email settings for system notifications</li></ul>
-
-<ul><li>Set default language and timezone</li></ul>
-
-<ul><li>Customize the site logo and favicon</li></ul>
-
-
-
-<h3>Theme Management</h3>
-
-
-
-<ol><li>Go to Admin > Appearance > Themes</li></ol>
-
-<ol><li>Browse available themes or upload a custom theme</li></ol>
-
-<ol><li>Preview themes before activating</li></ol>
-
-<ol><li>Customize theme settings (colors, fonts, layouts)</li></ol>
-
-
-
-<h3>Module Configuration</h3>
-
-
+### Module Configuration
 
 Enable, disable, or configure individual modules:
 
+1. Navigate to Admin > Modules
+2. Toggle modules on/off as needed
+3. Click "Configure" for module-specific settings
 
+## Security Best Practices
 
-<ol><li>Navigate to Admin > Modules</li></ol>
+- Regularly review user accounts and remove unnecessary access
+- Enforce strong password policies
+- Keep the system updated with the latest security patches
+- Monitor login attempts and investigate suspicious activity
+- Perform regular security audits
+- Configure proper backup procedures
 
-<ol><li>Toggle modules on/off as needed</li></ol>
+## System Maintenance
 
-<ol><li>Click "Configure" for module-specific settings</li></ol>
-
-
-
-<h2>Security Best Practices</h2>
-
-
-
-<ul><li>Regularly review user accounts and remove unnecessary access</li></ul>
-
-<ul><li>Enforce strong password policies</li></ul>
-
-<ul><li>Keep the system updated with the latest security patches</li></ul>
-
-<ul><li>Monitor login attempts and investigate suspicious activity</li></ul>
-
-<ul><li>Perform regular security audits</li></ul>
-
-<ul><li>Configure proper backup procedures</li></ul>
-
-
-
-<h2>System Maintenance</h2>
-
-
-
-<h3>Restarting Starman Server</h3>
-
-
+### Restarting Starman Server
 
 The Comserv platform provides an admin interface to safely restart the Starman web server:
 
+1. Navigate to Admin > System > Restart Starman Server
+2. Review the warning about service interruption
+3. Confirm the restart operation
+4. Enter your system username and password when prompted
+5. Review the restart results and service status
 
+For detailed instructions, see the [Starman Restart Guide](starman_restart_guide.md).
 
-<ol><li>Navigate to Admin > System > Restart Starman Server</li></ol>
-
-<ol><li>Review the warning about service interruption</li></ol>
-
-<ol><li>Confirm the restart operation</li></ol>
-
-<ol><li>Enter your system username and password when prompted</li></ol>
-
-<ol><li>Review the restart results and service status</li></ol>
-
-
-
-For detailed instructions, see the <a href="starman_restart_guide.md">Starman Restart Guide</a>.
-
-
-
-<h3>Server Updates</h3>
-
-
+### Server Updates
 
 To update the application code from the Git repository:
 
+1. Navigate to Admin > System > Git Pull
+2. Review the changes that will be applied
+3. Confirm the update operation
+4. After a successful update, consider restarting the Starman server
 
+## Troubleshooting
 
-<ol><li>Navigate to Admin > System > Git Pull</li></ol>
+### Common Issues
 
-<ol><li>Review the changes that will be applied</li></ol>
+- **Login Problems**: Check user credentials, account status, and server connectivity
+- **Performance Issues**: Review server resources, database optimization, and caching
+- **Email Delivery**: Verify SMTP settings and email server status
+- **Content Display**: Clear cache and check theme compatibility
+- **Server Errors**: Check application logs and consider restarting the Starman server
 
-<ol><li>Confirm the update operation</li></ol>
-
-<ol><li>After a successful update, consider restarting the Starman server</li></ol>
-
-
-
-<h2>Troubleshooting</h2>
-
-
-
-<h3>Common Issues</h3>
-
-
-
-<ul><li>**Login Problems**: Check user credentials, account status, and server connectivity</li></ul>
-
-<ul><li>**Performance Issues**: Review server resources, database optimization, and caching</li></ul>
-
-<ul><li>**Email Delivery**: Verify SMTP settings and email server status</li></ul>
-
-<ul><li>**Content Display**: Clear cache and check theme compatibility</li></ul>
-
-<ul><li>**Server Errors**: Check application logs and consider restarting the Starman server</li></ul>
-
-
-
-<h3>System Logs</h3>
-
-
+### System Logs
 
 Access logs at Admin > System > Logs to investigate issues:
 
+- Application logs: General system operations
+- Error logs: System errors and exceptions
+- Access logs: User login and page access information
+- Security logs: Security-related events and warnings
 
+## Backup and Recovery
 
-<ul><li>Application logs: General system operations</li></ul>
-
-<ul><li>Error logs: System errors and exceptions</li></ul>
-
-<ul><li>Access logs: User login and page access information</li></ul>
-
-<ul><li>Security logs: Security-related events and warnings</li></ul>
-
-
-
-<h2>Backup and Recovery</h2>
-
-
-
-<h3>Automated Backups</h3>
-
-
+### Automated Backups
 
 Configure automated backups:
 
+1. Go to Admin > System > Backup
+2. Set backup frequency and retention policy
+3. Configure backup storage location
+4. Enable email notifications for backup status
 
-
-<ol><li>Go to Admin > System > Backup</li></ol>
-
-<ol><li>Set backup frequency and retention policy</li></ol>
-
-<ol><li>Configure backup storage location</li></ol>
-
-<ol><li>Enable email notifications for backup status</li></ol>
-
-
-
-<h3>Manual Backup</h3>
-
-
+### Manual Backup
 
 Perform a manual backup:
 
+1. Navigate to Admin > System > Backup
+2. Click "Create Backup Now"
+3. Select backup components (database, files, configurations)
+4. Wait for the backup to complete and download if needed
 
+### Restoring from Backup
 
-<ol><li>Navigate to Admin > System > Backup</li></ol>
+1. Go to Admin > System > Restore
+2. Upload or select the backup file
+3. Choose restoration options
+4. Confirm and proceed with restoration
 
-<ol><li>Click "Create Backup Now"</li></ol>
-
-<ol><li>Select backup components (database, files, configurations)</li></ol>
-
-<ol><li>Wait for the backup to complete and download if needed</li></ol>
-
-
-
-<h3>Restoring from Backup</h3>
-
-
-
-<ol><li>Go to Admin > System > Restore</li></ol>
-
-<ol><li>Upload or select the backup file</li></ol>
-
-<ol><li>Choose restoration options</li></ol>
-
-<ol><li>Confirm and proceed with restoration</li></ol>
-
-
-
-<h2>Advanced Configuration</h2>
-
-
+## Advanced Configuration
 
 For advanced system configuration, refer to the following resources:
 
+- Server configuration documentation
+- Database optimization guide
+- Performance tuning recommendations
+- API documentation for system integration
 
-
-<ul><li>Server configuration documentation</li></ul>
-
-<ul><li>Database optimization guide</li></ul>
-
-<ul><li>Performance tuning recommendations</li></ul>
-
-<ul><li>API documentation for system integration</li></ul>
-
-
-
-<h2>Getting Support</h2>
-
-
+## Getting Support
 
 If you encounter issues beyond the scope of this guide:
 
-
-
-<ul><li>Check the administrator forums</li></ul>
-
-<ul><li>Submit a support ticket</li></ul>
-
-<ul><li>Contact your implementation specialist</li></ul>
-
-<ul><li>Consult the technical documentation</li></ul>
-
-</div>
+- Check the administrator forums
+- Submit a support ticket
+- Contact your implementation specialist
+- Consult the technical documentation

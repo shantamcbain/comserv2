@@ -11,12 +11,12 @@
 <h1>Record Details View.</h1>
 
 <!-- Return navigation buttons -->
-<div class="todo-nav-buttons">
-    <a href="/todo" class="btn btn-secondary">Return to List View</a>
-    <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
-    <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
-    <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
-    <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
+<div class="return-nav">
+    <a href="/todo" class="return-button">Return to List View</a>
+    <a href="/todo/day" class="return-button">Return to Day View</a>
+    <a href="/todo/week" class="return-button">Return to Week View</a>
+    <a href="/todo/month" class="return-button">Return to Month View</a>
+    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
 </div>
 
 <p>Record ID: [% record.get_column('record_id') %]</p>
@@ -28,6 +28,7 @@
 </div>
 
 <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
+    <input type="hidden" name="return_to" value="[% return_to %]">
     <div>
         <label for="sitename">Site Name:</label>
         <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]">
@@ -46,14 +47,8 @@
     <div>
         <label for="time_of_day">Time of Day:</label>
         <input type="time" id="time_of_day" name="time_of_day" value="[% record.get_column('time_of_day') %]">
-        [% IF record.get_column('time_of_day') %]
-            <span class="time-display">Scheduled for: [% record.get_column('time_of_day') %]</span>
-        [% ELSE %]
-            <span class="no-time">No specific time set</span>
-        [% END %]
     </div>
 
-    <div>
         <label for="subject">Subject:</label>
         <input type="text" id="subject" name="subject" value="[% record.get_column('subject') %]">
     </div>
@@ -108,8 +103,14 @@
     </div>
 
     <div>
-        <label for="project_id">Project ID:</label>
-        <input type="number" id="project_id" name="project_id" value="[% record.get_column('project_id') %]">
+        <label for="project_id">Select Project:</label>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          [% INCLUDE "todo/project_list.tt" projects=projects selected_project_id=record.get_column('project_id') field_name='project_id' %]
+          <button type="button" class="btn btn-secondary" onclick="openAddProjectForm()" title="Add New Project">
+            <i class="fas fa-plus"></i> Add Project
+          </button>
+        </div>
+        <small style="color: #666; font-size: 0.9em;">Current Project ID: [% record.get_column('project_id') || 'None' %]</small>
     </div>
 
     <div>
@@ -117,8 +118,8 @@
     </div>
 </form>
 
-<div class="todo-action-buttons">
-    <form action="/log/log_form" method="POST" target="_blank" style="display: inline;">
+<div class="action-buttons">
+    <form action="/log/log_form" method="POST" target="_blank">
         <input type="hidden" name="todo_record_id" value="[% record.get_column('record_id') %]">
         <input type="hidden" name="site_name" value="[% record.get_column('sitename') %]">
         <input type="hidden" name="start_date" value="[% record.get_column('start_date') %]">
@@ -128,18 +129,19 @@
         <input type="hidden" name="priority" value="[% record.get_column('priority') %]">
         <input type="hidden" name="status" value="[% record.get_column('status') %]">
         <input type="hidden" name="comments" value="[% record.get_column('comments') %]">
-        <button type="submit" class="btn btn-success">Add Log Entry</button>
+        <button type="submit">Add Log Entry</button>
     </form>
-    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST" style="display: inline;">
+    <form action="/todo/edit/[% record.get_column('record_id') %]" method="POST" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
         <input type="hidden" name="record_id" value="[% record.get_column('record_id') %]">
-        <button type="submit" class="btn btn-warning">Edit Todo</button>
+        <input type="hidden" name="return_to" value="">
+        <button type="submit">Edit Todo</button>
     </form>
 </div>
 <!-- Return navigation buttons -->
-<div class="todo-nav-buttons">
-    <a href="/todo" class="btn btn-secondary">Return to List View</a>
-    <a href="/todo/day" class="btn btn-secondary">Return to Day View</a>
-    <a href="/todo/week" class="btn btn-secondary">Return to Week View</a>
-    <a href="/todo/month" class="btn btn-secondary">Return to Month View</a>
-    <button type="button" class="btn btn-secondary" onclick="window.history.back();">Return to Previous Page</button>
+<div class="return-nav">
+    <a href="/todo" class="return-button">Return to List View</a>
+    <a href="/todo/day" class="return-button">Return to Day View</a>
+    <a href="/todo/week" class="return-button">Return to Week View</a>
+    <a href="/todo/month" class="return-button">Return to Month View</a>
+    <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
 </div>

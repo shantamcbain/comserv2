@@ -31,12 +31,8 @@ sub base :Path :Args(0) {
 
 sub index :Local :Args(0) {
     my ($self, $c) = @_;
-    # Removed hardcoded username and roles to allow offline mode visibility
-    # $c->session->{username} = 'Shanta';
-    # $c->session->{is_admin} = 1;
-    # $c->stash->{is_admin} = 1;
-    # $c->session->{role} = 'admin';
-    # $c->session->{roles} = 'admin' ;   # Set the MailServer in the session
+
+    # Set the MailServer in the session
     $c->session->{MailServer} = "http://webmail.computersystemconsulting.ca";
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Entered Index Method");
 
@@ -102,6 +98,7 @@ sub email_test :Local :Args(0) {
     
     # If this is a form submission, process it
     if ($c->req->method eq 'POST') {
+        
         my $to = $c->req->params->{to};
         my $subject = $c->req->params->{subject} || 'Test Email from Comserv';
         my $message = $c->req->params->{message} || 'This is a test email from the Comserv system.';
