@@ -6,6 +6,7 @@ use JSON;
 use Try::Tiny;
 use Data::Dumper;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
 use Catalyst::Utils;  # For path_to
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -15,9 +16,20 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub _require_admin {
+    my ($self, $c, $action) = @_;
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, $action)) {
+        $c->flash->{error_msg} = 'You must be an administrator to access remote database management.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        $c->detach;
+    }
+}
+
 # Main page for remote database management
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_admin($c, 'remotedb_index');
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessing remote database management page");
     
@@ -34,6 +46,7 @@ sub index :Path :Args(0) {
 # Add a new remote database connection
 sub add_connection :Path('add') :Args(0) {
     my ($self, $c) = @_;
+    $self->_require_admin($c, 'remotedb_add');
     
     if ($c->req->method eq 'POST') {
         my $params = $c->req->params;
@@ -92,6 +105,7 @@ sub add_connection :Path('add') :Args(0) {
 # View a remote database's tables and structure
 sub view :Path('view') :Args(1) {
     my ($self, $c, $conn_name) = @_;
+    $self->_require_admin($c, 'remotedb_view');
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view', "Viewing remote database: $conn_name");
     
@@ -123,6 +137,7 @@ sub view :Path('view') :Args(1) {
 # View a specific table in a remote database
 sub table :Path('table') :Args(2) {
     my ($self, $c, $conn_name, $table_name) = @_;
+    $self->_require_admin($c, 'remotedb_table');
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'table', 
         "Viewing table '$table_name' in remote database: $conn_name");
@@ -153,6 +168,7 @@ sub table :Path('table') :Args(2) {
 # Execute a custom SQL query
 sub query :Path('query') :Args(1) {
     my ($self, $c, $conn_name) = @_;
+    $self->_require_admin($c, 'remotedb_query');
     
     my $remote_db = $c->model('RemoteDB');
     
@@ -198,6 +214,7 @@ sub query :Path('query') :Args(1) {
 # Remove a remote database connection
 sub remove :Path('remove') :Args(1) {
     my ($self, $c, $conn_name) = @_;
+    $self->_require_admin($c, 'remotedb_remove');
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove', 
         "Removing remote database connection: $conn_name");
