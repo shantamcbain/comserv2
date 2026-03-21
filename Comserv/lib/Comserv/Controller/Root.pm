@@ -6,6 +6,7 @@ use Data::Dumper;
 use DateTime;
 use JSON;
 use URI;
+use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
 
@@ -21,6 +22,13 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+# Cache the RemoteDB config status so we don't hit the filesystem on every request.
+# Refreshes every 5 minutes. Each Starman worker has its own copy (that's fine).
+my $_remotedb_status       = undef;   # 'ok', 'missing', 'error', 'fallback'
+my $_remotedb_last_checked = 0;
+my $_REMOTEDB_TTL          = 300;     # seconds between re-checks
+
+
 # Add user_exists method
 sub user_exists {
     my ($self, $c) = @_;
@@ -30,118 +38,36 @@ sub user_exists {
 # Add check_user_roles method
 sub check_user_roles {
     my ($self, $c, $role) = @_;
-    
-    # First check if the user exists
+
     return 0 unless $self->user_exists($c);
-    
-    # Get roles from session
-    my $roles = $c->session->{roles};
-    # Removed hardcoded admin role to allow offline mode visibility
-    # $roles = "admin";
-    # Log the role check for debugging
-    my $roles_debug = 'none';
-    if (defined $roles) {
-        if (ref($roles) eq 'ARRAY') {
-            $roles_debug = join(', ', @$roles);
-        } else {
-            $roles_debug = $roles;
-        }
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Checking if user has role: $role, User roles: $roles_debug");
-    
-    # Add detailed debugging for session data
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Session data: username=" . ($c->session->{username} || 'undefined') . 
-        ", user_id=" . ($c->session->{user_id} || 'undefined') .
-        ", roles=" . (defined $roles ? (ref($roles) ? ref($roles) : $roles) : 'undefined'));
-    
-    # Check if the user has the admin role in the session
+
+    my $roles       = $c->session->{roles};
+    my $user_groups = $c->session->{user_groups};
+
     if ($role eq 'admin') {
-        # For admin role, check if user is in the admin group or has admin privileges
-        if ($c->session->{is_admin}) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "User has is_admin flag set in session");
-            return 1;
-        }
-        
-        # Check roles array
+        return 1 if $c->session->{is_admin};
+
         if (ref($roles) eq 'ARRAY') {
-            foreach my $user_role (@$roles) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Checking array role: '$user_role' against 'admin'");
-                if (lc($user_role) eq 'admin') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                        "Found admin role in array");
-                    return 1;
-                }
-            }
+            return 1 if grep { lc($_) eq 'admin' } @$roles;
+        } elsif (defined $roles && !ref($roles)) {
+            return 1 if $roles =~ /\badmin\b/i;
         }
-        # Check roles string
-        elsif (defined $roles && !ref($roles)) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking string role: '$roles' for 'admin'");
-            if ($roles =~ /\badmin\b/i) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found admin in roles string");
-                return 1;
-            }
-        }
-        
-        # Check user_groups
-        my $user_groups = $c->session->{user_groups};
+
         if (ref($user_groups) eq 'ARRAY') {
-            foreach my $group (@$user_groups) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Checking user group: '$group' against 'admin'");
-                if (lc($group) eq 'admin') {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                        "Found admin in user_groups array");
-                    return 1;
-                }
-            }
+            return 1 if grep { lc($_) eq 'admin' } @$user_groups;
+        } elsif (defined $user_groups && !ref($user_groups)) {
+            return 1 if $user_groups =~ /\badmin\b/i;
         }
-        elsif (defined $user_groups && !ref($user_groups)) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking user_groups string: '$user_groups' for 'admin'");
-            if ($user_groups =~ /\badmin\b/i) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found admin in user_groups string");
-                return 1;
-            }
-        }
-        
-        # If we get here, user doesn't have admin role
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-            "User does not have admin role");
-    }
-    
-    # For other roles, check if the role is in the user's roles
-    if (ref($roles) eq 'ARRAY') {
-        foreach my $user_role (@$roles) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Checking array role: '$user_role' against '$role'");
-            if (lc($user_role) eq lc($role)) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                    "Found matching role in array");
-                return 1;
-            }
-        }
-    }
-    elsif (defined $roles && !ref($roles)) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-            "Checking string role: '$roles' for '$role'");
-        if ($roles =~ /\b$role\b/i) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-                "Found matching role in string");
-            return 1;
-        }
+
+        return 0;
     }
 
-    # Role not found
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_user_roles',
-        "Role '$role' not found for user");
+    if (ref($roles) eq 'ARRAY') {
+        return 1 if grep { lc($_) eq lc($role) } @$roles;
+    } elsif (defined $roles && !ref($roles)) {
+        return 1 if $roles =~ /\b\Q$role\E\b/i;
+    }
+
     return 0;
 }
 
@@ -163,62 +89,778 @@ BEGIN { extends 'Catalyst::Controller' }
 
 __PACKAGE__->config(namespace => '');
 
+sub get_server_ip :Private {
+    my ($self, $c) = @_;
+    
+    # Check if running in Docker container
+    if (-f '/.dockerenv' || -f '/run/.containerenv') {
+        # Get container's IP address
+        my $ip = `hostname -i | awk '{print \$1}'`;
+        chomp($ip);
+        return $ip || 'unknown';
+    }
+    
+    # Fallback to host IP for non-containerized environments
+    my $ip = `ip route get 1.1.1.1 | awk '{print \$7; exit}'`;
+    chomp($ip);
+    
+    return $ip || 'unknown';
+}
 
+# Auto method to set up common stash variables for all requests
+sub auto :Private {
+    my ($self, $c) = @_;
+
+    # Skip everything for health checks and monitoring endpoints immediately
+    # This prevents creating session files for Docker health checks
+    if ($c->req->path =~ m{^/health(?:/|$)}) {
+        return 1;
+    }
+    # LAYER 1: Auto Method Protection - wrap entire method in error handling
+    eval {
+        # Skip setup redirect for setup pages themselves and static assets
+        # Note: $c->req->path returns path WITHOUT leading slash (e.g., "setup/k8s-secrets")
+        unless ($c->req->path =~ m{^/?setup(?:/|$)} || $c->req->path =~ m{^/?static/}) {
+            # Check RemoteDB configuration status — cached per worker to avoid hitting
+            # the filesystem (K8s secrets, db_config.json) on every single request.
+            my $now = time();
+            if (!defined $_remotedb_status || ($now - $_remotedb_last_checked) > $_REMOTEDB_TTL) {
+                eval {
+                    my $remotedb_class = $c->model('RemoteDB');
+                    my $remotedb;
+                    if (!ref($remotedb_class)) {
+                        require Comserv::Model::RemoteDB;
+                        $remotedb = Comserv::Model::RemoteDB->new();
+                        $remotedb->_load_config();
+                    } else {
+                        $remotedb = $remotedb_class;
+                    }
+                    $_remotedb_status = ($remotedb && ref($remotedb))
+                        ? ($remotedb->{configuration_status} // 'ok')
+                        : 'ok';
+                };
+                if ($@) {
+                    $_remotedb_status = 'ok';
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                        "Error checking RemoteDB configuration status: $@");
+                }
+                $_remotedb_last_checked = $now;
+            }
+
+            if ($_remotedb_status =~ /^(MISSING|ERROR)$/) {
+                if ($c->config->{debug} || $ENV{COMSERV_DEV_MODE}) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                        "Dev mode: redirecting to K8s secrets setup (status: $_remotedb_status)");
+                    $c->response->redirect($c->uri_for('/setup/k8s-secrets'));
+                    $c->detach();
+                    return 0;
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "Production mode: returning 503 - database configuration required (status: $_remotedb_status)");
+                    $c->response->status(503);
+                    $c->response->body('Service Unavailable: Database configuration required. Contact administrator.');
+                    $c->detach();
+                    return 0;
+                }
+            }
+        }
+
+        # CRITICAL: Capture debug parameter from URL query string
+        # URL format: http://host/path?debug=1 activates debug mode
+        #             http://host/path?debug=0 deactivates debug mode
+        my $debug_param = $c->req->params->{debug};
+        if (defined $debug_param) {
+            if ($debug_param eq '1') {
+                $c->session->{debug_mode} = 1;
+                $c->stash->{debug} = 1;
+            } elsif ($debug_param eq '0') {
+                $c->session->{debug_mode} = 0;
+                $c->stash->{debug} = 0;
+            }
+        } else {
+            # Ensure debug mode matches session or defaults to off
+            $c->session->{debug_mode} = 0 unless defined $c->session->{debug_mode};
+            $c->stash->{debug} = $c->session->{debug_mode};
+        }
+        
+        # Set up site name with timeout protection
+        eval {
+            local $SIG{ALRM} = sub { die "Site name fetch timeout\n"; };
+            alarm(3);  # 3 second timeout for site name fetch
+            $self->fetch_and_set($c, 'SiteName');
+            alarm(0);
+        };
+        alarm(0);  # Make sure alarm is cancelled
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Site name fetch timed out or failed: $@. Using default site name.");
+            $c->stash->{SiteName} = 'default';
+        }
+        
+        # Set up theme using canonical ThemeConfig model with timeout protection
+        my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+        eval {
+            local $SIG{ALRM} = sub { die "Theme fetch timeout\n"; };
+            alarm(3);  # 3 second timeout for theme fetch
+            my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
+            $c->stash->{theme_name} = $theme_name;
+            my $site_favicon = $c->model('ThemeConfig')->get_site_favicon($c, $SiteName);
+            $c->stash->{site_favicon} = $site_favicon if $site_favicon;
+            alarm(0);
+        };
+        alarm(0);  # Make sure alarm is cancelled
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Theme fetch timed out or failed: $@. Using default theme.");
+            $c->stash->{theme_name} = 'default';
+        }
+        
+        # Set up user information for templates
+        # Check both Catalyst auth system and session-based auth
+        my $user_logged_in = 0;
+        my $username = '';
+        my $user_id = '';
+        my $user_roles = [];
+        my $is_admin = 0;
+        
+        if ($self->user_exists($c)) {
+            # Session-based authentication — never call $c->user to avoid DB lookup clearing session
+            $user_logged_in = 1;
+            $username   = $c->session->{username};
+            $user_id    = $c->session->{user_id};
+            $user_roles = $c->session->{roles} || [];
+            # Normalise roles to always be an array ref
+            if (!ref $user_roles) {
+                $user_roles = [ map { s/^\s+|\s+$//gr } split /,/, $user_roles ];
+                $c->session->{roles} = $user_roles;
+            }
+        }
+        
+        # Check admin status
+        if ($user_logged_in) {
+            $is_admin = $self->check_user_roles($c, 'admin');
+
+            # If not admin from global roles, check UserSiteRole for the current site.
+            # This allows site-specific admins to get admin privileges without re-login.
+            if (!$is_admin && $user_id) {
+                eval {
+                    my $site_name_check = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+                    if ($site_name_check && lc($site_name_check) ne 'csc') {
+                        my $site_obj = $c->model('DBEncy')->resultset('Site')
+                            ->search({ name => $site_name_check })->single;
+                        if ($site_obj) {
+                            my $site_admin_count = $c->model('DBEncy')->resultset('UserSiteRole')->search({
+                                user_id   => $user_id,
+                                site_id   => $site_obj->id,
+                                role      => { -like => 'admin' },
+                                is_active => 1,
+                            })->count;
+                            if ($site_admin_count) {
+                                $is_admin = 1;
+                                $c->session->{is_admin} = 1;
+                                unless (grep { lc($_) eq 'admin' } @$user_roles) {
+                                    push @$user_roles, 'admin';
+                                    $c->session->{roles} = $user_roles;
+                                }
+                                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                                    "UserSiteRole admin granted for $username on site $site_name_check");
+                            }
+                        } else {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                                "Site not found in Site table: $site_name_check (user: $username)");
+                        }
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "UserSiteRole check failed for $username: $@");
+                }
+            }
+        }
+        
+        # Set stash variables
+        $c->stash->{username} = $username;
+        $c->stash->{user_id} = $user_id;
+        $c->stash->{user_roles} = $user_roles;
+        $c->stash->{is_admin} = $is_admin;
+        $c->stash->{user_logged_in} = $user_logged_in;
+        
+        # Initialize navigation variables with defaults to prevent template crashes
+        $c->stash->{main_pages} = [];
+        $c->stash->{member_pages} = [];
+        $c->stash->{coop_pages} = [];
+        $c->stash->{it_pages} = [];
+        $c->stash->{helpdesk_pages} = [];
+        $c->stash->{hosted_pages} = [];
+        $c->stash->{main_links} = [];
+        $c->stash->{member_links} = [];
+        $c->stash->{coop_links} = [];
+        $c->stash->{it_links} = [];
+        $c->stash->{helpdesk_links} = [];
+        $c->stash->{hosted_links} = [];
+        $c->stash->{admin_pages} = [];
+        $c->stash->{admin_links} = [];
+        $c->stash->{private_links} = [];
+        $c->stash->{navigation_error} = '';
+        
+        # Set up navigation data
+        my $site_name = $c->stash->{SiteName} || 'All';
+        my $nav_controller = $c->controller('Navigation');
+        
+        if ($nav_controller) {
+            # Wrap navigation setup with timeout to prevent hanging if database is unreachable
+            eval {
+                local $SIG{ALRM} = sub { die "Navigation setup timeout\n"; };
+                alarm(5);  # 5 second timeout for navigation setup
+                
+                # Ensure navigation tables exist and populate navigation data
+                $nav_controller->populate_navigation($c);
+                
+                alarm(0);  # Cancel alarm on success
+            };
+            alarm(0);  # Make sure alarm is cancelled
+            
+            if ($@) {
+                if ($@ =~ /timeout/i) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                        "Navigation setup timed out (database connectivity issue). Continuing without navigation data.");
+                    # Set empty navigation data to allow page to render
+                    $c->stash->{main_pages} = [];
+                    $c->stash->{member_pages} = [];
+                    $c->stash->{coop_pages} = [];
+                    $c->stash->{it_pages} = [];
+                    $c->stash->{helpdesk_pages} = [];
+                    $c->stash->{hosted_pages} = [];
+                    $c->stash->{main_links} = [];
+                    $c->stash->{member_links} = [];
+                    $c->stash->{coop_links} = [];
+                    $c->stash->{it_links} = [];
+                    $c->stash->{helpdesk_links} = [];
+                    $c->stash->{hosted_links} = [];
+                    $c->stash->{navigation_error} = "Database connection failed. Navigation unavailable.";
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "Navigation setup error: $@");
+                }
+            }
+            
+            # Only get menu items if navigation setup succeeded (no timeout)
+            unless ($@) {
+                # Get main menu items
+                $c->stash->{main_pages} = $nav_controller->get_pages($c, 'Main', $site_name);
+                $c->stash->{member_pages} = $nav_controller->get_pages($c, 'Member', $site_name);
+                $c->stash->{coop_pages} = $nav_controller->get_pages($c, 'Coop', $site_name);
+                $c->stash->{it_pages} = $nav_controller->get_pages($c, 'IT', $site_name);
+                $c->stash->{helpdesk_pages} = $nav_controller->get_pages($c, 'HelpDesk', $site_name);
+                $c->stash->{hosted_pages} = $nav_controller->get_pages($c, 'Hosted', $site_name);
+                
+                # Get internal links
+                $c->stash->{main_links} = $nav_controller->get_internal_links($c, 'Main_links', $site_name);
+                $c->stash->{member_links} = $nav_controller->get_internal_links($c, 'Member_links', $site_name);
+                $c->stash->{coop_links} = $nav_controller->get_internal_links($c, 'Coop_links', $site_name);
+                $c->stash->{it_links} = $nav_controller->get_internal_links($c, 'IT_links', $site_name);
+                $c->stash->{helpdesk_links} = $nav_controller->get_internal_links($c, 'HelpDesk_links', $site_name);
+                $c->stash->{hosted_links} = $nav_controller->get_internal_links($c, 'Hosted_links', $site_name);
+                
+                # Get admin data if user is admin
+                if ($c->stash->{is_admin}) {
+                    $c->stash->{admin_pages} = $nav_controller->get_admin_pages($c, $site_name);
+                    $c->stash->{admin_links} = $nav_controller->get_admin_links($c, $site_name);
+                }
+                
+                # Get private links for logged in users
+                if ($c->stash->{user_logged_in}) {
+                    $c->stash->{private_links} = $nav_controller->get_private_links($c, $c->session->{username}, $site_name);
+                }
+            }
+            
+            # Get navigation items from the new navigation system (showing private items only to logged-in users)
+            # Temporarily commented out to restore login functionality
+            # eval {
+            #     my $user_logged_in = $c->stash->{user_logged_in} || 0;
+            #     if ($nav_controller->can('get_navigation_tree')) {
+            #         $c->stash->{navigation_main} = $nav_controller->get_navigation_tree($c, 'Main', $user_logged_in);
+            #         $c->stash->{navigation_member} = $nav_controller->get_navigation_tree($c, 'Member', $user_logged_in);
+            #         $c->stash->{navigation_coop} = $nav_controller->get_navigation_tree($c, 'Coop', $user_logged_in);
+            #         $c->stash->{navigation_it} = $nav_controller->get_navigation_tree($c, 'IT', $user_logged_in);
+            #         $c->stash->{navigation_helpdesk} = $nav_controller->get_navigation_tree($c, 'HelpDesk', $user_logged_in);
+            #         $c->stash->{navigation_hosted} = $nav_controller->get_navigation_tree($c, 'Hosted', $user_logged_in);
+            #         
+            #         # Get admin navigation if user is admin
+            #         if ($c->stash->{is_admin}) {
+            #             $c->stash->{navigation_admin} = $nav_controller->get_navigation_tree($c, 'Admin', $user_logged_in);
+            #         }
+            #     }
+            # };
+            # if ($@) {
+            #     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            #         "Error loading new navigation system: $@");
+            # }
+            
+            # Debug logging for menu data
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+                "Menu data loaded for site '$site_name': " .
+                "main_pages=" . (@{$c->stash->{main_pages} || []} . " items, ") .
+                "main_links=" . (@{$c->stash->{main_links} || []} . " items, ") .
+                "user_logged_in=" . ($c->stash->{user_logged_in} ? 'yes' : 'no') . ", " .
+                "is_admin=" . ($c->stash->{is_admin} ? 'yes' : 'no')
+            );
+        } else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                "Navigation controller not found - menus will be empty");
+        }
+        
+        # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
+        # This section provides server information for the debug bar UI
+        # which displays hostname, IP, and database connection info to admins/debug mode.
+        # Removing this breaks admin diagnostic capability and page rendering visibility.
+        
+        # Get server information - extract from database connection if available
+        my $db_host = 'Unknown';
+        my $system_info = Comserv::Util::SystemInfo::get_system_info();
+        
+        # Get application directory name to distinguish between workflows
+        my $app_workflow = Comserv::Util::SystemInfo->get_app_workflow($c->config->{home});
+        $c->stash->{app_workflow} = $app_workflow;
+
+        # Expose the friendly system identifier (workstation / production) to all templates
+        $c->stash->{system_identifier} = Comserv::Util::Logging->get_system_identifier();
+        
+        # Validate system_info returned valid data, add defaults if needed
+        if (!$system_info || !ref($system_info)) {
+            $system_info = {
+                hostname => 'Unknown',
+                ip => 'Unknown',
+                os => $^O,
+                perl_version => $^V,
+            };
+        }
+        
+        # CRITICAL: Ensure system_info values are never empty strings - treat empty as Unknown
+        $system_info->{hostname} = 'Unknown' if !$system_info->{hostname} || $system_info->{hostname} eq '';
+        $system_info->{ip} = 'Unknown' if !$system_info->{ip} || $system_info->{ip} eq '';
+        
+        # Populate database connections information for debug display
+        my @db_connections;
+        eval {
+            # Try to get database connection info from active models
+            if ($c->model('DBEncy')) {
+                eval {
+                    my $conn_info = $c->model('DBEncy')->get_connection_info();
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                        "DBEncy connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
+                        
+                    if ($conn_info && ref($conn_info) eq 'HASH') {
+                        my $dsn = $conn_info->{current_dsn};
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "DBEncy DSN: $dsn");
+                        
+                        # Extract host from DSN: DBI:mysql:database=xyz;host=192.168.1.198;port=3306
+                        # or dbi:MariaDB:database=ency;host=192.168.1.198;port=3306
+                        my $host = 'Unknown';
+                        if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
+                            if ($dsn =~ /host=([^;]+)/) {
+                                $host = $1;
+                                # Clean up host value
+                                $host =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBEncy host extracted: $host");
+                            } else {
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBEncy DSN has no host= pattern (likely SQLite): $dsn");
+                            }
+                        }
+                        
+                        push @db_connections, {
+                            type => 'DBEncy',
+                            name => 'Ency',
+                            ip => $host
+                        };
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "Added DBEncy to db_connections with host: $host");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                            "DBEncy connection info is not a valid hash ref");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                        "Error extracting DBEncy connection info: $@");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                    "DBEncy model not available");
+            }
+            
+            if ($c->model('DBForager')) {
+                eval {
+                    my $conn_info = $c->model('DBForager')->get_connection_info();
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                        "DBForager connection info: " . (defined $conn_info ? (ref $conn_info ? "hash ref" : "scalar: $conn_info") : "undef"));
+                        
+                    if ($conn_info && ref($conn_info) eq 'HASH') {
+                        my $dsn = $conn_info->{current_dsn};
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "DBForager DSN: $dsn");
+                        
+                        # Extract host from DSN
+                        my $host = 'Unknown';
+                        if ($dsn && $dsn ne '' && $dsn ne 'Unknown') {
+                            if ($dsn =~ /host=([^;]+)/) {
+                                $host = $1;
+                                # Clean up host value
+                                $host =~ s/^\s+|\s+$//g;  # Trim whitespace
+                                $db_host = $host if $db_host eq 'Unknown' && $host ne 'Unknown';  # Use first available host
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBForager host extracted: $host");
+                            } else {
+                                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                                    "DBForager DSN has no host= pattern (likely SQLite): $dsn");
+                            }
+                        }
+                        
+                        push @db_connections, {
+                            type => 'DBForager',
+                            name => 'Forager',
+                            ip => $host
+                        };
+                        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', 
+                            "Added DBForager to db_connections with host: $host");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                            "DBForager connection info is not a valid hash ref");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                        "Error extracting DBForager connection info: $@");
+                }
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                    "DBForager model not available");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                "Error in database connection extraction: $@");
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+            "Database connections collected: " . scalar(@db_connections) . " entries");
+        
+        # CRITICAL FALLBACK: If no database connections were added from models,
+        # add a placeholder entry to ensure debug bar shows database info
+        if (scalar(@db_connections) == 0) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto', 
+                "No database connections collected from models - adding fallback entries");
+            
+            # Add placeholder entries so the debug bar displays SOMETHING
+            push @db_connections, {
+                type => 'DBEncy',
+                name => 'Ency (fallback)',
+                ip => 'Not available'
+            };
+            push @db_connections, {
+                type => 'DBForager',
+                name => 'Forager (fallback)',
+                ip => 'Not available'
+            };
+        }
+        
+        # FALLBACK: If no host extracted from models (they may have fallen back to SQLite),
+        # try to read db_config.json directly to get the configured primary database host
+        if ($db_host eq 'Unknown') {
+            eval {
+                require JSON;
+                my $config_paths = [
+                    '/opt/comserv/db_config.json',  # Docker/production path
+                    $ENV{COMSERV_DB_CONFIG},  # Environment variable override
+                    (exists $ENV{CATALYST_ROOT}) ? ($ENV{CATALYST_ROOT} . '/../db_config.json') : (),
+                ];
+                
+                foreach my $config_path (@$config_paths) {
+                    next unless $config_path && -f $config_path;
+                    
+                    eval {
+                        local $/;
+                        open my $fh, '<', $config_path or die "Cannot open $config_path: $!";
+                        my $json_text = <$fh>;
+                        close $fh;
+                        
+                        my $config = JSON::decode_json($json_text);
+                        
+                        # Get the first non-placeholder production connection (highest priority)
+                        foreach my $conn_name (sort {
+                            ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
+                        } keys %$config) {
+                            my $conn = $config->{$conn_name};
+                            next unless ref($conn) eq 'HASH';
+                            next if $conn->{db_type} && $conn->{db_type} eq 'sqlite';  # Skip SQLite
+                            next unless $conn->{host};
+                            next if $conn->{host} =~ /YOUR_|PLACEHOLDER|localhost/i;  # Skip placeholders and localhost
+                            
+                            $db_host = $conn->{host};
+                            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                                "Extracted DB host from config: $db_host (from $conn_name)");
+                            last;
+                        }
+                    };
+                    last if $db_host ne 'Unknown';
+                }
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                "DB config fallback: db_host = $db_host") if $db_host ne 'Unknown';
+        }
+        
+        $c->stash->{db_connections} = \@db_connections;
+        
+        # Set active database environment
+        eval {
+            require Comserv::Util::DatabaseEnv;
+            my $db_env = Comserv::Util::DatabaseEnv->new();
+            my $active_env = $db_env->get_active_environment($c);
+            $c->stash->{active_db_environment} = $active_env;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "Error getting active database environment: $@");
+            $c->stash->{active_db_environment} = 'production';
+        }
+        
+        # CRITICAL DIAGNOSTICS: Log actual values before stash assignment
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+            "DEBUG: system_info->{hostname}='" . (defined $system_info->{hostname} ? $system_info->{hostname} : 'UNDEF') . "', " .
+            "system_info->{ip}='" . (defined $system_info->{ip} ? $system_info->{ip} : 'UNDEF') . "', " .
+            "db_host='$db_host'");
+        
+        # Set server_hostname to the Catalyst web server's IP (NOT the database host).
+        # The database host is already shown separately in the Databases section.
+        # system_info->{ip} returns the actual IP of the machine running Catalyst.
+        my $display_hostname = ($system_info->{ip} && $system_info->{ip} ne 'Unknown')
+            ? $system_info->{ip} : $system_info->{hostname};
+        # Final safety check - ensure it's never empty or undef
+        $display_hostname = 'Unknown' if !$display_hostname || $display_hostname eq '';
+        
+        # CRITICAL: Before setting stash, log the exact value being set
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: About to set server_hostname='$display_hostname' into stash");
+        $c->stash->{server_hostname} = $display_hostname;
+        
+        # Verify stash was actually set
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: Verified stash server_hostname='" . $c->stash->{server_hostname} . "'");
+        
+        # Set server_ip to the actual server's network IP (Docker container IP for Catalyst)
+        # CRITICAL: Always ensure a non-empty value to prevent blank display in templates
+        my $display_ip = $system_info->{ip};
+        # Final safety check - ensure it's never empty or undef
+        $display_ip = 'Unknown' if !$display_ip || $display_ip eq '';
+        
+        # CRITICAL: Before setting stash, log the exact value being set
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: About to set server_ip='$display_ip' into stash");
+        $c->stash->{server_ip} = $display_ip;
+        
+        # Verify stash was actually set
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto',
+            "CRITICAL DEBUG: Verified stash server_ip='" . $c->stash->{server_ip} . "'");
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', 
+            "Server info - DB Host: $db_host, Hostname: $display_hostname, IP: $display_ip");
+        
+        return 1; # Continue processing
+    };
+    
+    # Error handling for auto() method
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', 
+            "Exception in auto() method: $error");
+        
+        # Set HTTP 500 status
+        $c->response->status(500);
+        
+        # Prepare error stash variables for error.tt template
+        $c->stash->{error_title} = 'Application Initialization Error';
+        $c->stash->{error_msg} = 'An error occurred while initializing the application.';
+        $c->stash->{technical_details} = $error;
+        $c->stash->{template} = 'error.tt';
+        
+        # Use detach() to cleanly exit and let default view rendering handle it
+        # DO NOT use forward() as it can cause infinite loops with view processing
+        $c->detach( $c->view('TT') );
+        
+        # Return 0 to halt further action processing after error
+        return 0;
+    }
+    
+    return 1;
+}
+
+sub health :Path('/health') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Lightweight liveness check — no DB query, no session, no logging.
+    # Purpose: tell Docker the web process is alive and accepting connections.
+    # DB health is monitored separately by ContainerHealthMonitor.pl.
+    $c->response->content_type('application/json');
+    $c->response->status(200);
+    $c->response->body('{"status":"ok"}');
+    $c->detach;
+    return;
+}
+
+sub health_detail :Path('/health/detail') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my %info;
+    my $ok = 1;
+
+    # 1. Process info
+    $info{pid}     = $$;
+    $info{uptime}  = time() - $^T;
+
+    # 2. Memory (Linux /proc/self/status)
+    eval {
+        open my $fh, '<', '/proc/self/status' or die;
+        while (<$fh>) {
+            if (/^VmRSS:\s+(\d+)\s+kB/) { $info{mem_rss_kb} = $1 + 0; last }
+        }
+        close $fh;
+    };
+
+    # 3. Starman sibling workers (how many Perl processes share same parent)
+    eval {
+        my $ppid = getppid();
+        my @siblings = split /\n/, `ps --no-headers -o pid --ppid $ppid 2>/dev/null` // '';
+        $info{worker_siblings} = scalar(grep { /\d/ } @siblings);
+    };
+
+    # 4. Session dir writable
+    eval {
+        my $sess_dir = $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session';
+        $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
+        $ok = 0 unless $info{session_dir_ok};
+    };
+
+    # 5. Quick DB ping (non-blocking, 2s timeout)
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm(2);
+        my $schema = $c->model('DBEncy');
+        $schema->storage->dbh->ping;
+        alarm(0);
+        $info{db_ok} = 1;
+    };
+    if ($@) {
+        alarm(0);
+        $info{db_ok}    = 0;
+        $info{db_error} = "$@";
+        $ok = 0;
+    }
+
+    my $status = $ok ? 'ok' : 'degraded';
+    $info{status} = $status;
+
+    # Log to system_log if degraded so admin/logging shows the reason
+    if (!$ok) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'health_detail',
+            "[HEALTH_DETAIL] status=$status db_ok=" . ($info{db_ok}//0) .
+            " mem_rss_kb=" . ($info{mem_rss_kb}//'?') .
+            " workers=" . ($info{worker_siblings}//'?') .
+            " session_ok=" . ($info{session_dir_ok}//'?') .
+            " db_error=" . ($info{db_error}//'none'));
+    }
+
+    require JSON;
+    $c->response->status($ok ? 200 : 503);
+    $c->response->body(JSON::encode_json(\%info));
+    $c->detach;
+    return;
+}
 
 sub index :Path('/') :Args(0) {
     my ($self, $c) = @_;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
-    $c->stash->{forwarder} = '/'; # Set a default forward path
+    # LAYER 2: Index Action Protection - wrap entire action in error handling
+    eval {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Starting index action. User exists: " . ($self->user_exists($c) ? 'Yes' : 'No'));
+        $c->stash->{forwarder} = '/'; # Set a default forward path
 
-    # Log if there's a view parameter, but don't handle specific views here
-    if ($c->req->param('view')) {
-        my $view = $c->req->param('view');
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
-    }
-
-    # Get ControllerName from the session
-    my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
-
-    if ($ControllerName && $ControllerName ne 'Root') {
-        # Check if the controller exists before attempting to detach
-        my $controller_exists = 0;
-        eval {
-            # Try to get the controller object
-            my $controller = $c->controller($ControllerName);
-            $controller_exists = 1 if $controller;
-        };
-
-        if ($controller_exists) {
-            # Forward to the controller's index action
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
-
-            # Use a standard redirect to the controller's path
-            # This is a more reliable approach that works for all controllers
-            $c->response->redirect("/$ControllerName");
-            $c->detach();
-        } else {
-            # Log the error and fall back to Root's index template
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
-                "Controller '$ControllerName' not found or not loaded. Falling back to Root's index template.");
-
-            # Set a flash message for debugging
-            $c->flash->{error_msg} = "Controller '$ControllerName' not found. Please try again or contact the administrator.";
-
-            # Default to Root's index template
-            $c->stash(template => 'index.tt');
-            $c->forward($c->view('TT'));
+        # Log if there's a view parameter, but don't handle specific views here
+        if ($c->req->param('view')) {
+            my $view = $c->req->param('view');
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "View parameter detected: $view");
         }
-    } else {
-        # Default to Root's index template
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
-        $c->stash(template => 'index.tt');
-        $c->forward($c->view('TT'));
-    }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Completed index action");
-    return 1; # Allow the request to proceed
+        # Get ControllerName from the session
+        my $ControllerName = $c->session->{ControllerName} || undef; # Default to undef if not set
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched ControllerName from session: " . ($ControllerName // 'undefined'));
+
+        if ($ControllerName && $ControllerName ne 'Root') {
+            # Check if the controller exists before attempting to detach
+            my $controller_exists = 0;
+            eval {
+                # Try to get the controller object
+                my $controller = $c->controller($ControllerName);
+                $controller_exists = 1 if $controller;
+            };
+
+            if ($controller_exists) {
+                # Forward to the controller's index action
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
+
+                # Use a standard redirect to the controller's path
+                # This is a more reliable approach that works for all controllers
+                $c->response->redirect("/$ControllerName");
+                return 1;  # Return after redirect, do not detach (causes catalyst_detach exception)
+            } else {
+                # Log the error and fall back to Root's index template
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
+                    "Controller '$ControllerName' not found or not loaded. Falling back to Root's index template.");
+
+                # Set a flash message for debugging
+                $c->flash->{error_msg} = "Controller '$ControllerName' not found. Please try again or contact the administrator.";
+
+                # Default to Root's index template - let default view rendering handle it
+                $c->stash(template => 'index.tt');
+                return 1;
+            }
+        } else {
+            # Default to Root's index template - let default view rendering handle it
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Defaulting to Root's index template");
+            $c->stash(template => 'index.tt');
+            return 1;
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Completed index action");
+        return 1; # Allow the request to proceed
+    };
+    
+    # Error handling for index() method
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
+            "Exception in index() action: $error");
+        
+        # Set HTTP 500 status
+        $c->response->status(500);
+        
+        # Prepare error stash variables for error.tt template
+        $c->stash->{error_title} = 'Home Page Error';
+        $c->stash->{error_msg} = 'An error occurred while loading the home page.';
+        $c->stash->{technical_details} = $error;
+        $c->stash->{template} = 'error.tt';
+        
+        # Use detach() to cleanly exit and let default view rendering handle it
+        # DO NOT use forward() as it can cause infinite loops with view processing
+        $c->detach( $c->view('TT') );
+        
+        return 0; # Halt further processing
+    }
 }
 
 
@@ -230,7 +872,7 @@ sub set_theme {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme', "Setting theme for site: $site_name");
 
-    # Get all available themes
+    # Get all available themes from canonical ThemeConfig
     my $all_themes = $c->model('ThemeConfig')->get_all_themes($c);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_theme',
         "Available themes: " . join(", ", sort keys %$all_themes));
@@ -267,56 +909,68 @@ sub fetch_and_set {
         $c->stash->{SiteName} = $value;
         $c->session->{SiteName} = $value;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Query parameter '$param' found: $value");
-    } elsif (defined $c->session->{SiteName}) {
-        $c->stash->{SiteName} = $c->session->{SiteName};
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
-    } else {
-        my $domain = $c->req->uri->host;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
+    } elsif (my $hdr_site = $c->req->header('X-Sitename')) {
+        $hdr_site =~ s/[^a-zA-Z0-9._-]//g;
+        if ($hdr_site) {
+            $value = $hdr_site;
+            $c->stash->{SiteName} = $value;
+            $c->session->{SiteName} = $value;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "X-Sitename header found: $value");
+        }
+    }
 
-        my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
-
-        if ($site_domain) {
-            my $site_id = $site_domain->site_id;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
-
-            my $site = $c->model('Site')->get_site_details($c, $site_id);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
-
-            if ($site) {
-                $value = $site->name;
-                $c->stash->{SiteName} = $value;
-                $c->session->{SiteName} = $value;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
-
-                # Set ControllerName based on the site's home_view
-                my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
-
-                # Verify the controller exists before setting it
-                my $controller_exists = 0;
-                eval {
-                    my $controller = $c->controller($home_view);
-                    $controller_exists = 1 if $controller;
-                };
-
-                if ($controller_exists) {
-                    $c->stash->{ControllerName} = $home_view;
-                    $c->session->{ControllerName} = $home_view;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
-                } else {
-                    # If controller doesn't exist, fall back to Root
-                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
-                        "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
-                    $c->stash->{ControllerName} = 'Root';
-                    $c->session->{ControllerName} = 'Root';
-                }
-            }
+    if (!defined $c->stash->{SiteName}) {
+        if (defined $c->session->{SiteName}) {
+            $c->stash->{SiteName} = $c->session->{SiteName};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
         } else {
-            $c->session->{SiteName} = 'none';
-            $c->stash->{SiteName} = 'none';
-            $c->session->{ControllerName} = 'Root';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+            my $domain = $c->req->uri->host;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
+
+            my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+
+            if ($site_domain) {
+                my $site_id = $site_domain->site_id;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
+
+                my $site = $c->model('Site')->get_site_details($c, $site_id);
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+
+                if ($site) {
+                    $value = $site->name;
+                    $c->stash->{SiteName} = $value;
+                    $c->session->{SiteName} = $value;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
+
+                    # Set ControllerName based on the site's home_view
+                    my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
+
+                    # Verify the controller exists before setting it
+                    my $controller_exists = 0;
+                    eval {
+                        my $controller = $c->controller($home_view);
+                        $controller_exists = 1 if $controller;
+                    };
+
+                    if ($controller_exists) {
+                        $c->stash->{ControllerName} = $home_view;
+                        $c->session->{ControllerName} = $home_view;
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
+                    } else {
+                        # If controller doesn't exist, fall back to Root
+                        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
+                            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
+                        $c->stash->{ControllerName} = 'Root';
+                        $c->session->{ControllerName} = 'Root';
+                    }
+                }
+            } else {
+                $c->session->{SiteName} = 'none';
+                $c->stash->{SiteName} = 'none';
+                $c->session->{ControllerName} = 'Root';
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+            }
         }
     }
 
@@ -325,328 +979,228 @@ sub fetch_and_set {
 
 sub track_application_start {
     my ($self, $c) = @_;
-    
+
     # Only track once per application start
     return if $self->_application_start_tracked;
     $self->_application_start_tracked(1);
 
-    # Log application start without JSON file manipulation
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', 
-        "Application started at " . DateTime->now->ymd);
+    # Get the current date
+    my $current_date = DateTime->now->ymd; # Format: YYYY-MM-DD
+
+    # Path to the JSON file
+    my $json_file = $c->path_to('root', 'Documentation', 'completed_items.json');
+
+    # Check if the file exists
+    if (-e $json_file) {
+        # Read the JSON file
+        open my $fh, '<:encoding(UTF-8)', $json_file or do {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for reading: $!");
+            return;
+        };
+        my $json_content = do { local $/; <$fh> };
+        close $fh;
+
+        # Parse the JSON content
+        my $data;
+        eval {
+            $data = decode_json($json_content);
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error parsing JSON: $@");
+            return;
+        }
+
+        # Check if we already have any application start entry
+        my $entry_exists = 0;
+        my $latest_start_date = '';
+
+        foreach my $item (@{$data->{completed_items}}) {
+            if ($item->{item} =~ /^Application started/) {
+                # Keep track of the latest application start date
+                if ($item->{date_created} gt $latest_start_date) {
+                    $latest_start_date = $item->{date_created};
+                }
+
+                # If we already have an entry for today, mark it as existing
+                if ($item->{date_created} eq $current_date) {
+                    $entry_exists = 1;
+                }
+            }
+        }
+
+        # If we have a previous application start entry but not for today,
+        # update that entry instead of creating a new one
+        if (!$entry_exists && $latest_start_date ne '') {
+            for my $i (0 .. $#{$data->{completed_items}}) {
+                my $item = $data->{completed_items}[$i];
+                if ($item->{item} =~ /^Application started/ && $item->{date_created} eq $latest_start_date) {
+                    # Update the existing entry with today's date
+                    $data->{completed_items}[$i]->{item} = "Application started on $current_date";
+                    $data->{completed_items}[$i]->{date_created} = $current_date;
+                    $data->{completed_items}[$i]->{date_completed} = $current_date;
+                    $entry_exists = 1; # Mark as existing so we don't create a new one
+
+                    # Write the updated data back to the file
+                    open my $fh, '>:encoding(UTF-8)', $json_file or do {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for writing: $!");
+                        return;
+                    };
+
+                    eval {
+                        print $fh encode_json($data);
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error encoding JSON: $@");
+                        close $fh;
+                        return;
+                    }
+
+                    close $fh;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Updated application start entry to $current_date");
+                    last;
+                }
+            }
+        }
+
+        # If no entry exists for today, add one
+        if (!$entry_exists) {
+            # Create a new entry
+            my $new_entry = {
+                item => "Application started on $current_date",
+                status => "completed",
+                date_created => $current_date,
+                date_completed => $current_date,
+                commit => "system" # Indicate this is a system-generated entry
+            };
+
+            # Add the new entry to the data
+            push @{$data->{completed_items}}, $new_entry;
+
+            # Write the updated data back to the file
+            open my $fh, '>:encoding(UTF-8)', $json_file or do {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Cannot open $json_file for writing: $!");
+                return;
+            };
+
+            eval {
+                print $fh encode_json($data);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "Error encoding JSON: $@");
+                close $fh;
+                return;
+            }
+
+            close $fh;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Added application start entry for $current_date");
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'track_application_start', "Application start entry for $current_date already exists");
+        }
+    } else {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'track_application_start', "JSON file $json_file does not exist");
+    }
     
-    return;
-}
-
-# Add class attributes for startup-only caching and database connection management
-has '_site_cache' => (
-    is => 'rw',
-    isa => 'HashRef',
-    default => sub { {} }
-);
-
-has '_theme_cache' => (
-    is => 'rw',
-    isa => 'HashRef',
-    default => sub { {} }
-);
-
-has '_system_info_cache' => (
-    is => 'rw',
-    isa => 'HashRef',
-    default => sub { {} }
-);
-
-has '_cache_timestamp' => (
-    is => 'rw',
-    isa => 'Int',
-    default => 0
-);
-
-has '_db_connections_tested' => (
-    is => 'rw',
-    isa => 'Bool',
-    default => 0
-);
-
-has '_startup_complete' => (
-    is => 'rw',
-    isa => 'Bool',
-    default => 0
-);
-
-# Production logging flag - set to 0 to disable detailed logging once issues are fixed
-my $ENABLE_DETAILED_LOGGING = $ENV{CATALYST_DEBUG} || 0;
-
-sub auto :Private {
-    my ($self, $c) = @_;
-    
-    # Minimal setup for every request
+    # Temporarily add back the uri_no_port function to prevent template errors
+    # This will be removed once all templates are updated
     $c->stash->{uri_no_port} = sub {
         my $path = shift;
         my $uri = $c->uri_for($path, @_);
         return $uri;
     };
     
-    $c->stash->{forwarder} = $c->req->path;
-    my $path = $c->req->path;
+    # Note: user_exists and check_user_roles methods are available via controller('Root')
     
-    # One-time startup operations
-    if (!$self->_startup_complete) {
-        eval {
-            $self->_perform_startup_operations($c);
-            $self->_startup_complete(1);
-        };
-        if ($@) {
-            # CRITICAL ERROR - Log to production and inform admin
-            $c->log->error("CRITICAL STARTUP ERROR: $@ - Run with CATALYST_DEBUG=1 for details");
-            # Still try to continue with minimal functionality
-        }
-    }
-    
-    # Fast path for cached site/theme data
-    my $domain = $c->req->uri->host;
-    $domain =~ s/:.*//;
-    
-    # Use cached site data or set defaults
-    if (exists $self->_site_cache->{$domain}) {
-        my $cached = $self->_site_cache->{$domain};
-        $c->stash->{$_} = $cached->{$_} for keys %$cached;
-        $c->session->{SiteName} = $cached->{SiteName};
-        $c->session->{ControllerName} = $cached->{ControllerName};
-    } else {
-        # Only do expensive site setup if not cached
-        eval {
-            $self->_setup_site_cached($c, $domain);
-        };
-        if ($@) {
-            $c->log->error("Site setup error for $domain: $@ - Run with CATALYST_DEBUG=1 for details");
-            $self->_set_default_site_values($c);
-        }
-    }
-    
-    # Setup debug mode (lightweight)
-    $self->setup_debug_mode($c);
-    
-    # Root path handling
-    if ($path eq '/' || $path eq '') {
-        my $ControllerName = $c->session->{ControllerName} || 'Root';
-        if ($ControllerName ne 'Root') {
-            # Quick controller existence check
-            eval {
-                my $controller = $c->controller($ControllerName);
-                unless ($controller) {
-                    $c->session->{ControllerName} = 'Root';
-                    $c->stash->{ControllerName} = 'Root';
-                }
-            };
-        }
-        $self->index($c);
-    }
-    
-    return 1;
-}
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Starting auto action with temporary uri_no_port helper");
 
-# Startup-only operations - called once per application start
-sub _perform_startup_operations {
-    my ($self, $c) = @_;
-    
-    if ($ENABLE_DETAILED_LOGGING) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations', 
-            "Performing one-time startup operations");
-    }
-    
     # Track application start
+    $c->stash->{forwarder} = $c->req->path; # Store current path as potential redirect target
     $self->track_application_start($c);
-    
-    # Generate theme CSS files (startup only)
+
+    # Log the request path
+    my $path = $c->req->path;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Request path: '$path'");
+
+    # Generate theme CSS files if they don't exist
+    # We only need to do this once per application start
     if (!$self->_theme_css_generated) {
-        eval {
+        # Backward-compatible bulk generator (optional: only if the method exists)
+        if (ref $c->model('ThemeConfig') && $c->model('ThemeConfig')->can('generate_all_theme_css')) {
             $c->model('ThemeConfig')->generate_all_theme_css($c);
-            $self->_theme_css_generated(1);
-        };
-        if ($@) {
-            $c->log->error("Theme CSS generation failed: $@");
+        } else {
+            # Fallback: perform per-theme CSS generation using available definitions
+            my $themes = $c->model('ThemeConfig')->get_all_themes($c);
+            foreach my $theme_name (keys %$themes) {
+                my $theme_id = $themes->{$theme_name}{id} || next;
+                next unless $theme_id;
+                my $css = $c->model('ThemeConfig')->generate_theme_css($c, $theme_id);
+                my $dir = $c->path_to('root', 'static', 'css', 'themes');
+                my $file = "$dir/$theme_name.css";
+                require File::Path;
+                unless (-d $dir) { File::Path::make_path($dir); }
+                use File::Slurp;
+                write_file($file, $css);
+            }
         }
+        $self->_theme_css_generated(1);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Generated all theme CSS files");
     }
     
-    # Cache system information (startup only)
-    eval {
-        my $system_info = Comserv::Util::SystemInfo::get_system_info();
-        $self->_system_info_cache->{info} = $system_info;
-        if ($ENABLE_DETAILED_LOGGING) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations',
-                "Cached system info - Hostname: $system_info->{hostname}, IP: $system_info->{ip}");
-        }
-    };
-    if ($@) {
-        $c->log->error("System info caching failed: $@");
-    }
-    
-    # Test database connections (startup only)
-    if (!$self->_db_connections_tested) {
-        $self->_test_database_connections($c);
-        $self->_db_connections_tested(1);
-    }
-    
-    # Load navigation data (startup only)
-    eval {
-        require Comserv::Controller::Navigation;
-        my $navigation = $c->controller('Navigation');
-        if ($navigation) {
-            $navigation->populate_navigation_data($c);
-            $self->_system_info_cache->{navigation_loaded} = 1;
-        }
-    };
-    if ($@) {
-        $c->log->warn("Navigation controller not available: $@") if $ENABLE_DETAILED_LOGGING;
-    }
-    
-    if ($ENABLE_DETAILED_LOGGING) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_perform_startup_operations',
-            "Startup operations completed successfully");
-    }
-}
-
-# Database connection testing - startup only unless different databases per user/site
-sub _test_database_connections {
-    my ($self, $c) = @_;
-    
-    # Test primary database connections
-    my $db_status = {
-        ency_ok => 0,
-        forager_ok => 0,
-        errors => []
-    };
-    
-    # Test DBEncy
-    eval {
-        if ($c->model('DBEncy')->test_connection($c)) {
-            $db_status->{ency_ok} = 1;
-        }
-    };
-    if ($@) {
-        push @{$db_status->{errors}}, "DBEncy: $@";
-        $c->log->error("Database connection failed - DBEncy: $@");
-    }
-    
-    # Test DBForager
-    eval {
-        if ($c->model('DBForager')->test_connection($c)) {
-            $db_status->{forager_ok} = 1;
-        }
-    };
-    if ($@) {
-        push @{$db_status->{errors}}, "DBForager: $@";
-        $c->log->error("Database connection failed - DBForager: $@");
-    }
-    
-    # Cache database status
-    $self->_system_info_cache->{db_status} = $db_status;
-    
-    # Log summary
-    if (@{$db_status->{errors}}) {
-        $c->log->error("Database connection issues detected - Run with CATALYST_DEBUG=1 for details");
-    } elsif ($ENABLE_DETAILED_LOGGING) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_test_database_connections',
-            "All database connections tested successfully");
-    }
-}
-
-# Cached site setup - only called if not already cached
-sub _setup_site_cached {
-    my ($self, $c, $domain) = @_;
-    
-    if ($ENABLE_DETAILED_LOGGING) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_setup_site_cached',
-            "Setting up site for domain: $domain");
-    }
-    
-    # Development bypass for localhost
-    if ($domain eq 'localhost' && ($ENV{CATALYST_DEBUG} || $ENV{CATALYST_ENV} eq 'development')) {
-        $self->_set_development_defaults($c);
-        return;
-    }
-    
-    # Perform site setup
     $self->setup_site($c);
     $self->set_theme($c);
     
-    # Cache the results
-    $self->_site_cache->{$domain} = {
-        SiteName => $c->stash->{SiteName},
-        ControllerName => $c->stash->{ControllerName},
-        HostName => $c->stash->{HostName},
-        ScriptDisplayName => $c->stash->{ScriptDisplayName},
-        css_view_name => $c->stash->{css_view_name},
-        mail_to_admin => $c->stash->{mail_to_admin},
-        mail_replyto => $c->stash->{mail_replyto},
-        theme_name => $c->stash->{theme_name},
-        available_themes => $c->stash->{available_themes},
+    # Try to populate navigation data if the controller is available
+    # This is done in a way that doesn't require explicit loading of the Navigation controller
+    eval {
+        # Check if the Navigation controller exists by trying to load it
+        require Comserv::Controller::Navigation;
+        
+        # If we get here, the controller exists, so try to use it
+        my $navigation = $c->controller('Navigation');
+        if ($navigation) {
+            $navigation->populate_navigation_data($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Navigation data populated");
+        }
     };
+    # Don't log errors here - if the controller isn't available, that's fine
     
-    # Set cache timestamp
-    $self->_cache_timestamp(time());
-    
-    if ($ENABLE_DETAILED_LOGGING) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_setup_site_cached',
-            "Cached site setup for domain: $domain, SiteName: " . $c->stash->{SiteName});
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed general setup tasks");
+
+    # Call the index action only for the root path
+    if ($path eq '/' || $path eq '') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Calling index action for root path");
+
+        # Check if we have a ControllerName in the session that might cause issues
+        my $ControllerName = $c->session->{ControllerName} || '';
+        if ($ControllerName && $ControllerName ne 'Root') {
+            # Verify the controller exists before proceeding
+            my $controller_exists = 0;
+            eval {
+                my $controller = $c->controller($ControllerName);
+                $controller_exists = 1 if $controller;
+            };
+
+            if (!$controller_exists) {
+                $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'auto',
+                    "Controller '$ControllerName' not found or not loaded. Setting ControllerName to 'Root'.");
+                $c->session->{ControllerName} = 'Root';
+                $c->stash->{ControllerName} = 'Root';
+            }
+        }
+
+        $self->index($c);
     }
-}
 
-# Set development defaults
-sub _set_development_defaults {
-    my ($self, $c) = @_;
-    
-    my $defaults = {
-        SiteName => 'CSC',
-        ControllerName => 'CSC',
-        HostName => 'http://localhost:3000',
-        ScriptDisplayName => 'CSC Development',
-        css_view_name => '/static/css/default.css',
-        mail_to_admin => 'admin@localhost',
-        mail_replyto => 'noreply@localhost',
-        theme_name => 'csc',
-        available_themes => ['csc', 'default'],
-    };
-    
-    $c->stash->{$_} = $defaults->{$_} for keys %$defaults;
-    $c->session->{SiteName} = $defaults->{SiteName};
-    $c->session->{ControllerName} = $defaults->{ControllerName};
-    
-    # Cache for localhost
-    $self->_site_cache->{localhost} = $defaults;
-    $self->_cache_timestamp(time());
-}
-
-# Set minimal default values for error conditions
-sub _set_default_site_values {
-    my ($self, $c) = @_;
-    
-    $c->stash->{SiteName} = 'CSC';
-    $c->stash->{ControllerName} = 'Root';
-    $c->stash->{HostName} = 'http://' . $c->req->uri->host;
-    $c->stash->{ScriptDisplayName} = 'Site';
-    $c->stash->{css_view_name} = '/static/css/default.css';
-    $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
-    $c->stash->{mail_replyto} = 'helpdesk@computersystemconsulting.ca';
-    $c->stash->{theme_name} = 'default';
-    $c->stash->{available_themes} = ['default'];
-    
-    $c->session->{SiteName} = 'CSC';
-    $c->session->{ControllerName} = 'Root';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto', "Completed auto action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+        "FINAL CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') . "'");
+    return 1; # Allow the request to proceed
 }
 
 sub setup_debug_mode {
     my ($self, $c) = @_;
 
     if (defined $c->req->params->{debug}) {
-        # Set debug_mode based on the actual parameter value, not just toggle
-        my $debug_param = $c->req->params->{debug};
-        $c->session->{debug_mode} = ($debug_param eq '1') ? 1 : 0;
-        
-        # Log the debug mode change
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_debug_mode',
-            "Debug mode changed via URL parameter to: " . $c->session->{debug_mode});
+        $c->session->{debug_mode} = $c->session->{debug_mode} ? 0 : 1;
     }
     $c->stash->{debug_mode} = $c->session->{debug_mode};
 }
@@ -686,7 +1240,6 @@ sub send_email {
             require Net::SMTP;
             require MIME::Lite;
             require Authen::SASL;
-            require IO::Socket::SSL;
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
                 "Falling back to hardcoded email config using Net::SMTP");
@@ -718,44 +1271,28 @@ sub send_email {
                 Data    => $params->{body}
             );
             
-            # Connect to the SMTP server with debug enabled and SSL support
+            # Connect to the SMTP server with debug enabled
             my $smtp = Net::SMTP->new(
                 $smtp_host,
                 Port => $smtp_port,
                 Debug => 1,
-                Timeout => 30,
-                SSL_verify_mode => 0,  # Disable certificate verification for now
-                SSL_version => 'TLSv1_2:!SSLv2:!SSLv3'  # Use secure TLS versions only
+                Timeout => 30
             );
             
             unless ($smtp) {
-                die "Could not connect to SMTP server $smtp_host:$smtp_port: $!";
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_email',
+                    "Could not connect to SMTP server $smtp_host:$smtp_port: $!");
+                return 0; # Return failure instead of dying
             }
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
                 "Connected to SMTP server $smtp_host:$smtp_port");
             
-            # Start TLS if needed with improved error handling
+            # Start TLS if needed
             if ($smtp_ssl eq 'starttls') {
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                    "Starting TLS negotiation");
-                
-                # Use IO::Socket::SSL for better TLS support
-                my $tls_result = $smtp->starttls(
-                    SSL_verify_mode => 0,  # Disable certificate verification
-                    SSL_version => 'TLSv1_2:!SSLv2:!SSLv3',  # Use secure TLS versions
-                    SSL_cipher_list => 'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA'
-                );
-                
-                unless ($tls_result) {
-                    my $error_msg = $smtp->message() || "Unknown TLS error";
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
-                        "STARTTLS failed: $error_msg");
-                    die "STARTTLS failed: $error_msg";
-                }
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                    "TLS negotiation successful");
+                    "Starting TLS");
+                $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
             }
             
             # Authenticate if credentials are provided
@@ -813,17 +1350,6 @@ sub setup_site {
 
     if (!defined $SiteName || $SiteName eq 'none' || $SiteName eq 'root') {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "SiteName is either undefined, 'none', or 'root'. Proceeding with domain extraction and site domain retrieval");
-
-        # Development bypass for localhost
-        if ($domain eq 'localhost' && ($ENV{CATALYST_DEBUG} || $ENV{CATALYST_ENV} eq 'development')) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site', "Development mode: bypassing domain check for localhost");
-            $SiteName = 'CSC';  # Default site for development
-            $c->stash->{SiteName} = $SiteName;
-            $c->session->{SiteName} = $SiteName;
-            $c->stash->{ControllerName} = 'CSC';
-            $c->session->{ControllerName} = 'CSC';
-            return;  # Skip the rest of the domain lookup
-        }
 
         # Get the domain from the sitedomain table
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
@@ -940,9 +1466,8 @@ sub setup_site {
             $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
             push @{$c->stash->{debug_msg}}, "Domain Error ($error_type): $technical_details";
 
-            # Forward to the error template and stop processing
-            $c->forward($c->view('TT'));
-            $c->detach(); # Ensure we stop processing here and show the error page
+            # Detach to the error template and stop processing
+            $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         } else {
             # Generic error case (should not happen with our improved error handling)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
@@ -982,18 +1507,12 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                eval {
-                    if ($self->send_email($c, $email_params)) {
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                            "Sent admin notification email about domain error for $domain");
-                    } else {
-                        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                            "Failed to send admin email notification about domain error for $domain");
-                    }
-                };
-                if ($@) {
+                if ($self->send_email($c, $email_params)) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                        "Sent admin notification email about domain error for $domain");
+                } else {
                     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Email notification failed with error: $@");
+                        "Failed to send admin email notification about domain error for $domain");
                 }
             }
 
@@ -1012,20 +1531,8 @@ sub setup_site {
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: This domain ($domain) is not properly configured in the system.";
 
-            # Check if this is an API endpoint that should continue processing
-            my $path = $c->req->path;
-            if ($path =~ m{^Documentation/search$} || 
-                $path =~ m{^Documentation/debug_search$} ||
-                $path =~ m{/api/} ||
-                $path =~ m{\.json$}) {
-                # Allow API endpoints to continue processing
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                    "Allowing API endpoint $path to continue despite domain configuration issue");
-            } else {
-                # Forward to the error template and stop processing for regular pages
-                $c->forward($c->view('TT'));
-                $c->detach(); # Ensure we stop processing here and show the error page
-            }
+            # Detach to the error template and stop processing
+            $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         }
     }
 
@@ -1035,28 +1542,37 @@ sub setup_site {
 
 sub site_setup {
     my ($self, $c, $SiteName) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName: $SiteName");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "SiteName (input): '" . (defined $SiteName ? $SiteName : 'UNDEF') . "'");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', 'MARKER: site_setup instrumentation active v1');
 
     # Get the current domain for HostName
     my $domain = $c->req->uri->host;
-    $domain =~ s/:.*//;  # Remove port if present
+    my $port = $c->req->uri->port;
+    my $host_port = $domain;
+    if ($port && $port != 80 && $port != 443) {
+        $host_port .= ":$port";
+    }
 
     # Set a default HostName based on the current domain
     my $protocol = $c->req->secure ? 'https' : 'http';
-    my $default_hostname = "$protocol://$domain";
+    my $default_hostname = "$protocol://$host_port";
     $c->stash->{HostName} = $default_hostname;
     $c->session->{Domain} = $domain;
-    
+
+    # Log key context prior to DB lookup
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "Context: Domain='$domain', Session.SiteName='" . ($c->session->{SiteName}//'UNDEF') . "', Stash.SiteName='" . ($c->stash->{SiteName}//'UNDEF') . "'");
+
     # Using Catalyst's built-in proxy configuration for URLs without port
     # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
-    
+
     # Log the configuration for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
-    
+
     # Test the configuration by generating a sample URL
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
-    
+
     # Add to debug_msg for visibility in templates
     # Ensure debug_msg is always an array
     $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
@@ -1064,75 +1580,113 @@ sub site_setup {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
+    # Primary attempt: lookup by SiteName (as provided)
     my $site = $c->model('Site')->get_site_details_by_name($c, $SiteName);
-    unless (defined $site) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site found for SiteName: $SiteName");
+    if (!defined $site) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup',
+            "No site found by name='" . (defined $SiteName ? $SiteName : 'UNDEF') . "'. Attempting domain-based resolution for '$domain'.");
+        # Fallback: resolve via domain to site_id then fetch details
+        my $site_domain = eval { $c->model('Site')->get_site_domain($c, $domain) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_domain error: $@");
+        }
+        if ($site_domain) {
+            my $site_id = eval { $site_domain->site_id };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Resolved site_id via domain: '" . (defined $site_id ? $site_id : 'UNDEF') . "'");
+            if (defined $site_id) {
+                $site = eval { $c->model('Site')->get_site_details($c, $site_id) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "get_site_details error: $@");
+                }
+            }
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'site_setup', "Domain-based resolution failed for domain '$domain'");
+        }
+    }
 
-        # Set default values for critical variables
+    unless (defined $site) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'site_setup', "No site could be resolved. SiteName='" . ($SiteName//'UNDEF') . "', Domain='" . ($domain//'UNDEF') . "'");
+
+        # Ensure site_display_name is never missing in stash/session, even on failure
+        my $fallback_display = $c->stash->{SiteName} || $c->session->{SiteName} || 'Site';
+        $c->stash->{SiteDisplayName}   = $fallback_display;
+        $c->stash->{site_display_name} = $fallback_display;
+        $c->session->{site_display_name} = $fallback_display;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+            "STASH_CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+            "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') . "' (fallback)");
+
+        # Set default values for other critical variables
         $c->stash->{ScriptDisplayName} = 'Site';
         $c->stash->{css_view_name} = '/static/css/default.css';
         $c->stash->{mail_to_admin} = 'admin@computersystemconsulting.ca';
         $c->stash->{mail_replyto} = 'helpdesk.computersystemconsulting.ca';
 
         # Add debug information
-        push @{$c->stash->{debug_errors}}, "ERROR: No site found for SiteName: $SiteName";
-        
+        $c->stash->{debug_errors} //= [];
+        push @{$c->stash->{debug_errors}}, "ERROR: No site found (by name or domain).";
+
         # Ensure debug_msg is always an array
         $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Using default site settings because no site was found for '$SiteName'";
+        push @{$c->stash->{debug_msg}}, "Using default site settings because no site was resolved for '" . ($SiteName//"UNDEF") . "'";
 
         return;
     }
 
-    my $css_view_name = $site->css_view_name || '/static/css/default.css';
-    my $site_display_name = $site->site_display_name || $SiteName;
-    my $mail_to_admin = $site->mail_to_admin || 'admin@computersystemconsulting.ca';
-    my $mail_replyto = $site->mail_replyto || 'helpdesk.computersystemconsulting.ca';
-    my $site_name = $site->name || $SiteName;
+    # Log ALL site values we care about for diagnostics
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "SITE RECORD: id='" . ($site->can('id') ? ($site->id//'UNDEF') : 'NA') .
+        "' name='" . ($site->can('name') ? ($site->name//'UNDEF') : 'NA') .
+        "' site_display_name='" . ($site->can('site_display_name') ? ($site->site_display_name//'UNDEF') : 'NA') .
+        "' css_view_name='" . ($site->can('css_view_name') ? ($site->css_view_name//'UNDEF') : 'NA') .
+        "' mail_to_admin='" . ($site->can('mail_to_admin') ? ($site->mail_to_admin//'UNDEF') : 'NA') .
+        "' mail_replyto='" . ($site->can('mail_replyto') ? ($site->mail_replyto//'UNDEF') : 'NA') .
+        "' document_root_url='" . ($site->can('document_root_url') ? ($site->document_root_url//'UNDEF') : 'NA') .
+        "' home_view='" . ($site->can('home_view') ? ($site->home_view//'UNDEF') : 'NA') . "'");
 
-    # Set ControllerName based on the site's home_view - this was missing!
-    my $home_view = $site->home_view || $site->name || 'Root';
-    
-    # Verify the controller exists before setting it
-    my $controller_exists = 0;
-    eval {
-        my $controller = $c->controller($home_view);
-        $controller_exists = 1 if $controller;
-    };
-
-    if ($controller_exists) {
-        $c->stash->{ControllerName} = $home_view;
-        $c->session->{ControllerName} = $home_view;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "ControllerName set to: $home_view");
-    } else {
-        # If controller doesn't exist, fall back to Root
-        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'site_setup',
-            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
-        $c->stash->{ControllerName} = 'Root';
-        $c->session->{ControllerName} = 'Root';
-    }
+    my $css_view_name     = $site->can('css_view_name')     ? ($site->css_view_name || '/static/css/default.css') : '/static/css/default.css';
+    my $site_display_name = $site->can('site_display_name') ? $site->site_display_name : undef;
+    my $mail_to_admin     = $site->can('mail_to_admin')     ? ($site->mail_to_admin || 'admin@computersystemconsulting.ca') : 'admin@computersystemconsulting.ca';
+    my $mail_replyto      = $site->can('mail_replyto')      ? ($site->mail_replyto || 'helpdesk.computersystemconsulting.ca') : 'helpdesk.computersystemconsulting.ca';
+    my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);
     }
 
-    # Get theme from ThemeConfig
-    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $SiteName);
+    # Get theme from canonical ThemeConfig
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
 
     # Set theme in stash for Header.tt to use
     $c->stash->{theme_name} = $theme_name;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Set theme_name in stash: $theme_name");
 
-    $c->stash->{ScriptDisplayName} = $site_display_name;
-    $c->stash->{css_view_name} = $css_view_name;
-    $c->stash->{mail_to_admin} = $mail_to_admin;
-    $c->stash->{mail_replyto} = $mail_replyto;
-    $c->stash->{SiteName} = $site_name;
-    $c->session->{SiteName} = $site_name;
+    # Write resolved values to stash/session
+    $c->stash->{SiteDisplayName}   = $site_display_name;
+    $c->stash->{site_display_name} = $site_display_name;
+    $c->stash->{css_view_name}     = $css_view_name;
+    $c->stash->{mail_to_admin}     = $mail_to_admin;
+    $c->stash->{mail_replyto}      = $mail_replyto;
+    $c->stash->{SiteName}          = $site_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "STASH_CHECK: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+        "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') . "'");
+
+    $c->session->{site_display_name} = $site_display_name;
+    $c->session->{SiteName}          = $site_name;
+
+    # Log the final values being set for verification
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
+        "STASHED: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') .
+        "', SiteDisplayName='" . ($c->stash->{SiteDisplayName}//'UNDEF') .
+        "', SiteName='" . ($c->stash->{SiteName}//'UNDEF') .
+        "', css_view_name='" . ($c->stash->{css_view_name}//'UNDEF') . "'");
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
         "Completed site_setup action with HostName: " . $c->stash->{HostName});
@@ -1232,351 +1786,176 @@ sub reset_session :Global {
     $c->response->redirect($c->uri_for('/'));
 }
 
-
-# Route for the "Back" functionality
-sub back :Path('/back') :Args(0) {
+# Request lifecycle: Begin - log request start
+sub begin :Private {
     my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'back',
-        "Back navigation requested");
+    # Store request start time for timing analysis
+    $c->stash->{_request_start_time} = time();
+    $c->stash->{_request_start_hires} = [gettimeofday()];
     
-    # Check if we have a return URL in session
-    my $return_url = $c->session->{return_url} || $c->req->referer || '/';
-    
-    # Avoid infinite loops - don't redirect back to /back
-    if ($return_url =~ m{/back$}) {
-        $return_url = '/';
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
+        "[REQUEST_START] Method: " . $c->req->method . 
+        " Path: " . $c->req->path . 
+        " at " . scalar(localtime($c->stash->{_request_start_time})));
+
+    # Ensure SiteName is established as early as possible for all routes
+    eval {
+        my $sn = $c->stash->{SiteName} // $c->session->{SiteName};
+        unless (defined $sn && $sn ne '' && $sn ne 'none') {
+            $self->fetch_and_set($c, 'SiteName');
+            $sn = $c->stash->{SiteName} // $c->session->{SiteName};
+        }
+        # Always perform site_setup at begin to guarantee site_display_name in stash
+        if (defined $sn && $sn ne '') {
+            $self->site_setup($c, $sn);
+        } else {
+            # As absolute fallback, try with 'CSC' (commonly configured)
+            $self->site_setup($c, 'CSC');
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin',
+            "BEGIN INIT: site_display_name='" . ($c->stash->{site_display_name}//'UNDEF') . "', SiteName='" . ($c->stash->{SiteName}//'UNDEF') . "'");
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'back',
-        "Redirecting back to: $return_url");
-    
-    $c->response->redirect($return_url);
 }
 
-# Route for the "Hosted" functionality
-sub hosted :Path('/hosted') :Args(0) {
+sub end : ActionClass('RenderView') {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hosted',
-        "Hosted accounts page requested");
-    
-    # Store current URL as return URL for back navigation
-    $c->session->{return_url} = $c->req->uri->as_string;
-    
-    # Get site name and domain for context
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
-    my $site_domain = '';
-    
-    # Get the actual domain from the database
-    eval {
-        if ($c->model('Site')) {
-            my $domain = $c->req->uri->host;
-            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
-            if ($site_domain_obj) {
-                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
-                if ($site && $site->domain) {
-                    $site_domain = $site->domain;
-                }
-            }
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosted',
-            "Could not fetch site domain: $@");
-    }
-    
-    # Fallback to current domain if not found in database
-    $site_domain = $site_domain || $c->req->uri->host;
-    
-    # Get hosted accounts from the database (if available)
-    my $hosted_accounts = [];
-    eval {
-        # Try to get hosted accounts from database
-        if ($c->model('DB') && $c->model('DB')->resultset('HostedAccount')) {
-            $hosted_accounts = [$c->model('DB')->resultset('HostedAccount')->search(
-                { site_name => $site_name },
-                { order_by => 'account_name' }
-            )->all];
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'hosted',
-            "Could not fetch hosted accounts from database: $@");
-    }
-    
-    $c->stash(
-        template => 'hosted/index.tt',
-        site_name => $site_name,
-        site_domain => $site_domain,
-        hosted_accounts => $hosted_accounts,
-        page_title => "Hosted Accounts - $site_domain"
-    );
-}
 
-# Route for the "Member" functionality  
-sub membership :Path('/membership') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'membership',
-        "Membership page requested");
-    
-    # Store current URL as return URL for back navigation
-    $c->session->{return_url} = $c->req->uri->as_string;
-    
-    # Get site name and domain for context
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
-    my $site_domain = '';
-    
-    # Get the actual domain from the database
-    eval {
-        if ($c->model('Site')) {
-            my $domain = $c->req->uri->host;
-            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
-            if ($site_domain_obj) {
-                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
-                if ($site && $site->domain) {
-                    $site_domain = $site->domain;
-                }
-            }
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'membership',
-            "Could not fetch site domain: $@");
-    }
-    
-    # Fallback to current domain if not found in database
-    $site_domain = $site_domain || $c->req->uri->host;
-    
-    # Check if user is already a member
-    my $is_member = 0;
-    my $user_membership = {};
-    
-    if ($c->session->{user_id}) {
+    # Intercept unhandled Catalyst errors and render a friendly error page —
+    # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
+    # show its full error page so developers can see the real stack trace.
+    if (@{$c->error || []} && !$c->response->body && !$c->debug) {
+        my @errors   = @{$c->error};
+        my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
+
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
+            "Unhandled application error: $err_text");
+
         eval {
-            # Try to get user membership info from database
-            if ($c->model('DB') && $c->model('DB')->resultset('Membership')) {
-                my $membership = $c->model('DB')->resultset('Membership')->find({
-                    user_id => $c->session->{user_id},
-                    site_name => $site_name
-                });
-                if ($membership) {
-                    $is_member = 1;
-                    $user_membership = {
-                        type => $membership->membership_type,
-                        status => $membership->status,
-                        expires => $membership->expires_date
-                    };
-                }
-            }
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'membership',
-                "Could not fetch membership info: $@");
-        }
-    }
-    
-    $c->stash(
-        template => 'membership/index.tt',
-        site_name => $site_name,
-        site_domain => $site_domain,
-        is_member => $is_member,
-        user_membership => $user_membership,
-        page_title => "Membership - $site_domain"
-    );
-}
-
-# Route for membership application
-sub applymembership :Path('/applymembership') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'applymembership',
-        "Membership application requested");
-    
-    # Store current URL as return URL for back navigation
-    $c->session->{return_url} = $c->req->uri->as_string;
-    
-    # Get site name and domain for context
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'Comserv';
-    my $site_domain = '';
-    
-    # Get the actual domain from the database
-    eval {
-        if ($c->model('Site')) {
-            my $domain = $c->req->uri->host;
-            my $site_domain_obj = $c->model('Site')->get_site_domain($c, $domain);
-            if ($site_domain_obj) {
-                my $site = $c->model('Site')->get_site_details($c, $site_domain_obj->site_id);
-                if ($site && $site->domain) {
-                    $site_domain = $site->domain;
-                }
-            }
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'applymembership',
-            "Could not fetch site domain: $@");
-    }
-    
-    # Fallback to current domain if not found in database
-    $site_domain = $site_domain || $c->req->uri->host;
-    
-    if ($c->req->method eq 'POST') {
-        # Process membership application
-        my $params = $c->req->params;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'applymembership',
-            "Processing membership application for: " . ($params->{email} || 'unknown'));
-        
-        # Basic validation
-        my @errors;
-        push @errors, "Name is required" unless $params->{name};
-        push @errors, "Email is required" unless $params->{email};
-        push @errors, "Membership type is required" unless $params->{membership_type};
-        
-        if (@errors) {
-            $c->stash(
-                template => 'membership/apply.tt',
-                site_name => $site_name,
-                site_domain => $site_domain,
-                errors => \@errors,
-                form_data => $params,
-                page_title => "Apply for Membership - $site_domain"
+            require Comserv::Util::HealthLogger;
+            Comserv::Util::HealthLogger->log_health_event(
+                undef, 'error', 'HTTP_ERROR',
+                "Unhandled 500: $err_text",
+                { sitename => ($c->stash->{SiteName} || '') }
             );
-            return;
-        }
-        
-        # Try to save the application
-        eval {
-            if ($c->model('DB') && $c->model('DB')->resultset('MembershipApplication')) {
-                $c->model('DB')->resultset('MembershipApplication')->create({
-                    name => $params->{name},
-                    email => $params->{email},
-                    phone => $params->{phone} || '',
-                    membership_type => $params->{membership_type},
-                    site_name => $site_name,
-                    application_date => DateTime->now,
-                    status => 'pending'
-                });
-                
-                $c->stash(
-                    template => 'membership/application_success.tt',
-                    site_name => $site_name,
-                    site_domain => $site_domain,
-                    applicant_name => $params->{name},
-                    page_title => "Application Submitted - $site_domain"
-                );
-                return;
-            }
         };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'applymembership',
-                "Failed to save membership application: $@");
-            push @errors, "Failed to submit application. Please try again.";
-        }
-        
+
+        $c->clear_errors;
+        $c->response->status(500);
         $c->stash(
-            template => 'membership/apply.tt',
-            site_name => $site_name,
-            site_domain => $site_domain,
-            errors => \@errors,
-            form_data => $params,
-            page_title => "Apply for Membership - $site_domain"
-        );
-    } else {
-        # Show application form
-        $c->stash(
-            template => 'membership/apply.tt',
-            site_name => $site_name,
-            site_domain => $site_domain,
-            page_title => "Apply for Membership - $site_domain"
+            template    => 'error.tt',
+            error_title => 'Temporary Service Issue',
+            error_msg   => 'We encountered an error processing your request. '
+                         . 'The system administrator has been notified. '
+                         . 'Please try again in a few minutes, or use the Back button.',
         );
     }
-}
 
-sub end : ActionClass('RenderView') {}
+    # Never try to render a template for redirect or no-content responses
+    my $status = $c->response->status || 0;
+    if ($status >= 300 && $status < 400) {
+        return;
+    }
+    if ($status == 204) {
+        return;
+    }
+    # Also skip if a JSON/non-HTML body has already been set
+    if ($c->response->body && $c->response->content_type &&
+        $c->response->content_type !~ m{^text/html}i) {
+        return;
+    }
+
+    if ($c->res->content_type && $c->res->content_type =~ m{^text/html}i) {
+        $c->res->headers->header(
+            'Content-Security-Policy' => 
+                "default-src 'self'; " .
+                "script-src 'self' 'unsafe-inline'; " .
+                "style-src 'self' 'unsafe-inline'; " .
+                "img-src 'self' data: https:; " .
+                "font-src 'self'; " .
+                "frame-src 'none'; " .
+                "object-src 'none'; " .
+                "base-uri 'self'; " .
+                "form-action 'self' https://www.paypal.com https://www.sandbox.paypal.com;"
+        );
+    }
+    
+    # Calculate request duration
+    if ($c->stash->{_request_start_time}) {
+        my $duration = time() - $c->stash->{_request_start_time};
+        my $status = $c->response->status || 'unknown';
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'end', 
+            "[REQUEST_END] Method: " . $c->req->method . 
+            " Path: " . $c->req->path . 
+            " Status: " . $status . 
+            " Duration: ${duration}s");
+        
+        # Warn if request took too long
+        if ($duration > 5) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'end', 
+                "[SLOW_REQUEST] Request took ${duration}s - may indicate database hang or processing issue");
+        }
+    }
+}
 
 # Default action for handling 404 errors
 sub default :Path {
     my ($self, $c) = @_;
-    
-    # Get the requested path
-    my $requested_path = $c->req->path;
-    my $path = join('/', @{$c->req->args});
-    
-    # Log the 404 error
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default', 
-        "Page not found: /$requested_path");
-    
-    # Set response status to 404
-    $c->response->status(404);
-    
-    # Set up the error page
-    $c->stash(
-        template => 'error.tt',
-        error_title => 'Page Not Found',
-        error_msg => "The page you requested could not be found: /$requested_path. <br><a href=\"/mcoop\" style=\"color: #006633; font-weight: bold;\">Return to Landing Page</a>",
-        requested_path => $path,
-        debug_msg => "Page not found: /$path",
-        technical_details => "Using Catalyst's built-in proxy configuration. Test URL: " . 
-                         $c->uri_for('/test')
-    );
-    
-    # Initialize debug_msg array if it doesn't exist
-    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-    
-    # Add the debug message to the array
-    push @{$c->stash->{debug_msg}}, "Page not found: /$path";
-}
 
-# PHASE 2: Enhanced Error Reporting - Test route to demonstrate error reporting system
-sub test_error_reporting :Path('/test_error_reporting') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check admin permissions
-    my $roles = $c->session->{roles};
-    if (!defined $roles || ref $roles ne 'ARRAY' || !grep { $_ eq 'admin' } @$roles) {
-        $c->response->status(403);
-        $c->response->body('Access denied. Admin role required.');
+    my $requested_path = $c->req->path;
+
+    # Classify the requester for logging context
+    my %req_info = Comserv::Util::Logging::extract_request_info($c);
+    my $req_type    = $req_info{request_type} // 'unknown';
+    my $ip          = $req_info{ip_address}   // '-';
+    my $ua          = $req_info{user_agent}   // '-';
+    my $method      = $req_info{request_method} // '-';
+    my $referer     = $req_info{referer}      // '-';
+
+    # Detect if the request targets a restricted admin path.
+    # For security, a 404 (not a 403) is returned so the path's existence is not revealed.
+    my $is_admin_path = ($requested_path =~ m{^/admin\b}i
+                      || $requested_path =~ m{^/csc/admin\b}i);
+    my $is_admin_user = $self->check_user_roles($c, 'admin');
+
+    if ($is_admin_path && !$is_admin_user) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'default',
+            "Stealth-404 for admin path '$requested_path' — "
+            . "IP:$ip Type:$req_type Method:$method Referer:$referer");
+        $c->response->status(404);
+        $self->logging->log_access($c, 404);
+        $c->stash(
+            template    => 'error.tt',
+            error_title => 'Page Not Found',
+            error_msg   => 'The page you requested could not be found.',
+        );
         return;
     }
-    
-    # Generate test errors to demonstrate the enhanced error reporting system
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_error_reporting',
-        "Starting error reporting system test");
-    
-    # Test different error levels
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_error_reporting',
-        "Test warning message - This is a sample warning to demonstrate warning level logging");
-    
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_error_reporting',
-        "Test error message - This is a sample error to demonstrate error level logging and tracking");
-    
-    $self->logging->log_critical($c, __FILE__, __LINE__, 'test_error_reporting',
-        "Test critical error - This is a sample critical error that should trigger admin notifications");
-    
-    # Generate a few more errors for testing
-    for my $i (1..3) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_error_reporting',
-            "Test error #$i - Multiple error testing for dashboard display");
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_error_reporting',
-        "Error reporting system test completed");
-    
-    # Return JSON response
-    $c->response->content_type('application/json');
-    $c->response->body(encode_json({
-        success => 1,
-        message => "Error reporting test completed. Check /admin/logging to see the results.",
-        errors_generated => {
-            critical => 1,
-            error => 4,
-            warning => 1,
-            info => 2
-        }
-    }));
+
+    my $log_level = ($req_type eq 'scanner') ? 'error'
+                  : ($req_type eq 'bot')     ? 'info'
+                  :                            'warn';
+
+    $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 'default',
+        "404 Not Found: '$requested_path' — "
+        . "IP:$ip Type:$req_type Method:$method Referer:$referer");
+
+    $c->response->status(404);
+    $self->logging->log_access($c, 404);
+    $c->stash(
+        template          => 'error.tt',
+        error_title       => 'Page Not Found',
+        error_msg         => "The page you requested could not be found: /$requested_path.",
+        requested_path    => $requested_path,
+        technical_details => '',
+    );
+
+    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
+    push @{$c->stash->{debug_msg}}, "Page not found: /$requested_path";
 }
 
 __PACKAGE__->meta->make_immutable;

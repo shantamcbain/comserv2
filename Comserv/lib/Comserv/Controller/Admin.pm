@@ -5,8 +5,10 @@ package Comserv::Controller::Admin;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::UserVerification;
 use Data::Dumper;
-use JSON qw(decode_json);
+use JSON qw(decode_json encode_json);
 use Try::Tiny;
 use MIME::Base64;
 use File::Slurp qw(read_file write_file);
@@ -17,7 +19,6 @@ use File::Spec;
 use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
-use Cwd;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -26,19 +27,16 @@ sub logging {
     my ($self) = @_;
     return Comserv::Util::Logging->instance();
 }
-
+# adding code to force restart
 # Begin method to check if the user has admin role
 sub begin : Private {
     my ($self, $c) = @_;
-
-     $c->stash->{is_admin} = 1;
+    
     # Add detailed logging
     my $username = ($c->user_exists && $c->user) ? $c->user->username : ($c->session->{username} || 'Guest');
-    $username = 'Shanta';
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'begin', 
         "Admin controller begin method called by user: $username");
-    
-    # Initialize debug_msg array if it doesn't exist and debug mode is enabled
+     # Initialize debug_msg array if it doesn't exist and debug mode is enabled
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         
@@ -67,13 +65,13 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     }
     
     # Check if the user has admin role
-    my $has_admin_role = 1;
+    my $has_admin_role = 0;
     
     # First check if user exists
     if ($c->user_exists) {
         # Get roles from session
         my $roles = $c->session->{roles};
-
+        
         # Log the roles for debugging
         my $roles_debug = 'none';
         if (defined $roles) {
@@ -99,7 +97,7 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
             "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
     }
-    $has_admin_role = 1;
+    
     unless ($has_admin_role) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'base', 
             "Access denied: User does not have admin role");
@@ -116,8 +114,7 @@ sub base :Chained('/') :PathPart('admin') :CaptureArgs(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
         "Completed Admin base action");
-     $has_admin_role = 1;
-
+    
     return 1;
 }
 
@@ -128,29 +125,60 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Starting Admin index action");
     
-    # Debug session information
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "Session debug - Username: " . ($c->session->{username} || 'none') . 
-        ", User ID: " . ($c->session->{user_id} || 'none') . 
-        ", Roles: " . (ref($c->session->{roles}) eq 'ARRAY' ? join(',', @{$c->session->{roles}}) : ($c->session->{roles} || 'none')));
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
-        "user_exists: " . ($c->user_exists ? 'true' : 'false') . 
-        ", check_user_roles('admin'): " . ($c->check_user_roles('admin') ? 'true' : 'false'));
-    
-    # Check if the user has admin role (same as other admin functions)
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
-            "Access denied: User does not have admin role");
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+            "Admin access granted to user Shanta (bypass role check)");
+        # Continue with the admin page
+    }
+    else {
+        # Check if the user has admin role
+        my $has_admin_role = 0;
         
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        # First check if user exists
+        if ($c->user_exists) {
+            # Get roles from session
+            my $roles = $c->session->{roles};
+            
+            # Log the roles for debugging
+            my $roles_debug = 'none';
+            if (defined $roles) {
+                if (ref($roles) eq 'ARRAY') {
+                    $roles_debug = join(', ', @$roles);
+                    
+                    # Check if 'admin' is in the roles array
+                    foreach my $role (@$roles) {
+                        if (lc($role) eq 'admin') {
+                            $has_admin_role = 1;
+                            last;
+                        }
+                    }
+                } elsif (!ref($roles)) {
+                    $roles_debug = $roles;
+                    # Check if roles string contains 'admin'
+                    if ($roles =~ /\badmin\b/i) {
+                        $has_admin_role = 1;
+                    }
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
+                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+        }
         
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
+        unless ($has_admin_role) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index', 
+                "Access denied: User does not have admin role");
+            
+            # Set error message in flash
+            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+            
+            # Redirect to login page with destination parameter
+            $c->response->redirect($c->uri_for('/user/login', {
+                destination => $c->req->uri
+            }));
+            return;
+        }
     }
     
     # Get system stats
@@ -168,21 +196,21 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
-    # Check if user has CSC backup access
-    my $has_csc_access = $self->check_csc_access($c);
-    
     # Pass data to the template
     $c->stash(
         template => 'admin/index.tt',
         stats => $stats,
         recent_activity => $recent_activity,
-        notifications => $notifications,
-        is_admin => 1,  # User has already passed admin check to get here
-        has_csc_access => $has_csc_access
+        notifications => $notifications
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Completed Admin index action");
+}
+
+sub docker_containers :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->res->redirect($c->uri_for('/admin/infrastructure'));
 }
 
 # Get system statistics for the admin dashboard
@@ -351,97 +379,296 @@ sub get_system_notifications {
 sub users :Path('/admin/users') :Args(0) {
     my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Starting users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
-    
-    # Get filter parameter
-    my $filter = $c->req->param('filter') || 'all';
-    
-    # Get search parameter
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+        "Admin accessing user management - user: " . ($c->session->{username} || 'unknown'));
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
     my $search = $c->req->param('search') || '';
-    
-    # Get page parameter
+    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_role = $c->req->param('filter_role') || '';
+    my $filter_status = $c->req->param('filter_status') || '';
     my $page = $c->req->param('page') || 1;
-    my $users_per_page = 20;
-    
-    # Build search conditions
-    my $search_conditions = {};
-    
-    # Apply filter
-    if ($filter eq 'active') {
-        $search_conditions->{status} = 'active';
-    }
-    elsif ($filter eq 'pending') {
-        $search_conditions->{status} = 'pending';
-    }
-    elsif ($filter eq 'disabled') {
-        $search_conditions->{status} = 'disabled';
-    }
-    
-    # Apply search
-    if ($search) {
-        $search_conditions->{'-or'} = [
-            { username => { 'like', "%$search%" } },
-            { email => { 'like', "%$search%" } },
-            { first_name => { 'like', "%$search%" } },
-            { last_name => { 'like', "%$search%" } }
-        ];
-    }
-    
-    # Get users from database
-    my $users_rs = $c->model('DBEncy::User')->search(
-        $search_conditions,
-        {
-            order_by => { -asc => 'username' },
-            page => $page,
-            rows => $users_per_page
-        }
-    );
-    
-    # Get user roles
-    my %user_roles = ();
+    my $rows_per_page = 50;
+
+    my @users;
+    my $pager;
+    my %stats = ( total => 0, active => 0, suspended => 0, pending => 0, by_role => {} );
+    my @available_sites;
+    my %user_sites_map;
+    my $error_msg;
+
     eval {
-        my @user_role_records = $c->model('DBEncy::UserRole')->search({});
-        foreach my $record (@user_role_records) {
-            push @{$user_roles{$record->user_id}}, $record->role->role;
+        my %search_conditions;
+
+        if ($search) {
+            $search_conditions{'-or'} = [
+                { username    => { like => "%$search%" } },
+                { first_name  => { like => "%$search%" } },
+                { last_name   => { like => "%$search%" } },
+                { email       => { like => "%$search%" } },
+            ];
         }
+
+        $search_conditions{status} = $filter_status if $filter_status;
+
+        if ($filter_role && $filter_role ne 'all') {
+            $search_conditions{roles} = { like => "%$filter_role%" };
+        }
+
+        my $user_rs;
+
+        if ($is_csc_admin) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "CSC admin - showing all users, search='$search' status='$filter_status' role='$filter_role'");
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Site admin ($sitename) - filtering by site");
+
+            if ($filter_site && $filter_site ne $sitename) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'users',
+                    "Site admin tried to access filter_site=$filter_site, forcing to $sitename");
+                $filter_site = $sitename;
+            }
+
+            my $site_obj = $schema->resultset('Site')->search({ name => $sitename })->single;
+            my @user_ids;
+            if ($site_obj) {
+                @user_ids = $schema->resultset('UserSiteRole')->search(
+                    { site_id => $site_obj->id },
+                    { columns => ['user_id'], distinct => 1 }
+                )->get_column('user_id')->all;
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+                "Found " . scalar(@user_ids) . " user_ids for sitename=$sitename");
+
+            $search_conditions{id} = @user_ids ? { -in => \@user_ids } : { -in => [0] };
+
+            $user_rs = $schema->resultset('User')->search(
+                \%search_conditions,
+                { page => $page, rows => $rows_per_page, order_by => { -desc => 'me.id' } }
+            );
+        }
+
+        @users = $user_rs->all;
+        $pager = $user_rs->pager;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Fetched " . scalar(@users) . " users (page $page, total " . $pager->total_entries . ")");
+
+        if (@users) {
+            my @user_ids = map { $_->id } @users;
+            my @site_role_rows = $schema->resultset('UserSiteRole')->search(
+                { user_id => { -in => \@user_ids } },
+                { columns => ['user_id', 'site_id'], distinct => 1 }
+            )->all;
+            my %site_name_cache;
+            for my $sr (@site_role_rows) {
+                my $sid = $sr->site_id;
+                next unless defined $sid;
+                unless (exists $site_name_cache{$sid}) {
+                    my $s = $schema->resultset('Site')->find($sid);
+                    $site_name_cache{$sid} = $s ? $s->name : "site#$sid";
+                }
+                push @{$user_sites_map{$sr->user_id}}, $site_name_cache{$sid};
+            }
+        }
+
+        my $stats_rs = $schema->resultset('User')->search(
+            $is_csc_admin ? {} : \%search_conditions
+        );
+
+        while (my $u = $stats_rs->next) {
+            $stats{total}++;
+            my $status = $u->status || 'active';
+            if    ($status eq 'active')    { $stats{active}++ }
+            elsif ($status eq 'suspended') { $stats{suspended}++ }
+            elsif ($status =~ /pending/)   { $stats{pending}++ }
+
+            if ($u->roles) {
+                for my $role (split /,/, $u->roles) {
+                    $role =~ s/^\s+|\s+$//g;
+                    $stats{by_role}{$role} = ($stats{by_role}{$role} || 0) + 1 if $role;
+                }
+            }
+        }
+
+        @available_sites = $is_csc_admin
+            ? $schema->resultset('Site')->search({}, { order_by => 'name' })->all
+            : $schema->resultset('Site')->search({ name => $sitename })->all;
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users',
+            "Completed users action - stats: total=$stats{total} active=$stats{active} suspended=$stats{suspended}");
     };
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller users view - Template: admin/users.tt";
-        push @{$c->stash->{debug_msg}}, "Filter: $filter, Search: $search, Page: $page";
-        push @{$c->stash->{debug_msg}}, "User count: " . $users_rs->pager->total_entries;
+
+    if ($@) {
+        $error_msg = "Database error loading users: $@";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'users', $error_msg);
     }
-    
-    # Pass data to the template
+
     $c->stash(
-        template => 'admin/users.tt',
-        users => [ $users_rs->all ],
-        user_roles => \%user_roles,
-        filter => $filter,
-        search => $search,
-        pager => $users_rs->pager
+        users           => \@users,
+        pager           => $pager,
+        stats           => \%stats,
+        search          => $search,
+        filter_site     => $filter_site,
+        filter_role     => $filter_role,
+        filter_status   => $filter_status,
+        is_csc_admin    => $is_csc_admin,
+        admin_type      => $admin_type,
+        sitename        => $sitename,
+        available_sites => \@available_sites,
+        user_sites_map  => \%user_sites_map,
+        error_msg       => $error_msg,
+        template        => 'admin/users.tt',
     );
+}
+
+# Admin create user
+sub create_user :Path('/admin/create_user') :Args(0) {
+    my ($self, $c) = @_;
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'users', 
-        "Completed users action");
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    
+    unless ($admin_auth->check_admin_access($c, 'admin_create_user')) {
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+    my $sitename = $c->session->{SiteName};
+    my $schema = $c->model('DBEncy');
+
+    if ($c->req->method eq 'POST') {
+        my $first_name = $c->req->param('first_name');
+        my $last_name = $c->req->param('last_name');
+        my $email = $c->req->param('email');
+        my @sitenames = $c->req->param('sitenames');
+        my @roles = $c->req->param('roles');
+
+        unless ($first_name && $last_name && $email) {
+            $c->stash(
+                error_msg => 'First name, last name, and email are required',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        unless (@sitenames && @roles) {
+            $c->stash(
+                error_msg => 'At least one site and role must be selected',
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        if (!$is_csc_admin) {
+            foreach my $site (@sitenames) {
+                if ($site ne $sitename) {
+                    $c->flash->{error_msg} = "You can only create users for your site: $sitename";
+                    $c->response->redirect($c->uri_for('/admin/create_user'));
+                    return;
+                }
+            }
+        }
+
+        my $existing_user = $schema->resultset('User')->find({ email => $email });
+        if ($existing_user) {
+            $c->stash(
+                error_msg => "A user with email '$email' already exists",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+
+        eval {
+            my $user = $schema->resultset('User')->create({
+                first_name => $first_name,
+                last_name => $last_name,
+                email => $email,
+                username => undef,
+                password => undef,
+                status => 'pending_setup',
+                created_by => $c->session->{user_id},
+                creation_context => 'admin_created',
+                roles => 'normal',
+            });
+
+            my $user_verification = Comserv::Util::UserVerification->new();
+            my $code = $user_verification->generate_verification_code();
+            $user_verification->create_verification_code($user, $code);
+
+            foreach my $site_name (@sitenames) {
+                my $site_obj = $schema->resultset('Site')->search({ name => $site_name })->single;
+                next unless $site_obj;
+                foreach my $role_name (@roles) {
+                    $schema->resultset('UserSiteRole')->create({
+                        user_id    => $user->id,
+                        site_id    => $site_obj->id,
+                        role       => $role_name,
+                        granted_by => $c->session->{user_id},
+                    });
+                }
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_user',
+                "Admin created user: $email with sites: " . join(',', @sitenames) . " roles: " . join(',', @roles));
+
+            $c->session->{invitation_code} = $code;
+            $c->session->{invitation_email} = $email;
+
+            $c->flash->{success_msg} = "User invitation sent to $email. Verification code: $code (testing mode)";
+            $c->response->redirect($c->uri_for('/admin/users'));
+            return;
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_user',
+                "Error creating user: $@");
+            $c->stash(
+                error_msg => "Error creating user: $@",
+                template => 'admin/create_user.tt'
+            );
+            return;
+        }
+    }
+
+    my @available_sites;
+    if ($is_csc_admin) {
+        @available_sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+    } else {
+        @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
+    }
+
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+
+    $c->stash(
+        available_sites => \@available_sites,
+        available_roles => \@available_roles,
+        is_csc_admin => $is_csc_admin,
+        template => 'admin/create_user.tt',
+    );
 }
 
 # Admin content management
@@ -451,18 +678,10 @@ sub content :Path('/admin/content') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'content', 
         "Starting content action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'content', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'content')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -538,18 +757,10 @@ sub settings :Path('/admin/settings') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'settings', 
         "Starting settings action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'settings', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'settings')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -730,6 +941,22 @@ sub settings :Path('/admin/settings') :Args(0) {
         "Completed settings action");
 }
 
+sub planning :Path('/admin/planning') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Planning page requested by user=" . ($c->session->{user_id} // 'anon'));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'planning')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    $c->stash(template => 'admin/documentation/Planning.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
+        "Rendering admin/documentation/Planning.tt");
+    $c->forward($c->view('TT'));
+}
+
 # Admin system information
 sub system_info :Path('/admin/system_info') :Args(0) {
     my ($self, $c) = @_;
@@ -737,18 +964,10 @@ sub system_info :Path('/admin/system_info') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'system_info', 
         "Starting system_info action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'system_info', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'system_info')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -872,24 +1091,19 @@ sub logs :Path('/admin/logs') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'logs', 
         "Starting logs action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'logs', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'logs')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
-    # Get log file parameter
-    my $log_file = $c->req->param('file') || 'catalyst.log';
-    
+    # Get log file parameter — sanitize to basename only, no path traversal
+    my $log_file_raw = $c->req->param('file') || 'catalyst.log';
+    (my $log_file = $log_file_raw) =~ s{[/\\]}{}g;
+    $log_file =~ s/\.\.\///g;
+    $log_file = 'catalyst.log' unless $log_file =~ /^[\w.\-]+\.log$/;
+
     # Get available log files
     my @log_files = ();
     eval {
@@ -900,15 +1114,22 @@ sub logs :Path('/admin/logs') :Args(0) {
             closedir($dh);
         }
     };
-    
+
+    # Validate that the requested file is actually in the list
+    my %valid_files = map { $_ => 1 } @log_files;
+    $log_file = 'catalyst.log' unless $valid_files{$log_file};
+
     # Get log content
     my $log_content = '';
     eval {
         my $log_path = $c->path_to('logs', $log_file);
         if (-f $log_path) {
-            # Get the last 1000 lines of the log file
-            my $tail_output = `tail -n 1000 $log_path`;
-            $log_content = $tail_output;
+            # Read last 1000 lines without shell interpolation
+            open(my $fh, '<', $log_path) or die "Cannot open log: $!";
+            my @lines = <$fh>;
+            close $fh;
+            my $start = @lines > 1000 ? @lines - 1000 : 0;
+            $log_content = join('', @lines[$start..$#lines]);
         }
     };
     
@@ -932,165 +1153,302 @@ sub logs :Path('/admin/logs') :Args(0) {
         "Completed logs action");
 }
 
-# Add missing field from table to result file
-sub add_field_to_result :Path('/admin/add_field_to_result') :Args(0) {
+# Admin security scan
+sub security_scan :Path('/admin/security-scan') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_result', 
-        "Starting add_field_to_result action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+        "Starting security_scan action");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
-    
-    my $table_name = $c->req->param('table_name');
-    my $database = $c->req->param('database');
-    my $field_name = $c->req->param('field_name');
-    
-    unless ($table_name && $database && $field_name) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Missing required parameters' });
-        $c->forward('View::JSON');
-        return;
+
+    my @known_targets = (
+        { label => 'localhost:3001 (dev main)',                     url => 'http://localhost:3001',                           site => 'none'  },
+        { label => 'localhost:3001 as MCoop',                       url => 'http://localhost:3001',                           site => 'MCoop' },
+        { label => 'localhost:3000 (docker)',                       url => 'http://localhost:3000',                           site => 'none'  },
+        { label => 'localhost:3000 as MCoop (docker)',              url => 'http://localhost:3000',                           site => 'MCoop' },
+        { label => 'Production coop.computersystemconsulting.ca',  url => 'http://coop.computersystemconsulting.ca',         site => 'MCoop' },
+        { label => 'usbm.local',                                    url => 'http://usbm.local',                               site => 'USBM'  },
+        { label => 'bmaster.workstation',                           url => 'http://bmaster.workstation',                      site => 'none'  },
+        { label => 've7tit.local',                                  url => 'http://ve7tit.local',                              site => 'none'  },
+    );
+
+    my $scan_results = undef;
+    my $scan_output  = '';
+    my $scan_error   = '';
+
+    if ($c->req->method eq 'POST') {
+        my $target_url = $c->req->param('target_url') // '';
+        my $site_name  = $c->req->param('site_name')  // 'none';
+        my $max_pages  = $c->req->param('max_pages')  // 100;
+
+        # Sanitize inputs
+        $target_url =~ s/\s+//g;
+        $site_name  =~ s/[^a-zA-Z0-9._-]//g;
+        $max_pages  = int($max_pages);
+        $max_pages  = 50  if $max_pages < 1;
+        $max_pages  = 500 if $max_pages > 500;
+
+        unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
+            $c->stash->{error_msg} = 'Invalid target URL. Must be http:// or https:// with a hostname.';
+            $c->stash(template => 'admin/security_scan.tt', known_targets => \@known_targets);
+            return;
+        }
+
+        my $report_file = File::Spec->catfile($c->path_to(''), 'security_crawl_report.json');
+        my $script      = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+            "Running security scan: url=$target_url site=$site_name max=$max_pages");
+
+        eval {
+            open(my $pipe, '-|',
+                'perl', $script,
+                '--url',    $target_url,
+                '--site',   $site_name,
+                '--max',    $max_pages,
+                '--output', $report_file,
+            ) or die "Cannot run scan script: $!";
+            while (my $line = <$pipe>) {
+                $scan_output .= $line;
+            }
+            close($pipe);
+        };
+        if ($@) {
+            $scan_error = $@;
+        }
+
+        if (-f $report_file) {
+            eval {
+                my $json_text = do { local $/; open(my $fh, '<', $report_file) or die $!; <$fh> };
+                $scan_results = decode_json($json_text);
+            };
+            $scan_error .= $@ if $@;
+        }
+
+        $c->stash(
+            scan_target  => $target_url,
+            scan_site    => $site_name,
+            scan_output  => $scan_output,
+            scan_error   => $scan_error,
+            scan_results => $scan_results,
+        );
     }
-    
-    try {
-        # Use the native comparison method to get field definitions
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
-        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
-        
-        unless ($comparison->{has_result_file}) {
-            die "No result file found for table '$table_name'";
-        }
-        
-        # Get the field definition from the table
-        my $field_data = $comparison->{fields}->{$field_name};
-        unless ($field_data && $field_data->{table}) {
-            die "Field '$field_name' not found in table '$table_name'";
-        }
-        
-        my $field_def = $field_data->{table};
-        
-        # Add field to result file
-        my $success = $self->add_field_to_result_file($c, $comparison->{result_file_path}, $field_name, $field_def);
-        
-        if ($success) {
-            $c->stash(json => { 
-                success => 1, 
-                message => "Field '$field_name' added to result file successfully",
-                field_name => $field_name,
-                table_name => $table_name
-            });
-        } else {
-            die "Failed to add field to result file";
-        }
-        
-    } catch {
-        my $error = "Error adding field to result: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result', $error);
-        
-        $c->response->status(500);
-        $c->stash(json => { success => 0, error => $error });
-    };
-    
-    $c->forward('View::JSON');
+
+    $c->stash(
+        template      => 'admin/security_scan.tt',
+        known_targets => \@known_targets,
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan',
+        "Completed security_scan action");
 }
 
-# Add missing field from result file to table
-sub add_field_to_table :Path('/admin/add_field_to_table') :Args(0) {
+# Security scan — start background scan (POST), returns JSON immediately
+sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table', 
-        "Starting add_field_to_table action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_start')) {
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
+        $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
-    
-    my $table_name = $c->req->param('table_name');
-    my $database = $c->req->param('database');
-    my $field_name = $c->req->param('field_name');
-    
-    unless ($table_name && $database && $field_name) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Missing required parameters' });
-        $c->forward('View::JSON');
+
+    my $target_url = $c->req->param('target_url') // '';
+    my $site_name  = $c->req->param('site_name')  // 'none';
+    my $max_pages  = $c->req->param('max_pages')  // 100;
+
+    $target_url =~ s/\s+//g;
+    $site_name  =~ s/[^a-zA-Z0-9._-]//g;
+    $max_pages  = int($max_pages);
+    $max_pages  = 50  if $max_pages < 1;
+    $max_pages  = 500 if $max_pages > 500;
+
+    unless ($target_url =~ m{^https?://[\w.\-]+(:\d+)?(/.*)?$}) {
+        $c->response->body(encode_json({ error => 'Invalid URL' }));
         return;
     }
-    
-    try {
-        # Use the native comparison method to get field definitions
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
-        
-        # Debug: Check if our specific table is in the mapping
-        my $table_key = lc($table_name);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
-            "Looking for table '$table_key' in mapping with " . scalar(keys %$result_table_mapping) . " entries");
-        
-        if (exists $result_table_mapping->{$table_key}) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
-                "Found mapping for '$table_key': " . $result_table_mapping->{$table_key}->{result_name});
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_table',
-                "No mapping found for '$table_key'. Available keys: " . join(', ', sort keys %$result_table_mapping));
+
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+    my $script    = File::Spec->catfile($c->path_to('script'), 'security_crawl.pl');
+
+    unlink $out_file, $json_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ error => "fork failed: $!" }));
+        return;
+    }
+
+    if ($pid == 0) {
+        open(STDOUT, '>', $out_file) or exit 1;
+        open(STDERR, '>&STDOUT');
+        exec('perl', $script,
+            '--url',    $target_url,
+            '--site',   $site_name,
+            '--max',    $max_pages,
+            '--output', $json_file,
+        );
+        exit 1;
+    }
+
+    # Reap child automatically so it doesn't become a zombie
+    local $SIG{CHLD} = 'IGNORE';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'security_scan_start',
+        "Started background scan pid=$pid url=$target_url site=$site_name max=$max_pages");
+
+    $c->response->body(encode_json({ started => 1, pid => $pid }));
+}
+
+# Security scan — poll for new output lines (GET)
+sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_poll')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $offset    = int($c->req->param('offset') // 0);
+    my $out_file  = '/tmp/comserv_security_scan.txt';
+    my $json_file = '/tmp/comserv_security_scan.json';
+
+    my @new_lines;
+    my $new_offset = $offset;
+
+    if (-f $out_file) {
+        open(my $fh, '<', $out_file);
+        seek($fh, $offset, 0);
+        while (my $line = <$fh>) {
+            chomp $line;
+            $line =~ s/\r//g;
+            push @new_lines, $line;
         }
-        
-        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
-        
-        # Debug: Log the comparison result
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_table',
-            "Comparison result: has_result_file=" . ($comparison->{has_result_file} ? 'YES' : 'NO') . 
-            ", result_file_path=" . ($comparison->{result_file_path} || 'NONE'));
-        
-        unless ($comparison->{has_result_file}) {
-            die "No result file found for table '$table_name'";
+        $new_offset = tell($fh);
+        close($fh);
+    }
+
+    my $done    = 0;
+    my $results = undef;
+
+    if (-f $out_file) {
+        my $content = '';
+        if (open(my $f, '<', $out_file)) { local $/; $content = <$f> // ''; close($f); }
+        if ($content =~ /Full report written/) {
+            $done = 1;
+            if (-f $json_file) {
+                eval {
+                    my $jt = do { local $/; open(my $f, '<', $json_file) or die; <$f> };
+                    $results = decode_json($jt);
+                };
+            }
         }
-        
-        # Get the field definition from the result file
-        my $field_data = $comparison->{fields}->{$field_name};
-        unless ($field_data && $field_data->{result}) {
-            die "Field '$field_name' not found in result file";
+    }
+
+    my %resp = (lines => \@new_lines, offset => $new_offset, done => $done);
+    if ($done && $results) {
+        $resp{results} = $results;
+        # Return the archive file that was written (last one in the archive dir)
+        my $archive_dir = $c->path_to('logs', 'security_scans');
+        if (-d $archive_dir) {
+            my @files = sort glob("$archive_dir/*.json");
+            $resp{archive_file} = $files[-1] if @files;
         }
-        
-        my $field_def = $field_data->{result};
-        
-        # Validate field definition has required attributes
-        my $validation_errors = $self->validate_field_definition($field_def, $field_name);
-        if (@$validation_errors) {
-            die "Field validation errors: " . join(', ', @$validation_errors);
+    }
+    $c->response->body(encode_json(\%resp));
+}
+
+# Security scan — list archived scan reports (GET, returns JSON)
+sub security_scan_history :Path('/admin/security-scan-history') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_history')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my @scans;
+
+    if (-d $archive_dir) {
+        for my $file (reverse sort glob("$archive_dir/*.json")) {
+            my $name = $file; $name =~ s|.*/||;
+            my $size = -s $file;
+            my $mtime = (stat $file)[9];
+            eval {
+                my $json_text = do { local $/; open(my $f, '<', $file) or die; <$f> };
+                my $data = decode_json($json_text);
+                push @scans, {
+                    file      => $name,
+                    scan_time => $data->{scan_time} // '',
+                    base_url  => $data->{base_url}  // '',
+                    sitename  => $data->{sitename}  // '',
+                    summary   => $data->{summary}   // {},
+                    size      => $size,
+                };
+            };
+            push @scans, { file => $name, size => $size, error => $@ } if $@;
         }
-        
-        # Add field to database table
-        my $success = $self->add_field_to_database_table($c, $table_name, $database, $field_name, $field_def);
-        
-        if ($success) {
-            $c->stash(json => { 
-                success => 1, 
-                message => "Field '$field_name' added to table '$table_name' successfully",
-                field_name => $field_name,
-                table_name => $table_name
-            });
-        } else {
-            die "Failed to add field to database table";
-        }
-        
-    } catch {
-        my $error = "Error adding field to table: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_table', $error);
-        
-        $c->response->status(500);
-        $c->stash(json => { success => 0, error => $error });
+    }
+
+    $c->response->body(encode_json({ scans => \@scans }));
+}
+
+# Security scan — load a specific archived report (GET, returns JSON)
+sub security_scan_load :Path('/admin/security-scan-load') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'security_scan_load')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ error => 'Access denied' }));
+        return;
+    }
+
+    my $file = $c->req->param('file') // '';
+    $file =~ s|[^a-zA-Z0-9._-]||g;
+
+    unless ($file =~ /\.json$/) {
+        $c->response->body(encode_json({ error => 'Invalid file name' }));
+        return;
+    }
+
+    my $archive_dir = $c->path_to('logs', 'security_scans');
+    my $path = "$archive_dir/$file";
+
+    unless (-f $path) {
+        $c->response->body(encode_json({ error => 'File not found' }));
+        return;
+    }
+
+    eval {
+        my $json_text = do { local $/; open(my $f, '<', $path) or die $!; <$f> };
+        my $data = decode_json($json_text);
+        $c->response->body(encode_json($data));
     };
-    
-    $c->forward('View::JSON');
+    if ($@) {
+        $c->response->body(encode_json({ error => "Cannot read file: $@" }));
+    }
 }
 
 # Admin backup and restore
@@ -1100,17 +1458,72 @@ sub backup :Path('/admin/backup') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Starting backup action");
 
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backup',
-            "Access denied: User does not have CSC backup access");
-
-        $c->flash->{error_msg} = "You need CSC administrator privileges to access backup functionality.";
-        $c->response->redirect($c->uri_for('/admin'));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'backup')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
 
-    # Backup creation is now handled by the separate 'create' action method
+    # Handle backup creation
+    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'create_backup') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+            "Creating backup");
+
+        my $backup_type = $c->req->param('backup_type') || 'full';
+        my $backup_name = $c->req->param('backup_name') || 'backup_' . time();
+
+        # Create backup directory if it doesn't exist
+        my $backup_dir = $c->path_to('backups');
+        unless (-d $backup_dir) {
+            eval { make_path($backup_dir) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                    "Error creating backup directory: $@");
+
+                $c->flash->{error_msg} = "Error creating backup directory: $@";
+                $c->response->redirect($c->uri_for('/admin/backup'));
+                return;
+            }
+        }
+
+        # Create backup
+        my $backup_file = "$backup_dir/$backup_name.tar.gz";
+        my $backup_command = '';
+
+        if ($backup_type eq 'full') {
+            # Full backup (files + database)
+            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
+        }
+        elsif ($backup_type eq 'files') {
+            # Files only backup
+            $backup_command = "tar -czf $backup_file --exclude='backups' --exclude='tmp' --exclude='logs/*.log' --exclude='db' .";
+        }
+        elsif ($backup_type eq 'database') {
+            # Database only backup
+            # This is a simplified example - you'd need to customize for your database
+            $backup_command = "mysqldump -u username -p'password' database_name > $backup_dir/db_dump.sql && tar -czf $backup_file $backup_dir/db_dump.sql && rm $backup_dir/db_dump.sql";
+        }
+
+        # Execute backup command
+        my $result = system($backup_command);
+
+        if ($result == 0) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
+                "Backup created successfully: $backup_file");
+
+            $c->flash->{success_msg} = "Backup created successfully: $backup_name.tar.gz";
+        }
+        else {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'backup',
+                "Error creating backup: $!");
+
+            $c->flash->{error_msg} = "Error creating backup: $!";
+        }
+
+        $c->response->redirect($c->uri_for('/admin/backup'));
+        return;
+    }
 
     # Handle backup restoration
     if ($c->req->method eq 'POST' && $c->req->param('action') eq 'restore_backup') {
@@ -1206,506 +1619,36 @@ sub backup :Path('/admin/backup') :Args(0) {
         return;
     }
 
-    # Clean up any orphaned backup files first
-    $self->cleanup_orphaned_backups($c);
-    
-    # Get available backups with detailed information
-    my $backups = $self->get_backup_list($c);
+    # Get available backups
+    my @backups = ();
+    eval {
+        my $backup_dir = $c->path_to('backups');
+        if (-d $backup_dir) {
+            opendir(my $dh, $backup_dir) or die "Cannot open backups directory: $!";
+            @backups = grep { -f "$backup_dir/$_" && $_ =~ /\.tar\.gz$/ } readdir($dh);
+            closedir($dh);
+
+            # Sort backups by modification time (newest first)
+            @backups = sort {
+                (stat("$backup_dir/$b"))[9] <=> (stat("$backup_dir/$a"))[9]
+            } @backups;
+        }
+    };
 
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
         push @{$c->stash->{debug_msg}}, "Admin controller backup view - Template: admin/backup.tt";
-        push @{$c->stash->{debug_msg}}, "Available backups: " . scalar(@$backups);
+        push @{$c->stash->{debug_msg}}, "Available backups: " . join(', ', @backups);
     }
 
     # Pass data to the template
     $c->stash(
         template => 'admin/backup.tt',
-        backups => $backups
+        backups => \@backups
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'backup',
         "Completed backup action");
-}
-
-# Handle backup creation (separate action for cleaner URL handling)
-sub create :Path('/admin/backup/create') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
-        "Starting backup creation");
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create',
-            "Access denied: User does not have CSC backup access");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to create backups.";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Only handle POST requests
-    unless ($c->req->method eq 'POST') {
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    my $backup_type = $c->req->param('type') || 'full';
-    my $description = $c->req->param('description') || '';
-    
-    # Generate backup name with timestamp and type
-    my $timestamp = time();
-    my ($sec, $min, $hour, $mday, $mon, $year) = localtime($timestamp);
-    my $date_str = sprintf("%04d%02d%02d_%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
-    my $backup_name = "backup_${date_str}_${backup_type}";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
-        "Creating $backup_type backup: $backup_name");
-    
-    # Create backup directory if it doesn't exist
-    my $backup_dir = $c->path_to('backups');
-    unless (-d $backup_dir) {
-        eval { make_path($backup_dir) };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
-                "Error creating backup directory: $@");
-            
-            $c->flash->{error_msg} = "Error creating backup directory: $@";
-            $c->response->redirect($c->uri_for('/admin/backup'));
-            return;
-        }
-    }
-    
-    # Create backup
-    my $backup_file = "$backup_dir/$backup_name.tar.gz";
-    my $backup_command = '';
-    my $backup_success = 0;
-    
-    if ($backup_type eq 'full') {
-        # Full backup (files + database)
-        $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' --exclude='logs/*.log' .";
-        
-    } elsif ($backup_type eq 'config') {
-        # Configuration files only
-        $backup_command = "tar -czf '$backup_file' --exclude='backups' --exclude='tmp' config/ lib/Comserv.pm *.conf *.yml *.yaml 2>/dev/null || true";
-        
-    } elsif ($backup_type eq 'database') {
-        # Database only backup
-        my $db_backup_result = $self->create_database_backup($c, $backup_dir, $backup_name);
-        
-        if ($db_backup_result->{success}) {
-            # Get the application root directory for relative path calculation
-            my $app_root = $c->path_to('.');
-            # Use relative path from app root for tar command
-            my $relative_dump_file = File::Spec->abs2rel($db_backup_result->{dump_file}, $app_root);
-            $backup_command = "tar -czf '$backup_file' '$relative_dump_file' && rm '$db_backup_result->{dump_file}'";
-            
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-                "Database backup dump file: $db_backup_result->{dump_file}");
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-                "Relative dump file path: $relative_dump_file");
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
-                "Failed to create database backup: " . $db_backup_result->{error});
-            
-            $c->flash->{error_msg} = "Failed to create database backup: " . $db_backup_result->{error};
-            $c->response->redirect($c->uri_for('/admin/backup'));
-            return;
-        }
-    }
-    
-    # Execute backup command
-    if ($backup_command) {
-        # Get the application root directory for proper tar execution
-        my $app_root = $c->path_to('.');
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-            "Executing backup command from directory: $app_root");
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-            "Backup command: $backup_command");
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-            "Target backup file: $backup_file");
-        
-        # Change to application root directory and execute command
-        my $original_dir = Cwd::getcwd();
-        chdir($app_root) or do {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
-                "Cannot change to application directory: $app_root - $!");
-            $c->flash->{error_msg} = "Cannot change to application directory: $!";
-            $c->response->redirect($c->uri_for('/admin/backup'));
-            return;
-        };
-        
-        my $result = system($backup_command);
-        
-        # Change back to original directory
-        chdir($original_dir);
-        
-        if ($result == 0) {
-            # Add a small delay to ensure file is fully written
-            sleep(1);
-            
-            # Verify backup file was created and has content
-            if (-f $backup_file && -s $backup_file) {
-                $backup_success = 1;
-                
-                my $file_size = -s $backup_file;
-                my $formatted_size = $self->format_file_size($file_size);
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
-                    "Backup created successfully: $backup_file ($formatted_size)");
-                
-                # Force a debug message to appear in the UI
-                if ($c->session->{debug_mode}) {
-                    $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-                    push @{$c->stash->{debug_msg}}, "DEBUG: Backup file created at: $backup_file (Size: $formatted_size)";
-                }
-                
-                my $success_msg = "Backup created successfully: $backup_name.tar.gz ($formatted_size)";
-                $success_msg .= " - $description" if $description;
-                
-                $c->flash->{success_msg} = $success_msg;
-            } else {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
-                    "Backup file was not created or is empty: $backup_file");
-                
-                # Additional debugging
-                if (-f $backup_file) {
-                    my $size = -s $backup_file;
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-                        "Backup file exists but has size: $size bytes");
-                    
-                    # Force debug message to UI
-                    if ($c->session->{debug_mode}) {
-                        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-                        push @{$c->stash->{debug_msg}}, "DEBUG: Backup file exists but empty: $backup_file ($size bytes)";
-                    }
-                } else {
-                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create',
-                        "Backup file does not exist at: $backup_file");
-                    
-                    # Force debug message to UI
-                    if ($c->session->{debug_mode}) {
-                        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-                        push @{$c->stash->{debug_msg}}, "DEBUG: Backup file does not exist: $backup_file";
-                    }
-                }
-                
-                $c->flash->{error_msg} = "Backup file was not created or is empty";
-            }
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create',
-                "Error creating backup (exit code: $result): $!");
-            
-            # Force debug message to UI
-            if ($c->session->{debug_mode}) {
-                $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-                push @{$c->stash->{debug_msg}}, "DEBUG: Backup command failed with exit code: $result";
-            }
-            
-            $c->flash->{error_msg} = "Error creating backup (exit code: $result)";
-        }
-    }
-    
-    $c->response->redirect($c->uri_for('/admin/backup'));
-}
-
-# Cleanup orphaned backup files (like .meta files without corresponding .tar.gz)
-sub cleanup_orphaned_backups {
-    my ($self, $c) = @_;
-    
-    my $backup_dir = $c->path_to('backups');
-    return unless -d $backup_dir;
-    
-    eval {
-        opendir(my $dh, $backup_dir) or die "Cannot open backup directory: $!";
-        my @all_files = readdir($dh);
-        closedir($dh);
-        
-        # Find .meta files
-        my @meta_files = grep { $_ =~ /\.tar\.gz\.meta$/ } @all_files;
-        
-        foreach my $meta_file (@meta_files) {
-            my $backup_file = $meta_file;
-            $backup_file =~ s/\.meta$//; # Remove .meta extension
-            
-            # If the corresponding .tar.gz file doesn't exist, remove the .meta file
-            unless (-f "$backup_dir/$backup_file") {
-                my $meta_path = "$backup_dir/$meta_file";
-                if (unlink($meta_path)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'cleanup_orphaned_backups',
-                        "Removed orphaned meta file: $meta_file");
-                }
-            }
-        }
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'cleanup_orphaned_backups',
-            "Error during cleanup: $@");
-    }
-}
-
-# Debug endpoint to check backup directory contents
-sub debug_backups :Path('/admin/backup/debug') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $c->response->body("Access denied");
-        return;
-    }
-    
-    my $backup_dir = $c->path_to('backups');
-    my $debug_info = {
-        backup_dir => "$backup_dir",
-        dir_exists => (-d $backup_dir) ? 1 : 0,
-        files => [],
-        error => ''
-    };
-    
-    if (-d $backup_dir) {
-        eval {
-            opendir(my $dh, $backup_dir) or die "Cannot open directory: $!";
-            my @all_files = readdir($dh);
-            closedir($dh);
-            
-            foreach my $file (@all_files) {
-                next if $file eq '.' || $file eq '..';
-                my $filepath = "$backup_dir/$file";
-                my @stat = stat($filepath);
-                
-                push @{$debug_info->{files}}, {
-                    name => $file,
-                    is_file => (-f $filepath) ? 1 : 0,
-                    size => $stat[7] || 0,
-                    mtime => $stat[9] || 0,
-                    matches_pattern => ($file =~ /\.tar\.gz$/) ? 1 : 0
-                };
-            }
-        };
-        $debug_info->{error} = $@ if $@;
-    }
-    
-    $c->response->content_type('application/json');
-    $c->response->body(JSON::encode_json($debug_info));
-}
-
-# Test backup creation manually
-sub test_create :Path('/admin/backup/test_create') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $c->response->body("Access denied");
-        return;
-    }
-    
-    my $result = {
-        steps => [],
-        success => 0,
-        error => ''
-    };
-    
-    eval {
-        push @{$result->{steps}}, "Starting manual backup test...";
-        
-        my $backup_dir = $c->path_to('backups');
-        my $app_root = $c->path_to('.');
-        my $timestamp = time();
-        my ($sec, $min, $hour, $mday, $mon, $year) = localtime($timestamp);
-        my $date_str = sprintf("%04d%02d%02d_%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
-        my $backup_name = "test_backup_${date_str}_database";
-        my $backup_file = "$backup_dir/$backup_name.tar.gz";
-        
-        push @{$result->{steps}}, "Backup directory: $backup_dir";
-        push @{$result->{steps}}, "App root: $app_root";
-        push @{$result->{steps}}, "Backup name: $backup_name";
-        push @{$result->{steps}}, "Backup file: $backup_file";
-        
-        # Test database backup creation
-        my $db_backup_result = $self->create_database_backup($c, $backup_dir, $backup_name);
-        
-        if ($db_backup_result->{success}) {
-            push @{$result->{steps}}, "✅ Database dump created: " . $db_backup_result->{dump_file};
-            
-            # Check if dump file exists
-            if (-f $db_backup_result->{dump_file}) {
-                my $dump_size = -s $db_backup_result->{dump_file};
-                push @{$result->{steps}}, "✅ Dump file exists with size: $dump_size bytes";
-                
-                # Create tar command
-                my $relative_dump_file = File::Spec->abs2rel($db_backup_result->{dump_file}, $app_root);
-                my $backup_command = "tar -czf '$backup_file' '$relative_dump_file' && rm '$db_backup_result->{dump_file}'";
-                
-                push @{$result->{steps}}, "Relative dump file: $relative_dump_file";
-                push @{$result->{steps}}, "Backup command: $backup_command";
-                
-                # Change to app root and execute
-                my $original_dir = Cwd::getcwd();
-                chdir($app_root);
-                push @{$result->{steps}}, "Changed to directory: " . Cwd::getcwd();
-                
-                my $cmd_result = system($backup_command);
-                chdir($original_dir);
-                
-                push @{$result->{steps}}, "Command exit code: $cmd_result";
-                
-                if ($cmd_result == 0) {
-                    if (-f $backup_file && -s $backup_file) {
-                        my $backup_size = -s $backup_file;
-                        push @{$result->{steps}}, "✅ Backup created successfully: $backup_size bytes";
-                        $result->{success} = 1;
-                        
-                        # Clean up test file
-                        unlink($backup_file);
-                        push @{$result->{steps}}, "Test backup file cleaned up";
-                    } else {
-                        push @{$result->{steps}}, "❌ Backup file not created or empty";
-                    }
-                } else {
-                    push @{$result->{steps}}, "❌ Backup command failed";
-                }
-            } else {
-                push @{$result->{steps}}, "❌ Dump file does not exist";
-            }
-        } else {
-            push @{$result->{steps}}, "❌ Database backup failed: " . $db_backup_result->{error};
-        }
-    };
-    
-    if ($@) {
-        $result->{error} = $@;
-        push @{$result->{steps}}, "❌ Exception: $@";
-    }
-    
-    $c->response->content_type('application/json');
-    $c->response->body(JSON::encode_json($result));
-}
-
-# Handle backup download
-sub download :Path('/admin/backup/download') :Args(1) {
-    my ($self, $c, $filename) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
-        "Starting backup download: $filename");
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
-            "Access denied: User does not have CSC backup access");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to download backups.";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Validate filename (security check)
-    unless ($filename && $filename =~ /^[a-zA-Z0-9_\-\.]+\.tar\.gz$/) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
-            "Invalid filename: $filename");
-        
-        $c->flash->{error_msg} = "Invalid backup filename.";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Check if backup file exists
-    my $backup_file = $c->path_to('backups', $filename);
-    unless (-f $backup_file) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'download',
-            "Backup file not found: $backup_file");
-        
-        $c->flash->{error_msg} = "Backup file not found: $filename";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Serve the file for download
-    $c->response->content_type('application/gzip');
-    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
-    $c->response->header('Content-Length' => -s $backup_file);
-    
-    # Stream the file
-    $c->serve_static_file($backup_file);
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'download',
-        "Backup download completed: $filename");
-}
-
-# Handle backup deletion
-sub delete :Path('/admin/backup/delete') :Args(1) {
-    my ($self, $c, $filename) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
-        "Starting backup deletion: $filename");
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
-            "Access denied: User does not have CSC backup access");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to delete backups.";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Validate filename (security check)
-    unless ($filename && $filename =~ /^[a-zA-Z0-9_\-\.]+\.tar\.gz$/) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
-            "Invalid filename: $filename");
-        
-        $c->flash->{error_msg} = "Invalid backup filename.";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Check if backup file exists
-    my $backup_file = $c->path_to('backups', $filename);
-    unless (-f $backup_file) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete',
-            "Backup file not found: $backup_file");
-        
-        $c->flash->{error_msg} = "Backup file not found: $filename";
-        $c->response->redirect($c->uri_for('/admin/backup'));
-        return;
-    }
-    
-    # Delete the backup file
-    if (unlink($backup_file)) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete',
-            "Backup deleted successfully: $backup_file");
-        
-        $c->flash->{success_msg} = "Backup deleted successfully: $filename";
-    } else {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete',
-            "Error deleting backup: $!");
-        
-        $c->flash->{error_msg} = "Error deleting backup: $!";
-    }
-    
-    $c->response->redirect($c->uri_for('/admin/backup'));
-}
-
-# Test database connection (AJAX endpoint)
-sub test_db :Path('/admin/backup/test_db') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has CSC backup access
-    unless ($self->check_csc_access($c)) {
-        my $result = {
-            success => 0,
-            message => "Access denied: CSC administrator privileges required"
-        };
-        $c->response->content_type('application/json');
-        $c->response->body(JSON::encode_json($result));
-        return;
-    }
-    
-    # This method already exists further down in the file, so we'll just redirect to it
-    # or we can implement it here if needed
-    $self->test_database_connection($c);
 }
 
 # Keeping it here for backward compatibility
@@ -1739,9 +1682,7 @@ sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
 # Database Schema Comparison functionality (with alias)
 sub compare_schema :Path('/admin/compare_schema') :Args(0) {
     my ($self, $c) = @_;
-    # Redirect to the main schema_compare action
-    $c->response->redirect($c->uri_for('/admin/schema_compare'));
-    return;
+    $c->forward('schema_compare');
 }
 
 # Database Schema Comparison functionality
@@ -1751,498 +1692,142 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Starting schema_compare action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare', 
-            "Access denied: User does not have admin role");
+    # TEMPORARY FIX: Allow specific users direct access
+    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+            "Admin access granted to user Shanta (bypass role check)");
+        # Continue with the admin page
+    }
+    else {
+        # Check if the user has admin role
+        my $has_admin_role = 0;
         
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
+        # First check if user exists
+        if ($c->user_exists) {
+            # Get roles from session
+            my $roles = $c->session->{roles};
+            
+            # Log the roles for debugging
+            my $roles_debug = 'none';
+            if (defined $roles) {
+                if (ref($roles) eq 'ARRAY') {
+                    $roles_debug = join(', ', @$roles);
+                    
+                    # Check if 'admin' is in the roles array
+                    foreach my $role (@$roles) {
+                        if (lc($role) eq 'admin') {
+                            $has_admin_role = 1;
+                            last;
+                        }
+                    }
+                } elsif (!ref($roles)) {
+                    $roles_debug = $roles;
+                    # Check if roles string contains 'admin'
+                    if ($roles =~ /\badmin\b/i) {
+                        $has_admin_role = 1;
+                    }
+                }
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+                "Admin access check - User: " . $c->session->{username} . ", Roles: $roles_debug, Has admin: " . ($has_admin_role ? 'Yes' : 'No'));
+        }
+        
+        unless ($has_admin_role) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare', 
+                "Access denied: User does not have admin role");
+            
+            $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+            $c->response->redirect($c->uri_for('/user/login', {
+                destination => $c->req->uri
+            }));
+            return;
+        }
     }
     
-    # Get database comparison data with caching (only caches when this page is accessed)
-    require Comserv::Util::DatabaseSchemaCache;
-    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
-    my $database_comparison = $cache->get_schema_comparison_with_cache($c);
+    # Get database environment info
+    my $db_env = Comserv::Util::DatabaseEnv->new;
     
-    # Add access control schema status
-    my $access_control_status = $self->check_access_control_schema($c);
+    # Check if environment parameter is provided in URL
+    my $requested_env = $c->req->param('environment');
+    if ($requested_env && $db_env->validate_environment($requested_env)) {
+        # Temporarily override environment for this request (store in session)
+        $c->session->{override_db_environment} = $requested_env;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "User requested database environment: $requested_env");
+    }
+    
+    # Handle Full Dev Mode parameter
+    my $full_dev = $c->req->param('full_dev');
+    if (defined $full_dev) {
+        $c->session->{in_dev_mode} = $full_dev ? 1 : 0;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "Full Dev Mode " . ($c->session->{in_dev_mode} ? "ENABLED" : "DISABLED"));
+    }
+    
+    my $active_env = $db_env->get_active_environment($c);
+    my $available_envs = $db_env->get_available_environments($c, 'ency');
+    
+    # Select schema based on Full Dev Mode
+    my $main_schema;
+    if ($c->session->{in_dev_mode}) {
+        # Use development schema
+        eval {
+            $main_schema = $c->model('DBEncy'); # In dev mode, use dev connection
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+                "Full Dev Mode: Using development schema");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_compare',
+                "Failed to load dev schema: $@");
+            $main_schema = $c->model('DBEncy'); # Fallback to default
+        }
+    } else {
+        # Use production schema
+        $main_schema = $c->model('DBEncy');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare',
+            "Using production schema");
+    }
+    
+    # Get database comparison data
+    my $database_comparison = $self->get_database_comparison($c);
+    
+    # Set theme for proper CSS loading (CRITICAL for admin pages)
+    my $site_name = $c->session->{site_name} || $c->stash->{site_name} || 'default';
+    my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
     
     # Debug: Log the structure of database_comparison
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+        "Set theme_name in stash: $theme_name for site: $site_name");
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
+        push @{$c->stash->{debug_msg}}, "Site: $site_name, Theme: $theme_name";
         push @{$c->stash->{debug_msg}}, "Ency tables: " . scalar(@{$database_comparison->{ency}->{tables}});
         push @{$c->stash->{debug_msg}}, "Forager tables: " . scalar(@{$database_comparison->{forager}->{tables}});
         push @{$c->stash->{debug_msg}}, "Tables with results: " . $database_comparison->{summary}->{tables_with_results};
         push @{$c->stash->{debug_msg}}, "Tables without results: " . $database_comparison->{summary}->{tables_without_results};
+        push @{$c->stash->{debug_msg}}, "Active DB environment: $active_env";
     }
     
     # Set the template and data
     $c->stash(
         template => 'admin/schema_compare.tt',
         database_comparison => $database_comparison,
-        access_control_status => $access_control_status
+        theme_name => $theme_name,
+        site_name => $site_name,
+        active_environment => $active_env,
+        available_environments => $available_envs,
+        current_schema => $main_schema,
+        in_dev_mode => $c->session->{in_dev_mode} || 0
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Completed schema_compare action");
-}
-
-# Refresh database schema cache (admin endpoint)
-sub schema_cache_refresh :Path('/admin/schema_cache_refresh') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_cache_refresh', 
-        "Manual schema cache refresh requested");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->flash->{error_msg} = "You need to be an administrator to refresh the cache.";
-        $c->response->redirect($c->uri_for('/admin/schema_compare'));
-        return;
-    }
-    
-    # Refresh the schema cache
-    require Comserv::Util::DatabaseSchemaCache;
-    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
-    $cache->refresh_schema_cache($c);
-    
-    $c->flash->{success_msg} = "Database schema cache has been refreshed successfully.";
-    $c->response->redirect($c->uri_for('/admin/schema_compare'));
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_cache_refresh', 
-        "Schema cache refresh completed");
-}
-
-# Get active database information (API endpoint)
-sub get_active_database :Path('/admin/get_active_database') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->response->body('Access denied');
-        return;
-    }
-    
-    # Get active database from cache
-    require Comserv::Util::DatabaseSchemaCache;
-    my $cache = Comserv::Util::DatabaseSchemaCache->instance();
-    my $active_database = $cache->get_active_database($c);
-    my $cache_status = $cache->get_cache_status();
-    
-    # Return JSON response
-    $c->response->content_type('application/json');
-    $c->response->body($c->model('JSON')->encode({
-        active_database => $active_database,
-        cache_status => $cache_status
-    }));
-}
-
-# Update table schema to match result file
-sub update_table_schema :Path('/admin/update_table_schema') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->response->body('Access denied');
-        return;
-    }
-    
-    my $table_name = $c->req->param('table_name');
-    my $database_name = $c->req->param('database_name');
-    
-    unless ($table_name && $database_name) {
-        $c->response->status(400);
-        $c->response->body('Missing required parameters');
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_schema', 
-        "Updating table schema: $table_name in database: $database_name");
-    
-    try {
-        # Get the result file schema
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database_name);
-        my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, $database_name, $result_table_mapping);
-        
-        if (!$table_comparison->{has_result_file}) {
-            $c->response->status(400);
-            $c->response->body('No result file found for this table');
-            return;
-        }
-        
-        # Generate ALTER TABLE statements
-        my @alter_statements = ();
-        
-        foreach my $field_name (keys %{$table_comparison->{fields}}) {
-            my $field = $table_comparison->{fields}->{$field_name};
-            
-            if ($field->{differences} && @{$field->{differences}} > 0) {
-                # Field needs updating
-                my $result_type = $field->{result_type} || 'varchar(255)';
-                push @alter_statements, "ALTER TABLE `$table_name` MODIFY COLUMN `$field_name` $result_type";
-            }
-        }
-        
-        # Add missing fields
-        foreach my $field_name (keys %{$table_comparison->{missing_in_table}}) {
-            my $field_info = $table_comparison->{missing_in_table}->{$field_name};
-            my $field_type = $field_info->{data_type} || 'varchar(255)';
-            push @alter_statements, "ALTER TABLE `$table_name` ADD COLUMN `$field_name` $field_type";
-        }
-        
-        $c->response->content_type('application/json');
-        $c->response->body($c->model('JSON')->encode({
-            success => 1,
-            table_name => $table_name,
-            database_name => $database_name,
-            alter_statements => \@alter_statements,
-            message => "Generated " . scalar(@alter_statements) . " ALTER statements"
-        }));
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_table_schema', 
-            "Error updating table schema: $error");
-        
-        $c->response->status(500);
-        $c->response->body("Error: $error");
-    };
-}
-
-# Update result file to match table schema
-sub update_result_file :Path('/admin/update_result_file') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->response->body('Access denied');
-        return;
-    }
-    
-    my $table_name = $c->req->param('table_name');
-    my $database_name = $c->req->param('database_name');
-    
-    unless ($table_name && $database_name) {
-        $c->response->status(400);
-        $c->response->body('Missing required parameters');
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_result_file', 
-        "Updating result file for table: $table_name in database: $database_name");
-    
-    try {
-        # Get table schema from database
-        my $table_schema = $self->get_table_schema($c, $table_name, $database_name);
-        
-        if (!$table_schema || !@{$table_schema}) {
-            $c->response->status(400);
-            $c->response->body('Table not found in database');
-            return;
-        }
-        
-        # Generate result file content
-        my $result_file_content = $self->generate_result_file_content($c, $table_name, $table_schema, $database_name);
-        
-        $c->response->content_type('application/json');
-        $c->response->body($c->model('JSON')->encode({
-            success => 1,
-            table_name => $table_name,
-            database_name => $database_name,
-            result_file_content => $result_file_content,
-            message => "Generated result file content for $table_name"
-        }));
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_result_file', 
-            "Error updating result file: $error");
-        
-        $c->response->status(500);
-        $c->response->body("Error: $error");
-    };
-}
-
-# Generate result file content from table schema
-sub generate_result_file_content {
-    my ($self, $c, $table_name, $table_schema, $database_name) = @_;
-    
-    my $class_name = ucfirst($table_name);
-    my $namespace = ucfirst($database_name);
-    
-    my $content = qq{package Comserv::Model::Schema::${namespace}::Result::${class_name};
-
-use strict;
-use warnings;
-use base 'DBIx::Class::Core';
-
-__PACKAGE__->table('$table_name');
-
-__PACKAGE__->add_columns(
-};
-
-    foreach my $field (@{$table_schema}) {
-        my $field_name = $field->{Field};
-        my $data_type = $self->normalize_mysql_type_for_result_file($field->{Type});
-        my $is_nullable = $field->{Null} eq 'YES' ? 1 : 0;
-        my $default = $field->{Default};
-        my $is_auto_increment = $field->{Extra} =~ /auto_increment/i ? 1 : 0;
-        
-        $content .= qq{    $field_name => {
-        data_type => '$data_type',};
-        
-        if ($is_nullable) {
-            $content .= qq{
-        is_nullable => 1,};
-        }
-        
-        if (defined $default && $default ne '') {
-            $content .= qq{
-        default_value => '$default',};
-        }
-        
-        if ($is_auto_increment) {
-            $content .= qq{
-        is_auto_increment => 1,};
-        }
-        
-        $content .= qq{
-    },
-};
-    }
-    
-    $content .= qq{);
-
-__PACKAGE__->set_primary_key('id') if grep { \$_->{Field} eq 'id' } \@{\$table_schema};
-
-1;
-};
-
-    return $content;
-}
-
-# Normalize MySQL data types for result files
-sub normalize_mysql_type_for_result_file {
-    my ($self, $mysql_type) = @_;
-    
-    # Convert MySQL types to DBIx::Class types
-    if ($mysql_type =~ /^int/i) {
-        return 'integer';
-    } elsif ($mysql_type =~ /^varchar\((\d+)\)/i) {
-        return "varchar($1)";
-    } elsif ($mysql_type =~ /^text/i) {
-        return 'text';
-    } elsif ($mysql_type =~ /^datetime/i) {
-        return 'datetime';
-    } elsif ($mysql_type =~ /^timestamp/i) {
-        return 'timestamp';
-    } elsif ($mysql_type =~ /^enum/i) {
-        return 'enum';
-    } elsif ($mysql_type =~ /^decimal/i) {
-        return 'decimal';
-    } else {
-        return 'varchar(255)'; # Default fallback
-    }
-}
-
-# Check access control schema status
-sub check_access_control_schema {
-    my ($self, $c) = @_;
-    
-    my $status = {
-        overall_status => 'unknown',
-        users_table => {},
-        user_site_roles_table => {},
-        migration_needed => 0,
-        errors => [],
-        recommendations => []
-    };
-    
-    # Check User table columns
-    $status->{users_table} = $self->check_users_table_schema($c);
-    
-    # Check UserSiteRole table
-    $status->{user_site_roles_table} = $self->check_user_site_roles_table_schema($c);
-    
-    # Determine overall status
-    my $has_errors = 0;
-    my $needs_migration = 0;
-    
-    if ($status->{users_table}->{has_errors}) {
-        $has_errors = 1;
-        push @{$status->{errors}}, @{$status->{users_table}->{errors}};
-    }
-    
-    if ($status->{user_site_roles_table}->{has_errors}) {
-        $has_errors = 1;
-        push @{$status->{errors}}, @{$status->{user_site_roles_table}->{errors}};
-    }
-    
-    if ($status->{users_table}->{needs_migration} || $status->{user_site_roles_table}->{needs_migration}) {
-        $needs_migration = 1;
-    }
-    
-    # Set overall status
-    if ($has_errors) {
-        $status->{overall_status} = 'error';
-        push @{$status->{recommendations}}, 'Database schema errors detected. System is using fallback compatibility mode.';
-    } elsif ($needs_migration) {
-        $status->{overall_status} = 'migration_available';
-        $status->{migration_needed} = 1;
-        push @{$status->{recommendations}}, 'Enhanced access control features are available. Migration is optional.';
-    } else {
-        $status->{overall_status} = 'ok';
-        push @{$status->{recommendations}}, 'Access control schema is up to date.';
-    }
-    
-    return $status;
-}
-
-# Check users table schema for access control enhancements
-sub check_users_table_schema {
-    my ($self, $c) = @_;
-    
-    my $table_status = {
-        exists => 0,
-        has_errors => 0,
-        needs_migration => 0,
-        columns => {},
-        missing_columns => [],
-        errors => []
-    };
-    
-    try {
-        # Try to describe the users table
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my $sth = $dbh->prepare("DESCRIBE users");
-        $sth->execute();
-        
-        $table_status->{exists} = 1;
-        
-        # Get existing columns
-        while (my $row = $sth->fetchrow_hashref) {
-            $table_status->{columns}->{lc($row->{Field})} = {
-                type => $row->{Type},
-                null => $row->{Null},
-                default => $row->{Default},
-                key => $row->{Key}
-            };
-        }
-        
-        # Check for required columns
-        my @required_columns = qw(id username password email roles);
-        foreach my $col (@required_columns) {
-            unless (exists $table_status->{columns}->{$col}) {
-                push @{$table_status->{errors}}, "Missing required column: $col";
-                $table_status->{has_errors} = 1;
-            }
-        }
-        
-        # Check for optional enhancement columns
-        my @optional_columns = qw(status created_at last_login);
-        foreach my $col (@optional_columns) {
-            unless (exists $table_status->{columns}->{$col}) {
-                push @{$table_status->{missing_columns}}, $col;
-                $table_status->{needs_migration} = 1;
-            }
-        }
-        
-    } catch {
-        my $error = $_;
-        push @{$table_status->{errors}}, "Error checking users table: $error";
-        $table_status->{has_errors} = 1;
-        
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'check_users_table_schema',
-            "Error checking users table schema: $error");
-    };
-    
-    return $table_status;
-}
-
-# Check user_site_roles table schema
-sub check_user_site_roles_table_schema {
-    my ($self, $c) = @_;
-    
-    my $table_status = {
-        exists => 0,
-        has_errors => 0,
-        needs_migration => 0,
-        columns => {},
-        missing_columns => [],
-        errors => []
-    };
-    
-    try {
-        # Try to describe the user_site_roles table
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my $sth = $dbh->prepare("DESCRIBE user_site_roles");
-        $sth->execute();
-        
-        $table_status->{exists} = 1;
-        
-        # Get existing columns
-        while (my $row = $sth->fetchrow_hashref) {
-            $table_status->{columns}->{lc($row->{Field})} = {
-                type => $row->{Type},
-                null => $row->{Null},
-                default => $row->{Default},
-                key => $row->{Key}
-            };
-        }
-        
-    } catch {
-        my $error = $_;
-        if ($error =~ /doesn't exist/i) {
-            # Table doesn't exist - this is expected for basic installations
-            $table_status->{needs_migration} = 1;
-            push @{$table_status->{missing_columns}}, 'entire_table';
-        } else {
-            push @{$table_status->{errors}}, "Error checking user_site_roles table: $error";
-            $table_status->{has_errors} = 1;
-        }
-    };
-    
-    return $table_status;
-}
-
-# Access control help page
-sub access_control_help :Path('/admin/access_control_help') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'access_control_help',
-        "Displaying access control help page");
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller access_control_help view - Template: admin/access_control_help.tt";
-    }
-    
-    $c->stash(
-        template => 'admin/access_control_help.tt',
-        title => 'Multi-Site Access Control Help'
-    );
 }
 
 # AJAX endpoint to get table schema details
@@ -2252,8 +1837,27 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_table_schema', 
         "Starting get_table_schema action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has admin role - use session-based check
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -2306,24 +1910,6 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison',
         "Starting get_field_comparison action");
     
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_field_comparison', 
-            "Admin access granted to user Shanta (bypass role check)");
-    }
-    else {
-        # Check if the user has admin role
-        unless ($c->user_exists && $c->check_user_roles('admin')) {
-            $c->response->status(403);
-            $c->stash(json => {
-                success => 0,
-                error => "Access denied: Admin role required"
-            });
-            $c->forward('View::JSON');
-            return;
-        }
-    }
-    
     my $table_name = $c->request->param('table_name');
     my $database = $c->request->param('database');
     
@@ -2340,8 +1926,6 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     try {
         # Build comprehensive mapping for this database
         my $result_table_mapping = $self->build_result_table_mapping($c, $database);
-        
-
         
         my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
         
@@ -2394,72 +1978,6 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
         my $error = "Error getting field comparison for $table_name ($database): $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_field_comparison', $error);
         
-        # Don't return 500 status - return success with error info instead
-        # This prevents JavaScript parsing errors
-        $c->stash(json => {
-            success => 0,
-            error => $error,
-            table_name => $table_name,
-            database => $database,
-            debug_mode => $c->session->{debug_mode} ? 1 : 0
-        });
-    };
-    
-    $c->forward('View::JSON');
-}
-
-# AJAX endpoint to get result file fields
-sub get_result_file_fields :Path('/admin/get_result_file_fields') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
-        "Starting get_result_file_fields action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => {
-            success => 0,
-            error => "Access denied: Admin role required"
-        });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    my $result_name = $c->req->param('result_name');
-    my $database = $c->req->param('database');
-    
-    unless ($result_name && $database) {
-        $c->response->status(400);
-        $c->stash(json => {
-            success => 0,
-            error => "Missing required parameters: result_name and database"
-        });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
-        "Getting fields for result: $result_name in database: $database");
-    
-    try {
-        # Get the result file fields
-        my $fields = $self->get_result_file_field_definitions($c, $result_name, $database);
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_fields', 
-            "Successfully retrieved " . scalar(keys %$fields) . " fields for result: $result_name");
-        
-        $c->stash(json => {
-            success => 1,
-            fields => $fields,
-            result_name => $result_name,
-            database => $database
-        });
-        
-    } catch {
-        my $error = "Error getting result file fields for $result_name ($database): $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_result_file_fields', $error);
-        
         $c->response->status(500);
         $c->stash(json => {
             success => 0,
@@ -2470,63 +1988,11 @@ sub get_result_file_fields :Path('/admin/get_result_file_fields') :Args(0) {
     $c->forward('View::JSON');
 }
 
-# Get field definitions from a result file
-sub get_result_file_field_definitions {
-    my ($self, $c, $result_name, $database) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
-        "Getting field definitions for result: $result_name in database: $database");
-    
-    # Build the result file path
-    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
-    my $result_file_path;
-    
-    if (lc($database) eq 'ency') {
-        $result_file_path = "$base_path/Ency/Result/$result_name.pm";
-        # Also check subdirectories
-        unless (-f $result_file_path) {
-            if (-f "$base_path/Ency/Result/System/$result_name.pm") {
-                $result_file_path = "$base_path/Ency/Result/System/$result_name.pm";
-            } elsif (-f "$base_path/Ency/Result/User/$result_name.pm") {
-                $result_file_path = "$base_path/Ency/Result/User/$result_name.pm";
-            }
-        }
-    } elsif (lc($database) eq 'forager') {
-        $result_file_path = "$base_path/Forager/Result/$result_name.pm";
-    } else {
-        die "Unsupported database: $database";
-    }
-    
-    unless (-f $result_file_path) {
-        die "Result file not found: $result_file_path";
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
-        "Found result file: $result_file_path");
-    
-    # Parse the result file schema
-    my $schema_info = $self->get_result_file_schema($c, $result_name, $result_file_path);
-    
-    unless ($schema_info && $schema_info->{columns}) {
-        die "Could not parse result file schema: $result_file_path";
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_result_file_field_definitions', 
-        "Successfully parsed " . scalar(keys %{$schema_info->{columns}}) . " fields from result file");
-    
-    return $schema_info->{columns};
-}
-
 # Get database comparison between each database and its result files
 sub get_database_comparison {
     my ($self, $c) = @_;
     
-    # Get available backends from HybridDB
-    my $hybrid_db = $c->model('HybridDB');
-    my $available_backends = $hybrid_db->get_available_backends() || {};
-    
     my $comparison = {
-        backends => {},
         ency => {
             name => 'ency',
             display_name => 'Encyclopedia Database',
@@ -2551,87 +2017,14 @@ sub get_database_comparison {
             total_tables => 0,
             tables_with_results => 0,
             tables_without_results => 0,
-            results_without_tables => 0,
-            total_backends => scalar(keys %$available_backends),
-            available_backends => scalar(grep { $available_backends->{$_}->{available} } keys %$available_backends)
+            results_without_tables => 0
         }
     };
-    
-    # Add backend-specific schema comparison
-    foreach my $backend_name (sort keys %$available_backends) {
-        my $backend_info = $available_backends->{$backend_name};
-        
-        # CRITICAL FIX: Ensure backend_info is a hash reference, not a JSON string
-        if (!ref($backend_info)) {
-            # If it's a JSON string, decode it
-            try {
-                $backend_info = decode_json($backend_info);
-            } catch {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison',
-                    "Error decoding JSON for backend '$backend_name': $_");
-                # Skip this backend if JSON parsing fails
-                next;
-            };
-        }
-        
-        # Ensure backend_info is still a hash reference after potential JSON decoding
-        unless (ref($backend_info) eq 'HASH') {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison',
-                "Backend info for '$backend_name' is not a hash reference: " . ref($backend_info));
-            next;
-        }
-        
-        $comparison->{backends}->{$backend_name} = {
-            name => $backend_name,
-            display_name => $backend_info->{config}->{description} || $backend_name,
-            type => $backend_info->{type},
-            available => $backend_info->{available},
-            priority => $backend_info->{config}->{priority} || 999,
-            connection_status => $backend_info->{available} ? 'connected' : 'disconnected',
-            tables => [],
-            table_count => 0,
-            table_comparisons => [],
-            error => undef
-        };
-        
-        # If backend is available, get its schema information
-        if ($backend_info->{available}) {
-            try {
-                my $backend_tables = $self->get_backend_database_tables($c, $backend_name, $backend_info);
-                $comparison->{backends}->{$backend_name}->{tables} = $backend_tables;
-                $comparison->{backends}->{$backend_name}->{table_count} = scalar(@$backend_tables);
-                
-                # Build result file mapping for this backend
-                my $result_table_mapping = $self->build_result_table_mapping($c, 'ency');
-                
-                # Compare each table with its result file
-                foreach my $table_name (@$backend_tables) {
-                    my $table_comparison = $self->compare_backend_table_with_result_file($c, $table_name, $backend_name, $backend_info, $result_table_mapping);
-                    push @{$comparison->{backends}->{$backend_name}->{table_comparisons}}, $table_comparison;
-                    
-                    if ($table_comparison->{has_result_file}) {
-                        $comparison->{summary}->{tables_with_results}++;
-                    } else {
-                        $comparison->{summary}->{tables_without_results}++;
-                    }
-                }
-                
-                $comparison->{summary}->{total_tables} += scalar(@$backend_tables);
-                
-            } catch {
-                my $error = $_;
-                $comparison->{backends}->{$backend_name}->{error} = $error;
-                $comparison->{backends}->{$backend_name}->{connection_status} = 'error';
-                
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', 
-                    "Error getting schema for backend '$backend_name': $error");
-            };
-        }
-    }
     
     # Get Ency database tables and compare with result files
     try {
         my $ency_tables = $self->get_ency_database_tables($c);
+        @$ency_tables = sort { lc($a) cmp lc($b) } @$ency_tables; # Alphabetical sort
         $comparison->{ency}->{tables} = $ency_tables;
         $comparison->{ency}->{table_count} = scalar(@$ency_tables);
         $comparison->{ency}->{connection_status} = 'connected';
@@ -2648,11 +2041,6 @@ sub get_database_comparison {
         foreach my $table_name (@$ency_tables) {
             my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'ency', $result_table_mapping);
             
-            # Debug logging
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
-                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
-            
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
                 $comparison->{summary}->{tables_with_results}++;
@@ -2663,19 +2051,15 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
+        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'ency', $ency_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
-        # Organize comparisons: tables with results first, then tables without results
+        # Sort comparisons alphabetically
+        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
         $comparison->{ency}->{table_comparisons} = [@tables_with_results, @tables_without_results];
         $comparison->{ency}->{results_without_tables} = \@results_without_tables;
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-            "Found " . scalar(@$ency_tables) . " tables in ency database, " . 
-            scalar(@tables_with_results) . " with results, " . 
-            scalar(@tables_without_results) . " without results, " . 
-            scalar(@results_without_tables) . " orphaned results");
-            
     } catch {
         my $error = "Error connecting to ency database: $_";
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $error);
@@ -2686,6 +2070,7 @@ sub get_database_comparison {
     # Get Forager database tables and compare with result files
     try {
         my $forager_tables = $self->get_forager_database_tables($c);
+        @$forager_tables = sort { lc($a) cmp lc($b) } @$forager_tables; # Alphabetical sort
         $comparison->{forager}->{tables} = $forager_tables;
         $comparison->{forager}->{table_count} = scalar(@$forager_tables);
         $comparison->{forager}->{connection_status} = 'connected';
@@ -2702,11 +2087,6 @@ sub get_database_comparison {
         foreach my $table_name (@$forager_tables) {
             my $table_comparison = $self->compare_table_with_result_file_v2($c, $table_name, 'forager', $result_table_mapping);
             
-            # Debug logging
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_database_comparison', 
-                "Forager Table: $table_name -> Has result: " . ($table_comparison->{has_result_file} ? 'YES' : 'NO') .
-                ($table_comparison->{result_file_path} ? " -> Path: " . $table_comparison->{result_file_path} : ""));
-            
             if ($table_comparison->{has_result_file}) {
                 push @tables_with_results, $table_comparison;
                 $comparison->{summary}->{tables_with_results}++;
@@ -2717,10 +2097,12 @@ sub get_database_comparison {
         }
         
         # Find result files without corresponding tables
-        my @results_without_tables = $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
+        my @results_without_tables = sort { lc($a->{result_name}) cmp lc($b->{result_name}) } $self->find_orphaned_result_files_v2($c, 'forager', $forager_tables, $result_table_mapping);
         $comparison->{summary}->{results_without_tables} += scalar(@results_without_tables);
         
-        # Organize comparisons: tables with results first, then tables without results
+        # Sort comparisons alphabetically
+        @tables_with_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+        @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
         $comparison->{forager}->{table_comparisons} = [@tables_with_results, @tables_without_results];
         $comparison->{forager}->{results_without_tables} = \@results_without_tables;
         
@@ -2956,7 +2338,8 @@ sub extract_table_name_from_result_file {
     }
     
     # Extract table name from __PACKAGE__->table('table_name') declaration
-    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
+    # Robust multiline regex to handle different formatting styles
+    if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
         return $1;
     }
     
@@ -2972,15 +2355,9 @@ sub build_result_table_mapping {
     # Get all Result files for this database
     my @result_files = $self->get_all_result_files($database);
     
-    # Debug: Log the number of result files found
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_result_table_mapping',
-        "Found " . scalar(@result_files) . " result files for database '$database'");
-    
     foreach my $result_file (@result_files) {
         # Extract actual table name from Result file
         my $table_name = $self->extract_table_name_from_result_file($result_file->{path});
-        
-
         
         if ($table_name) {
             $mapping{lc($table_name)} = {
@@ -2990,11 +2367,6 @@ sub build_result_table_mapping {
             };
         }
     }
-    
-    # Debug: Log the final mapping keys
-    my @mapping_keys = sort keys %mapping;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'build_result_table_mapping',
-        "Final mapping contains " . scalar(@mapping_keys) . " entries: " . join(', ', @mapping_keys));
     
     return \%mapping;
 }
@@ -3050,13 +2422,6 @@ sub compare_table_with_result_file_v2 {
             $comparison->{result_file_schema}
         );
         
-        # Debug logging for differences
-        if (scalar(@{$comparison->{differences}}) > 0) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compare_table_with_result_file_v2', 
-                "Found " . scalar(@{$comparison->{differences}}) . " differences for table $table_name: " . 
-                join(", ", map { $_->{description} } @{$comparison->{differences}}));
-        }
-        
         # Determine sync status
         if (scalar(@{$comparison->{differences}}) == 0) {
             $comparison->{sync_status} = 'synchronized';
@@ -3081,12 +2446,23 @@ sub find_orphaned_result_files_v2 {
     foreach my $table_name (keys %$result_table_mapping) {
         unless (exists $table_lookup{$table_name}) {
             my $result_info = $result_table_mapping->{$table_name};
+            
+            # Extract schema information for orphaned results
+            my $result_schema = { columns => {} };
+            eval {
+                $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
+            };
+            
             push @orphaned_results, {
                 result_name => $result_info->{result_name},
                 result_path => $result_info->{result_path},
                 expected_table_name => $table_name,
                 actual_table_name => $table_name,
-                last_modified => $result_info->{last_modified}
+                last_modified => $result_info->{last_modified},
+                columns => $result_schema->{columns},
+                primary_keys => $result_schema->{primary_keys} || [],
+                relationships => $result_schema->{relationships} || {},
+                raw_package_calls => $result_schema->{raw_package_calls} || []
             };
         }
     }
@@ -3099,29 +2475,23 @@ sub get_all_result_files {
     my ($self, $database) = @_;
     
     my @result_files = ();
-    my $base_path = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema";
+    use File::Basename qw(dirname);
+    my $lib_path = dirname(dirname(dirname(__FILE__)));
+    my $base_path = "$lib_path/Comserv/Model/Schema";
     
     if (lc($database) eq 'ency') {
         my $result_dir = "$base_path/Ency/Result";
-        @result_files = $self->scan_result_directory($result_dir, '');
-        
-        # Also scan subdirectories
-        if (-d "$result_dir/System") {
-            push @result_files, $self->scan_result_directory("$result_dir/System", 'System/');
-        }
-        if (-d "$result_dir/User") {
-            push @result_files, $self->scan_result_directory("$result_dir/User", 'User/');
-        }
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
     } elsif (lc($database) eq 'forager') {
         my $result_dir = "$base_path/Forager/Result";
-        @result_files = $self->scan_result_directory($result_dir, '');
+        @result_files = $self->scan_result_directory_recursive($result_dir, '');
     }
     
     return @result_files;
 }
 
-# Scan a directory for Result files
-sub scan_result_directory {
+# Scan a directory recursively for Result files
+sub scan_result_directory_recursive {
     my ($self, $dir_path, $prefix) = @_;
     
     my @files = ();
@@ -3129,19 +2499,23 @@ sub scan_result_directory {
     if (opendir(my $dh, $dir_path)) {
         while (my $file = readdir($dh)) {
             next if $file =~ /^\.\.?$/;  # Skip . and ..
-            next unless $file =~ /\.pm$/;  # Only .pm files
             
             my $full_path = "$dir_path/$file";
-            next unless -f $full_path;  # Only regular files
             
-            my $name = $file;
-            $name =~ s/\.pm$//;  # Remove .pm extension
-            
-            push @files, {
-                name => $prefix . $name,
-                path => $full_path,
-                last_modified => (stat($full_path))[9]
-            };
+            if (-d $full_path) {
+                # Recursively scan subdirectory
+                push @files, $self->scan_result_directory_recursive($full_path, $prefix . $file . '/');
+            } elsif ($file =~ /\.pm$/) {
+                # Add Result file
+                my $name = $file;
+                $name =~ s/\.pm$//;  # Remove .pm extension
+                
+                push @files, {
+                    name => $prefix . $name,
+                    path => $full_path,
+                    last_modified => (stat($full_path))[9]
+                };
+            }
         }
         closedir($dh);
     }
@@ -3279,7 +2653,7 @@ sub get_table_result_comparison_v2 {
     my ($self, $c, $table_name, $database, $result_table_mapping) = @_;
     
     # Get table schema
-    my $table_schema = { columns => {} };
+    my $table_schema;
     eval {
         if ($database eq 'ency') {
             $table_schema = $self->get_ency_table_schema($c, $table_name);
@@ -3288,10 +2662,6 @@ sub get_table_result_comparison_v2 {
         } else {
             die "Invalid database: $database";
         }
-        
-        # Ensure we have a valid schema structure
-        $table_schema = { columns => {} } unless $table_schema && ref($table_schema) eq 'HASH';
-        $table_schema->{columns} = {} unless $table_schema->{columns} && ref($table_schema->{columns}) eq 'HASH';
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -3317,9 +2687,12 @@ sub get_table_result_comparison_v2 {
     my $comparison = {
         table_name => $table_name,
         database => $database,
-        has_result_file => ($result_info && -f $result_info->{result_path}) ? 1 : 0,
+        has_result_file => $result_info ? 1 : 0,
         result_file_path => $result_info ? $result_info->{result_path} : undef,
-        fields => {}
+        fields => {},
+        primary_keys => $result_schema->{primary_keys} || [],
+        relationships => $result_schema->{relationships} || {},
+        raw_package_calls => $result_schema->{raw_package_calls} || []
     };
     
     # Get all unique field names from both sources
@@ -3336,6 +2709,20 @@ sub get_table_result_comparison_v2 {
         my $table_field = $table_schema->{columns}->{$field_name};
         my $result_field = $result_schema->{columns}->{$field_name};
         
+        # Add primary key and foreign key status to field data
+        if ($table_field) {
+            $table_field->{is_primary_key} = (grep { $_ eq $field_name } @{$table_schema->{primary_keys} || []}) ? 1 : 0;
+            $table_field->{is_foreign_key} = (grep { $_->{column} eq $field_name } @{$table_schema->{foreign_keys} || []}) ? 1 : 0;
+        }
+        if ($result_field) {
+            $result_field->{is_primary_key} = (grep { $_ eq $field_name } @{$result_schema->{primary_keys} || []}) ? 1 : 0;
+            # In Result files, foreign keys are often identified via belongs_to relationships
+            # Already set in get_result_file_schema, but ensuring it here too
+            unless ($result_field->{is_foreign_key}) {
+                $result_field->{is_foreign_key} = (grep { ($_->{column} || '') eq $field_name } values %{$result_schema->{relationships} || {}}) ? 1 : 0;
+            }
+        }
+        
         $comparison->{fields}->{$field_name} = {
             table => $table_field,
             result => $result_field,
@@ -3351,7 +2738,7 @@ sub compare_field_attributes {
     my ($self, $table_field, $result_field, $c, $field_name) = @_;
     
     my @differences = ();
-    my @attributes = qw(data_type size is_nullable is_auto_increment default_value);
+    my @attributes = qw(data_type size is_nullable is_auto_increment is_primary_key is_foreign_key default_value extra relationship);
     
     foreach my $attr (@attributes) {
         my $table_value = $table_field ? $table_field->{$attr} : undef;
@@ -3425,198 +2812,32 @@ sub normalize_field_value {
     }
     
     # Handle boolean attributes
-    if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment') {
+    if ($attribute eq 'is_nullable' || $attribute eq 'is_auto_increment' || $attribute eq 'is_primary_key' || $attribute eq 'is_foreign_key') {
         return $value ? 1 : 0;
     }
     
     # Handle numeric attributes
     if ($attribute eq 'size') {
-        return $value + 0 if $value =~ /^\d+$/;
+        return "$value" if $value =~ /^[\d,]+$/;
+    }
+    
+    # Handle extra attributes normalization
+    if ($attribute eq 'extra') {
+        $value =~ s/\s+/ /g; # Normalize whitespace
+        $value =~ s/^\s+|\s+$//g; # Trim
+        return $value;
+    }
+
+    # Handle relationship object normalization for comparison
+    if ($attribute eq 'relationship') {
+        if (ref($value) eq 'HASH') {
+            return $value->{type} . ":" . $value->{accessor} . "->" . ($value->{related_class} =~ s/.*:://r);
+        }
+        return $value;
     }
     
     # Handle string attributes
     return "$value";
-}
-
-# Parse Result file schema
-sub parse_result_file_schema {
-    my ($self, $c, $file_path) = @_;
-    
-    my $schema = {
-        columns => {},
-        primary_keys => [],
-        relationships => [],
-        table_name => undef
-    };
-    
-    # Try to load the Result class directly first
-    my $result_class_schema = $self->parse_result_class_schema($c, $file_path);
-    if ($result_class_schema && keys %{$result_class_schema->{columns}}) {
-        return $result_class_schema;
-    }
-    
-    # Fallback to file parsing if direct class loading fails
-    my $content;
-    eval {
-        $content = File::Slurp::read_file($file_path);
-    };
-    if ($@) {
-        warn "Failed to read Result file $file_path: $@";
-        return $schema;
-    }
-    
-    # Extract table name
-    if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\);/) {
-        $schema->{table_name} = $1;
-    }
-    
-    # Extract columns
-    if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
-        my $columns_block = $1;
-        
-        # Parse individual column definitions (format: column_name => { attributes })
-        while ($columns_block =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
-            my ($col_name, $col_def) = ($1, $2);
-            
-            my $column = {
-                data_type => undef,
-                is_nullable => 1,
-                size => undef,
-                is_auto_increment => 0,
-                default_value => undef
-            };
-            
-            # Parse column attributes
-            if ($col_def =~ /data_type\s*=>\s*['"]([^'"]+)['"]/) {
-                $column->{data_type} = $1;
-            }
-            if ($col_def =~ /is_nullable\s*=>\s*(\d+)/) {
-                $column->{is_nullable} = $1;
-            }
-            if ($col_def =~ /size\s*=>\s*(\d+)/) {
-                $column->{size} = $1;
-            }
-            if ($col_def =~ /is_auto_increment\s*=>\s*(\d+)/) {
-                $column->{is_auto_increment} = $1;
-            }
-            if ($col_def =~ /default_value\s*=>\s*['"]([^'"]+)['"]/) {
-                $column->{default_value} = $1;
-            }
-            
-            $schema->{columns}->{$col_name} = $column;
-        }
-    }
-    
-    # Extract primary keys
-    if ($content =~ /__PACKAGE__->set_primary_key\(([^)]+)\);/) {
-        my $pk_def = $1;
-        while ($pk_def =~ /['"]([^'"]+)['"]/g) {
-            push @{$schema->{primary_keys}}, $1;
-        }
-    }
-    
-    # Extract relationships
-    while ($content =~ /__PACKAGE__->(belongs_to|has_many|might_have|has_one)\(\s*['"]([^'"]+)['"],\s*['"]([^'"]+)['"],\s*\{([^}]+)\}/gs) {
-        my ($rel_type, $accessor, $related_class, $rel_def) = ($1, $2, $3, $4);
-        
-        my $relationship = {
-            type => $rel_type,
-            accessor => $accessor,
-            related_class => $related_class,
-            foreign_key => undef
-        };
-        
-        if ($rel_def =~ /['"]foreign\.([^'"]+)['"]/) {
-            $relationship->{foreign_key} = $1;
-        }
-        
-        push @{$schema->{relationships}}, $relationship;
-    }
-    
-    return $schema;
-}
-
-# Parse Result class schema by loading the class directly
-sub parse_result_class_schema {
-    my ($self, $c, $file_path) = @_;
-    
-    my $schema = {
-        columns => {},
-        primary_keys => [],
-        relationships => [],
-        table_name => undef
-    };
-    
-    # Extract the Result class name from the file path
-    my $result_class;
-    if ($file_path =~ m{/Result/(.+)\.pm$}) {
-        my $class_path = $1;
-        $class_path =~ s{/}{::}g;  # Convert path separators to Perl package separators
-        $result_class = "Comserv::Model::Schema::Ency::Result::$class_path";
-    } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'parse_result_class_schema',
-            "Could not extract Result class name from path: $file_path");
-        return $schema;
-    }
-    
-    # Try to load the Result class
-    eval {
-        eval "require $result_class";
-        die $@ if $@;
-        
-        # Get the table name
-        $schema->{table_name} = $result_class->table if $result_class->can('table');
-        
-        # Get column information
-        if ($result_class->can('columns_info')) {
-            my $columns_info = $result_class->columns_info;
-            foreach my $col_name (keys %$columns_info) {
-                my $col_info = $columns_info->{$col_name};
-                $schema->{columns}->{$col_name} = {
-                    data_type => $col_info->{data_type} || 'unknown',
-                    is_nullable => $col_info->{is_nullable} // 1,
-                    size => $col_info->{size},
-                    is_auto_increment => $col_info->{is_auto_increment} || 0,
-                    default_value => $col_info->{default_value},
-                    extra => $col_info->{extra}
-                };
-            }
-        }
-        
-        # Get primary key information
-        if ($result_class->can('primary_columns')) {
-            my @primary_keys = $result_class->primary_columns;
-            $schema->{primary_keys} = \@primary_keys;
-        }
-        
-        # Get relationship information
-        if ($result_class->can('relationships')) {
-            my @relationships = $result_class->relationships;
-            foreach my $rel_name (@relationships) {
-                if ($result_class->can('relationship_info')) {
-                    my $rel_info = $result_class->relationship_info($rel_name);
-                    push @{$schema->{relationships}}, {
-                        type => $rel_info->{attrs}->{accessor} || 'unknown',
-                        accessor => $rel_name,
-                        related_class => $rel_info->{class},
-                        foreign_key => $rel_info->{cond} || {}
-                    };
-                }
-            }
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'parse_result_class_schema',
-            "Successfully loaded Result class $result_class with " . scalar(keys %{$schema->{columns}}) . " columns");
-            
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'parse_result_class_schema',
-            "Failed to load Result class $result_class: $@");
-        return undef;  # Return undef to indicate failure, so fallback parsing can be used
-    }
-    
-    return $schema;
 }
 
 # Find differences between database and Result file schemas
@@ -3678,6 +2899,100 @@ sub find_schema_differences {
                     description => "Nullable status mismatch for column '$col_name'"
                 };
             }
+
+            # Compare size
+            if (($db_col->{size} || '') ne ($result_col->{size} || '')) {
+                push @differences, {
+                    type => 'column_size_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{size} || 'N/A',
+                    result_value => $result_col->{size} || 'N/A',
+                    description => "Size mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare auto increment
+            if (($db_col->{is_auto_increment} || 0) != ($result_col->{is_auto_increment} || 0)) {
+                push @differences, {
+                    type => 'column_auto_increment_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{is_auto_increment} ? 'YES' : 'NO',
+                    result_value => $result_col->{is_auto_increment} ? 'YES' : 'NO',
+                    description => "Auto-increment mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare default value
+            if (($db_col->{default_value} // '') ne ($result_col->{default_value} // '')) {
+                push @differences, {
+                    type => 'column_default_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{default_value} // 'NULL',
+                    result_value => $result_col->{default_value} // 'NULL',
+                    description => "Default value mismatch for column '$col_name'"
+                };
+            }
+
+            # Compare extra
+            if (($db_col->{extra} || '') ne ($result_col->{extra} || '')) {
+                push @differences, {
+                    type => 'column_extra_mismatch',
+                    column => $col_name,
+                    database_value => $db_col->{extra} || 'N/A',
+                    result_value => $result_col->{extra} || 'N/A',
+                    description => "Extra attributes mismatch for column '$col_name'"
+                };
+            }
+        }
+    }
+    
+    # Compare Primary Keys
+    my @db_pks = sort @{$db_schema->{primary_keys} || []};
+    my @result_pks = sort @{$result_schema->{primary_keys} || []};
+    
+    if (join(',', @db_pks) ne join(',', @result_pks)) {
+        push @differences, {
+            type => 'primary_key_mismatch',
+            attribute => 'set_primary_key',
+            database_value => join(', ', @db_pks) || 'None',
+            result_value => join(', ', @result_pks) || 'None',
+            description => "Primary key mismatch"
+        };
+    }
+    
+    # Compare Unique Constraints
+    my %db_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$db_schema->{unique_constraints} || []};
+    my %result_uniques = map { ($_->{name} || 'unnamed') => join(',', sort @{$_->{columns}}) } @{$result_schema->{unique_constraints} || []};
+    
+    foreach my $name (keys %db_uniques) {
+        if (!exists $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_result',
+                attribute => "add_unique_constraint ($name)",
+                database_value => $db_uniques{$name},
+                result_value => undef,
+                description => "Unique constraint '$name' missing in Result file"
+            };
+        } elsif ($db_uniques{$name} ne $result_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_mismatch',
+                attribute => "add_unique_constraint ($name)",
+                database_value => $db_uniques{$name},
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' column mismatch"
+            };
+        }
+    }
+    
+    foreach my $name (keys %result_uniques) {
+        if (!exists $db_uniques{$name}) {
+            push @differences, {
+                type => 'unique_constraint_missing_in_table',
+                attribute => "add_unique_constraint ($name)",
+                database_value => undef,
+                result_value => $result_uniques{$name},
+                description => "Unique constraint '$name' exists in Result file but not in database"
+            };
         }
     }
     
@@ -3738,11 +3053,6 @@ sub get_ency_database_tables {
     
     try {
         my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        
-        # Log database connection info
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_ency_database_tables',
-            "Connected to database: " . $dbh->{Name});
-        
         my $sth = $dbh->prepare("SHOW TABLES");
         $sth->execute();
         
@@ -3750,15 +3060,14 @@ sub get_ency_database_tables {
             push @tables, $table;
         }
         
-        # Log the number of tables found
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_ency_database_tables',
-            "Found " . scalar(@tables) . " tables: " . join(', ', @tables));
-        
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_ency_database_tables', 
             "Error getting ency database tables: $_");
         die $_;
     };
+    
+    # Sort tables alphabetically
+    @tables = sort @tables;
     
     return \@tables;
 }
@@ -3783,6 +3092,9 @@ sub get_forager_database_tables {
             "Error getting forager database tables: $_");
         die $_;
     };
+    
+    # Sort tables alphabetically
+    @tables = sort @tables;
     
     return \@tables;
 }
@@ -3814,6 +3126,7 @@ sub get_ency_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef  # Will be parsed from Type if needed
             };
             
@@ -3882,6 +3195,7 @@ sub get_forager_table_schema {
                 is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
                 default_value => $row->{Default},
                 is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                extra => $row->{Extra},
                 size => undef  # Will be parsed from Type if needed
             };
             
@@ -4042,21 +3356,22 @@ sub get_result_files {
         if (-d $result_dir) {
             find(sub {
                 return unless -f $_ && /\.pm$/;
-                return if $_ eq 'User.pm' && -d $File::Find::dir . '/User'; # Skip if there's a User directory
+                # Skip helper directories/files if any
+                return if $File::Find::dir =~ /\/Result\/(User|Base|Audit)$/; 
                 
                 my $file_path = $File::Find::name;
                 my $relative_path = $file_path;
                 $relative_path =~ s/^\Q$result_dir\E\/?//;
                 
-                # Skip files in subdirectories for now (like User/User.pm)
-                return if $relative_path =~ /\//;
+                # Extract class name (e.g., Comserv::Model::Schema::Ency::Result::PlanSystemMapping)
+                my $class_rel = $relative_path;
+                $class_rel =~ s/\.pm$//;
+                $class_rel =~ s/\//::/g;
+                my $full_class = "Comserv::Model::Schema::Ency::Result::$class_rel";
                 
-                my $table_name = $_;
-                $table_name =~ s/\.pm$//;
-                
-                my $schema_info = $self->get_result_file_schema($c, $table_name, $file_path);
-                if ($schema_info) {
-                    $result_files->{$schema_info->{table_name} || lc($table_name)} = $schema_info;
+                my $schema_info = $self->get_result_file_schema($c, $full_class, $file_path);
+                if ($schema_info && $schema_info->{table_name}) {
+                    $result_files->{$schema_info->{table_name}} = $schema_info;
                 }
             }, $result_dir);
         }
@@ -4071,14 +3386,14 @@ sub get_result_files {
 
 # Get schema information from a Result file
 sub get_result_file_schema {
-    my ($self, $c, $class_name, $file_path) = @_;
+    my ($self, $c, $file_path) = @_;
     
     my $schema_info = {
         file_path => $file_path,
         columns => {},
         primary_keys => [],
         unique_constraints => [],
-        relationships => [],
+        relationships => {},
         table_name => undef
     };
     
@@ -4087,26 +3402,43 @@ sub get_result_file_schema {
         my $content = read_file($file_path);
         
         # Extract table name
-        if ($content =~ /__PACKAGE__->table\(['"]([^'"]+)['"]\)/) {
+        if ($content =~ /__PACKAGE__->table\s*\(\s*['"]([^'"]+)['"]\s*\)/s) {
             $schema_info->{table_name} = $1;
         }
         
+        # Capture all __PACKAGE__ calls for display
+        $schema_info->{raw_package_calls} = [];
+        while ($content =~ /(__PACKAGE__->(\w+)\s*\((.*?)\)\s*;)/gs) {
+            push @{$schema_info->{raw_package_calls}}, {
+                full => $1,
+                method => $2,
+                args => $3
+            };
+        }
+        
         # Extract columns
-        if ($content =~ /__PACKAGE__->add_columns\((.*?)\);/s) {
+        if ($content =~ /__PACKAGE__->add_columns\s*\((.*?)\);/s) {
             my $columns_text = $1;
             $schema_info->{columns} = $self->parse_result_file_columns($columns_text);
         }
         
         # Extract primary key
-        if ($content =~ /__PACKAGE__->set_primary_key\((.*?)\)/) {
+        if ($content =~ /__PACKAGE__->set_primary_key\s*\((.*?)\)/s) {
             my $pk_text = $1;
             $pk_text =~ s/['"\s]//g;
             @{$schema_info->{primary_keys}} = split(/,/, $pk_text);
+            
+            # Mark columns as PK in the columns hash
+            foreach my $pk (@{$schema_info->{primary_keys}}) {
+                if ($schema_info->{columns}->{$pk}) {
+                    $schema_info->{columns}->{$pk}->{is_primary_key} = 1;
+                }
+            }
         }
         
         # Extract unique constraints
-        while ($content =~ /__PACKAGE__->add_unique_constraint\(['"]([^'"]+)['"] => \[(.*?)\]\)/g) {
-            my $constraint_name = $1;
+        while ($content =~ /__PACKAGE__->add_unique_constraint\s*\(\s*(?:['"]([^'"]+)['"]\s*=>\s*)?\[(.*?)\]\s*\)/gs) {
+            my $constraint_name = $1 || 'unnamed';
             my $columns_text = $2;
             $columns_text =~ s/['"\s]//g;
             push @{$schema_info->{unique_constraints}}, {
@@ -4115,29 +3447,32 @@ sub get_result_file_schema {
             };
         }
         
-        # Extract relationships
-        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\(([^)]+)\)/g) {
-            my $relationship_type = $1;
-            my $relationship_text = $2;
+        # Extract relationships (belongs_to, has_many, etc.)
+        # Pattern: __PACKAGE__->rel_type('accessor' => 'Related::Class', 'foreign_key', { options })
+        while ($content =~ /__PACKAGE__->(belongs_to|has_many|has_one|might_have)\s*\(\s*['"]?(\w+)['"]?\s*=>\s*['"]?([^'",\s\)]+)['"]?\s*(?:,\s*(?:['"]?(\w+)['"]?|\{(.*?)\}))?/gs) {
+            my $type = $1;
+            my $accessor = $2;
+            my $related_class = $3;
+            my $fk_col_or_opt = $4;
             
-            # Parse relationship parameters
-            my @params = split(/,/, $relationship_text);
-            if (@params >= 3) {
-                my $accessor = $params[0];
-                my $related_class = $params[1];
-                my $foreign_key = $params[2];
-                
-                # Clean up the parameters
-                $accessor =~ s/['"\s]//g;
-                $related_class =~ s/['"\s]//g;
-                $foreign_key =~ s/['"\s]//g;
-                
-                push @{$schema_info->{relationships}}, {
-                    type => $relationship_type,
-                    accessor => $accessor,
+            # Handle cases where the 3rd param is a hashref (options)
+            my $fk_col = ($fk_col_or_opt && $fk_col_or_opt !~ /^\{/) ? $fk_col_or_opt : undef;
+            
+            $schema_info->{relationships}->{$accessor} = {
+                type => $type,
+                class => $related_class,
+                column => $fk_col || $accessor # Fallback to accessor name if no FK specified
+            };
+            
+            # Mark the column as a foreign key if we can find it
+            my $target_col = $fk_col || $accessor;
+            if ($schema_info->{columns}->{$target_col}) {
+                $schema_info->{columns}->{$target_col}->{relationship} = {
+                    type => $type,
                     related_class => $related_class,
-                    foreign_key => $foreign_key
+                    accessor => $accessor
                 };
+                $schema_info->{columns}->{$target_col}->{is_foreign_key} = 1;
             }
         }
         
@@ -4150,6 +3485,12 @@ sub get_result_file_schema {
     return $schema_info;
 }
 
+# Legacy wrapper for parse_result_file_schema
+sub parse_result_file_schema {
+    my ($self, $c, $file_path) = @_;
+    return $self->get_result_file_schema($c, $file_path);
+}
+
 # Parse column definitions from Result file
 sub parse_result_file_columns {
     my ($self, $columns_text) = @_;
@@ -4157,27 +3498,42 @@ sub parse_result_file_columns {
     my $columns = {};
     
     # Split by column definitions (looking for column_name => { ... })
-    while ($columns_text =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+    # Using more robust matching for nested structures
+    while ($columns_text =~ /(\w+)\s*=>\s*\{([\s\S]*?)\}(?=\s*,\s*\w+\s*=>|\s*,?\s*\))/g) {
         my $column_name = $1;
         my $column_def = $2;
         
         my $column_info = {};
         
         # Parse column attributes
-        while ($column_def =~ /(\w+)\s*=>\s*['"]?([^'",\s]+)['"]?/g) {
+        # Handles: attr => 'value', attr => 1, attr => \'SCALAR', attr => { ... }
+        while ($column_def =~ /(\w+)\s*=>\s*(?:['"]([^'"]+)['"]|(\d+)|\\['"]([^'"]+)['"]|\{([\s\S]*?)\})/g) {
             my $attr = $1;
-            my $value = $2;
+            my $value = $2 // $3 // $4 // $5;
             
             if ($attr eq 'size' && $value =~ /^\d+$/) {
                 $column_info->{$attr} = int($value);
             } elsif ($attr eq 'is_nullable' || $attr eq 'is_auto_increment') {
-                $column_info->{$attr} = ($value eq '1' || $value eq 'true') ? 1 : 0;
+                $column_info->{$attr} = ($value eq '1' || $value eq 'true' || $value =~ /true/i) ? 1 : 0;
             } else {
                 $column_info->{$attr} = $value;
             }
         }
         
         $columns->{$column_name} = $column_info;
+    }
+    
+    # Fallback if the above robust regex fails for some reason
+    if (scalar(keys %$columns) == 0) {
+        while ($columns_text =~ /(\w+)\s*=>\s*\{([^}]+)\}/g) {
+            my $column_name = $1;
+            my $column_def = $2;
+            my $column_info = {};
+            while ($column_def =~ /(\w+)\s*=>\s*['"]?([^'",\s]+)['"]?/g) {
+                $column_info->{$1} = $2;
+            }
+            $columns->{$column_name} = $column_info;
+        }
     }
     
     return $columns;
@@ -4515,18 +3871,10 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_pull', 
         "Starting git_pull action");
     
-    # Check if the user has admin role (same as other admin functions)
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_pull', 
-            "Access denied: User does not have admin role");
-        
-        # Set error message in flash
+    my $admin_auth_git = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_git->check_admin_access($c, 'git_pull')) {
         $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        
-        # Redirect to login page with destination parameter
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return;
     }
     
@@ -4559,7 +3907,7 @@ sub git_pull :Path('/admin/git_pull') :Args(0) {
         "Completed git_pull action");
 }
 
-# Execute the git pull operation with divergent branch handling
+# Execute the git pull operation
 sub execute_git_pull {
     my ($self, $c) = @_;
     my $output = '';
@@ -4582,22 +3930,7 @@ sub execute_git_pull {
             $output .= "Backed up theme_mappings.json to $backup_path\n";
         }
         
-        # Check Git status and handle divergent branches
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Checking Git status for divergent branches");
-        
-        # First, fetch the latest changes from remote
-        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
-        $output .= "Git fetch output:\n$fetch_output\n";
-        
-        # Check for divergent branches
-        my $status_output = `git -C ${\$c->path_to()} status --porcelain=v1 2>&1`;
-        my $branch_status = `git -C ${\$c->path_to()} status -b --porcelain=v1 2>&1`;
-        
-        $output .= "Git status output:\n$status_output\n";
-        $output .= "Branch status:\n$branch_status\n";
-        
-        # Check if there are local changes that need to be stashed
+        # Check if there are local changes to theme_mappings.json
         my $has_local_changes = 0;
         if ($theme_mappings_exists) {
             my $git_status = `git -C ${\$c->path_to()} status --porcelain root/static/config/theme_mappings.json`;
@@ -4609,72 +3942,20 @@ sub execute_git_pull {
                 $output .= "Local changes detected in theme_mappings.json\n";
                 
                 # Stash the changes
-                my $stash_output = `git -C ${\$c->path_to()} stash push -m "Auto-stash before git pull" -- root/static/config/theme_mappings.json 2>&1`;
+                my $stash_output = `git -C ${\$c->path_to()} stash push -- root/static/config/theme_mappings.json 2>&1`;
                 $output .= "Stashed changes: $stash_output\n";
             }
         }
         
-        # Check if we have divergent branches by comparing local and remote
-        my $local_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
-        my $remote_commit = `git -C ${\$c->path_to()} rev-parse origin/master 2>&1`;
-        chomp($local_commit);
-        chomp($remote_commit);
-        
-        $output .= "Local commit: $local_commit\n";
-        $output .= "Remote commit: $remote_commit\n";
-        
-        # Check if branches have diverged
-        my $merge_base = `git -C ${\$c->path_to()} merge-base HEAD origin/master 2>&1`;
-        chomp($merge_base);
-        
-        my $diverged = 0;
-        if ($local_commit ne $remote_commit && $merge_base ne $local_commit && $merge_base ne $remote_commit) {
-            $diverged = 1;
-            $output .= "Divergent branches detected - local and remote have different commits\n";
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_pull', 
-                "Divergent branches detected");
-        }
-        
-        # Execute git pull with appropriate strategy
+        # Execute git pull
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Executing git pull with merge strategy");
-        
-        # Use merge strategy to handle divergent branches safely
-        my $pull_output = `git -C ${\$c->path_to()} pull --no-rebase origin master 2>&1`;
+            "Executing git pull");
+        my $pull_output = `git -C ${\$c->path_to()} pull 2>&1`;
         $output .= "Git pull output:\n$pull_output\n";
         
-        # Check if pull was successful or if we need to handle divergent branches
-        if ($pull_output =~ /Already up to date|Fast-forward|Updating|Merge made by/) {
+        # Check if pull was successful
+        if ($pull_output =~ /Already up to date|Fast-forward|Updating/) {
             $success = 1;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-                "Git pull completed successfully");
-        } elsif ($pull_output =~ /divergent branches|Need to specify how to reconcile/) {
-            # Handle divergent branches with explicit merge strategy
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-                "Handling divergent branches with merge strategy");
-            
-            # Configure git to use merge strategy for divergent branches
-            my $config_output = `git -C ${\$c->path_to()} config pull.rebase false 2>&1`;
-            $output .= "Git config output: $config_output\n";
-            
-            # Try pull again with explicit merge strategy
-            $pull_output = `git -C ${\$c->path_to()} pull --no-rebase origin master 2>&1`;
-            $output .= "Git pull (retry) output:\n$pull_output\n";
-            
-            if ($pull_output =~ /Already up to date|Fast-forward|Updating|Merge made by/) {
-                $success = 1;
-                $warning = "Divergent branches were successfully merged. Local changes have been preserved.";
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-                    "Divergent branches resolved successfully");
-            } else {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
-                    "Git pull failed after handling divergent branches: $pull_output");
-                return (0, $output, "Git pull failed after attempting to resolve divergent branches. Manual intervention may be required.");
-            }
-        } elsif ($pull_output =~ /CONFLICT/) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
-                "Git pull resulted in conflicts: $pull_output");
-            return (0, $output, "Git pull resulted in merge conflicts. Manual resolution required.");
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
                 "Git pull failed: $pull_output");
@@ -4702,260 +3983,14 @@ sub execute_git_pull {
             }
         }
         
-        # Final status check
-        my $final_status = `git -C ${\$c->path_to()} status --porcelain 2>&1`;
-        if ($final_status) {
-            $output .= "Final git status:\n$final_status\n";
-            if ($final_status =~ /^UU|^AA|^DD/) {
-                $warning = "There may be unresolved merge conflicts. Please check the repository status.";
-            }
-        }
-        
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_pull', 
-            "Git pull operation completed");
-            
+            "Git pull completed successfully");
     } catch {
         my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_pull', 
             "Error during git pull: $error");
         $output .= "Error: $error\n";
         return (0, $output, undef);
-    };
-    
-    return ($success, $output, $warning);
-}
-
-# Emergency Git operations for production servers
-sub git_emergency :Path('/admin/git_emergency') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_emergency', 
-        "Starting git_emergency action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'git_emergency', 
-            "Access denied: User does not have admin role");
-        
-        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
-        $c->response->redirect($c->uri_for('/user/login', {
-            destination => $c->req->uri
-        }));
-        return;
-    }
-    
-    # Check if this is a POST request with specific action
-    if ($c->req->method eq 'POST') {
-        my $action = $c->req->param('action') || '';
-        my ($success, $output, $warning) = (0, '', undef);
-        
-        if ($action eq 'reset_hard') {
-            ($success, $output, $warning) = $self->execute_git_reset_hard($c);
-        } elsif ($action eq 'force_pull') {
-            ($success, $output, $warning) = $self->execute_git_force_pull($c);
-        } elsif ($action eq 'status_check') {
-            ($success, $output, $warning) = $self->execute_git_status_check($c);
-        }
-        
-        $c->stash(
-            output => $output,
-            success_msg => $success ? "Operation completed successfully." : undef,
-            error_msg => $success ? undef : "Operation failed. See output for details.",
-            warning_msg => $warning,
-            action_performed => $action
-        );
-    }
-    
-    # Set the template
-    $c->stash(template => 'admin/git_emergency.tt');
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'git_emergency', 
-        "Completed git_emergency action");
-}
-
-# Execute Git status check for diagnostics
-sub execute_git_status_check {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = undef;
-    my $success = 1;
-    
-    try {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_git_status_check', 
-            "Performing comprehensive Git status check");
-        
-        # Get current branch
-        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>&1`;
-        chomp($current_branch);
-        $output .= "Current branch: $current_branch\n\n";
-        
-        # Get Git status
-        my $status = `git -C ${\$c->path_to()} status 2>&1`;
-        $output .= "Git status:\n$status\n\n";
-        
-        # Get local and remote commit info
-        my $local_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
-        my $remote_commit = `git -C ${\$c->path_to()} rev-parse origin/master 2>&1`;
-        chomp($local_commit);
-        chomp($remote_commit);
-        
-        $output .= "Local commit (HEAD): $local_commit\n";
-        $output .= "Remote commit (origin/master): $remote_commit\n\n";
-        
-        # Check if branches have diverged
-        if ($local_commit ne $remote_commit) {
-            my $merge_base = `git -C ${\$c->path_to()} merge-base HEAD origin/master 2>&1`;
-            chomp($merge_base);
-            
-            if ($merge_base ne $local_commit && $merge_base ne $remote_commit) {
-                $output .= "⚠️  DIVERGENT BRANCHES DETECTED\n";
-                $output .= "Merge base: $merge_base\n";
-                $warning = "Branches have diverged. Local and remote have different commits.";
-            } elsif ($merge_base eq $local_commit) {
-                $output .= "✅ Local branch is behind remote (safe to pull)\n";
-            } else {
-                $output .= "✅ Local branch is ahead of remote\n";
-            }
-        } else {
-            $output .= "✅ Local and remote are in sync\n";
-        }
-        
-        # Get recent commits
-        my $recent_commits = `git -C ${\$c->path_to()} log --oneline -5 2>&1`;
-        $output .= "\nRecent commits:\n$recent_commits\n";
-        
-        # Check for uncommitted changes
-        my $uncommitted = `git -C ${\$c->path_to()} diff --name-only 2>&1`;
-        if ($uncommitted) {
-            $output .= "\nUncommitted changes:\n$uncommitted\n";
-        }
-        
-        # Check for untracked files
-        my $untracked = `git -C ${\$c->path_to()} ls-files --others --exclude-standard 2>&1`;
-        if ($untracked) {
-            $output .= "\nUntracked files (first 10):\n";
-            my @untracked_lines = split(/\n/, $untracked);
-            for my $i (0..9) {
-                last unless $untracked_lines[$i];
-                $output .= "$untracked_lines[$i]\n";
-            }
-            if (@untracked_lines > 10) {
-                $output .= "... and " . (@untracked_lines - 10) . " more files\n";
-            }
-        }
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_status_check', 
-            "Error during Git status check: $error");
-        $output .= "Error: $error\n";
-        $success = 0;
-    };
-    
-    return ($success, $output, $warning);
-}
-
-# Execute Git force pull (dangerous - use with caution)
-sub execute_git_force_pull {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = "⚠️  FORCE PULL PERFORMED - Local changes may be lost!";
-    my $success = 0;
-    
-    try {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_force_pull', 
-            "Performing FORCE PULL - this may lose local changes");
-        
-        # Backup theme_mappings.json if it exists
-        my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
-        my $backup_path = "$theme_mappings_path.bak";
-        
-        if (-e $theme_mappings_path) {
-            copy($theme_mappings_path, $backup_path);
-            $output .= "Backed up theme_mappings.json to $backup_path\n";
-        }
-        
-        # Fetch latest changes
-        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
-        $output .= "Git fetch output:\n$fetch_output\n\n";
-        
-        # Reset to remote state (DANGEROUS)
-        my $reset_output = `git -C ${\$c->path_to()} reset --hard origin/master 2>&1`;
-        $output .= "Git reset --hard output:\n$reset_output\n\n";
-        
-        # Clean untracked files
-        my $clean_output = `git -C ${\$c->path_to()} clean -fd 2>&1`;
-        $output .= "Git clean output:\n$clean_output\n\n";
-        
-        # Verify final state
-        my $final_status = `git -C ${\$c->path_to()} status 2>&1`;
-        $output .= "Final status:\n$final_status\n";
-        
-        $success = 1;
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_force_pull', 
-            "Force pull completed - local changes were discarded");
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_force_pull', 
-            "Error during force pull: $error");
-        $output .= "Error: $error\n";
-    };
-    
-    return ($success, $output, $warning);
-}
-
-# Execute Git reset hard (very dangerous - use only in emergencies)
-sub execute_git_reset_hard {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = "⚠️  HARD RESET PERFORMED - All local changes have been discarded!";
-    my $success = 0;
-    
-    try {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_reset_hard', 
-            "Performing HARD RESET - this will discard ALL local changes");
-        
-        # Get current commit for reference
-        my $current_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
-        chomp($current_commit);
-        $output .= "Current commit before reset: $current_commit\n\n";
-        
-        # Backup theme_mappings.json if it exists
-        my $theme_mappings_path = $c->path_to('root', 'static', 'config', 'theme_mappings.json');
-        my $backup_path = "$theme_mappings_path.bak";
-        
-        if (-e $theme_mappings_path) {
-            copy($theme_mappings_path, $backup_path);
-            $output .= "Backed up theme_mappings.json to $backup_path\n";
-        }
-        
-        # Fetch latest changes first
-        my $fetch_output = `git -C ${\$c->path_to()} fetch origin 2>&1`;
-        $output .= "Git fetch output:\n$fetch_output\n\n";
-        
-        # Hard reset to remote master
-        my $reset_output = `git -C ${\$c->path_to()} reset --hard origin/master 2>&1`;
-        $output .= "Git reset --hard origin/master output:\n$reset_output\n\n";
-        
-        # Get new commit for reference
-        my $new_commit = `git -C ${\$c->path_to()} rev-parse HEAD 2>&1`;
-        chomp($new_commit);
-        $output .= "New commit after reset: $new_commit\n\n";
-        
-        # Final status
-        my $final_status = `git -C ${\$c->path_to()} status 2>&1`;
-        $output .= "Final status:\n$final_status\n";
-        
-        $success = 1;
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_git_reset_hard', 
-            "Hard reset completed - repository is now at origin/master");
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_git_reset_hard', 
-            "Error during hard reset: $error");
-        $output .= "Error: $error\n";
     };
     
     return ($success, $output, $warning);
@@ -4968,10 +4003,29 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
         "Starting sync_table_to_result action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    # Check if the user has admin role (using session-based check like create_table_from_result)
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
         $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->stash(json => { success => 0, error => 'Access denied - admin role required' });
         $c->forward('View::JSON');
         return;
     }
@@ -5006,26 +4060,20 @@ sub sync_table_to_result :Path('/admin/sync_table_to_result') :Args(0) {
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Getting field info for table: $table_name, field: $field_name, database: $database");
+        
         # Get table field info
         my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
         
-        # Check if field is missing from database
-        if ($table_field_info->{field_missing}) {
-            $c->stash(json => {
-                success => 0,
-                error => $table_field_info->{error},
-                error_type => 'field_missing_in_database',
-                suggestion => "Field exists in result file but not in database. Use 'Sync to Table' to create the field in database.",
-                table_name => $table_name,
-                field_name => $field_name,
-                database => $database
-            });
-            $c->forward('View::JSON');
-            return;
-        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Field info retrieved: " . Data::Dumper::Dumper($table_field_info));
         
         # Update result file with table values
         my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_table_to_result',
+            "Result file updated successfully for field: $field_name");
         
         $c->stash(json => {
             success => 1,
@@ -5051,191 +4099,8 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_result_to_table',
         "Starting sync_result_to_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    # Parse JSON request
-    my $json_data;
-    try {
-        my $body = $c->req->body;
-        if ($body) {
-            local $/;
-            my $json_text = <$body>;
-            $json_data = decode_json($json_text);
-        } else {
-            die "No request body provided";
-        }
-    } catch {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
-        $c->forward('View::JSON');
-        return;
-    };
-    
-    my $table_name = $json_data->{table_name};
-    my $field_name = $json_data->{field_name};
-    my $database = $json_data->{database};
-    my $sync_all = $json_data->{sync_all};
-    
-    unless ($table_name && $database) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, database' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    # If field_name is not provided but sync_all is not true, return error
-    unless ($field_name || $sync_all) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Either field_name or sync_all must be provided' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    try {
-        if ($sync_all) {
-            # Sync all fields from Result to table
-            my $result = $self->sync_all_fields_result_to_table($c, $table_name, $database);
-            
-            $c->stash(json => {
-                success => 1,
-                message => "Successfully synced all fields from Result file to table '$table_name'",
-                synced_fields => $result->{synced_fields} || [],
-                warnings => $result->{warnings} || []
-            });
-        } else {
-            # Sync single field
-            my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
-            my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
-            
-            $c->stash(json => {
-                success => 1,
-                message => "Successfully synced result field '$field_name' to table",
-                field_info => $result_field_info
-            });
-        }
-        
-    } catch {
-        my $error = "Error syncing result to table: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', $error);
-        
-        $c->response->status(500);
-        $c->stash(json => { success => 0, error => $error });
-    };
-    
-    $c->forward('View::JSON');
-}
-
-# AJAX endpoint to sync field to result (alias for sync_table_to_result)
-sub sync_field_to_result :Path('/admin/sync_field_to_result') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_field_to_result',
-        "Starting sync_field_to_result action (alias for sync_table_to_result)");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    # Parse JSON request
-    my $json_data;
-    try {
-        my $body = $c->req->body;
-        if ($body) {
-            local $/;
-            my $json_text = <$body>;
-            $json_data = decode_json($json_text);
-        } else {
-            die "No request body provided";
-        }
-    } catch {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
-        $c->forward('View::JSON');
-        return;
-    };
-    
-    my $table_name = $json_data->{table_name};
-    my $field_name = $json_data->{field_name};
-    my $database = $json_data->{database};
-    
-    unless ($table_name && $field_name && $database) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Missing required parameters: table_name, field_name, database' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    try {
-        # Get table field info
-        my $table_field_info = $self->get_table_field_info($c, $table_name, $field_name, $database);
-        
-        # Check if field is missing from database
-        if ($table_field_info->{field_missing}) {
-            $c->stash(json => {
-                success => 0,
-                error => $table_field_info->{error},
-                error_type => 'field_missing_in_database',
-                suggestion => "Field exists in result file but not in database. Use 'Sync to Table' to create the field in database.",
-                table_name => $table_name,
-                field_name => $field_name,
-                database => $database
-            });
-            $c->forward('View::JSON');
-            return;
-        }
-        
-        # Update result file with table values
-        my $result = $self->update_result_field_from_table($c, $table_name, $field_name, $database, $table_field_info);
-        
-        $c->stash(json => {
-            success => 1,
-            message => "Successfully synced table field '$field_name' to result file",
-            field_info => $table_field_info
-        });
-        
-    } catch {
-        my $error = "$_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_field_to_result', $error);
-        
-        # Check if this is a "result file not found" error
-        if ($error =~ /Result file not found for table/) {
-            $c->response->status(404);
-            $c->stash(json => { 
-                success => 0, 
-                error => $error,
-                error_type => 'result_file_not_found',
-                table_name => $table_name,
-                database => $database,
-                suggestion => "Create a result file for this table first using the 'Create Result File' button"
-            });
-        } else {
-            $c->response->status(500);
-            $c->stash(json => { success => 0, error => "Error syncing field to result: $error" });
-        }
-    };
-    
-    $c->forward('View::JSON');
-}
-
-# AJAX endpoint to sync field to table (alias for sync_result_to_table)
-sub sync_field_to_table :Path('/admin/sync_field_to_table') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_field_to_table',
-        "Starting sync_field_to_table action (alias for sync_result_to_table)");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'sync_result_to_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -5275,79 +4140,19 @@ sub sync_field_to_table :Path('/admin/sync_field_to_table') :Args(0) {
         # Get result field info
         my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
         
-        # Update table with result values
+        # Update table schema with result values
         my $result = $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
-        
-        if ($result->{success}) {
-            $c->stash(json => {
-                success => 1,
-                message => "Successfully synced result field '$field_name' to table",
-                field_info => $result_field_info
-            });
-        } else {
-            die $result->{error} || "Unknown error updating table field";
-        }
-        
-    } catch {
-        my $error = "$_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_field_to_table', $error);
-        
-        # Check if this is a "result file not found" error
-        if ($error =~ /Result file not found for table/) {
-            $c->response->status(404);
-            $c->stash(json => { 
-                success => 0, 
-                error => $error,
-                error_type => 'result_file_not_found',
-                table_name => $table_name,
-                database => $database,
-                suggestion => "Create a result file for this table first using the 'Create Result File' button"
-            });
-        } else {
-            $c->response->status(500);
-            $c->stash(json => { success => 0, error => "Error syncing field to table: $error" });
-        }
-    };
-    
-    $c->forward('View::JSON');
-}
-
-# Debug endpoint to test field comparison
-sub debug_field_comparison :Path('/admin/debug_field_comparison') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    my $table_name = $c->req->param('table_name') || 'users';
-    my $database = $c->req->param('database') || 'ency';
-    
-    try {
-        # Build comprehensive mapping for this database
-        my $result_table_mapping = $self->build_result_table_mapping($c, $database);
-        
-        my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
         
         $c->stash(json => {
             success => 1,
-            table_name => $table_name,
-            database => $database,
-            comparison => $comparison,
-            mapping_keys => [keys %$result_table_mapping],
-            debug_info => {
-                has_result_file => $comparison->{has_result_file},
-                result_file_path => $comparison->{result_file_path},
-                fields_count => $comparison->{fields} ? scalar(keys %{$comparison->{fields}}) : 0
-            }
+            message => "Successfully synced result field '$field_name' to table",
+            field_info => $result_field_info
         });
         
     } catch {
-        my $error = "Debug field comparison error: $_";
+        my $error = "Error syncing result to table: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_result_to_table', $error);
+        
         $c->response->status(500);
         $c->stash(json => { success => 0, error => $error });
     };
@@ -5362,31 +4167,42 @@ sub get_table_field_info {
     my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
     my $schema = $c->model($model_name)->schema;
     
-    # Get table information from database
+    # Get table information from database using DESCRIBE (same as get_ency_table_schema)
     my $dbh = $schema->storage->dbh;
-    my $sth = $dbh->column_info(undef, undef, $table_name, $field_name);
-    my $column_info = $sth->fetchrow_hashref;
+    my $sth = $dbh->prepare("DESCRIBE $table_name");
+    $sth->execute();
     
-    if (!$column_info) {
-        # Return a special marker for missing fields instead of dying
-        return {
-            field_missing => 1,
-            error => "Field '$field_name' not found in table '$table_name'",
-            data_type => undef,
-            size => undef,
-            is_nullable => undef,
-            is_auto_increment => undef,
-            default_value => undef
-        };
+    my $field_info;
+    while (my $row = $sth->fetchrow_hashref()) {
+        if ($row->{Field} eq $field_name) {
+            $field_info = {
+                data_type => $row->{Type},
+                size => undef,  # Will be parsed from Type
+                is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
+                is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
+                default_value => $row->{Default},
+                extra => $row->{Extra},
+            };
+            
+            # Parse size from Type (e.g., "varchar(255)" -> 255)
+            if ($row->{Type} =~ /\((\d+)\)/) {
+                $field_info->{size} = $1;
+            }
+            last;
+        }
+    }
+    
+    unless ($field_info) {
+        die "Field '$field_name' not found in table '$table_name'";
     }
     
     return {
-        field_missing => 0,
-        data_type => $column_info->{TYPE_NAME} || $column_info->{DATA_TYPE},
-        size => $column_info->{COLUMN_SIZE},
-        is_nullable => $column_info->{NULLABLE} ? 1 : 0,
-        is_auto_increment => $column_info->{IS_AUTOINCREMENT} ? 1 : 0,
-        default_value => $column_info->{COLUMN_DEF}
+        data_type => $field_info->{data_type},
+        size => $field_info->{size},
+        is_nullable => $field_info->{is_nullable},
+        is_auto_increment => $field_info->{is_auto_increment},
+        default_value => $field_info->{default_value},
+        extra => $field_info->{extra}
     };
 }
 
@@ -5501,9 +4317,8 @@ sub get_result_field_info {
         # Add debug information if debug mode is enabled
         if ($c->session->{debug_mode}) {
             my $debug_info = "\nDEBUG INFO (get_result_field_info):\n";
-            $debug_info .= "Database: '$database'\n";
             $debug_info .= "Table key searched: '$table_key'\n";
-            $debug_info .= "Available tables: " . join(', ', sort keys %$result_table_mapping) . "\n";
+            $debug_info .= "Available tables: " . join(', ', keys %$result_table_mapping) . "\n";
             $debug_info .= "Result file path: " . ($result_file_path || 'undefined') . "\n";
             if ($result_file_path) {
                 $debug_info .= "File exists: " . (-f $result_file_path ? 'YES' : 'NO') . "\n";
@@ -5632,43 +4447,78 @@ sub update_result_field_from_table {
     my $content = read_file($result_file_path);
     
     # Build new field definition
-    my $new_field_def = "{ data_type => '$table_field_info->{data_type}'";
+    my $new_field_def = "{\n        data_type => '$table_field_info->{data_type}'";
     
     if ($table_field_info->{size}) {
-        $new_field_def .= ", size => $table_field_info->{size}";
+        $new_field_def .= ",\n        size => $table_field_info->{size}";
     }
     
-    $new_field_def .= ", is_nullable => $table_field_info->{is_nullable}";
+    if ($table_field_info->{is_nullable}) {
+        $new_field_def .= ",\n        is_nullable => 1";
+    }
     
     if ($table_field_info->{is_auto_increment}) {
-        $new_field_def .= ", is_auto_increment => 1";
+        $new_field_def .= ",\n        is_auto_increment => 1";
     }
     
     if (defined $table_field_info->{default_value}) {
-        $new_field_def .= ", default_value => '$table_field_info->{default_value}'";
+        my $default = $table_field_info->{default_value};
+        
+        # Handle special timestamp defaults (scalar refs)
+        if ($default =~ /CURRENT_TIMESTAMP/i) {
+            if ($default =~ /ON UPDATE/i) {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'";
+            } else {
+                $new_field_def .= ",\n        default_value => \\'CURRENT_TIMESTAMP'";
+            }
+        }
+        # Handle NULL default
+        elsif (!defined $default || $default eq '') {
+            # Skip - NULL is default when is_nullable => 1
+        }
+        # Handle numeric defaults
+        elsif ($default =~ /^\d+$/) {
+            $new_field_def .= ",\n        default_value => $default";
+        }
+        # Handle string defaults
+        else {
+            $default =~ s/'/\\'/g;  # Escape single quotes
+            $new_field_def .= ",\n        default_value => '$default'";
+        }
     }
     
-    $new_field_def .= " }";
+    $new_field_def .= ",\n    }";
     
     # Update the field definition in the content
     if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
         my $columns_section = $1;
         my $updated = 0;
         
-        # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/) {
-            $columns_section =~ s/(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{[^}]+\}/$field_name => $new_field_def/;
+        # Try hash format: field_name => { ... } (handles multiline)
+        # Match field_name => { ... } where { ... } can span multiple lines
+        if ($columns_section =~ /(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/s) {
+            $columns_section =~ s/(?:^|\n|\s|,)\s*'?$field_name'?\s*=>\s*\{.*?\}/$field_name => $new_field_def/s;
             $updated = 1;
         }
-        # Try array format: "field_name", { ... }
-        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{[^}]+\}/) {
-            $columns_section =~ s/["']$field_name["']\s*,\s*\{[^}]+\}/"$field_name", $new_field_def/;
+        # Try array format: "field_name", { ... } (handles multiline)
+        elsif ($columns_section =~ /["']$field_name["']\s*,\s*\{.*?\}/s) {
+            $columns_section =~ s/["']$field_name["']\s*,\s*\{.*?\}/"$field_name", $new_field_def/s;
+            $updated = 1;
+        }
+        # If not found, append it to the columns section
+        else {
+            # Find the last field definition to insert after
+            if ($columns_section =~ /,\s*$/s) {
+                $columns_section .= "\n    $field_name => $new_field_def";
+            } else {
+                $columns_section .= ",\n    $field_name => $new_field_def";
+            }
             $updated = 1;
         }
         
         if ($updated) {
             # Replace in the full content
-            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns(\n$columns_section\n);/s;
+            $content =~ s/__PACKAGE__->add_columns\(\s*.*?\s*\);/__PACKAGE__->add_columns($columns_section\n);/s;
             
             # Write back to file
             write_file($result_file_path, $content);
@@ -5708,21 +4558,324 @@ sub update_result_field_from_table {
 # Helper method to update table schema with result field values
 sub update_table_field_from_result {
     my ($self, $c, $table_name, $field_name, $database, $result_field_info) = @_;
-    
-    # This is a placeholder - actual table schema modification would require
-    # database-specific ALTER TABLE statements and is more complex
-    # For now, we'll just log what would be done
-    
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
-        "Would update table '$table_name' field '$field_name' with result file values: " . 
-        Data::Dumper::Dumper($result_field_info));
+        "Adding/modifying column '$field_name' in table '$table_name' (db=$database)");
+
+    my $dbh;
+    if (lc($database) eq 'ency') {
+        $dbh = $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        $dbh = $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        die "Unknown database '$database'";
+    }
+
+    my $data_type    = uc($result_field_info->{data_type} || 'VARCHAR');
+    my $size         = $result_field_info->{size};
+    my $is_nullable  = $result_field_info->{is_nullable};
+    my $is_auto_inc  = $result_field_info->{is_auto_increment};
+    my $default_val  = $result_field_info->{default_value};
+
+    my $col_def = "`$field_name` ";
+
+    if ($data_type eq 'INTEGER' || $data_type eq 'INT') {
+        $col_def .= 'INT';
+    } elsif ($data_type eq 'VARCHAR') {
+        $col_def .= 'VARCHAR(' . ($size || 255) . ')';
+    } elsif ($data_type eq 'TEXT') {
+        $col_def .= 'TEXT';
+    } elsif ($data_type eq 'TINYINT') {
+        $col_def .= 'TINYINT';
+    } elsif ($data_type eq 'BIGINT') {
+        $col_def .= 'BIGINT';
+    } elsif ($data_type eq 'TIMESTAMP') {
+        $col_def .= 'TIMESTAMP';
+    } elsif ($data_type eq 'DATETIME') {
+        $col_def .= 'DATETIME';
+    } elsif ($data_type eq 'DATE') {
+        $col_def .= 'DATE';
+    } elsif ($data_type eq 'BOOLEAN') {
+        $col_def .= 'TINYINT(1)';
+    } else {
+        $col_def .= $data_type;
+        $col_def .= "($size)" if $size;
+    }
+
+    if ($is_auto_inc) {
+        $col_def .= ' NOT NULL AUTO_INCREMENT';
+    } elsif (defined $is_nullable && !$is_nullable) {
+        $col_def .= ' NOT NULL';
+    } else {
+        $col_def .= ' NULL';
+    }
+
+    if (defined $default_val && $default_val ne '') {
+        $col_def .= " DEFAULT '$default_val'";
+    }
+
+    my $check_sth = $dbh->prepare(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS " .
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+    );
+    $check_sth->execute($table_name, $field_name);
+    my ($exists) = $check_sth->fetchrow_array;
+
+    if ($is_auto_inc) {
+        eval { $dbh->do("ALTER TABLE `$table_name` DROP PRIMARY KEY") };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+            "Dropped existing primary key (if any): $@") if $@;
+    }
+
+    my $sql;
+    if ($exists) {
+        $sql = "ALTER TABLE `$table_name` MODIFY COLUMN $col_def";
+    } else {
+        $sql = "ALTER TABLE `$table_name` ADD COLUMN $col_def";
+    }
+
+    if ($is_auto_inc) {
+        $sql .= ", ADD PRIMARY KEY (`$field_name`)";
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Executing SQL: $sql");
+
+    $dbh->do($sql);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_table_field_from_result',
+        "Successfully executed: $sql");
+
+    return 1;
+}
+
+sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
+    my ($self, $c) = @_;
     
-    # In a real implementation, you would:
-    # 1. Generate appropriate ALTER TABLE statement
-    # 2. Execute it against the database
-    # 3. Handle any constraints or dependencies
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+        "Starting create_table_from_result action");
     
-    return { success => 1, message => "Table field sync simulated (not implemented)" };
+    my $has_admin_role = 0;
+    if ($c->session->{username}) {
+        if ($c->session->{username} eq 'Shanta') {
+            $has_admin_role = 1;
+        } else {
+            my $roles = $c->session->{roles};
+            if (ref($roles) eq 'ARRAY') {
+                foreach my $role (@$roles) {
+                    if (lc($role) eq 'admin') {
+                        $has_admin_role = 1;
+                        last;
+                    }
+                }
+            } elsif (defined $roles && !ref($roles) && $roles =~ /\badmin\b/i) {
+                $has_admin_role = 1;
+            }
+        }
+    }
+    
+    unless ($has_admin_role) {
+        $c->response->status(403);
+        $c->stash(json => { success => 0, error => 'Access denied' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    my $result_class = $c->req->param('result_class');
+    my $database = $c->req->param('database') || 'ency';
+    
+    unless ($result_class) {
+        $c->response->status(400);
+        $c->stash(json => { success => 0, error => 'Missing required parameter: result_class' });
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    try {
+        my $sql_statements = $self->generate_create_table_sql($c, $result_class, $database);
+        
+        my $schema;
+        if (lc($database) eq 'ency') {
+            $schema = $c->model('DBEncy')->schema;
+        } elsif (lc($database) eq 'forager') {
+            $schema = $c->model('DBForager')->schema;
+        } else {
+            die "Invalid database: $database";
+        }
+        
+        unless ($schema) {
+            die "Failed to get database schema for $database";
+        }
+        
+        my $dbh = $schema->storage->dbh;
+        my @executed = ();
+        my @errors = ();
+        
+        foreach my $sql (@$sql_statements) {
+            try {
+                $dbh->do($sql);
+                push @executed, $sql;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                    "Executed SQL: $sql");
+            } catch {
+                my $error = "Failed to execute SQL: $sql - Error: $_";
+                push @errors, $error;
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+            };
+        }
+        
+        if (@errors) {
+            $c->stash(json => { 
+                success => 0, 
+                error => 'Some SQL statements failed',
+                executed => \@executed,
+                errors => \@errors,
+                sql_statements => $sql_statements
+            });
+        } else {
+            $c->stash(json => { 
+                success => 1, 
+                message => "Successfully created table from $result_class",
+                executed => \@executed,
+                sql_statements => $sql_statements
+            });
+        }
+        
+    } catch {
+        my $error = "Error creating table from Result: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
+        
+        $c->response->status(500);
+        $c->stash(json => { success => 0, error => $error });
+    };
+    
+    $c->forward('View::JSON');
+}
+
+sub generate_create_table_sql {
+    my ($self, $c, $result_class, $database) = @_;
+    
+    my $result_file_path = $self->find_result_file($c, $result_class, $database);
+    unless ($result_file_path && -f $result_file_path) {
+        die "Result file not found for $result_class in database $database";
+    }
+    
+    my $schema = $self->parse_result_file_schema($c, $result_file_path);
+    unless ($schema && $schema->{table_name}) {
+        die "Failed to parse schema from Result file: $result_file_path";
+    }
+    
+    my $table_name = $schema->{table_name};
+    my @sql_statements = ();
+    
+    my $create_sql = "CREATE TABLE IF NOT EXISTS `$table_name` (\n";
+    my @column_defs = ();
+    my @indexes = ();
+    my @constraints = ();
+    
+    foreach my $col_name (sort keys %{$schema->{columns}}) {
+        my $col = $schema->{columns}->{$col_name};
+        my $col_def = "  `$col_name` ";
+        
+        my $data_type = uc($col->{data_type});
+        if ($data_type eq 'INTEGER') {
+            $col_def .= 'INT';
+        } elsif ($data_type eq 'VARCHAR') {
+            my $size = $col->{size} || 255;
+            $col_def .= "VARCHAR($size)";
+        } elsif ($data_type eq 'TEXT') {
+            $col_def .= 'TEXT';
+        } elsif ($data_type eq 'TIMESTAMP') {
+            $col_def .= 'TIMESTAMP';
+        } elsif ($data_type eq 'DATETIME') {
+            $col_def .= 'DATETIME';
+        } elsif ($data_type eq 'DATE') {
+            $col_def .= 'DATE';
+        } elsif ($data_type eq 'TIME') {
+            $col_def .= 'TIME';
+        } elsif ($data_type eq 'BOOLEAN') {
+            $col_def .= 'BOOLEAN';
+        } elsif ($data_type eq 'ENUM') {
+            if ($col->{extra} && $col->{extra}->{list}) {
+                my $values = join(',', map { "'$_'" } @{$col->{extra}->{list}});
+                $col_def .= "ENUM($values)";
+            } else {
+                $col_def .= "VARCHAR(50)";
+            }
+        } else {
+            $col_def .= $data_type;
+        }
+        
+        if ($col->{is_nullable} == 0 || !$col->{is_nullable}) {
+            $col_def .= ' NOT NULL';
+        }
+        
+        if ($col->{is_auto_increment}) {
+            $col_def .= ' AUTO_INCREMENT';
+        }
+        
+        if (defined $col->{default_value}) {
+            my $default = $col->{default_value};
+            if (ref($default) eq 'SCALAR') {
+                $col_def .= " DEFAULT $$default";
+            } elsif ($default =~ /^CURRENT_TIMESTAMP$/i) {
+                $col_def .= " DEFAULT CURRENT_TIMESTAMP";
+            } else {
+                $col_def .= " DEFAULT '$default'";
+            }
+        }
+        
+        push @column_defs, $col_def;
+    }
+    
+    if ($schema->{primary_key}) {
+        my @pk_cols = ref($schema->{primary_key}) eq 'ARRAY' 
+            ? @{$schema->{primary_key}} 
+            : ($schema->{primary_key});
+        my $pk_cols_str = join(', ', map { "`$_`" } @pk_cols);
+        push @constraints, "  PRIMARY KEY ($pk_cols_str)";
+    }
+    
+    if ($schema->{unique_constraints}) {
+        foreach my $constraint_name (keys %{$schema->{unique_constraints}}) {
+            my $cols = $schema->{unique_constraints}->{$constraint_name};
+            my $cols_str = join(', ', map { "`$_`" } @$cols);
+            push @constraints, "  UNIQUE KEY `$constraint_name` ($cols_str)";
+        }
+    }
+    
+    if ($schema->{indexes}) {
+        foreach my $index_name (keys %{$schema->{indexes}}) {
+            my $cols = $schema->{indexes}->{$index_name};
+            my $cols_str = join(', ', map { "`$_`" } @$cols);
+            push @indexes, "  KEY `$index_name` ($cols_str)";
+        }
+    }
+    
+    $create_sql .= join(",\n", @column_defs, @constraints, @indexes);
+    $create_sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+    
+    push @sql_statements, $create_sql;
+    
+    if ($schema->{relationships}) {
+        foreach my $rel_name (keys %{$schema->{relationships}}) {
+            my $rel = $schema->{relationships}->{$rel_name};
+            if ($rel->{type} eq 'belongs_to') {
+                my $foreign_key = $rel->{foreign_key};
+                my $foreign_table = $rel->{foreign_table};
+                my $foreign_column = $rel->{foreign_column} || 'id';
+                my $on_delete = $rel->{on_delete} || 'RESTRICT';
+                
+                my $fk_sql = "ALTER TABLE `$table_name` ADD CONSTRAINT `fk_${table_name}_${foreign_key}` ";
+                $fk_sql .= "FOREIGN KEY (`$foreign_key`) REFERENCES `$foreign_table` (`$foreign_column`) ";
+                $fk_sql .= "ON DELETE " . uc($on_delete) . ";";
+                
+                push @sql_statements, $fk_sql;
+            }
+        }
+    }
+    
+    return \@sql_statements;
 }
 
 # AJAX endpoint to create a Result file from a database table
@@ -5732,8 +4885,8 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_result_from_table',
         "Starting create_result_from_table action");
     
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'create_result_from_table')) {
         $c->response->status(403);
         $c->stash(json => { success => 0, error => 'Access denied' });
         $c->forward('View::JSON');
@@ -5796,7 +4949,7 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
         }
         
         # Generate Result file content
-        my $result_content = $self->generate_result_file_content_with_db($c, $table_name, $database, $table_schema);
+        my $result_content = $self->generate_result_file_content($c, $table_name, $database, $table_schema);
         
         # Determine Result file path
         my $result_file_path = $self->get_result_file_path($c, $table_name, $database);
@@ -5832,88 +4985,8 @@ sub create_result_from_table :Path('/admin/create_result_from_table') :Args(0) {
     $c->forward('View::JSON');
 }
 
-# AJAX endpoint to create a database table from a Result file
-sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Starting create_table_from_result action");
-    
-    # Check if the user has admin role
-    unless ($c->user_exists && $c->check_user_roles('admin')) {
-        $c->response->status(403);
-        $c->stash(json => { success => 0, error => 'Access denied' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    # Parse JSON request
-    my $json_data;
-    try {
-        my $body = $c->req->body;
-        if ($body) {
-            local $/;
-            my $json_text = <$body>;
-            $json_data = decode_json($json_text);
-        } else {
-            die "No request body provided";
-        }
-    } catch {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => "Invalid JSON request: $_" });
-        $c->forward('View::JSON');
-        return;
-    };
-    
-    my $result_name = $json_data->{result_name};
-    
-    unless ($result_name) {
-        $c->response->status(400);
-        $c->stash(json => { success => 0, error => 'Result name is required' });
-        $c->forward('View::JSON');
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-        "Attempting to create table from result: $result_name");
-    
-    try {
-        # Get the database schema
-        my $schema = $c->model('DBEncy')->schema;
-        
-        # Call the create_table_from_result method from the DBEncy model
-        my $result = $c->model('DBEncy')->create_table_from_result($result_name, $schema, $c);
-        
-        if ($result) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                "Successfully created table from result: $result_name");
-            
-            $c->stash(json => {
-                success => 1,
-                message => "Successfully created table from result '$result_name'",
-                result_name => $result_name
-            });
-        } else {
-            my $error = "Failed to create table from result '$result_name'";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
-            
-            $c->response->status(500);
-            $c->stash(json => { success => 0, error => $error });
-        }
-        
-    } catch {
-        my $error = "Error creating table from result: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_table_from_result', $error);
-        
-        $c->response->status(500);
-        $c->stash(json => { success => 0, error => $error });
-    };
-    
-    $c->forward('View::JSON');
-}
-
-# Helper method to generate Result file content from table schema with database context
-sub generate_result_file_content_with_db {
+# Helper method to generate Result file content from table schema
+sub generate_result_file_content {
     my ($self, $c, $table_name, $database, $table_schema) = @_;
     
     # Convert table name to proper case for class name
@@ -5981,6 +5054,911 @@ sub generate_result_file_content_with_db {
     return $content;
 }
 
+=head2 Docker Container Management Routes
+
+=cut
+
+sub docker_containers :Path('/admin/docker-containers') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
+        "Docker containers management page accessed");
+
+    # Port restriction: only accessible from port 3001 (host dev server)
+    my $port = $c->req->uri->port || 0;
+    if ($port == 5000) {
+        $c->response->body('');
+        $c->response->status(403);
+        return;
+    }
+    if ($port && $port != 3001) {
+        my $redirect_uri = $c->req->uri->clone;
+        $redirect_uri->port(3001);
+        $c->response->redirect($redirect_uri);
+        return;
+    }
+
+    # CSC admin only - use AdminAuth (same pattern as all other admin actions)
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_containers',
+            "Access denied: admin required");
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', {
+            destination => $c->req->uri
+        }));
+        return;
+    }
+
+    # Check if we're inside a Docker container
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker_containers.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
+sub docker_list :Path('/admin/docker-list') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_list',
+        "Docker list API called");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_list')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    # Check if we're inside a Docker container
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Run docker compose ps to get container status
+    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse JSON output (one JSON object per line)
+    my @containers;
+    foreach my $line (split /\n/, $output) {
+        next unless $line =~ /^\{/;
+        eval {
+            my $container = decode_json($line);
+            push @containers, {
+                name => $container->{Name} || '',
+                service => $container->{Service} || '',
+                state => $container->{State} || 'unknown',
+                status => $container->{Status} || '',
+                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
+                image => $container->{Image} || ''
+            };
+        };
+    }
+    
+    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_volumes',
+        "Docker volumes list API called");
+
+    my $admin_auth_vol = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth_vol->check_admin_access($c, 'docker_volumes')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Authentication required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_out = `docker volume ls -q 2>&1`;
+    my $names_exit = $? >> 8;
+
+    if ($names_exit != 0) {
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my @names = grep { $_ ne '' } split /\n/, $names_out;
+
+    if (!@names) {
+        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $names_str = join(' ', map { quotemeta($_) } @names);
+    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_exit = $? >> 8;
+
+    my @volumes;
+    eval {
+        my $data = decode_json($inspect_out);
+        foreach my $vol (@$data) {
+            my $opts    = $vol->{Options} || {};
+            my $is_nfs  = (lc($opts->{type} || '') eq 'nfs' || lc($opts->{type} || '') eq 'nfs4');
+            my $nfs_addr = '';
+            if ($is_nfs && $opts->{o}) {
+                ($nfs_addr) = ($opts->{o} =~ /addr=([^,]+)/);
+            }
+            push @volumes, {
+                name       => $vol->{Name}       || '',
+                driver     => $vol->{Driver}     || 'local',
+                mountpoint => $vol->{Mountpoint} || '',
+                labels     => ref($vol->{Labels}) eq 'HASH'
+                    ? join(', ', map { "$_=$vol->{Labels}{$_}" } keys %{$vol->{Labels}})
+                    : ($vol->{Labels} || ''),
+                scope      => $vol->{Scope}      || 'local',
+                is_nfs     => $is_nfs ? \1 : \0,
+                nfs_server => $nfs_addr,
+                nfs_device => $opts->{device} || '',
+            };
+        }
+    };
+
+    $c->response->body(encode_json({ success => 1, volumes => \@volumes }));
+    $c->response->content_type('application/json');
+}
+
+sub docker_restart :Path('/admin/docker-restart') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_restart',
+        "Docker restart requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_restart')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $cmd = $service eq 'all' 
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose restart 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose restart $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_start :Path('/admin/docker-start') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start',
+        "Docker start requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose start 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose start $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_stop :Path('/admin/docker-stop') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_stop',
+        "Docker stop requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_stop')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose stop 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose stop $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_up :Path('/admin/docker-up') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_up',
+        "Docker up requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_up')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_logs :Path('/admin/docker-logs') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_logs',
+        "Docker logs requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_logs')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $lines = int($c->req->params->{lines} || 100);
+    $lines = 100 unless $lines > 0 && $lines <= 10000;
+    
+    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_rebuild',
+        "Docker rebuild requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $cmd = $service eq 'all'
+        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
+        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        stdout => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_prune :Path('/admin/docker-prune') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_prune',
+        "Docker prune requested");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_prune')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Prune stopped containers, dangling images, and unused networks
+    my $output = '';
+    
+    # Remove stopped containers
+    $output .= "=== Removing stopped containers ===\n";
+    $output .= `docker container prune -f 2>&1`;
+    
+    # Remove dangling images
+    $output .= "\n=== Removing dangling images ===\n";
+    $output .= `docker image prune -f 2>&1`;
+    
+    # Remove unused networks
+    $output .= "\n=== Removing unused networks ===\n";
+    $output .= `docker network prune -f 2>&1`;
+    
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_system_df',
+        "Docker system df requested");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_system_df')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $output = `docker system df 2>&1`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
+    my ($self, $c, $service) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_save_image',
+        "Docker save image requested for service: $service");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_save_image')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $timestamp = time();
+    my $export_dir = "$ENV{HOME}/docker-exports";
+    system("mkdir -p $export_dir") unless -d $export_dir;
+    
+    my $image_name = "comserv2-$service";
+    my $tar_file = "$export_dir/${image_name}_${timestamp}.tar";
+    
+    my $cmd = "docker save -o $tar_file $image_name 2>&1";
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        tar_file => $tar_file,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_test_ssh',
+        "Docker SSH connection test requested");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_test_ssh')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $save_credentials = $c->req->params->{save_credentials} || '';
+
+    # Validate ssh_target: must be user@hostname format with safe characters only
+    unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
+        $c->response->body('{"success": false, "error": "Invalid SSH target format (expected user@hostname)"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    # Validate port is a number
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Check if sshpass is installed
+    my $sshpass_check = `which sshpass 2>/dev/null`;
+    unless ($sshpass_check) {
+        $c->response->body('{"success": false, "error": "sshpass not installed. Install with: sudo apt-get install sshpass"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Use SSHPASS env var to avoid password on command line (prevents shell injection)
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_target "echo 'SSH connection successful'; docker --version; docker compose version" 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    # Save credentials if requested
+    if ($save_credentials eq 'yes' && $exit_code == 0) {
+        my $secrets_dir = "$ENV{HOME}/.comserv/secrets";
+        my $credentials_file = "$secrets_dir/ssh_credentials.json";
+        
+        unless (-d $secrets_dir) {
+            system("mkdir -p $secrets_dir");
+            system("chmod 700 $secrets_dir");
+        }
+        
+        my $credentials = {
+            ssh_target => $ssh_target,
+            ssh_port => $ssh_port,
+            ssh_password => $ssh_password,
+            last_updated => time(),
+            last_test_success => time()
+        };
+        
+        if (open my $fh, '>', $credentials_file) {
+            print $fh encode_json($credentials);
+            close $fh;
+            chmod 0600, $credentials_file;
+            
+            $result->{credentials_saved} = \1;
+            $result->{credentials_path} = $credentials_file;
+        }
+    }
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_deploy_to_production',
+        "Docker deploy to production requested");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $ssh_target = $c->req->params->{ssh_target} || '';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    my $production_directory = $c->req->params->{production_directory} || '~/PycharmProjects/comserv2';
+    my $service = $c->req->params->{service} || 'web-prod';
+    
+    if (!$ssh_target) {
+        $c->response->body('{"success": false, "error": "SSH target not specified"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (!$ssh_password) {
+        $c->response->body('{"success": false, "error": "SSH password required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    # Parse user@host format - validate safe characters only
+    my ($user, $host) = $ssh_target =~ /^([a-zA-Z0-9_\-]+)\@([a-zA-Z0-9_\-\.]+)$/;
+    unless ($user && $host) {
+        $c->response->body('{"success": false, "error": "SSH target must be in format: user@hostname (alphanumeric only)"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+    $production_directory =~ s/[^a-zA-Z0-9_\-\/\.~]//g;
+    
+    my $script_path = "$FindBin::Bin/deploy_docker_to_production.pl";
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = "perl $script_path --host=$host --user=$user --port=$ssh_port --service=$service --directory='$production_directory' 2>&1";
+    
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    my $result = {
+        success => $exit_code == 0 ? \1 : \0,
+        output => $output,
+        exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_ssh_terminal',
+        "SSH Terminal WebSocket requested");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_ssh_terminal')) {
+        $c->response->status(403);
+        $c->response->status(403);
+        $c->response->body('Access denied: admin required');
+        return;
+    }
+
+    # Get parameters from query string
+    my $ssh_target = $c->req->params->{ssh_target} || 'ubuntu@192.168.1.126';
+    my $ssh_port = $c->req->params->{ssh_port} || 22;
+    my $ssh_password = $c->req->params->{ssh_password} || '';
+    
+    # Check if this is a WebSocket upgrade request
+    my $upgrade = $c->req->header('Upgrade') || '';
+    my $connection = $c->req->header('Connection') || '';
+    
+    unless ($upgrade eq 'websocket' && $connection =~ /Upgrade/i) {
+        $c->response->status(400);
+        $c->response->body('WebSocket upgrade required');
+        return;
+    }
+    
+    # Load saved credentials if no password provided
+    if (!$ssh_password) {
+        my $credentials_file = "$ENV{HOME}/.comserv/secrets/ssh_credentials.json";
+        if (-f $credentials_file) {
+            if (open my $fh, '<', $credentials_file) {
+                local $/;
+                my $json = <$fh>;
+                close $fh;
+                my $creds = eval { decode_json($json) };
+                $ssh_password = $creds->{ssh_password} if $creds;
+            }
+        }
+    }
+    
+    unless ($ssh_password) {
+        $c->response->status(400);
+        $c->response->body('SSH password required');
+        return;
+    }
+    
+    # Import WebSocket modules
+    require Protocol::WebSocket::Handshake::Server;
+    require AnyEvent;
+    require AnyEvent::Handle;
+    
+    # Get the raw IO handle
+    my $io = $c->req->io_fh;
+    
+    # Perform WebSocket handshake
+    my $hs = Protocol::WebSocket::Handshake::Server->new;
+    
+    # Parse the handshake from request headers
+    my $env = $c->req->env;
+    my $handshake_request = 
+        "GET " . $env->{REQUEST_URI} . " HTTP/1.1\r\n" .
+        "Host: " . $env->{HTTP_HOST} . "\r\n" .
+        "Upgrade: " . ($env->{HTTP_UPGRADE} || 'websocket') . "\r\n" .
+        "Connection: " . ($env->{HTTP_CONNECTION} || 'Upgrade') . "\r\n" .
+        "Sec-WebSocket-Key: " . ($env->{HTTP_SEC_WEBSOCKET_KEY} || '') . "\r\n" .
+        "Sec-WebSocket-Version: " . ($env->{HTTP_SEC_WEBSOCKET_VERSION} || '13') . "\r\n" .
+        "\r\n";
+    
+    $hs->parse($handshake_request);
+    
+    # Send handshake response
+    my $handshake_response = $hs->to_string;
+    print $io $handshake_response;
+    
+    # Create AnyEvent handle for WebSocket
+    my $handle = AnyEvent::Handle->new(
+        fh => $io,
+        on_error => sub {
+            my ($hdl, $fatal, $msg) = @_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'websocket_error',
+                "WebSocket error: $msg");
+            $hdl->destroy;
+        }
+    );
+    
+    # Spawn SSH process
+    require IPC::Run3;
+    
+    my $ssh_cmd;
+    if ($ssh_password) {
+        $ssh_cmd = ['sshpass', '-p', $ssh_password, 'ssh', '-p', $ssh_port, 
+                    '-o', 'StrictHostKeyChecking=no', 
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    $ssh_target];
+    } else {
+        $ssh_cmd = ['ssh', '-p', $ssh_port, $ssh_target];
+    }
+    
+    # Use pseudo-terminal for interactive SSH
+    require IO::Pty;
+    my $pty = IO::Pty->new;
+    
+    my $pid = fork();
+    
+    if (!defined $pid) {
+        $c->response->status(500);
+        $c->response->body('Failed to fork SSH process');
+        return;
+    }
+    
+    if ($pid == 0) {
+        # Child process
+        $pty->make_slave_controlling_terminal();
+        my $slave = $pty->slave();
+        
+        close STDIN;
+        close STDOUT;
+        close STDERR;
+        
+        open STDIN, '<&', $slave->fileno() or die "Can't redirect STDIN: $!";
+        open STDOUT, '>&', $slave->fileno() or die "Can't redirect STDOUT: $!";
+        open STDERR, '>&', $slave->fileno() or die "Can't redirect STDERR: $!";
+        
+        exec(@$ssh_cmd) or die "Can't exec SSH: $!";
+    }
+    
+    # Parent process - proxy between WebSocket and PTY
+    $pty->close_slave();
+    $pty->set_raw();
+    
+    # Create frame parser
+    require Protocol::WebSocket::Frame;
+    my $frame = Protocol::WebSocket::Frame->new;
+    
+    # Declare pty_watcher variable for use in closure
+    my $pty_watcher;
+    
+    # Read from PTY and send to WebSocket
+    $pty_watcher = AnyEvent->io(
+        fh => $pty,
+        poll => 'r',
+        cb => sub {
+            my $buf;
+            my $n = sysread($pty, $buf, 4096);
+            if ($n) {
+                my $ws_frame = Protocol::WebSocket::Frame->new(buffer => $buf, type => 'binary');
+                $handle->push_write($ws_frame->to_bytes);
+            } elsif (defined $n) {
+                # EOF - SSH process exited
+                $handle->destroy;
+                undef $pty_watcher;
+                waitpid($pid, 0);
+            }
+        }
+    );
+    
+    # Read from WebSocket and send to PTY
+    $handle->on_read(sub {
+        my ($hdl) = @_;
+        
+        $frame->append(delete $hdl->{rbuf});
+        
+        while (my $message = $frame->next_bytes) {
+            # Write to PTY
+            syswrite($pty, $message);
+        }
+    });
+    
+    # Clean up on disconnect
+    $handle->on_eof(sub {
+        undef $pty_watcher;
+        undef $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+    });
+    
+    # Enter event loop - this blocks until connection closes
+    my $cv = AnyEvent->condvar;
+    
+    # Set up cleanup when connection ends
+    my $cleanup = sub {
+        undef $pty_watcher;
+        $handle->destroy if $handle;
+        kill 'TERM', $pid if $pid;
+        waitpid($pid, 0) if $pid;
+        $cv->send;
+    };
+    
+    # Monitor SSH process
+    my $child_watcher = AnyEvent->child(
+        pid => $pid,
+        cb => sub {
+            my ($pid, $status) = @_;
+            $cleanup->();
+        }
+    );
+    
+    # Wait for connection to close
+    $cv->recv;
+    
+    # Prevent template rendering
+    $c->detach();
+}
+
+sub end : Private {
+    my ($self, $c) = @_;
+    
+    # Skip template rendering for WebSocket endpoints
+    if ($c->req->path =~ m{/admin/docker-ssh-terminal}) {
+        return;
+    }
+    
+    # Normal template rendering for other requests
+    $c->forward($c->view('TT')) unless $c->response->body;
+}
+
 # Helper method to convert table name to class name
 sub table_name_to_class_name {
     my ($self, $table_name) = @_;
@@ -6015,68 +5993,6 @@ sub get_result_file_path {
     return $result_file_path;
 }
 
-# Sync all fields from Result file to database table
-sub sync_all_fields_result_to_table {
-    my ($self, $c, $table_name, $database) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
-        "Starting sync all fields for table '$table_name' in database '$database'");
-    
-    # Get the field comparison to see what needs to be synced
-    my $result_table_mapping = $self->build_result_table_mapping($c, $database);
-    my $comparison = $self->get_table_result_comparison_v2($c, $table_name, $database, $result_table_mapping);
-    
-    unless ($comparison->{has_result_file}) {
-        die "No Result file found for table '$table_name'";
-    }
-    
-    my @synced_fields = ();
-    my @warnings = ();
-    
-    # Process each field that has differences
-    foreach my $field_name (keys %{$comparison->{fields}}) {
-        my $field_data = $comparison->{fields}->{$field_name};
-        
-        # Skip if field exists in both and has no differences
-        if ($field_data->{table} && $field_data->{result} && 
-            (!$field_data->{differences} || @{$field_data->{differences}} == 0)) {
-            next;
-        }
-        
-        # Skip if field only exists in table (would require dropping column)
-        if ($field_data->{table} && !$field_data->{result}) {
-            push @warnings, "Field '$field_name' exists in table but not in Result file - skipping (manual intervention required)";
-            next;
-        }
-        
-        # Sync field if it exists in Result file
-        if ($field_data->{result}) {
-            eval {
-                my $result_field_info = $self->get_result_field_info($c, $table_name, $field_name, $database);
-                $self->update_table_field_from_result($c, $table_name, $field_name, $database, $result_field_info);
-                push @synced_fields, $field_name;
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
-                    "Successfully synced field '$field_name' for table '$table_name'");
-            };
-            if ($@) {
-                push @warnings, "Failed to sync field '$field_name': $@";
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
-                    "Failed to sync field '$field_name' for table '$table_name': $@");
-            }
-        }
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_all_fields_result_to_table',
-        "Completed sync for table '$table_name' - synced " . scalar(@synced_fields) . " fields, " . scalar(@warnings) . " warnings");
-    
-    return {
-        synced_fields => \@synced_fields,
-        warnings => \@warnings,
-        total_synced => scalar(@synced_fields)
-    };
-}
-
 =head1 AUTHOR
 
 Shanta McBain
@@ -6087,1888 +6003,6 @@ This library is free software. You can redistribute it and/or modify
 it under the same terms as Perl itself.
 
 =cut
-
-# Find result file for a given table
-sub find_result_file_for_table {
-    my ($self, $c, $table_name, $database) = @_;
-    
-    # Build the expected result file path
-    my $result_dir;
-    if ($database eq 'ency') {
-        $result_dir = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result');
-    } elsif ($database eq 'forager') {
-        $result_dir = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Forager', 'Result');
-    } else {
-        return undef;
-    }
-    
-    # Try different naming conventions
-    my @possible_names = (
-        ucfirst(lc($table_name)),  # Standard case
-        ucfirst($table_name),      # Keep original case
-        uc($table_name),           # All uppercase
-        lc($table_name),           # All lowercase
-        $table_name                # Exact match
-    );
-    
-    foreach my $name (@possible_names) {
-        my $file_path = File::Spec->catfile($result_dir, "$name.pm");
-        if (-f $file_path) {
-            return $file_path;
-        }
-    }
-    
-    return undef;
-}
-
-# Add field to result file
-sub add_field_to_result_file {
-    my ($self, $c, $result_file_path, $field_name, $field_def) = @_;
-    
-    try {
-        # Read the current file content
-        my $content = read_file($result_file_path);
-        
-        # Convert database field definition to DBIx::Class format
-        my $dbic_field_def = $self->convert_db_field_to_dbic($field_def);
-        
-        # Find the add_columns section
-        if ($content =~ /(__PACKAGE__->add_columns\(\s*)(.*?)(\s*\);)/s) {
-            my $before = $1;
-            my $columns_section = $2;
-            my $after = $3;
-            
-            # Add the new field to the columns section
-            my $new_field_text = sprintf(
-                "    %s => {\n        data_type => '%s',\n        is_nullable => %d,\n%s    },\n",
-                $field_name,
-                $dbic_field_def->{data_type},
-                $dbic_field_def->{is_nullable} ? 1 : 0,
-                $dbic_field_def->{size} ? "        size => $dbic_field_def->{size},\n" : ""
-            );
-            
-            # Add auto_increment if needed
-            if ($dbic_field_def->{is_auto_increment}) {
-                $new_field_text =~ s/    },\n$/        is_auto_increment => 1,\n    },\n/;
-            }
-            
-            # Add default value if specified
-            if (defined $dbic_field_def->{default_value}) {
-                my $default_val = $dbic_field_def->{default_value};
-                $default_val = "'$default_val'" unless $default_val =~ /^\d+$/;
-                $new_field_text =~ s/    },\n$/        default_value => $default_val,\n    },\n/;
-            }
-            
-            # Insert the new field (add comma to previous field if needed)
-            $columns_section =~ s/(\n\s*})(\s*)$/$1,\n$new_field_text$2/;
-            
-            # Reconstruct the file content
-            my $new_content = $before . $columns_section . $after;
-            
-            # Write the updated content back to the file
-            write_file($result_file_path, $new_content);
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_result_file',
-                "Added field '$field_name' to result file: $result_file_path");
-            
-            return 1;
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result_file',
-                "Could not find add_columns section in result file: $result_file_path");
-            return 0;
-        }
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_result_file',
-            "Error adding field to result file: $_");
-        return 0;
-    };
-}
-
-# Add field to database table
-sub add_field_to_database_table {
-    my ($self, $c, $table_name, $database, $field_name, $field_def) = @_;
-    
-    try {
-        # Get database handle
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        } else {
-            die "Invalid database: $database";
-        }
-        
-        # Convert DBIx::Class field definition to SQL
-        my $sql_field_def = $self->convert_dbic_field_to_sql($field_def);
-        
-        # Build ALTER TABLE statement
-        my $sql = "ALTER TABLE `$table_name` ADD COLUMN `$field_name` $sql_field_def";
-        
-        # Execute the ALTER TABLE statement
-        $dbh->do($sql);
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_field_to_database_table',
-            "Added field '$field_name' to table '$table_name' with SQL: $sql");
-        
-        return 1;
-        
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_field_to_database_table',
-            "Error adding field to database table: $_");
-        return 0;
-    };
-}
-
-# Validate field definition
-sub validate_field_definition {
-    my ($self, $field_def, $field_name) = @_;
-    
-    my @errors = ();
-    
-    # Check required attributes
-    unless ($field_def->{data_type}) {
-        push @errors, "Field '$field_name' missing data_type";
-    }
-    
-    # Check if integer types have size when required
-    if ($field_def->{data_type} && $field_def->{data_type} =~ /^(varchar|char|decimal|numeric)$/i) {
-        unless (defined $field_def->{size}) {
-            push @errors, "Field '$field_name' of type '$field_def->{data_type}' requires size specification";
-        }
-    }
-    
-    return \@errors;
-}
-
-# Convert database field definition to DBIx::Class format
-sub convert_db_field_to_dbic {
-    my ($self, $field_def) = @_;
-    
-    my $dbic_def = {
-        data_type => $field_def->{data_type},
-        is_nullable => $field_def->{is_nullable} // 1,
-        is_auto_increment => $field_def->{is_auto_increment} // 0,
-        default_value => $field_def->{default_value}
-    };
-    
-    # Handle size
-    if (defined $field_def->{size}) {
-        $dbic_def->{size} = $field_def->{size};
-    }
-    
-    # Normalize data type
-    $dbic_def->{data_type} = $self->normalize_data_type($dbic_def->{data_type});
-    
-    return $dbic_def;
-}
-
-# Convert DBIx::Class field definition to SQL
-sub convert_dbic_field_to_sql {
-    my ($self, $field_def) = @_;
-    
-    my $sql = $field_def->{data_type};
-    
-    # Add size if specified
-    if (defined $field_def->{size}) {
-        $sql .= "($field_def->{size})";
-    }
-    
-    # Add nullable constraint
-    if ($field_def->{is_nullable}) {
-        $sql .= " NULL";
-    } else {
-        $sql .= " NOT NULL";
-    }
-    
-    # Add auto increment
-    if ($field_def->{is_auto_increment}) {
-        $sql .= " AUTO_INCREMENT";
-    }
-    
-    # Add default value
-    if (defined $field_def->{default_value}) {
-        my $default = $field_def->{default_value};
-        if ($default =~ /^\d+$/) {
-            $sql .= " DEFAULT $default";
-        } else {
-            $sql .= " DEFAULT '$default'";
-        }
-    }
-    
-    return $sql;
-}
-
-# Enhanced security check for CSC admin operations
-sub check_csc_admin_access {
-    my ($self, $c) = @_;
-    
-    # Check if user exists and is logged in
-    unless ($c->user_exists) {
-        return 0;
-    }
-    
-    # TEMPORARY FIX: Allow specific users direct access
-    if ($c->session->{username} && $c->session->{username} eq 'Shanta') {
-        return 1;
-    }
-    
-    # Check for CSC admin role specifically
-    my $roles = $c->session->{roles};
-    if (defined $roles) {
-        if (ref($roles) eq 'ARRAY') {
-            # Check if 'csc_admin' or 'admin' is in the roles array
-            foreach my $role (@$roles) {
-                if (lc($role) eq 'csc_admin' || lc($role) eq 'admin') {
-                    return 1;
-                }
-            }
-        } elsif (!ref($roles)) {
-            # Check if roles string contains 'csc_admin' or 'admin'
-            if ($roles =~ /\b(csc_admin|admin)\b/i) {
-                return 1;
-            }
-        }
-    }
-    
-    return 0;
-}
-
-# Check if we're on an allowed branch for upgrade operations
-sub check_install_branch {
-    my ($self, $c) = @_;
-    
-    try {
-        my $current_branch = `git -C ${\$c->path_to()} branch --show-current 2>/dev/null`;
-        chomp $current_branch;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_install_branch',
-            "Current git branch: $current_branch");
-        
-        # Allow both 'install' and 'master' branches for upgrade operations
-        # This enables web-based upgrades without requiring SSH access to switch branches
-        return ($current_branch eq 'install' || $current_branch eq 'master' || $current_branch eq 'main');
-    } catch {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'check_install_branch',
-            "Could not determine git branch: $_");
-        return 0;
-    };
-}
-
-# Start development server for testing
-sub start_dev_server :Path('/admin/start_dev_server') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
-        "Starting development server action");
-    
-    # Enhanced security check
-    unless ($self->check_csc_admin_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'start_dev_server',
-            "Access denied: User does not have CSC admin role");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to start the development server.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Check if we're on an allowed branch
-    unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Development server can only be started from the install, master, or main branches for security reasons.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Check if this is a POST request (user confirmed)
-    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
-            "Development server start confirmed, executing");
-        
-        # Execute the development server startup
-        my ($success, $output, $warning, $dev_url) = $self->execute_start_dev_server($c);
-        
-        # Store the results in stash for the template
-        $c->stash(
-            output => $output,
-            success_msg => $success ? "Development server started successfully." : undef,
-            error_msg => $success ? undef : "Failed to start development server. See output for details.",
-            warning_msg => $warning,
-            dev_server_url => $dev_url
-        );
-    }
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller start_dev_server view - Template: admin/start_dev_server.tt";
-    }
-    
-    # Set the template
-    $c->stash(template => 'admin/start_dev_server.tt');
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'start_dev_server',
-        "Completed start_dev_server action");
-}
-
-# Execute the development server startup
-sub execute_start_dev_server {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = undef;
-    my $success = 0;
-    my $dev_url = undef;
-    
-    try {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_start_dev_server',
-            "Starting development server execution");
-        
-        # Check if development server is already running
-        my $check_running = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
-        if ($check_running) {
-            $output .= "Development server appears to be already running:\n$check_running\n";
-            $warning = "A development server process is already running. You may need to stop it first.";
-        }
-        
-        # Install/update dependencies first
-        $output .= "Installing/updating dependencies...\n";
-        my $cpanm_output = `cd ${\$c->path_to()} && cpanm --installdeps . 2>&1`;
-        $output .= "Dependency installation output:\n$cpanm_output\n";
-        
-        # Check if dependency installation was successful
-        if ($? != 0) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'execute_start_dev_server',
-                "Dependency installation had issues, but continuing");
-            $warning = "Some dependencies may not have installed correctly. Check the output for details.";
-        }
-        
-        # Start the development server in the background
-        my $app_root = $c->path_to();
-        my $dev_port = 3000; # Default Catalyst development port
-        
-        # Create a unique log file for this development server session
-        my $timestamp = time();
-        my $log_file = "$app_root/script/logs/dev_server_$timestamp.log";
-        
-        # Ensure log directory exists
-        system("mkdir -p $app_root/script/logs");
-        
-        # Start development server with proper environment
-        my $start_cmd = "cd $app_root && CATALYST_DEBUG=1 perl script/comserv_server.pl -r -d > $log_file 2>&1 &";
-        $output .= "Starting development server with command:\n$start_cmd\n";
-        
-        my $start_result = system($start_cmd);
-        
-        if ($start_result == 0) {
-            $success = 1;
-            $dev_url = "http://localhost:$dev_port";
-            $output .= "Development server started successfully!\n";
-            $output .= "Server should be available at: $dev_url\n";
-            $output .= "Log file: $log_file\n";
-            $output .= "Note: It may take a few moments for the server to fully start up.\n";
-            
-            # Store dev server info in session for later reference
-            $c->session->{dev_server} = {
-                url => $dev_url,
-                log_file => $log_file,
-                started_at => $timestamp,
-                pid_check_cmd => "ps aux | grep 'comserv_server.pl' | grep -v grep"
-            };
-            
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_start_dev_server',
-                "Failed to start development server");
-            $output .= "Failed to start development server.\n";
-            return (0, $output, "Development server startup failed.");
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_start_dev_server',
-            "Development server startup completed successfully");
-            
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_start_dev_server',
-            "Error during development server startup: $error");
-        $output .= "Error: $error\n";
-        return (0, $output, undef, undef);
-    };
-    
-    return ($success, $output, $warning, $dev_url);
-}
-
-# Restart Starman server
-sub restart_starman :Path('/admin/restart_starman') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
-        "Starting restart_starman action");
-    
-    # Enhanced security check
-    unless ($self->check_csc_admin_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'restart_starman',
-            "Access denied: User does not have CSC admin role");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to restart the Starman server.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Check if we're on an allowed branch for production restart
-    unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Starman server can only be restarted from the install, master, or main branches for security reasons.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Check if this is a POST request (user confirmed)
-    if ($c->req->method eq 'POST' && $c->req->param('confirm')) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
-            "Starman restart confirmed, executing");
-        
-        # Execute the Starman restart
-        my ($success, $output, $warning) = $self->execute_restart_starman($c);
-        
-        # Store the results in stash for the template
-        $c->stash(
-            output => $output,
-            success_msg => $success ? "Starman server restart initiated successfully." : undef,
-            error_msg => $success ? undef : "Failed to restart Starman server. See output for details.",
-            warning_msg => $warning
-        );
-    }
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller restart_starman view - Template: admin/restart_starman.tt";
-    }
-    
-    # Set the template
-    $c->stash(template => 'admin/restart_starman.tt');
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'restart_starman',
-        "Completed restart_starman action");
-}
-
-# Execute the Starman server restart
-sub execute_restart_starman {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = undef;
-    my $success = 0;
-    
-    try {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_restart_starman',
-            "Starting Starman server restart");
-        
-        # First, try to find running Starman processes
-        my $starman_processes = `ps aux | grep starman | grep -v grep`;
-        $output .= "Current Starman processes:\n$starman_processes\n";
-        
-        if (!$starman_processes) {
-            $output .= "No Starman processes found running.\n";
-            $warning = "No Starman processes were found. The server may not be running via Starman.";
-        }
-        
-        # Try different methods to restart Starman
-        my $restart_success = 0;
-        
-        # Method 1: Try systemctl if it's a systemd service
-        $output .= "Attempting to restart via systemctl...\n";
-        my $systemctl_result = system("sudo systemctl restart starman 2>/dev/null");
-        if ($systemctl_result == 0) {
-            $output .= "Successfully restarted via systemctl.\n";
-            $restart_success = 1;
-        } else {
-            $output .= "systemctl restart failed or service not found.\n";
-        }
-        
-        # Method 2: Try service command if systemctl failed
-        if (!$restart_success) {
-            $output .= "Attempting to restart via service command...\n";
-            my $service_result = system("sudo service starman restart 2>/dev/null");
-            if ($service_result == 0) {
-                $output .= "Successfully restarted via service command.\n";
-                $restart_success = 1;
-            } else {
-                $output .= "service restart failed or service not found.\n";
-            }
-        }
-        
-        # Method 3: Try to kill and restart manually if other methods failed
-        if (!$restart_success && $starman_processes) {
-            $output .= "Attempting manual restart by killing existing processes...\n";
-            
-            # Kill existing Starman processes
-            my $kill_result = system("sudo pkill -f starman");
-            if ($kill_result == 0) {
-                $output .= "Successfully killed existing Starman processes.\n";
-                
-                # Wait a moment for processes to terminate
-                sleep(2);
-                
-                # Try to start Starman again (this would need to be configured based on your setup)
-                $output .= "Note: Manual restart of Starman would require specific startup script.\n";
-                $warning = "Starman processes were killed, but automatic restart requires manual configuration.";
-                $restart_success = 1; # Consider it successful if we killed the processes
-            } else {
-                $output .= "Failed to kill existing Starman processes.\n";
-            }
-        }
-        
-        # Method 4: Check for common Starman startup scripts
-        if (!$restart_success) {
-            my @common_scripts = (
-                '/etc/init.d/starman',
-                '/usr/local/bin/restart-starman.sh',
-                '/opt/starman/restart.sh'
-            );
-            
-            foreach my $script (@common_scripts) {
-                if (-x $script) {
-                    $output .= "Found startup script: $script\n";
-                    my $script_result = system("sudo $script restart 2>&1");
-                    if ($script_result == 0) {
-                        $output .= "Successfully restarted via $script\n";
-                        $restart_success = 1;
-                        last;
-                    } else {
-                        $output .= "Failed to restart via $script\n";
-                    }
-                }
-            }
-        }
-        
-        if ($restart_success) {
-            $success = 1;
-            $output .= "\nStarman server restart completed.\n";
-            $output .= "Please wait a few moments for the server to fully restart.\n";
-        } else {
-            $output .= "\nCould not automatically restart Starman server.\n";
-            $output .= "You may need to manually restart the server or configure the restart method.\n";
-            $warning = "Automatic restart failed. Manual intervention may be required.";
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_restart_starman',
-            "Starman restart attempt completed");
-            
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_restart_starman',
-            "Error during Starman restart: $error");
-        $output .= "Error: $error\n";
-        return (0, $output, undef);
-    };
-    
-    return ($success, $output, $warning);
-}
-
-# Stop development server
-sub stop_dev_server :Path('/admin/stop_dev_server') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'stop_dev_server',
-        "Starting stop_dev_server action");
-    
-    # Enhanced security check
-    unless ($self->check_csc_admin_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'stop_dev_server',
-            "Access denied: User does not have CSC admin role");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to stop the development server.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Execute the development server stop
-    my ($success, $output) = $self->execute_stop_dev_server($c);
-    
-    # Store the results in stash
-    $c->stash(
-        output => $output,
-        success_msg => $success ? "Development server stopped successfully." : undef,
-        error_msg => $success ? undef : "Failed to stop development server completely.",
-    );
-    
-    # Clear dev server info from session
-    delete $c->session->{dev_server};
-    
-    # Redirect back to admin with message
-    $c->flash->{success_msg} = $c->stash->{success_msg} if $c->stash->{success_msg};
-    $c->flash->{error_msg} = $c->stash->{error_msg} if $c->stash->{error_msg};
-    $c->response->redirect($c->uri_for('/admin'));
-}
-
-# Execute the development server stop
-sub execute_stop_dev_server {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $success = 0;
-    
-    try {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_stop_dev_server',
-            "Stopping development server");
-        
-        # Find and kill development server processes
-        my $dev_processes = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
-        $output .= "Current development server processes:\n$dev_processes\n";
-        
-        if ($dev_processes) {
-            # Kill the development server processes
-            my $kill_result = system("pkill -f 'comserv_server.pl'");
-            if ($kill_result == 0) {
-                $output .= "Successfully stopped development server processes.\n";
-                $success = 1;
-            } else {
-                $output .= "Failed to stop some development server processes.\n";
-            }
-        } else {
-            $output .= "No development server processes found running.\n";
-            $success = 1; # Consider it successful if nothing was running
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_stop_dev_server',
-            "Development server stop completed");
-            
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_stop_dev_server',
-            "Error during development server stop: $error");
-        $output .= "Error: $error\n";
-        return (0, $output);
-    };
-    
-    return ($success, $output);
-}
-
-# Software Upgrade Management - Step-by-step upgrade process
-sub software_upgrade :Path('/admin/software_upgrade') :Args(0) {
-    my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_upgrade',
-        "Starting software upgrade management");
-    
-    # Enhanced security check - CSC admin only for production upgrades
-    unless ($self->check_csc_admin_access($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'software_upgrade',
-            "Access denied: User does not have CSC admin role");
-        
-        $c->flash->{error_msg} = "You need CSC administrator privileges to perform software upgrades.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Check if we're on an allowed branch for production upgrades
-    unless ($self->check_install_branch($c)) {
-        $c->flash->{error_msg} = "Software upgrades can only be performed from the install, master, or main branches for security reasons.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    # Handle different upgrade steps
-    my $step = $c->req->param('step') || 'overview';
-    my $action = $c->req->param('action') || '';
-    
-    # Initialize upgrade status in session if not exists
-    unless ($c->session->{upgrade_status}) {
-        $c->session->{upgrade_status} = {
-            current_step => 'overview',
-            steps_completed => {},
-            start_time => time(),
-            logs => []
-        };
-    }
-    
-    my $upgrade_status = $c->session->{upgrade_status};
-    
-    # Process actions based on step
-    if ($c->req->method eq 'POST' && $action) {
-        $self->process_upgrade_action($c, $step, $action);
-    }
-    
-    # Get current system status
-    my $system_status = $self->get_upgrade_system_status($c);
-    
-    # Use the standard debug message system
-    if ($c->session->{debug_mode}) {
-        $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
-        push @{$c->stash->{debug_msg}}, "Admin controller software_upgrade view - Template: admin/software_upgrade.tt";
-    }
-    
-    # Set template data
-    $c->stash(
-        template => 'admin/software_upgrade.tt',
-        current_step => $step,
-        upgrade_status => $upgrade_status,
-        system_status => $system_status,
-        production_server => 'computersystemconsulting.ca',
-        server_path => '/opt/comserv'
-    );
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'software_upgrade',
-        "Completed software upgrade management");
-}
-
-# Process upgrade actions for each step
-sub process_upgrade_action {
-    my ($self, $c, $step, $action) = @_;
-    
-    my $upgrade_status = $c->session->{upgrade_status};
-    my $output = '';
-    my $success = 0;
-    my $warning = undef;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_upgrade_action',
-        "Processing upgrade action: step=$step, action=$action");
-    
-    if ($step eq 'git_pull' && $action eq 'execute') {
-        # Step 1: Pull latest code from GitHub
-        ($success, $output, $warning) = $self->execute_git_pull($c);
-        $upgrade_status->{steps_completed}->{git_pull} = $success;
-        $upgrade_status->{current_step} = $success ? 'dependencies' : 'git_pull';
-        
-    } elsif ($step eq 'dependencies' && $action eq 'execute') {
-        # Step 2: Install/update dependencies
-        ($success, $output, $warning) = $self->execute_dependency_update($c);
-        $upgrade_status->{steps_completed}->{dependencies} = $success;
-        $upgrade_status->{current_step} = $success ? 'dev_server' : 'dependencies';
-        
-    } elsif ($step eq 'dev_server' && $action eq 'start') {
-        # Step 3: Start development server for testing
-        my $dev_url;
-        ($success, $output, $warning, $dev_url) = $self->execute_start_dev_server($c);
-        $upgrade_status->{steps_completed}->{dev_server_start} = $success;
-        $upgrade_status->{dev_server_url} = $dev_url if $success;
-        
-    } elsif ($step eq 'dev_server' && $action eq 'stop') {
-        # Stop development server
-        ($success, $output) = $self->execute_stop_dev_server($c);
-        $upgrade_status->{steps_completed}->{dev_server_stop} = $success;
-        $upgrade_status->{current_step} = 'production' if $success;
-        delete $upgrade_status->{dev_server_url};
-        
-    } elsif ($step eq 'production' && $action eq 'restart') {
-        # Step 4: Restart production Starman server
-        ($success, $output, $warning) = $self->execute_restart_starman($c);
-        $upgrade_status->{steps_completed}->{production_restart} = $success;
-        $upgrade_status->{current_step} = $success ? 'complete' : 'production';
-        
-    } elsif ($step eq 'complete' && $action eq 'reset') {
-        # Reset upgrade process
-        delete $c->session->{upgrade_status};
-        $c->response->redirect($c->uri_for('/admin/software_upgrade'));
-        return;
-    }
-    
-    # Store action results
-    push @{$upgrade_status->{logs}}, {
-        timestamp => scalar(localtime()),
-        step => $step,
-        action => $action,
-        success => $success,
-        output => $output,
-        warning => $warning
-    };
-    
-    # Set flash messages
-    if ($success) {
-        $c->flash->{success_msg} = "Step completed successfully.";
-    } else {
-        $c->flash->{error_msg} = "Step failed. Check the output for details.";
-    }
-    
-    if ($warning) {
-        $c->flash->{warning_msg} = $warning;
-    }
-    
-    # Store output for template
-    $c->stash(
-        step_output => $output,
-        step_success => $success,
-        step_warning => $warning
-    );
-}
-
-# Execute dependency update (similar to what's done in start_dev_server)
-sub execute_dependency_update {
-    my ($self, $c) = @_;
-    my $output = '';
-    my $warning = undef;
-    my $success = 0;
-    
-    try {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_dependency_update',
-            "Starting dependency update");
-        
-        # Change to application directory
-        my $app_path = $c->path_to();
-        $output .= "Updating dependencies in: $app_path\n\n";
-        
-        # Install/update dependencies using cpanm
-        $output .= "Installing/updating Perl dependencies...\n";
-        my $cpanm_output = `cd $app_path && cpanm --installdeps . 2>&1`;
-        $output .= $cpanm_output;
-        
-        # Check if dependency installation was successful
-        if ($? == 0) {
-            $success = 1;
-            $output .= "\nDependency update completed successfully.\n";
-        } else {
-            $output .= "\nDependency update had issues. Exit code: $?\n";
-            $warning = "Some dependencies may not have installed correctly. Check the output for details.";
-        }
-        
-        # Also try to update npm dependencies if package.json exists
-        my $package_json = $c->path_to('package.json');
-        if (-e $package_json) {
-            $output .= "\nUpdating Node.js dependencies...\n";
-            my $npm_output = `cd $app_path && npm install 2>&1`;
-            $output .= $npm_output;
-            
-            if ($? != 0) {
-                $warning = ($warning ? "$warning " : "") . "NPM dependency update had issues.";
-            }
-        }
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'execute_dependency_update',
-            "Dependency update completed with success: $success");
-            
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_dependency_update',
-            "Error during dependency update: $error");
-        $output .= "Error: $error\n";
-        return (0, $output, undef);
-    };
-    
-    return ($success, $output, $warning);
-}
-
-# Get current system status for upgrade overview
-sub get_upgrade_system_status {
-    my ($self, $c) = @_;
-    
-    my $status = {
-        git_status => 'unknown',
-        git_branch => 'unknown',
-        git_last_commit => 'unknown',
-        dev_server_running => 0,
-        starman_running => 0,
-        disk_space => 'unknown',
-        perl_version => $^V ? $^V->stringify : 'unknown'
-    };
-    
-    # Get Git status
-    eval {
-        my $git_status = `cd ${\$c->path_to()} && git status --porcelain 2>/dev/null`;
-        $status->{git_status} = $git_status ? 'modified' : 'clean';
-        
-        my $git_branch = `cd ${\$c->path_to()} && git branch --show-current 2>/dev/null`;
-        chomp($git_branch);
-        $status->{git_branch} = $git_branch || 'unknown';
-        
-        my $git_commit = `cd ${\$c->path_to()} && git log -1 --format="%h %s" 2>/dev/null`;
-        chomp($git_commit);
-        $status->{git_last_commit} = $git_commit || 'unknown';
-    };
-    
-    # Check if development server is running
-    eval {
-        my $dev_processes = `ps aux | grep 'comserv_server.pl' | grep -v grep`;
-        $status->{dev_server_running} = $dev_processes ? 1 : 0;
-    };
-    
-    # Check if Starman is running
-    eval {
-        my $starman_processes = `ps aux | grep starman | grep -v grep`;
-        $status->{starman_running} = $starman_processes ? 1 : 0;
-    };
-    
-    # Get disk space
-    eval {
-        my $df_output = `df -h . | tail -1`;
-        if ($df_output =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%/) {
-            $status->{disk_space} = "$4% used ($3 available)";
-        }
-    };
-    
-    return $status;
-}
-
-
-
-# Create a new backup
-# Format file size for display
-sub format_file_size {
-    my ($self, $size) = @_;
-    
-    return '0 B' unless $size;
-    
-    my @units = ('B', 'KB', 'MB', 'GB', 'TB');
-    my $unit_index = 0;
-    
-    while ($size >= 1024 && $unit_index < $#units) {
-        $size /= 1024;
-        $unit_index++;
-    }
-    
-    return sprintf("%.1f %s", $size, $units[$unit_index]);
-}
-
-# Check if user has CSC (hosting company) access
-sub check_csc_access {
-    my ($self, $c) = @_;
-    
-    # First check if user exists
-    return 0 unless $c->user_exists;
-    
-    my $username = $c->session->{username} || '';
-    
-    # Check hardcoded CSC usernames first (most reliable)
-    my @csc_users = qw(shanta csc_admin backup_admin);
-    if (grep { lc($_) eq lc($username) } @csc_users) {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
-            "CSC access granted to hardcoded user: $username");
-        return 1;
-    }
-    
-    # Try enhanced role checking with comprehensive fallback
-    my $enhanced_check_result = 0;
-    eval {
-        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('backup_admin');
-        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('csc_admin');
-        $enhanced_check_result = 1 if $c->check_user_roles_enhanced('super_admin');
-    };
-    
-    if ($@) {
-        # Enhanced role checking failed (likely schema issue)
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
-            "Enhanced role checking failed, using legacy fallback: $@");
-        
-        # Fall back to legacy admin check for known CSC users
-        if ($c->check_user_roles('admin')) {
-            # Additional verification for CSC users
-            if (grep { lc($_) eq lc($username) } @csc_users) {
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
-                    "CSC access granted via legacy admin role for user: $username");
-                return 1;
-            }
-        }
-        
-        # Check session roles directly as final fallback
-        my $roles = $c->session->{roles};
-        if ($roles) {
-            my @session_roles = ref($roles) eq 'ARRAY' ? @$roles : split(/,/, $roles);
-            foreach my $role (@session_roles) {
-                $role =~ s/^\s+|\s+$//g; # trim whitespace
-                if (lc($role) eq 'admin' && grep { lc($_) eq lc($username) } @csc_users) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'check_csc_access',
-                        "CSC access granted via session admin role for user: $username");
-                    return 1;
-                }
-            }
-        }
-    } else {
-        # Enhanced role checking succeeded
-        if ($enhanced_check_result) {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
-                "CSC access granted via enhanced role checking for user: $username");
-            return 1;
-        }
-    }
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'check_csc_access',
-        "CSC access denied for user: $username");
-    return 0;
-}
-
-# Check backup system status
-sub check_backup_system_status {
-    my ($self, $c) = @_;
-    
-    my $status = {
-        database_connection => 'unknown',
-        mysqldump_available => 'unknown',
-        backup_directory => 'unknown',
-        access_control => 'unknown',
-        overall_status => 'unknown'
-    };
-    
-    # Check database connection
-    eval {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        if ($dbh && $dbh->ping) {
-            $status->{database_connection} = 'ok';
-        } else {
-            $status->{database_connection} = 'failed';
-        }
-    };
-    if ($@) {
-        $status->{database_connection} = 'error: ' . $@;
-    }
-    
-    # Check mysqldump availability
-    my $mysqldump_check = `which mysqldump 2>/dev/null`;
-    if ($mysqldump_check && $mysqldump_check =~ /mysqldump/) {
-        $status->{mysqldump_available} = 'ok';
-    } else {
-        $status->{mysqldump_available} = 'not found';
-    }
-    
-    # Check backup directory
-    my $backup_dir = $self->get_backup_directory($c);
-    if (-d $backup_dir && -w $backup_dir) {
-        $status->{backup_directory} = 'ok';
-    } elsif (-d $backup_dir) {
-        $status->{backup_directory} = 'not writable';
-    } else {
-        $status->{backup_directory} = 'does not exist';
-    }
-    
-    # Check access control
-    if ($self->check_csc_access($c)) {
-        $status->{access_control} = 'ok';
-    } else {
-        $status->{access_control} = 'access denied';
-    }
-    
-    # Determine overall status
-    if ($status->{database_connection} eq 'ok' && 
-        $status->{mysqldump_available} eq 'ok' && 
-        $status->{backup_directory} eq 'ok' && 
-        $status->{access_control} eq 'ok') {
-        $status->{overall_status} = 'ok';
-    } else {
-        $status->{overall_status} = 'issues detected';
-    }
-    
-    return $status;
-}
-
-# Test database connection for debugging backup issues
-sub test_database_connection :Path('/admin/backup/test_db') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check if the user has CSC access
-    unless ($self->check_csc_access($c)) {
-        $c->flash->{error_msg} = "Backup management is restricted to CSC hosting administrators only.";
-        $c->response->redirect($c->uri_for('/admin'));
-        return;
-    }
-    
-    my $result = { 
-        success => 0, 
-        message => '', 
-        databases => {},
-        overall_status => 'failed'
-    };
-    
-    # Test all available database models
-    my @db_models = ('DBEncy', 'DBForager');
-    my $successful_tests = 0;
-    
-    foreach my $model_name (@db_models) {
-        my $db_result = {
-            model => $model_name,
-            success => 0,
-            message => '',
-            details => {}
-        };
-        
-        eval {
-            # Check if model exists
-            my $model = eval { $c->model($model_name) };
-            if (!$model) {
-                $db_result->{message} = "Model $model_name not available";
-                $result->{databases}->{$model_name} = $db_result;
-                return;
-            }
-            
-            # Get database connection info using the application's method (same as backup function)
-            my $connect_info = $model->config->{connect_info};
-            my ($dsn, $user, $password);
-            
-            if (ref($connect_info) eq 'HASH') {
-                $dsn = $connect_info->{dsn};
-                $user = $connect_info->{user};
-                $password = $connect_info->{password};
-            } else {
-                die "Unexpected connect_info format: " . ref($connect_info);
-            }
-            
-            $db_result->{details}->{dsn} = $dsn;
-            $db_result->{details}->{user} = $user || 'none';
-            $db_result->{details}->{connect_info_type} = ref($connect_info);
-            $db_result->{details}->{config_source} = "$model_name model config";
-            
-            # Test database connection
-            my $dbh = $model->schema->storage->dbh;
-            my $version = $dbh->selectrow_array("SELECT VERSION()");
-            
-            $db_result->{success} = 1;
-            $db_result->{message} = "Database connection successful";
-            $db_result->{details}->{version} = $version;
-            $successful_tests++;
-            
-            # Test mysqldump availability if this is a MySQL database
-            if ($dsn =~ /^dbi:mysql:/i) {
-                my $mysqldump_path = `which mysqldump 2>/dev/null`;
-                chomp($mysqldump_path);
-                
-                if ($mysqldump_path) {
-                    my $mysqldump_version = `mysqldump --version 2>&1`;
-                    chomp($mysqldump_version);
-                    $db_result->{details}->{mysqldump_path} = $mysqldump_path;
-                    $db_result->{details}->{mysqldump_version} = $mysqldump_version;
-                    $db_result->{details}->{mysqldump_available} = 1;
-                } else {
-                    $db_result->{details}->{mysqldump_available} = 0;
-                    $db_result->{details}->{mysqldump_error} = "mysqldump command not found. Install mysql-client package.";
-                }
-            } else {
-                $db_result->{details}->{mysqldump_note} = "Not applicable for non-MySQL databases";
-            }
-            
-        };
-        
-        if ($@) {
-            $db_result->{message} = "Database connection failed: $@";
-        }
-        
-        $result->{databases}->{$model_name} = $db_result;
-    }
-    
-    # Set overall result
-    if ($successful_tests > 0) {
-        $result->{success} = 1;
-        $result->{overall_status} = 'success';
-        $result->{message} = "Successfully tested $successful_tests out of " . scalar(@db_models) . " databases";
-    } else {
-        $result->{message} = "All database connection tests failed";
-    }
-    
-    $c->response->content_type('application/json');
-    $c->response->body(JSON::encode_json($result));
-}
-
-# Get list of available backups with detailed information
-sub get_backup_list {
-    my ($self, $c) = @_;
-    
-    my @backups = ();
-    
-    eval {
-        my $backup_dir = $c->path_to('backups');
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
-            "Looking for backups in directory: $backup_dir");
-        
-        unless (-d $backup_dir) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backup_list',
-                "Backup directory does not exist: $backup_dir");
-            return \@backups;
-        }
-        
-        opendir(my $dh, $backup_dir) or die "Cannot open backups directory: $!";
-        my @all_files = readdir($dh);
-        closedir($dh);
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
-            "All files in backup directory: " . join(', ', @all_files));
-        
-        # Filter for .tar.gz files only (exclude .meta files and other artifacts)
-        my @files = grep { -f "$backup_dir/$_" && $_ =~ /\.tar\.gz$/ && $_ !~ /\.meta$/ } @all_files;
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
-            "Filtered .tar.gz files: " . join(', ', @files));
-        
-        foreach my $filename (@files) {
-            my $filepath = "$backup_dir/$filename";
-            my @stat = stat($filepath);
-            
-            # Parse backup information from filename
-            my $backup_info = {
-                filename => $filename,
-                filepath => $filepath,
-                size => $self->format_file_size($stat[7]),
-                mtime => $stat[9],
-                type => 'unknown'
-            };
-            
-            # Determine backup type from filename
-            if ($filename =~ /_full\.tar\.gz$/) {
-                $backup_info->{type} = 'full';
-            } elsif ($filename =~ /_database\.tar\.gz$/ || $filename =~ /_db\.tar\.gz$/) {
-                $backup_info->{type} = 'database';
-            } elsif ($filename =~ /_config\.tar\.gz$/) {
-                $backup_info->{type} = 'config';
-            } elsif ($filename =~ /_files\.tar\.gz$/) {
-                $backup_info->{type} = 'files';
-            } else {
-                # Try to guess from filename patterns
-                if ($filename =~ /config/i) {
-                    $backup_info->{type} = 'config';
-                } elsif ($filename =~ /db|database/i) {
-                    $backup_info->{type} = 'database';
-                } elsif ($filename =~ /full/i) {
-                    $backup_info->{type} = 'full';
-                } else {
-                    $backup_info->{type} = 'full'; # Default assumption
-                }
-            }
-            
-            # Format date and time
-            my ($sec, $min, $hour, $mday, $mon, $year) = localtime($backup_info->{mtime});
-            $backup_info->{date} = sprintf("%04d-%02d-%02d", $year + 1900, $mon + 1, $mday);
-            $backup_info->{time} = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
-            
-            push @backups, $backup_info;
-        }
-        
-        # Sort backups by modification time (newest first)
-        @backups = sort { $b->{mtime} <=> $a->{mtime} } @backups;
-        
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'get_backup_list',
-            "Found " . scalar(@backups) . " backup files");
-        
-    };
-    
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backup_list',
-            "Error reading backup directory: $@");
-    }
-    
-    return \@backups;
-}
-
-# Create database backup with proper error handling for multiple databases
-sub create_database_backup {
-    my ($self, $c, $backup_dir, $backup_name) = @_;
-    
-    my $result = {
-        success => 0,
-        error => '',
-        dump_file => '',
-        databases_backed_up => []
-    };
-    
-    eval {
-        # Get all available database models
-        my @db_models = ('DBEncy', 'DBForager');
-        my @successful_backups = ();
-        my @backup_files = ();
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
-            "Starting multi-database backup for models: " . join(', ', @db_models));
-        
-        foreach my $model_name (@db_models) {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                "Processing database model: $model_name");
-            
-            # Check if model exists
-            my $model = eval { $c->model($model_name) };
-            if (!$model) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                    "Model $model_name not available, skipping");
-                next;
-            }
-            
-            my $connect_info = $model->config->{connect_info};
-            my ($dsn, $user, $password);
-            
-            # The database models store connection info as a hash with dsn, user, password keys
-            if (ref($connect_info) eq 'HASH') {
-                $dsn = $connect_info->{dsn};
-                $user = $connect_info->{user};
-                $password = $connect_info->{password};
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "Retrieved connection info from $model_name - DSN: $dsn, User: " . ($user || 'none'));
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                    "Unexpected connection info format in $model_name model: " . ref($connect_info));
-                next;
-            }
-            
-            # Validate required connection parameters
-            unless ($dsn) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                    "DSN not found in $model_name configuration, skipping");
-                next;
-            }
-            
-            # Ensure user and password are defined (even if empty)
-            $user = '' unless defined $user;
-            $password = '' unless defined $password;
-            
-            # Test database connection before attempting backup
-            eval {
-                my $test_schema = $model->schema;
-                my $test_dbh = $test_schema->storage->dbh;
-                # Simple test query
-                $test_dbh->do('SELECT 1');
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "Database connection test successful for $model_name");
-            };
-            if ($@) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-                    "Database connection test failed for $model_name: $@");
-                next;
-            }
-            
-            # Parse DSN to get database name and type
-            my ($db_type, $db_name, $host, $port);
-            
-            if ($dsn =~ /^dbi:mysql:database=([^;]+)(?:;host=([^;]+))?(?:;port=(\d+))?/i) {
-                $db_type = 'mysql';
-                $db_name = $1;
-                $host = $2 || 'localhost';
-                $port = $3 || 3306;
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "Parsed MySQL DSN for $model_name - Database: $db_name, Host: $host, Port: $port");
-                    
-            } elsif ($dsn =~ /^dbi:sqlite:(.+)$/i) {
-                $db_type = 'sqlite';
-                $db_name = $1;
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "Parsed SQLite DSN for $model_name - Database file: $db_name");
-                    
-            } elsif ($dsn =~ /^dbi:(\w+):/i) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                    "Unsupported database type '$1' for $model_name, skipping");
-                next;
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_database_backup',
-                    "Invalid DSN format for $model_name: $dsn, skipping");
-                next;
-            }
-            
-            # Create individual dump file for this database
-            my $individual_dump_file = "$backup_dir/${backup_name}_${model_name}_${db_name}.sql";
-            push @backup_files, $individual_dump_file;
-            
-            # Create backup command based on database type
-            my $backup_command;
-            
-            if ($db_type eq 'mysql') {
-                # MySQL backup
-                my $host_param = ($host && $host ne 'localhost') ? "-h '$host'" : '';
-                my $port_param = ($port && $port != 3306) ? "-P $port" : '';
-                my $user_param = $user ? "-u '$user'" : '';
-                
-                # Handle password parameter more securely
-                my $password_param = '';
-                if ($password) {
-                    # Escape single quotes in password for shell safety
-                    my $escaped_password = $password;
-                    $escaped_password =~ s/'/'"'"'/g;
-                    $password_param = "-p'$escaped_password'";
-                }
-                
-                $backup_command = "mysqldump $host_param $port_param $user_param $password_param --single-transaction --routines --triggers '$db_name' > '$individual_dump_file' 2>&1";
-                
-                # Test mysqldump availability
-                my $mysqldump_test = `which mysqldump 2>/dev/null`;
-                chomp($mysqldump_test);
-                unless ($mysqldump_test) {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-                        "mysqldump command not found for $model_name, skipping");
-                    next;
-                }
-                
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "MySQL backup command prepared for $model_name database: $db_name, host: " . ($host || 'localhost') . 
-                    ", user: " . ($user || 'none') . ", mysqldump path: $mysqldump_test");
-                
-            } elsif ($db_type eq 'sqlite') {
-                # SQLite backup - just copy the database file
-                if (-f $db_name) {
-                    $backup_command = "cp '$db_name' '$individual_dump_file'";
-                } else {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-                        "SQLite database file not found for $model_name: $db_name, skipping");
-                    next;
-                }
-            }
-            
-            # Execute backup command for this database
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
-                "Executing backup command for $model_name ($db_type database)");
-            
-            my $backup_output = `$backup_command`;
-            my $backup_result = $?;
-            
-            if ($backup_result != 0) {
-                my $error_msg = "Backup command failed for $model_name with exit code: $backup_result";
-                if ($backup_output) {
-                    $error_msg .= "\nCommand output: $backup_output";
-                }
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-                    $error_msg);
-                next; # Continue with next database instead of failing completely
-            }
-            
-            # Log any output from the backup command (even on success)
-            if ($backup_output) {
-                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_database_backup',
-                    "Backup command output for $model_name: $backup_output");
-            }
-            
-            # Verify backup file was created
-            unless (-f $individual_dump_file && -s $individual_dump_file) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-                    "Backup file for $model_name was not created or is empty: $individual_dump_file");
-                next;
-            }
-            
-            # Record successful backup
-            push @successful_backups, {
-                model => $model_name,
-                database => $db_name,
-                file => $individual_dump_file,
-                size => -s $individual_dump_file
-            };
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
-                "Successfully backed up $model_name database ($db_name) to $individual_dump_file");
-        }
-        
-        # Check if we have any successful backups
-        if (@successful_backups == 0) {
-            die "No databases were successfully backed up";
-        }
-        
-        # Create a combined dump file containing all individual backups
-        my $combined_dump_file = "$backup_dir/${backup_name}_all_databases.sql";
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
-            "Creating combined backup file: $combined_dump_file");
-        
-        # Combine all individual backup files
-        my $combine_command = "cat " . join(' ', map { "'$_'" } @backup_files) . " > '$combined_dump_file'";
-        my $combine_result = system($combine_command);
-        
-        if ($combine_result == 0 && -f $combined_dump_file && -s $combined_dump_file) {
-            # Clean up individual files after successful combination
-            foreach my $individual_file (@backup_files) {
-                unlink $individual_file if -f $individual_file;
-            }
-            
-            $result->{dump_file} = $combined_dump_file;
-        } else {
-            # If combination failed, keep individual files and use the first one as primary
-            $result->{dump_file} = $backup_files[0] if @backup_files;
-        }
-        
-        $result->{success} = 1;
-        $result->{databases_backed_up} = \@successful_backups;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_database_backup',
-            "Multi-database backup completed successfully. Backed up " . scalar(@successful_backups) . 
-            " databases to: " . $result->{dump_file});
-        
-    };
-    
-    if ($@) {
-        $result->{error} = $@;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_database_backup',
-            "Database backup failed: $@");
-    }
-    
-    return $result;
-}
-
-# Database mode selection - forward to DatabaseMode controller
-sub database_mode :Path('database_mode') :Args {
-    my ($self, $c, @args) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_mode',
-        "Forwarding to DatabaseMode controller with args: " . join(', ', @args));
-    
-    # Handle sub-routes
-    if (@args) {
-        my $action = shift @args;
-        
-        if ($action eq 'switch_backend' && @args) {
-            $c->forward('Controller::DatabaseMode', 'switch_backend', \@args);
-        } elsif ($action eq 'test_connection' && @args) {
-            $c->forward('Controller::DatabaseMode', 'test_connection', \@args);
-        } elsif ($action eq 'status') {
-            $c->forward('Controller::DatabaseMode', 'status', \@args);
-        } elsif ($action eq 'sync_to_production') {
-            $c->forward('Controller::DatabaseMode', 'sync_to_production', \@args);
-        } elsif ($action eq 'sync_from_production') {
-            $c->forward('Controller::Admin', 'sync_from_production', \@args);
-        } elsif ($action eq 'refresh_backends') {
-            $c->forward('Controller::DatabaseMode', 'refresh_backends', \@args);
-        } elsif ($action eq 'debug_backends') {
-            $c->forward('Controller::DatabaseMode', 'debug_backends', \@args);
-        } elsif ($action eq 'add_backend') {
-            $c->forward('Controller::DatabaseMode', 'add_backend', \@args);
-        } elsif ($action eq 'update_backend' && @args) {
-            $c->forward('Controller::DatabaseMode', 'update_backend', \@args);
-        } elsif ($action eq 'delete_backend' && @args) {
-            $c->forward('Controller::DatabaseMode', 'delete_backend', \@args);
-        } elsif ($action eq 'get_backend' && @args) {
-            $c->forward('Controller::DatabaseMode', 'get_backend', \@args);
-        } else {
-            # Unknown sub-route, forward to index with all args
-            $c->forward('Controller::DatabaseMode', 'index', [$action, @args]);
-        }
-    } else {
-        # No args, forward to index
-        $c->forward('Controller::DatabaseMode', 'index', \@args);
-    }
-}
-
-# Manual database synchronization from production
-sub sync_from_production :Path('sync_from_production') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check admin permissions
-    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
-        $c->response->redirect($c->uri_for('/access_denied'));
-        return;
-    }
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_from_production',
-        "Manual sync from production requested by user: " . ($c->user ? $c->user->username : 'unknown'));
-    
-    try {
-        my $hybrid_db = $c->model('HybridDB');
-        unless ($hybrid_db) {
-            die "HybridDB model not available";
-        }
-        
-        # Get sync options from request parameters
-        my $dry_run = $c->request->params->{dry_run} ? 1 : 0;
-        my $force_overwrite = $c->request->params->{force_overwrite} ? 1 : 0;
-        my $tables_param = $c->request->params->{tables} || '';
-        my @tables = $tables_param ? split(/,/, $tables_param) : ();
-        
-        # Clean up table names
-        @tables = map { s/^\s+|\s+$//g; $_ } @tables;
-        @tables = grep { $_ ne '' } @tables;
-        
-        my $sync_result = $hybrid_db->sync_from_production($c, {
-            dry_run => $dry_run,
-            force_overwrite => $force_overwrite,
-            tables => \@tables,
-        });
-        
-        # Prepare result message
-        my $message = '';
-        if ($dry_run) {
-            $message = "DRY RUN: Would sync " . $sync_result->{tables_synced} . " tables, " .
-                      "create " . $sync_result->{tables_created} . " new tables, " .
-                      "update " . $sync_result->{tables_updated} . " existing tables, " .
-                      "sync " . $sync_result->{records_synced} . " records";
-        } else {
-            $message = "Sync completed: " . $sync_result->{tables_synced} . " tables processed, " .
-                      $sync_result->{tables_created} . " tables created, " .
-                      $sync_result->{tables_updated} . " tables updated, " .
-                      $sync_result->{records_synced} . " records synced";
-        }
-        
-        if (@{$sync_result->{errors}}) {
-            $message .= ". Errors: " . join('; ', @{$sync_result->{errors}});
-        }
-        
-        $c->stash(
-            sync_result => $sync_result,
-            message => $message,
-            success => (@{$sync_result->{errors}} == 0),
-        );
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'sync_from_production',
-            "Sync completed: " . $message);
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'sync_from_production',
-            "Sync failed: $error");
-        
-        $c->stash(
-            error => $error,
-            message => "Sync failed: $error",
-            success => 0,
-        );
-    };
-    
-    # If this is an AJAX request, return JSON
-    if ($c->request->header('X-Requested-With') eq 'XMLHttpRequest') {
-        $c->response->content_type('application/json');
-        $c->response->body(JSON::encode_json({
-            success => $c->stash->{success},
-            message => $c->stash->{message},
-            sync_result => $c->stash->{sync_result},
-        }));
-        return;
-    }
-    
-    # Otherwise render template
-    $c->stash(template => 'admin/sync_from_production.tt');
-}
-
-# Get database tables for a specific backend
-sub get_backend_database_tables {
-    my ($self, $c, $backend_name, $backend_info) = @_;
-    
-    my @tables = ();
-    
-    try {
-        if ($backend_info->{type} eq 'mysql') {
-            # Create direct connection to this backend
-            my $config = $backend_info->{config};
-            my $host = $config->{host};
-            
-            # Apply localhost override if configured
-            if ($config->{localhost_override} && $host ne 'localhost') {
-                $host = 'localhost';
-            }
-            
-            my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
-            my $dbh = DBI->connect(
-                $dsn,
-                $config->{username},
-                $config->{password},
-                {
-                    RaiseError => 1,
-                    PrintError => 0,
-                    mysql_enable_utf8 => 1,
-                }
-            );
-            
-            if ($dbh) {
-                my $sth = $dbh->prepare("SHOW TABLES");
-                $sth->execute();
-                
-                while (my ($table) = $sth->fetchrow_array()) {
-                    push @tables, $table;
-                }
-                
-                $dbh->disconnect();
-                
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backend_database_tables',
-                    "Found " . scalar(@tables) . " tables in backend '$backend_name': " . join(', ', @tables));
-            }
-            
-        } elsif ($backend_info->{type} eq 'sqlite') {
-            # For SQLite, get tables from the database file
-            my $db_path = $backend_info->{config}->{database_path};
-            
-            if (-f $db_path) {
-                my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", "", "", {
-                    RaiseError => 1,
-                    PrintError => 0,
-                });
-                
-                if ($dbh) {
-                    my $sth = $dbh->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-                    $sth->execute();
-                    
-                    while (my ($table) = $sth->fetchrow_array()) {
-                        push @tables, $table;
-                    }
-                    
-                    $dbh->disconnect();
-                    
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_backend_database_tables',
-                        "Found " . scalar(@tables) . " tables in SQLite backend '$backend_name': " . join(', ', @tables));
-                }
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_backend_database_tables',
-                    "SQLite database file not found: $db_path");
-            }
-        }
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backend_database_tables', 
-            "Error getting tables for backend '$backend_name': $error");
-        die $error;
-    };
-    
-    return \@tables;
-}
-
-# Compare a backend table with its Result file
-sub compare_backend_table_with_result_file {
-    my ($self, $c, $table_name, $backend_name, $backend_info, $result_table_mapping) = @_;
-    
-    # Get table schema from the backend
-    my $table_schema = { columns => {} };
-    eval {
-        $table_schema = $self->get_backend_table_schema($c, $table_name, $backend_name, $backend_info);
-    };
-    if ($@) {
-        warn "Failed to get table schema for $table_name ($backend_name): $@";
-        $table_schema = { columns => {} };
-    }
-    
-    # Check if this table has a corresponding result file using the mapping
-    my $table_key = lc($table_name);
-    my $result_info = $result_table_mapping->{$table_key};
-    my $result_schema = { columns => {} };
-    
-    if ($result_info && -f $result_info->{result_path}) {
-        eval {
-            $result_schema = $self->parse_result_file_schema($c, $result_info->{result_path});
-        };
-        if ($@) {
-            warn "Failed to parse Result file $result_info->{result_path}: $@";
-            $result_schema = { columns => {} };
-        }
-    }
-    
-    # Create field comparison
-    my $comparison = {
-        table_name => $table_name,
-        database => $backend_name,
-        backend_type => $backend_info->{type},
-        has_result_file => ($result_info && -f $result_info->{result_path}) ? 1 : 0,
-        result_file_path => $result_info ? $result_info->{result_path} : undef,
-        fields => {}
-    };
-    
-    # Get all unique field names from both sources
-    my %all_fields = ();
-    if ($table_schema && $table_schema->{columns}) {
-        %all_fields = (%all_fields, map { $_ => 1 } keys %{$table_schema->{columns}});
-    }
-    if ($result_schema && $result_schema->{columns}) {
-        %all_fields = (%all_fields, map { $_ => 1 } keys %{$result_schema->{columns}});
-    }
-    
-    # Compare each field
-    foreach my $field_name (sort keys %all_fields) {
-        my $table_field = $table_schema->{columns}->{$field_name};
-        my $result_field = $result_schema->{columns}->{$field_name};
-        
-        $comparison->{fields}->{$field_name} = {
-            table => $table_field,
-            result => $result_field,
-            differences => $self->compare_field_attributes($table_field, $result_field, $c, $field_name)
-        };
-    }
-    
-    return $comparison;
-}
-
-# Get table schema from a specific backend
-sub get_backend_table_schema {
-    my ($self, $c, $table_name, $backend_name, $backend_info) = @_;
-    
-    my $schema_info = {
-        columns => {},
-        primary_keys => [],
-        unique_constraints => [],
-        foreign_keys => [],
-        indexes => []
-    };
-    
-    try {
-        if ($backend_info->{type} eq 'mysql') {
-            # Create direct connection to this backend
-            my $config = $backend_info->{config};
-            my $host = $config->{host};
-            
-            # Apply localhost override if configured
-            if ($config->{localhost_override} && $host ne 'localhost') {
-                $host = 'localhost';
-            }
-            
-            my $dsn = "dbi:mysql:database=$config->{database};host=$host;port=$config->{port}";
-            my $dbh = DBI->connect(
-                $dsn,
-                $config->{username},
-                $config->{password},
-                {
-                    RaiseError => 1,
-                    PrintError => 0,
-                    mysql_enable_utf8 => 1,
-                }
-            );
-            
-            if ($dbh) {
-                # Get column information
-                my $sth = $dbh->prepare("DESCRIBE `$table_name`");
-                $sth->execute();
-                
-                while (my $row = $sth->fetchrow_hashref()) {
-                    my $column_name = $row->{Field};
-                    
-                    # Parse MySQL column type
-                    my ($data_type, $size) = $self->parse_mysql_column_type($row->{Type});
-                    
-                    $schema_info->{columns}->{$column_name} = {
-                        data_type => $data_type,
-                        size => $size,
-                        is_nullable => ($row->{Null} eq 'YES' ? 1 : 0),
-                        default_value => $row->{Default},
-                        is_auto_increment => ($row->{Extra} =~ /auto_increment/i ? 1 : 0),
-                        extra => $row->{Extra}
-                    };
-                    
-                    # Check for primary key
-                    if ($row->{Key} eq 'PRI') {
-                        push @{$schema_info->{primary_keys}}, $column_name;
-                    }
-                }
-                
-                $dbh->disconnect();
-            }
-            
-        } elsif ($backend_info->{type} eq 'sqlite') {
-            # For SQLite, get schema information
-            my $db_path = $backend_info->{config}->{database_path};
-            
-            if (-f $db_path) {
-                my $dbh = DBI->connect("dbi:SQLite:dbname=$db_path", "", "", {
-                    RaiseError => 1,
-                    PrintError => 0,
-                });
-                
-                if ($dbh) {
-                    # Get column information from SQLite
-                    my $sth = $dbh->prepare("PRAGMA table_info(`$table_name`)");
-                    $sth->execute();
-                    
-                    while (my $row = $sth->fetchrow_hashref()) {
-                        my $column_name = $row->{name};
-                        
-                        $schema_info->{columns}->{$column_name} = {
-                            data_type => $row->{type},
-                            size => undef,  # SQLite doesn't enforce size
-                            is_nullable => ($row->{notnull} ? 0 : 1),
-                            default_value => $row->{dflt_value},
-                            is_auto_increment => 0,  # Will be detected separately
-                            extra => ''
-                        };
-                        
-                        # Check for primary key
-                        if ($row->{pk}) {
-                            push @{$schema_info->{primary_keys}}, $column_name;
-                        }
-                    }
-                    
-                    $dbh->disconnect();
-                }
-            }
-        }
-        
-    } catch {
-        my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_backend_table_schema', 
-            "Error getting schema for table '$table_name' in backend '$backend_name': $error");
-        die $error;
-    };
-    
-    return $schema_info;
-}
 
 __PACKAGE__->meta->make_immutable;
 
