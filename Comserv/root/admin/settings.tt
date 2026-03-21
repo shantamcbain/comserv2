@@ -1,0 +1,76 @@
+[% META
+   title = "Admin Settings"
+   description = "Site administration settings"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-03-21"
+%]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Administration Settings</h1>
+        <h2 class="page-subtitle">Configure site-wide settings</h2>
+    </div>
+
+    [% IF error_msg %]
+    <div class="alert alert-danger">[% error_msg | html %]</div>
+    [% END %]
+    [% IF success_msg %]
+    <div class="alert alert-success">[% success_msg | html %]</div>
+    [% END %]
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="[% c.uri_for('/admin/settings') %]">
+                <div class="form-group mb-3">
+                    <label for="site_name"><strong>Site Name</strong></label>
+                    <input type="text" class="form-control" id="site_name" name="site_name"
+                        value="[% form_data.site_name || settings.site_name | html %]" required>
+                    [% IF errors.site_name %]<div class="text-danger">[% errors.site_name | html %]</div>[% END %]
+                </div>
+                <div class="form-group mb-3">
+                    <label for="site_description"><strong>Site Description</strong></label>
+                    <textarea class="form-control" id="site_description" name="site_description" rows="3">[% form_data.site_description || settings.site_description | html %]</textarea>
+                </div>
+                <div class="form-group mb-3">
+                    <label for="admin_email"><strong>Admin Email</strong></label>
+                    <input type="email" class="form-control" id="admin_email" name="admin_email"
+                        value="[% form_data.admin_email || settings.admin_email | html %]" required>
+                    [% IF errors.admin_email %]<div class="text-danger">[% errors.admin_email | html %]</div>[% END %]
+                </div>
+                <div class="form-group mb-3">
+                    <label for="items_per_page"><strong>Items Per Page</strong></label>
+                    <input type="number" class="form-control" id="items_per_page" name="items_per_page"
+                        value="[% form_data.items_per_page || settings.items_per_page || 25 | html %]" min="1" max="500" required>
+                    [% IF errors.items_per_page %]<div class="text-danger">[% errors.items_per_page | html %]</div>[% END %]
+                </div>
+                <div class="form-group mb-3">
+                    <label for="theme"><strong>Theme</strong></label>
+                    <select class="form-control" id="theme" name="theme">
+                        [% FOREACH t IN themes %]
+                        <option value="[% t | html %]" [% IF (form_data.theme || settings.theme) == t %]selected[% END %]>[% t | html %]</option>
+                        [% END %]
+                    </select>
+                </div>
+                <div class="form-group mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="allow_comments" name="allow_comments" value="1"
+                            [% IF form_data.allow_comments || settings.allow_comments %]checked[% END %]>
+                        <label class="form-check-label" for="allow_comments">Allow Comments</label>
+                    </div>
+                </div>
+                <div class="form-group mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="moderate_comments" name="moderate_comments" value="1"
+                            [% IF form_data.moderate_comments || settings.moderate_comments %]checked[% END %]>
+                        <label class="form-check-label" for="moderate_comments">Moderate Comments</label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+                <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary ms-2">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
