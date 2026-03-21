@@ -199,7 +199,12 @@ sub  create_project :Local :Args(0) {
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
-    
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/project/project' }));
+        return;
+    }
+
     # Log the start of the project action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'project', 'Starting project action');
     
@@ -245,6 +250,11 @@ sub project :Path('project') :Args(0) {
 sub details :Path('details') :Args(0) {
     my ( $self, $c ) = @_;
 
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/project/details' }));
+        return;
+    }
+
     # Logging: Start of the details action
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 'Starting details action.');
 
@@ -252,8 +262,8 @@ sub details :Path('details') :Args(0) {
     my $project_id = $c->request->body_parameters->{project_id} || $c->request->query_parameters->{project_id};
 
     if (!$project_id) {
-        # Logging: Parameter missing
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
+        # Logging: Parameter missing (warn not error - expected for bots hitting bare URL)
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details', 'Missing parent_id or project_id parameter in request.');
 
         # Check if this was meant to be a sub-project creation
         my $parent_id = $c->request->query_parameters->{parent_id};
