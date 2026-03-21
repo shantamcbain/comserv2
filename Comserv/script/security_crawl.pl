@@ -169,6 +169,18 @@ sub classify_response {
         return \%finding;
     }
 
+    # Connection failure (LWP-generated 5xx, not a real server response)
+    if ($code >= 500) {
+        my $message = $resp->message // '';
+        if ($message =~ /Can't connect|connect.*(?:failed|refused|timeout)|Bad hostname|Name or service not known|resolution failed/i
+            || !$resp->header('content-type'))
+        {
+            $finding{result} = 'CONNECT_FAIL';
+            $finding{detail} = $message;
+            return \%finding;
+        }
+    }
+
     # 500 with stack trace = information disclosure
     if ($code == 500) {
         if ($body =~ /at \/opt\/comserv|Comserv::Controller|DBIx::Class|stack trace/i) {
@@ -256,10 +268,11 @@ print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 2: Directly probe sensitive GET endpoints
-# (uses probe_ua — NO X-Sitename header — exactly like a fresh
-#  anonymous browser.  Host header determines the site.)
+# (uses probe_ua — fresh empty cookie jar = truly unauthenticated.
+#  X-Sitename sent so Root.pm can route correctly; authentication
+#  state is determined solely by the cookie jar, not the site header.)
 # ============================================================
-print "[Phase 2] Probing known sensitive GET endpoints (no session, no site header)...\n";
+print "[Phase 2] Probing known sensitive GET endpoints (unauthenticated — fresh session)...\n";
 
 my @SENSITIVE_GET = (
     '/admin',
@@ -299,7 +312,7 @@ my @SENSITIVE_GET = (
 for my $path (@SENSITIVE_GET) {
     my $url = $base_url . $path;
     next if $visited{$url};
-    my $resp = $probe_ua->get($url);
+    my $resp = $probe_ua->get($url, @site_hdr);
     my $finding = classify_response($url, $resp);
     $finding->{phase} = 'probe_get';
 
@@ -314,13 +327,14 @@ print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 3: Probe sensitive POST endpoints with dummy data
-# (probe_ua — no session, no site header)
+# (probe_ua — fresh empty cookie jar = unauthenticated)
 # ============================================================
-print "[Phase 3] Probing sensitive POST endpoints (no session)...\n";
+print "[Phase 3] Probing sensitive POST endpoints (unauthenticated — fresh session)...\n";
 
 for my $path (@SENSITIVE_POST_ENDPOINTS) {
     my $url = $base_url . $path;
     my $resp = $probe_ua->post($url,
+        @site_hdr,
         Content => [name => 'test', client_name => 'test', project_id => '1', record_id => '1'],
     );
     my $code  = $resp->code;
@@ -351,16 +365,16 @@ print "\n" . "=" x 60 . "\n";
 
 # ============================================================
 # Phase 4: Check public pages for links to private areas
-# (probe_ua — no session, no site header — true public view)
+# (probe_ua — fresh empty cookie jar = unauthenticated public view)
 # ============================================================
-print "[Phase 4] Checking public pages for leaking private links (no session)...\n";
+print "[Phase 4] Checking public pages for leaking private links (unauthenticated)...\n";
 
 my @PUBLIC_PAGES = ('/', '/ENCY', '/ENCY/BeePastureView', '/ENCY/BotanicalNameView',
                     '/workshop', '/HelpDesk', '/WeaverBeck', '/MCoop', '/3d', '/CSC');
 
 for my $path (@PUBLIC_PAGES) {
     my $url  = $base_url . $path;
-    my $resp = $probe_ua->get($url);
+    my $resp = $probe_ua->get($url, @site_hdr);
     next unless $resp->code == 200 && $resp->content_type =~ /html/;
 
     my @links   = extract_links($url, $resp->decoded_content // '');
@@ -382,9 +396,10 @@ print "\n" . "=" x 60 . "\n";
 # ============================================================
 # Summary
 # ============================================================
-my @critical = grep { $_->{result} =~ /EXPOSED|LEAK/i } @findings;
+my @critical  = grep { $_->{result} =~ /EXPOSED|LEAK/i } @findings;
 my @protected = grep { $_->{result} eq 'PROTECTED' } @findings;
-my @errors   = grep { $_->{result} eq 'SERVER_ERROR' } @findings;
+my @errors    = grep { $_->{result} eq 'SERVER_ERROR' } @findings;
+my @conn_fail = grep { $_->{result} eq 'CONNECT_FAIL' } @findings;
 
 print "=" x 60 . "\n";
 print "SUMMARY\n";
@@ -393,6 +408,11 @@ printf "  Total URLs tested : %d\n", scalar @findings;
 printf "  PROTECTED (good)  : %d\n", scalar @protected;
 printf "  EXPOSED/LEAK (BAD): %d\n", scalar @critical;
 printf "  Server errors     : %d\n", scalar @errors;
+printf "  Connect failures  : %d\n", scalar @conn_fail if @conn_fail;
+if (@conn_fail) {
+    print "\n  NOTE: Connect failures mean the target host is unreachable (bad hostname or not running).\n";
+    print "  Use a hostname from /etc/hosts or check the server is up.\n";
+}
 
 if (@critical) {
     print "\nCRITICAL FINDINGS:\n";
@@ -411,10 +431,11 @@ my %report = (
     base_url  => $base_url,
     sitename  => $sitename,
     summary   => {
-        total     => scalar @findings,
-        exposed   => scalar @critical,
-        protected => scalar @protected,
-        errors    => scalar @errors,
+        total        => scalar @findings,
+        exposed      => scalar @critical,
+        protected    => scalar @protected,
+        errors       => scalar @errors,
+        connect_fail => scalar @conn_fail,
     },
     findings => \@findings,
 );
