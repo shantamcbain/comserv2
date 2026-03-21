@@ -94,10 +94,10 @@ $c->stash(template => 'admin/index.tt');
 <p>For more detailed information, refer to the `Root.pm` and `Admin.pm` controllers.</p>
 
 <h2 id="setup_controller"><a href="#setup_controller">Setup Controller</a></h2>
-[% TRY; INCLUDE 'Documentation/SetupController.tt'; CATCH; END %]
+[% TRY %][% INCLUDE 'Documentation/SetupController.tt' %][% CATCH %][% END %]
 
 <h2 id="setup_model"><a href="#setup_model">Setup Model</a></h2>
-[% TRY; INCLUDE 'Documentation/SetupModel.tt'; CATCH; END %]
+[% TRY %][% INCLUDE 'Documentation/SetupModel.tt' %][% CATCH %][% END %]
 
 <h2 id="setup_view"><a href="#setup_view">Setup View</a></h2>
 <p>The Setup View is responsible for displaying the setup process to the user. It includes templates that guide the user through the setup steps and provide feedback on the success or failure of the setup process.</p>
