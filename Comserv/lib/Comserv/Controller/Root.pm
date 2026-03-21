@@ -10,6 +10,7 @@ use Time::HiRes qw(gettimeofday);
 use Comserv::Util::Logging;
 use Comserv::Util::SystemInfo;
 use Comserv::Util::CSRF;
+use Comserv::Util::AdminAuth;
 
 # Configure static file serving
 __PACKAGE__->config(
@@ -1652,6 +1653,14 @@ sub site_setup {
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'debug')) {
+        $c->flash->{error_msg} = 'You must be an administrator to access the debug page.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $site_name = $c->stash->{SiteName};
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
