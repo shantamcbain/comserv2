@@ -18,6 +18,7 @@
     .finding-LINK_LEAK             { background-color: #fff3cd; font-weight: bold; }
     .finding-SERVER_ERROR          { background-color: #ffeeba; }
     .finding-NOT_FOUND             { background-color: #e2e3e5; color: #6c757d; }
+    .finding-CONNECT_FAIL          { background-color: #343a40; color: #adb5bd; }
     .scan-terminal {
         font-family: monospace;
         font-size: 0.78em;
@@ -38,6 +39,7 @@
     .badge-PROTECTED, .badge-FORBIDDEN { background-color: #28a745; color: #fff; }
     .badge-OK_PUBLIC         { background-color: #6c757d; color: #fff; }
     .badge-NOT_FOUND         { background-color: #adb5bd; color: #fff; }
+    .badge-CONNECT_FAIL      { background-color: #343a40; color: #adb5bd; }
     #scan-progress { display: none; }
     #scan-results  { display: none; }
     .stat-card { text-align: center; padding: 0.75rem; border-radius: 4px; color: #fff; }
@@ -236,14 +238,19 @@ function renderResults(findings) {
         if (r.indexOf('EXPOSED') === 0 || r === 'LEAK_STACK_TRACE') counts.critical++;
         else if (r === 'LINK_LEAK' || r === 'SERVER_ERROR')          counts.warning++;
         else if (r === 'PROTECTED' || r === 'FORBIDDEN')             counts.ok++;
+        else if (r === 'CONNECT_FAIL')                                counts.connfail = (counts.connfail||0) + 1;
         else                                                          counts.neutral++;
     });
 
+    var connfailCard = counts.connfail
+        ? statCard('bg-dark', counts.connfail, 'Connect Fail')
+        : '';
     document.getElementById('stat-row').innerHTML =
         statCard('bg-danger',    counts.critical, 'Critical') +
         statCard('bg-warning',   counts.warning,  'Warnings') +
         statCard('bg-success',   counts.ok,        'Protected') +
-        statCard('bg-secondary', counts.neutral,   'Scanned / 404');
+        statCard('bg-secondary', counts.neutral,   'Scanned / 404') +
+        connfailCard;
 
     var tbody = document.getElementById('findings-body');
     tbody.innerHTML = '';
@@ -254,6 +261,7 @@ function renderResults(findings) {
         if (f.snippet)   detail += '<details><summary>snippet</summary><pre style="font-size:0.7em;max-height:80px;overflow:auto">' + esc(f.snippet) + '</pre></details>';
         if (f.final_url && f.final_url !== url) detail += '<small class="text-muted">→ ' + esc(f.final_url) + '</small>';
         if (f.leaked_link) detail += '<small class="text-muted d-block">leaked: ' + esc(f.leaked_link) + '</small>';
+        if (f.detail)    detail += '<small class="text-muted d-block">' + esc(f.detail) + '</small>';
         var tr = '<tr class="finding-' + esc(r) + '" data-result="' + esc(r) + '">' +
             '<td><small>' + esc(f.phase||'') + '</small></td>' +
             '<td><span class="badge-result badge-' + esc(r) + '">' + esc(r) + '</span></td>' +
