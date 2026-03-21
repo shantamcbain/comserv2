@@ -160,9 +160,13 @@ sub add_site :Local {
 sub add_site_form :Local {
     my ($self, $c) = @_;
 
-    # Your code here...
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_site_form')) {
+        $c->flash->{error_msg} = 'You must be an administrator to add sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
-    # Set the template to site/add_site_form.tt
     $c->stash(template => 'site/add_site_form.tt');
 }
 sub details :Local {
