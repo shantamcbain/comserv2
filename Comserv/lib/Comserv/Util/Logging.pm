@@ -18,46 +18,85 @@ use File::Copy;
 use FindBin;
 use File::Path qw(make_path);
 use File::Spec;
+use Comserv::Util::NfsPath;
 use Fcntl qw(:flock O_WRONLY O_APPEND O_CREAT);
 use POSIX qw(strftime); # For timestamp formatting
-use JSON qw(encode_json decode_json); # For structured error logging
 
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
-my $MAX_LOG_SIZE = 100 * 1024; # 100 KB max size for easier AI analysis
-my $ROTATION_THRESHOLD = 80 * 1024; # Rotate at 80 KB to prevent exceeding max size
-my $MAX_LOG_FILES = 20; # Maximum number of archived log files to keep
-
-# PHASE 2: Enhanced Error Reporting - Error tracking storage
-my $ERROR_STORAGE = {}; # In-memory error storage for current session
-my $MAX_STORED_ERRORS = 100; # Maximum number of errors to store in memory
-my $ERROR_LOG_FILE; # Separate error log file
-
-# PHASE 3: Application-level log filtering (integrated with CATALYST_DEBUG)
-# This controls what actually gets written to application.log
-my $APPLICATION_LOG_LEVEL = do {
-    if ($ENV{CATALYST_DEBUG}) {
-        'DEBUG';  # Development: Show everything for debugging
-    } elsif ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'production') {
-        'ERROR';  # Production: Only errors for admin review, nothing to users
-    } else {
-        'WARN';   # Default: Warnings and above
-    }
-};
-my %LOG_LEVELS = (
-    'DEBUG' => 1,
-    'INFO'  => 2, 
-    'WARN'  => 3,
-    'ERROR' => 4,
-    'CRITICAL' => 5
+# Known bot/spider user-agent patterns for request classification
+my @BOT_PATTERNS = (
+    qr/googlebot/i,
+    qr/bingbot/i,
+    qr/baiduspider/i,
+    qr/yandexbot/i,
+    qr/duckduckbot/i,
+    qr/slurp/i,
+    qr/facebookexternalhit/i,
+    qr/twitterbot/i,
+    qr/linkedinbot/i,
+    qr/applebot/i,
+    qr/ia_archiver/i,
+    qr/archive\.org/i,
+    qr/semrushbot/i,
+    qr/ahrefsbot/i,
+    qr/mj12bot/i,
+    qr/dotbot/i,
+    qr/rogerbot/i,
+    qr/crawler/i,
+    qr/spider/i,
+    qr/\bbot\b/i,
+    qr/scrapy/i,
+    qr/wget/i,
+    qr/curl/i,
+    qr/python-requests/i,
+    qr/go-http-client/i,
+    qr/java\//i,
+    qr/nikto/i,
+    qr/sqlmap/i,
+    qr/nmap/i,
+    qr/masscan/i,
+    qr/zgrab/i,
+    qr/dirbuster/i,
+    qr/havij/i,
+    qr/acunetix/i,
+    qr/nessus/i,
 );
+
+# Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
+my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
+my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
+
+# Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
+my $_email_failed_at = 0;  # epoch time of last email send failure
+my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+
+my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
+my $ROTATION_THRESHOLD = 40 * 1024 * 1024; # Rotate at 40 MB
+my $MAX_LOG_FILES = 10; # Maximum number of archived log files to keep
+
+# Level threshold for sending email notifications
+our %LEVEL_PRIORITY = (
+    'CRITICAL' => 5,
+    'ERROR'    => 4,
+    'WARN'     => 3,
+    'INFO'     => 2,
+    'DEBUG'    => 1,
+);
+our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
+
+# Minimum level to write to the DB system_log table.
+# Default: WARN (DEBUG and INFO go only to file log; WARN/ERROR/CRITICAL go to DB).
+# Override via environment variable DB_LOG_MIN_LEVEL=INFO (or DEBUG for full capture).
+# This prevents millions of low-value rows from filling the table.
+our $DB_LOG_MIN_LEVEL = $ENV{DB_LOG_MIN_LEVEL} || 'WARN';
 
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
     my ($msg) = @_;
     print STDERR "$msg\n";
-    if (defined $LOG_FH) {
+    if (defined $LOG_FH && fileno($LOG_FH)) {
         flock($LOG_FH, LOCK_EX);
         print $LOG_FH "$msg\n";
         flock($LOG_FH, LOCK_UN);
@@ -70,7 +109,11 @@ sub rotate_log {
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
+    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
     return if $file_size < $MAX_LOG_SIZE;
+
+    # Log that we're rotating the file
+    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -85,18 +128,31 @@ sub rotate_log {
 
     # For very large files, we'll split them into chunks
     if ($file_size > $MAX_LOG_SIZE * 2) {
-        $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE);
+        _print_log("Log file is very large ($file_size bytes). Splitting into chunks of $MAX_LOG_SIZE bytes.");
+        eval { $archived_log = _split_large_log($LOG_FILE, $archive_dir, $filename, $timestamp, $MAX_LOG_SIZE); };
+        if ($@) {
+            _print_log("Log split failed (non-fatal): $@");
+            $archived_log = undef;
+        }
     } else {
         # For smaller files, just move the whole file
-        move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
+        unless (File::Copy::move($LOG_FILE, $archived_log)) {
+            _print_log("Could not rotate log (non-fatal): $!");
+            sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644);
+            return;
+        }
     }
 
     # Reopen log file
-    sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)
-        or die "Cannot reopen log file after rotation: $!";
+    unless (sysopen($LOG_FH, $LOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
+        _print_log("Cannot reopen log file after rotation (non-fatal): $!");
+        return;
+    }
 
     # Clean up old log files if we have too many
     _cleanup_old_logs($archive_dir, $filename);
+
+    _print_log("Log rotated: $archived_log");
 }
 
 # Helper function to clean up old log files
@@ -149,17 +205,98 @@ sub _get_timestamp {
     return strftime("%Y-%m-%d %H:%M:%S", localtime);
 }
 
+# Helper function to get the system identifier (Production, Workstation2, etc.)
+sub get_system_identifier {
+    my ($class) = @_;
+
+    # Determine listening port from env or ARGV (same logic as Comserv.pm session isolation)
+    my $port = $ENV{WEB_PORT} || $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
+        my $p = '';
+        for my $i (0 .. $#ARGV) {
+            if    ($ARGV[$i] =~ /^-p(\d+)$/)                                    { $p = $1; last }
+            elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+            elsif ($ARGV[$i] =~ /^--port=(\d+)$/)                               { $p = $1; last }
+            elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
+        }
+        $p;
+    };
+
+    # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
+    my $identifier = $ENV{SYSTEM_IDENTIFIER};
+    if ($identifier && $identifier ne '') {
+        # Append port when it adds useful info (i.e. not already encoded in the name)
+        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
+        return $identifier;
+    }
+
+    # 2. Map known IP addresses to friendly names.
+    # Use a UDP connect (no packets sent) to find which local IP the OS would
+    # use when routing outbound — the most reliable way to get the primary LAN IP.
+    my %IP_NAMES = (
+        '192.168.1.126' => 'production',
+        '192.168.1.199' => 'workstation',
+    );
+    eval {
+        require Socket;
+        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
+            or die "socket: $!";
+        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
+            or die "connect: $!";
+        my $local = getsockname($sock);
+        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+        my $ip = Socket::inet_ntoa($local_ip_packed);
+        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
+    };
+
+    # 3. Fall back to plain hostname
+    unless ($identifier && $identifier ne '') {
+        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
+        $identifier //= 'unknown';
+    }
+
+    # Append port to disambiguate multiple dev servers on the same host
+    $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
+
+    return $identifier;
+}
+
 # Initialize the logging system
 sub init {
     my ($class) = @_;
 
     # Determine the base directory for logs
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    _print_log("Base directory: $base_dir");
+    # Priority 1: Configured path in Database (logging_nfs_dir)
+    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
+    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
+    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
+    # Priority 5: Default relative to binary
+    my $log_file;
+    my $log_dir;
 
-    my $log_dir  = File::Spec->catdir($base_dir, "logs");
-    my $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Log directory: $log_dir");
+    # Note: DB access in init() might be restricted depending on startup sequence.
+    # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
+    
+    my $nfs_path_util = Comserv::Util::NfsPath->new();
+    my $standard_nfs = $nfs_path_util->get_nfs_root();
+    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
+    
+    my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
+    
+    if (-d $standard_log_dir && -w $standard_log_dir) {
+        $log_dir  = $standard_log_dir;
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using standardized NFS log directory: $log_dir");
+    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
+        $log_dir  = $nfs_log_dir;
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using centralized log directory: $log_dir");
+    } else {
+        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir  = File::Spec->catdir($base_dir, "logs");
+        $log_file = File::Spec->catfile($log_dir, "application.log");
+        _print_log("Using local log directory: $log_dir");
+    }
+
     _print_log("Log file: $log_file");
 
     # Create the log directory if it doesn't exist
@@ -194,34 +331,13 @@ sub init {
     _print_log("Global log file path set to: $LOG_FILE");
 
     # Log initialization message
-    log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
 }
 
 # Constructor for creating a new instance
 sub new {
     my ($class) = @_;
     return bless {}, $class;
-}
-
-# PHASE 3: Application log level management (separate from browser debug_mode)
-sub set_application_log_level {
-    my ($class, $level) = @_;
-    $level = uc($level || 'WARN');
-    if (exists $LOG_LEVELS{$level}) {
-        $APPLICATION_LOG_LEVEL = $level;
-        return 1;
-    }
-    return 0;
-}
-
-sub get_application_log_level {
-    my ($class) = @_;
-    return $APPLICATION_LOG_LEVEL;
-}
-
-sub get_available_log_levels {
-    my ($class) = @_;
-    return sort { $LOG_LEVELS{$a} <=> $LOG_LEVELS{$b} } keys %LOG_LEVELS;
 }
 
 # Singleton-like instance method
@@ -236,68 +352,83 @@ sub log_with_details {
     $message //= 'No message provided';
     $level   //= 'INFO';
 
-    # Convert level to uppercase for consistency
-    $level = uc($level);
-
-    # PHASE 3: Application-level log filtering - Check if this level should be logged to file
-    # This is separate from browser debug_mode and controls what goes to application.log
-    if (exists $LOG_LEVELS{$level} && exists $LOG_LEVELS{$APPLICATION_LOG_LEVEL}) {
-        # Only log if the message level is >= the application log level
-        # This filtering applies to file logging, not browser debug display
-        my $should_log_to_file = $LOG_LEVELS{$level} >= $LOG_LEVELS{$APPLICATION_LOG_LEVEL};
-        
-        # If this message shouldn't be logged to file, we still add it to browser debug display
-        # but skip the file logging part
-        if (!$should_log_to_file) {
-            # Add to debug_errors in stash for browser display if debug_mode is enabled
-            if ($c && ref($c) && ref($c->stash) eq 'HASH') {
-                my $debug_mode = 0;
-                eval {
-                    $debug_mode = $c->session->{debug_mode} || 0;
-                };
-                
-                # Only add to browser debug display if debug_mode is enabled
-                if ($debug_mode) {
-                    my $debug_errors = $c->stash->{debug_errors} ||= [];
-                    my $timestamp = _get_timestamp();
-                    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $level, $file, $line || 0, ($subroutine // 'unknown'), $message);
-                    push @$debug_errors, $log_message;
-                }
-            }
-            return; # Skip file logging but allow browser display
-        }
-    }
-
     # Format the log message with a timestamp
     my $timestamp = _get_timestamp();
+    my $system_id = __PACKAGE__->get_system_identifier();
 
     # Make sure $line is numeric, default to 0 if not
     $line = 0 unless defined $line && $line =~ /^\d+$/;
 
-    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s", $timestamp, $level, $file, $line, ($subroutine // 'unknown'), $message);
+    my %_req = extract_request_info($c);
+    my $_req_suffix = '';
+    if (%_req && $level =~ /^(warn|error|critical)$/i) {
+        $_req_suffix = sprintf(' [IP:%s Type:%s UA:%s]',
+            $_req{ip_address}   // '-',
+            $_req{request_type} // '-',
+            substr($_req{user_agent} // '-', 0, 80));
+    }
+    my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s%s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message, $_req_suffix);
 
-    # PHASE 2: Enhanced Error Reporting - Track errors separately for dashboard
-    if ($level eq 'ERROR' || $level eq 'CRITICAL' || $level eq 'WARN') {
-        _track_error($c, $level, $file, $line, $subroutine, $message, $timestamp);
+    # Add to debug_errors in stash if Catalyst context is available
+    # But avoid calling $c->log methods to prevent recursion
+    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+        my $debug_errors = $c->stash->{debug_errors} ||= [];
+        push @$debug_errors, $log_message;
     }
 
-    # Log to file - this is our primary logging mechanism
-    # (rotation is now handled in log_to_file)
+    # Restore standard behavior: also write to application log file and STDERR
     log_to_file($log_message, undef, $level);
+    _print_log($log_message);
 
-    # Add to debug_errors in stash for browser display if debug_mode is enabled
-    # This is separate from file logging and controlled by browser debug_mode
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
-        my $debug_mode = 0;
-        eval {
-            $debug_mode = $c->session->{debug_mode} || 0;
-        };
-        
-        # Only add to browser debug display if debug_mode is enabled
-        if ($debug_mode) {
-            my $debug_errors = $c->stash->{debug_errors} ||= [];
-            push @$debug_errors, $log_message;
+    # Log to database — only WARN and above to keep the table manageable.
+    # DEBUG/INFO messages go to file log only.
+    my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
+    my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
+    if ($c && ref($c) && $c->can('model') && $level_prio >= $db_min_prio) {
+        my $now = time();
+        if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
+            _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");
+        } else {
+            my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $username = ($c->can('session') && $c->session) ? $c->session->{username} : undef;
+            eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                $dbh->do('SET SESSION innodb_lock_wait_timeout = 1');
+                $c->model('DBEncy')->resultset('SystemLog')->create({
+                    timestamp         => $timestamp,
+                    level             => $level,
+                    file              => $file,
+                    line              => $line,
+                    subroutine        => ($subroutine // 'unknown'),
+                    message           => $message,
+                    sitename          => $sitename,
+                    username          => $username,
+                    system_identifier => $system_id,
+                });
+            };
+            if ($@) {
+                $_db_log_failed_at = time();
+                _print_log("[DB-LOG-ERROR] DB write failed (circuit breaker set for ${_db_log_backoff_s}s): $@");
+            }
         }
+    }
+
+    # Automatically send email notification for levels >= $EMAIL_NOTIFY_THRESHOLD
+    my $current_prio = $LEVEL_PRIORITY{uc($level)} || 0;
+    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 3; # Default to WARN priority
+    
+    if ($current_prio >= $notify_prio) {
+        # We don't want to cause recursion if send_error_notification calls logging
+        # So we use a flag or just be careful. 
+        # EmailNotification already logs things.
+        eval {
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Alert: $subroutine ($level)", $log_message);
+            }
+        };
+        # Don't log the error of sending the error notification to avoid infinite loop
     }
 
     return $log_message;
@@ -310,10 +441,10 @@ sub log_error {
 
     # Format the error message with a timestamp
     my $timestamp = _get_timestamp();
-    my $log_message = sprintf("[%s] [ERROR] [%s:%d] unknown - %s", $timestamp, $file, $line, $error_message);
+    my $log_message = sprintf("[%s] [ERROR] - %s:%d - %s", $timestamp, $file, $line, $error_message);
 
     # Log to file - this is our primary logging mechanism
-    # ERROR messages are ALWAYS logged regardless of debug_mode
+    # Pass 'ERROR' level explicitly
     log_to_file($log_message, undef, 'ERROR');
 
     # Add to debug_errors in stash if Catalyst context is available
@@ -323,232 +454,78 @@ sub log_error {
         push @$debug_errors, $log_message;
     }
 
+    # Automatically send email notification for ERROR level
+    my $current_prio = $LEVEL_PRIORITY{'ERROR'} || 4; # Default ERROR priority
+    my $notify_prio  = $LEVEL_PRIORITY{uc($EMAIL_NOTIFY_THRESHOLD)} || 4;
+    
+    if ($current_prio >= $notify_prio) {
+        eval {
+            if (ref($self) || ($self && $self eq __PACKAGE__)) {
+                $self->send_error_notification($c, "Application Error", $log_message);
+            } else {
+                __PACKAGE__->send_error_notification($c, "Application Error", $log_message);
+            }
+        };
+    }
+
     return $log_message;
 }
 
-# Convenience methods for different log levels
-# These methods provide a cleaner interface for logging at specific levels
-
-sub log_debug {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
-    return $self->log_with_details($c, 'DEBUG', $file, $line, $subroutine, $message);
-}
-
-sub log_info {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
-    return $self->log_with_details($c, 'INFO', $file, $line, $subroutine, $message);
-}
-
-sub log_warn {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
-    return $self->log_with_details($c, 'WARN', $file, $line, $subroutine, $message);
-}
-
-sub log_error_with_details {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
-    return $self->log_with_details($c, 'ERROR', $file, $line, $subroutine, $message);
-}
-
-# PHASE 2: Enhanced Error Reporting - New critical error logging method
-sub log_critical {
-    my ($self, $c, $file, $line, $subroutine, $message) = @_;
-    return $self->log_with_details($c, 'CRITICAL', $file, $line, $subroutine, $message);
-}
-
-# PHASE 2: Enhanced Error Reporting - Track errors separately from regular logging
-sub _track_error {
-    my ($c, $level, $file, $line, $subroutine, $message, $timestamp) = @_;
+# Send an error notification via email
+sub send_error_notification {
+    my ($self, $c, $subject, $error_details) = @_;
     
-    # Create error entry with JSON-safe values
-    my $error_entry = {
-        timestamp => "$timestamp",
-        level => "$level",
-        file => "$file",
-        line => int($line || 0),
-        subroutine => defined($subroutine) ? "$subroutine" : 'unknown',
-        message => defined($message) ? "$message" : 'No message',
-        session_id => $c && $c->can('sessionid') ? "${\$c->sessionid}" : 'unknown',
-        user_id => $c && $c->can('session') ? "${\$c->session->{user_id} || 'anonymous'}" : 'unknown',
-        site_name => $c && $c->can('session') ? "${\$c->session->{SiteName} || 'default'}" : 'unknown',
-        request_uri => $c && $c->can('request') && $c->request->uri ? "${\$c->request->uri}" : 'unknown',
-    };
-    
-    # Store in memory (with size limit)
-    my $error_id = time() . '_' . int(rand(10000));
-    $ERROR_STORAGE->{$error_id} = $error_entry;
-    
-    # Maintain storage size limit
-    if (keys %$ERROR_STORAGE > $MAX_STORED_ERRORS) {
-        # Remove oldest entries
-        my @sorted_keys = sort keys %$ERROR_STORAGE;
-        my $to_remove = keys(%$ERROR_STORAGE) - $MAX_STORED_ERRORS;
-        for my $i (0 .. $to_remove - 1) {
-            delete $ERROR_STORAGE->{$sorted_keys[$i]};
-        }
+    my $system_id = __PACKAGE__->get_system_identifier();
+    $subject = "[$system_id] $subject";
+    return if $self->{_sending_email};
+    local $self->{_sending_email} = 1;
+
+    # Email circuit breaker: skip email if SMTP failed recently (prevents blocking workers)
+    if (time() - $_email_failed_at < $_email_backoff_s) {
+        _print_log("[EMAIL-SKIP] email circuit breaker open, skipping notification: $subject");
+        return;
     }
-    
-    # Log to separate error file
-    _log_to_error_file($error_entry);
-    
-    # Check if this is a critical error that needs admin notification
-    if ($level eq 'CRITICAL') {
-        _notify_admin_of_critical_error($c, $error_entry);
-    }
-}
 
-# PHASE 2: Enhanced Error Reporting - Log errors to separate error file
-sub _log_to_error_file {
-    my ($error_entry) = @_;
-    
-    # Initialize error log file if not done yet
-    unless ($ERROR_LOG_FILE) {
-        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-        my $log_dir = File::Spec->catdir($base_dir, "logs");
-        $ERROR_LOG_FILE = File::Spec->catfile($log_dir, "errors.log");
-        
-        # Create log directory if it doesn't exist
-        unless (-d $log_dir) {
-            eval { make_path($log_dir) };
-            return if $@; # Silently fail if we can't create directory
-        }
-    }
-    
-    # Format error entry as JSON for structured logging
-    my $error_json;
-    eval {
-        $error_json = encode_json($error_entry);
-    };
-    if ($@) {
-        # If JSON encoding fails, create a simple fallback entry
-        $error_json = encode_json({
-            timestamp => $error_entry->{timestamp},
-            level => $error_entry->{level},
-            message => $error_entry->{message},
-            file => $error_entry->{file},
-            line => $error_entry->{line},
-            subroutine => $error_entry->{subroutine},
-            encoding_error => "Original entry failed JSON encoding: $@"
-        });
-    }
-    
-    # Write to error log file
-    if (open my $error_fh, '>>', $ERROR_LOG_FILE) {
-        flock($error_fh, LOCK_EX);
-        print $error_fh "$error_json\n";
-        flock($error_fh, LOCK_UN);
-        close $error_fh;
-    }
-}
+    # Always notify CSC Admin for all errors
+    my $csc_admin_email = 'helpdesk@computersystemconsulting.ca';
+    my $site_admin_email;
+    my $sitename = 'CSC';
 
-# PHASE 2: Enhanced Error Reporting - Admin notification for critical errors
-sub _notify_admin_of_critical_error {
-    my ($c, $error_entry) = @_;
-    
-    # Store critical error notification in session for admin dashboard
-    if ($c && $c->can('session')) {
-        my $critical_errors = $c->session->{critical_errors} ||= [];
-        
-        # Add to critical errors list (with limit)
-        push @$critical_errors, $error_entry;
-        
-        # Keep only last 10 critical errors in session
-        if (@$critical_errors > 10) {
-            splice @$critical_errors, 0, @$critical_errors - 10;
-        }
-        
-        # Set flag for admin notification
-        $c->session->{has_critical_errors} = 1;
-    }
-}
-
-# PHASE 2: Enhanced Error Reporting - Get stored errors for dashboard
-sub get_stored_errors {
-    my ($self, $level_filter) = @_;
-    
-    my @errors;
-    for my $error_id (sort keys %$ERROR_STORAGE) {
-        my $error = $ERROR_STORAGE->{$error_id};
-        
-        # Apply level filter if specified
-        if ($level_filter) {
-            next unless $error->{level} eq uc($level_filter);
-        }
-        
-        push @errors, {
-            id => $error_id,
-            %$error
-        };
-    }
-    
-    # Sort by timestamp (newest first)
-    @errors = sort { $b->{timestamp} cmp $a->{timestamp} } @errors;
-    
-    return \@errors;
-}
-
-# PHASE 2: Enhanced Error Reporting - Get error summary statistics
-sub get_error_summary {
-    my ($self) = @_;
-    
-    my $summary = {
-        total_errors => 0,
-        critical_count => 0,
-        error_count => 0,
-        warn_count => 0,
-        recent_errors => [],
-    };
-    
-    for my $error_id (keys %$ERROR_STORAGE) {
-        my $error = $ERROR_STORAGE->{$error_id};
-        $summary->{total_errors}++;
-        
-        if ($error->{level} eq 'CRITICAL') {
-            $summary->{critical_count}++;
-        } elsif ($error->{level} eq 'ERROR') {
-            $summary->{error_count}++;
-        } elsif ($error->{level} eq 'WARN') {
-            $summary->{warn_count}++;
-        }
-    }
-    
-    # Get recent errors (last 5)
-    my $recent_errors = $self->get_stored_errors();
-    $summary->{recent_errors} = [ splice(@$recent_errors, 0, 5) ];
-    
-    return $summary;
-}
-
-# PHASE 2: Enhanced Error Reporting - Clear stored errors
-sub clear_stored_errors {
-    my ($self, $level_filter) = @_;
-    
-    if ($level_filter) {
-        # Clear only specific level
-        for my $error_id (keys %$ERROR_STORAGE) {
-            if ($ERROR_STORAGE->{$error_id}->{level} eq uc($level_filter)) {
-                delete $ERROR_STORAGE->{$error_id};
+    if ($c && ref($c) && $c->can('model')) {
+        eval { # Use eval instead of try if Try::Tiny is not explicitly imported or available
+            $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+            if ($site && $site->mail_to_admin) {
+                $site_admin_email = $site->mail_to_admin;
             }
+        };
+        # Ignore errors here, we have fallbacks
+    }
+
+    # Use the existing email system
+    my $email_ok = 0;
+    eval {
+        require Comserv::Util::EmailNotification;
+        my $notifier = Comserv::Util::EmailNotification->new(logging => $self);
+        
+        # 1. Notify CSC Admin
+        my $r = $notifier->send_error_notification($c, $csc_admin_email, $subject, $error_details);
+        $email_ok = $r ? 1 : 0;
+        
+        # 2. Notify Site-specific Admin if different
+        if ($site_admin_email && $site_admin_email ne $csc_admin_email) {
+            $notifier->send_error_notification($c, $site_admin_email, $subject, $error_details);
         }
-    } else {
-        # Clear all stored errors
-        $ERROR_STORAGE = {};
+    };
+    if ($@ || !$email_ok) {
+        $_email_failed_at = time();
+        _print_log("[EMAIL-CB] email failed, circuit breaker set for ${_email_backoff_s}s: " . ($@ || 'send returned false'));
     }
 }
 
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
-    my $self = shift if ref($_[0]); # Handle both instance and class method calls
     my ($message, $file_path, $level) = @_;
-    
-    $level //= 'INFO';
-    $level = uc($level);
-    
-    # PHASE 3: Application-level log filtering - Check if this level should be logged
-    # This is separate from browser debug_mode and controls what goes to application.log
-    if (exists $LOG_LEVELS{$level} && exists $LOG_LEVELS{$APPLICATION_LOG_LEVEL}) {
-        # Only log if the message level is >= the application log level
-        return if $LOG_LEVELS{$level} < $LOG_LEVELS{$APPLICATION_LOG_LEVEL};
-    }
     
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
@@ -575,13 +552,16 @@ sub log_to_file {
             $file_path = File::Spec->catfile($log_dir, 'application.log');
         }
     }
+    
+    $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
-            # Rotate log without verbose messaging to prevent feedback loop
-            rotate_log();
+            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+            eval { rotate_log() };
+            _print_log("Log rotation failed (non-fatal): $@") if $@;
         }
     }
 
@@ -621,9 +601,16 @@ sub log_to_file {
         return;
     }
 
-    flock($file, LOCK_EX);
+    # Use non-blocking lock to prevent deadlock in multi-worker environments
+    # If lock fails, write anyway (better to lose a log than hang the request)
+    my $lock_acquired = flock($file, LOCK_EX | LOCK_NB);
+    
     print $file "$level: $message\n";
-    flock($file, LOCK_UN);
+    
+    # Only unlock if we acquired the lock
+    if ($lock_acquired) {
+        flock($file, LOCK_UN);
+    }
 
     close $file;
 }
@@ -664,7 +651,7 @@ sub force_log_rotation {
     } else {
         # For smaller files, just move the whole file
         $archived_log = File::Spec->catfile($archive_dir, "${filename}_${timestamp}");
-        move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
+        File::Copy::move($LOG_FILE, $archived_log) or die "Could not rotate log: $!";
     }
 
     # Reopen log file
@@ -727,7 +714,12 @@ sub _split_large_log {
     close $new_log_fh;
 
     # Replace the original log file with the empty new one
-    rename $temp_log, $log_file or die "Cannot replace log file: $!";
+    unless (rename $temp_log, $log_file) {
+        my $err = $!;
+        _print_log("Cannot replace log file (non-fatal): $err — removing temp file");
+        unlink $temp_log;
+        return $first_chunk_file;
+    }
 
     return $first_chunk_file;
 }
@@ -742,6 +734,105 @@ sub get_log_file_size {
 
     my $size_bytes = -s $file_path;
     return sprintf("%.2f", $size_bytes / 1024); # Return size in KB
+}
+
+# Refresh settings from database
+sub refresh_settings {
+    my ($self, $c) = @_;
+    return unless $c && ref($c) && $c->can('model');
+    
+    eval {
+        my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+        my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+        if ($site) {
+            my $threshold_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id => $site->id,
+                config_key => 'logging_email_threshold'
+            });
+            if ($threshold_cfg) {
+                $EMAIL_NOTIFY_THRESHOLD = uc($threshold_cfg->config_value);
+            }
+            
+            my $nfs_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id => $site->id,
+                config_key => 'logging_nfs_dir'
+            });
+            if ($nfs_cfg && $nfs_cfg->config_value && -d $nfs_cfg->config_value && -w $nfs_cfg->config_value) {
+                my $new_dir = $nfs_cfg->config_value;
+                my $new_file = File::Spec->catfile($new_dir, "application.log");
+                if (!defined $LOG_FILE || $LOG_FILE ne $new_file) {
+                    _print_log("Updating log directory from database: $new_dir");
+                    $LOG_FILE = $new_file;
+                    # We might want to call init() or handle handle closure here
+                    # but let's keep it simple for now to avoid handle issues
+                }
+            }
+        }
+    };
+}
+
+sub log_access {
+    my ($self, $c, $status_code) = @_;
+    return unless $c && ref($c) && $c->can('model');
+
+    my $now = time();
+    if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
+        return;
+    }
+
+    my %req  = extract_request_info($c);
+    my $sys  = __PACKAGE__->get_system_identifier();
+
+    eval {
+        $c->model('DBEncy')->resultset('AccessLog')->create({
+            timestamp          => _get_timestamp(),
+            sitename           => ($c->stash ? ($c->stash->{SiteName} || 'CSC') : 'CSC'),
+            path               => substr($c->req->path // '', 0, 512),
+            request_method     => $req{request_method},
+            status_code        => $status_code,
+            ip_address         => $req{ip_address},
+            user_agent         => $req{user_agent},
+            referer            => $req{referer},
+            request_type       => $req{request_type},
+            username           => ($c->session ? $c->session->{username} : undef),
+            session_id         => eval { $c->sessionid } // undef,
+            system_identifier  => $sys,
+        });
+    };
+    if ($@) {
+        $_db_log_failed_at = time();
+        _print_log("[ACCESS-LOG-ERROR] DB write failed: $@");
+    }
+}
+
+sub _classify_request {
+    my ($ua) = @_;
+    return 'unknown' unless defined $ua && length $ua;
+
+    my %SCANNER_PATTERNS = map { $_ => 1 } qw(nikto sqlmap nmap masscan zgrab dirbuster havij acunetix nessus);
+    my $ua_lc = lc($ua);
+    for my $kw (keys %SCANNER_PATTERNS) {
+        return 'scanner' if index($ua_lc, $kw) >= 0;
+    }
+    for my $pattern (@BOT_PATTERNS) {
+        return 'bot' if $ua =~ $pattern;
+    }
+    return 'human' if $ua =~ /Mozilla|Chrome|Safari|Firefox|Opera|Edge|MSIE/;
+    return 'script';
+}
+
+sub extract_request_info {
+    my ($c) = @_;
+    my %info;
+    return %info unless $c && ref($c) && $c->can('req');
+    eval {
+        $info{ip_address}     = $c->req->address // '';
+        $info{user_agent}     = substr($c->req->user_agent // '', 0, 512);
+        $info{referer}        = substr($c->req->referer   // '', 0, 512);
+        $info{request_method} = $c->req->method           // '';
+        $info{request_type}   = _classify_request($info{user_agent});
+    };
+    return %info;
 }
 
 1; # Ensure the module returns true
