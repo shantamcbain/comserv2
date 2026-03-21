@@ -2319,13 +2319,75 @@ sub daily_plan :Path('/Documentation/DailyPlan') :Args {
             "Could not fetch DB plans: $@");
     }
 
+    # Fetch projects from DB for PLANNING tab (with their linked plans)
+    # CSC sees all sites; others see only their own sitename
+    my @planning_projects;
+    my @orphan_plans;       # plans not linked to any project
+    my @plan_sitenames;     # distinct sitenames for filter toggle (CSC only)
+    eval {
+        my %proj_cond = $is_csc ? () : (sitename => $sitename);
+        my @proj_rows = $c->model('DBEncy')->resultset('Project')->search(
+            \%proj_cond,
+            { order_by => ['sitename', 'name'] }
+        )->all;
+
+        for my $proj (@proj_rows) {
+            next if $proj->parent_id;   # top-level projects only
+            my %p = $proj->get_columns;
+
+            # Linked plans
+            my @linked_plans;
+            eval {
+                for my $pln ($proj->dailyplans->all) {
+                    my %ph = $pln->get_columns;
+                    push @linked_plans, \%ph;
+                }
+            };
+            $p{linked_plans} = \@linked_plans;
+            push @planning_projects, \%p;
+
+            # Collect sitenames for filter toggle
+            push @plan_sitenames, $proj->sitename if $proj->sitename;
+        }
+
+        # Deduplicate sitenames
+        my %seen_site;
+        @plan_sitenames = grep { !$seen_site{$_}++ } sort @plan_sitenames;
+
+        # Standalone plans (not linked to any project)
+        my %plan_cond = $is_csc ? () : (sitename => $sitename);
+        for my $pln ($c->model('DBEncy')->resultset('DailyPlan')->search(
+            \%plan_cond, { order_by => { -desc => 'created_at' } }
+        )->all) {
+            eval {
+                push @orphan_plans, { $pln->get_columns }
+                    if $pln->dailyplan_projects->count == 0;
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily_plan',
+            "Could not fetch planning projects: $@");
+    }
+
+    # Filter projects by filter_site param (CSC admin only)
+    my $filter_site = $c->req->param('filter_site') || '';
+    if ($is_csc && $filter_site) {
+        @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
+        @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
+    }
+
     # Pass all date information and todos to template
     $c->stash(
         # Site context
-        is_csc       => $is_csc,
-        plan_sitename => $sitename,
-        db_plans     => \@db_plans,
-        is_admin     => $c->stash->{is_admin},
+        is_csc         => $is_csc,
+        plan_sitename  => $sitename,
+        db_plans       => \@db_plans,
+        planning_projects => \@planning_projects,
+        orphan_plans   => \@orphan_plans,
+        plan_sitenames => \@plan_sitenames,
+        filter_site    => $filter_site,
+        is_admin       => $c->stash->{is_admin},
 
         # Date strings
         current_date_str => $current_date_str,
