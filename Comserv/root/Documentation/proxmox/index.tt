@@ -1,129 +1,57 @@
-[% PageVersion = 'Comserv/root/Documentation/proxmox/index.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
-[% END %]
-
-[% META title = 'Proxmox Documentation' %]
-
-<!-- Documentation page for index -->
-<div class="documentation-content">
-
-
-
-
-<!-- Documentation CSS is now included in the theme system -->
-
-<div class="markdown-content">
-
+# Proxmox Documentation
 
 This page provides access to comprehensive documentation for Proxmox VE, including API references, command-line tools, and configuration guides.
 
+## Available Documentation
 
+### API and Integration
 
-<h2>Available Documentation</h2>
+- [Proxmox VE API Documentation](/Documentation/proxmox/api) - Overview of the Proxmox VE API endpoints used in the Comserv application
+- [Proxmox Authentication Changes](/Documentation/proxmox/authentication) - Changes to the authentication system for Proxmox integration
+- [Proxmox Integration Overview](/Documentation/proxmox/integration) - Overview of the Proxmox integration in Comserv
 
+### Command Reference
 
+- [Proxmox Command Reference](commands.md) - Comprehensive list of CLI commands for managing Proxmox VE
+- [Proxmox IP Configuration Guide](ip_configuration.md) - Detailed guide for configuring IP addresses in Proxmox
 
-<h3>API and Integration</h3>
+### Changelog
 
+- [2024-07 Proxmox Controller Fixes](changelog/2024-07-proxmox-controller-fixes.md) - Fixes for the Proxmox controller
+- [2024-08 Proxmox Debug Message Fix](changelog/2024-08-proxmox-debug-msg-fix.md) - Fix for debug message handling in the Proxmox controller
 
+## Quick Reference
 
-<ul><li><a href="/Documentation/proxmox/api">Proxmox VE API Documentation</a> - Overview of the Proxmox VE API endpoints used in the Comserv application</li></ul>
+### Common Proxmox Commands
 
-<ul><li><a href="/Documentation/proxmox/authentication">Proxmox Authentication Changes</a> - Changes to the authentication system for Proxmox integration</li></ul>
-
-<ul><li><a href="/Documentation/proxmox/integration">Proxmox Integration Overview</a> - Overview of the Proxmox integration in Comserv</li></ul>
-
-
-
-<h3>Command Reference</h3>
-
-
-
-<ul><li><a href="commands.md">Proxmox Command Reference</a> - Comprehensive list of CLI commands for managing Proxmox VE</li></ul>
-
-<ul><li><a href="ip_configuration.md">Proxmox IP Configuration Guide</a> - Detailed guide for configuring IP addresses in Proxmox</li></ul>
-
-
-
-<h3>Changelog</h3>
-
-
-
-<ul><li><a href="changelog/2024-07-proxmox-controller-fixes.md">2024-07 Proxmox Controller Fixes</a> - Fixes for the Proxmox controller</li></ul>
-
-<ul><li><a href="changelog/2024-08-proxmox-debug-msg-fix.md">2024-08 Proxmox Debug Message Fix</a> - Fix for debug message handling in the Proxmox controller</li></ul>
-
-
-
-<h2>Quick Reference</h2>
-
-
-
-<h3>Common Proxmox Commands</h3>
-
-
-
-<code></code>`bash
-
-<h1>List all VMs</h1>
-
+```bash
+# List all VMs
 qm list
 
-
-
-<h1>Start a VM</h1>
-
+# Start a VM
 qm start <vmid>
 
-
-
-<h1>Stop a VM</h1>
-
+# Stop a VM
 qm stop <vmid>
 
-
-
-<h1>List all containers</h1>
-
+# List all containers
 pct list
 
-
-
-<h1>Start a container</h1>
-
+# Start a container
 pct start <ctid>
 
-
-
-<h1>Stop a container</h1>
-
+# Stop a container
 pct stop <ctid>
+```
 
-<code></code>`
+### Setting IP Addresses
 
-
-
-<h3>Setting IP Addresses</h3>
-
-
-
-<code></code>`bash
-
-<h1>Set static IP for a container</h1>
-
+```bash
+# Set static IP for a container
 pct set <ctid> --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
 
-
-
-<h1>Set static IP for a VM (requires QEMU guest agent)</h1>
-
+# Set static IP for a VM (requires QEMU guest agent)
 qm set <vmid> --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+```
 
-<code></code>`
-
-
-
-For more detailed commands and examples, see the <a href="commands.md">Proxmox Command Reference</a> and <a href="ip_configuration.md">Proxmox IP Configuration Guide</a>.
-
-</div>
+For more detailed commands and examples, see the [Proxmox Command Reference](commands.md) and [Proxmox IP Configuration Guide](ip_configuration.md).

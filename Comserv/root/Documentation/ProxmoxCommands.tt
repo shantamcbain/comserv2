@@ -1,13 +1,8 @@
+[% META title = 'Proxmox Command Reference' %]
 [% PageVersion = 'Documentation/proxmox_commands.tt,v 1.1 2025/04/08 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
-
-[% META title = 'Proxmox Command Reference' %]
-
-<!-- Documentation page for proxmox_commands -->
-<div class="documentation-content">
-
 <head>
     <link rel="stylesheet" href="[% c.uri_for('/static/css/components/proxmox-documentation.css') %]">
     <link rel="stylesheet" href="[% c.uri_for('/static/css/components/documentation.css') %]">
@@ -20,6 +15,7 @@
             <span class="context-item"><strong>Site:</strong> [% site_name || 'Comserv' %]</span>
             <span class="context-item"><strong>Role:</strong> [% display_role %]</span>
             <span class="admin-badge">Admin Only</span>
+        </div>
     </header>
     
     <div style="background-color: #e3f2fd; border: 1px solid #1976d2; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
@@ -48,6 +44,7 @@
             <li><a href="#api-and-shell">API and Shell Interface</a></li>
             <li><a href="#system-administration">System Administration</a></li>
         </ul>
+    </div>
     
     <section id="virtual-machine-management">
         <h2>Virtual Machine Management (QEMU/KVM)</h2>
@@ -59,31 +56,31 @@
         <pre><code># List all VMs
 qm list
 
-<h1>Show VM configuration</h1>
+# Show VM configuration
 qm config &lt;vmid&gt;
 
-<h1>Start a VM</h1>
+# Start a VM
 qm start &lt;vmid&gt;
 
-<h1>Stop a VM (immediate power off)</h1>
+# Stop a VM (immediate power off)
 qm stop &lt;vmid&gt;
 
-<h1>Gracefully shutdown a VM</h1>
+# Gracefully shutdown a VM
 qm shutdown &lt;vmid&gt;
 
-<h1>Reset a VM</h1>
+# Reset a VM
 qm reset &lt;vmid&gt;
 
-<h1>Suspend a VM</h1>
+# Suspend a VM
 qm suspend &lt;vmid&gt;
 
-<h1>Resume a suspended VM</h1>
+# Resume a suspended VM
 qm resume &lt;vmid&gt;
 
-<h1>Reboot a VM</h1>
+# Reboot a VM
 qm reboot &lt;vmid&gt;
 
-<h1>Delete a VM</h1>
+# Delete a VM
 qm destroy &lt;vmid&gt;</code></pre>
         
         <h3>VM Creation and Cloning</h3>
@@ -91,16 +88,16 @@ qm destroy &lt;vmid&gt;</code></pre>
         <pre><code># Create a new VM with ID 100
 qm create 100
 
-<h1>Create a VM with basic configuration</h1>
+# Create a VM with basic configuration
 qm create 101 --name "web-server" --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
 
-<h1>Create a VM with an OS disk</h1>
+# Create a VM with an OS disk
 qm create 102 --name "db-server" --memory 4096 --cores 4 --net0 virtio,bridge=vmbr0 --scsi0 local-lvm:20
 
-<h1>Clone a VM</h1>
+# Clone a VM
 qm clone &lt;source-vmid&gt; &lt;target-vmid&gt; --name "clone-name"
 
-<h1>Create a template from a VM</h1>
+# Create a template from a VM
 qm template &lt;vmid&gt;</code></pre>
         
         <h3>VM Configuration</h3>
@@ -108,37 +105,37 @@ qm template &lt;vmid&gt;</code></pre>
         <pre><code># Set VM name
 qm set &lt;vmid&gt; --name &lt;name&gt;
 
-<h1>Set memory (in MB)</h1>
+# Set memory (in MB)
 qm set &lt;vmid&gt; --memory &lt;memory&gt;
 
-<h1>Set CPU cores</h1>
+# Set CPU cores
 qm set &lt;vmid&gt; --cores &lt;cores&gt;
 
-<h1>Set CPU type</h1>
+# Set CPU type
 qm set &lt;vmid&gt; --cpu &lt;cputype&gt;
 
-<h1>Add a network interface</h1>
+# Add a network interface
 qm set &lt;vmid&gt; --net0 virtio,bridge=vmbr0
 
-<h1>Set IP address for a VM (requires QEMU guest agent)</h1>
+# Set IP address for a VM (requires QEMU guest agent)
 qm set &lt;vmid&gt; --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
 
-<h1>Add a virtual disk</h1>
+# Add a virtual disk
 qm set &lt;vmid&gt; --scsi0 local-lvm:20
 
-<h1>Resize a disk (increase to 40GB)</h1>
+# Resize a disk (increase to 40GB)
 qm resize &lt;vmid&gt; scsi0 40G
 
-<h1>Set boot order</h1>
+# Set boot order
 qm set &lt;vmid&gt; --boot c --bootdisk scsi0
 
-<h1>Enable/disable QEMU guest agent</h1>
+# Enable/disable QEMU guest agent
 qm set &lt;vmid&gt; --agent enabled=1,fstrim_cloned_disks=1
 
-<h1>Set VM to start on boot</h1>
+# Set VM to start on boot
 qm set &lt;vmid&gt; --onboot 1
 
-<h1>Set VM startup/shutdown order</h1>
+# Set VM startup/shutdown order
 qm set &lt;vmid&gt; --startup order=1,up=120,down=60</code></pre>
         
         <h3>VM Migration</h3>
@@ -146,7 +143,7 @@ qm set &lt;vmid&gt; --startup order=1,up=120,down=60</code></pre>
         <pre><code># Migrate a VM to another node
 qm migrate &lt;vmid&gt; &lt;target-node&gt;
 
-<h1>Migrate with specific options</h1>
+# Migrate with specific options
 qm migrate &lt;vmid&gt; &lt;target-node&gt; --online --with-local-disks</code></pre>
         
         <h3>VM Snapshots</h3>
@@ -154,13 +151,13 @@ qm migrate &lt;vmid&gt; &lt;target-node&gt; --online --with-local-disks</code></
         <pre><code># Create a snapshot
 qm snapshot &lt;vmid&gt; &lt;snapshot-name&gt; --description "Description"
 
-<h1>List snapshots</h1>
+# List snapshots
 qm listsnapshot &lt;vmid&gt;
 
-<h1>Rollback to a snapshot</h1>
+# Rollback to a snapshot
 qm rollback &lt;vmid&gt; &lt;snapshot-name&gt;
 
-<h1>Delete a snapshot</h1>
+# Delete a snapshot
 qm delsnapshot &lt;vmid&gt; &lt;snapshot-name&gt;</code></pre>
     </section>
     
@@ -174,22 +171,22 @@ qm delsnapshot &lt;vmid&gt; &lt;snapshot-name&gt;</code></pre>
         <pre><code># List all containers
 pct list
 
-<h1>Show container configuration</h1>
+# Show container configuration
 pct config &lt;ctid&gt;
 
-<h1>Start a container</h1>
+# Start a container
 pct start &lt;ctid&gt;
 
-<h1>Stop a container</h1>
+# Stop a container
 pct stop &lt;ctid&gt;
 
-<h1>Restart a container</h1>
+# Restart a container
 pct restart &lt;ctid&gt;
 
-<h1>Enter a container (get shell)</h1>
+# Enter a container (get shell)
 pct enter &lt;ctid&gt;
 
-<h1>Delete a container</h1>
+# Delete a container
 pct destroy &lt;ctid&gt;</code></pre>
         
         <h3>Container Creation and Cloning</h3>
@@ -197,10 +194,10 @@ pct destroy &lt;ctid&gt;</code></pre>
         <pre><code># Create a container from a template
 pct create &lt;ctid&gt; &lt;storage&gt;:vztmpl/&lt;template&gt; --hostname &lt;hostname&gt; --memory &lt;memory&gt; --net0 name=eth0,bridge=vmbr0,ip=dhcp
 
-<h1>Create a container with static IP</h1>
+# Create a container with static IP
 pct create &lt;ctid&gt; &lt;storage&gt;:vztmpl/&lt;template&gt; --hostname &lt;hostname&gt; --memory &lt;memory&gt; --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
 
-<h1>Clone a container</h1>
+# Clone a container
 pct clone &lt;source-ctid&gt; &lt;target-ctid&gt; --name &lt;name&gt;</code></pre>
         
         <h3>Container Configuration</h3>
@@ -208,28 +205,28 @@ pct clone &lt;source-ctid&gt; &lt;target-ctid&gt; --name &lt;name&gt;</code></pr
         <pre><code># Set container hostname
 pct set &lt;ctid&gt; --hostname &lt;hostname&gt;
 
-<h1>Set memory limit (in MB)</h1>
+# Set memory limit (in MB)
 pct set &lt;ctid&gt; --memory &lt;memory&gt;
 
-<h1>Set CPU cores</h1>
+# Set CPU cores
 pct set &lt;ctid&gt; --cores &lt;cores&gt;
 
-<h1>Set container to start on boot</h1>
+# Set container to start on boot
 pct set &lt;ctid&gt; --onboot 1
 
-<h1>Set container startup/shutdown order</h1>
+# Set container startup/shutdown order
 pct set &lt;ctid&gt; --startup order=1,up=120,down=60
 
-<h1>Add a network interface with DHCP</h1>
+# Add a network interface with DHCP
 pct set &lt;ctid&gt; --net0 name=eth0,bridge=vmbr0,ip=dhcp
 
-<h1>Set static IP address for a container</h1>
+# Set static IP address for a container
 pct set &lt;ctid&gt; --net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
 
-<h1>Add a mount point</h1>
+# Add a mount point
 pct set &lt;ctid&gt; --mp0 &lt;host_path&gt;,mp=&lt;container_path&gt;
 
-<h1>Resize a container disk</h1>
+# Resize a container disk
 pct resize &lt;ctid&gt; rootfs 20G</code></pre>
     </section>
     
@@ -241,13 +238,13 @@ pct resize &lt;ctid&gt; rootfs 20G</code></pre>
         <pre><code># View network interfaces
 ip addr show
 
-<h1>View routing table</h1>
+# View routing table
 ip route show
 
-<h1>Restart networking service</h1>
+# Restart networking service
 systemctl restart networking
 
-<h1>Apply network changes without reboot</h1>
+# Apply network changes without reboot
 ifreload -a</code></pre>
         
         <h3>Bridge Management</h3>
@@ -260,10 +257,10 @@ iface vmbr1 inet static
     bridge-stp off
     bridge-fd 0" >> /etc/network/interfaces
 
-<h1>Activate a bridge</h1>
+# Activate a bridge
 ifup vmbr1
 
-<h1>Deactivate a bridge</h1>
+# Deactivate a bridge
 ifdown vmbr1</code></pre>
     </section>
     
@@ -277,28 +274,28 @@ ifdown vmbr1</code></pre>
         <pre><code># List all storage
 pvesm status
 
-<h1>Show storage configuration</h1>
+# Show storage configuration
 pvesm config &lt;storage&gt;
 
-<h1>Add a directory storage</h1>
+# Add a directory storage
 pvesm add dir &lt;storage&gt; --path &lt;path&gt;
 
-<h1>Add an NFS storage</h1>
+# Add an NFS storage
 pvesm add nfs &lt;storage&gt; --server &lt;server&gt; --export &lt;export&gt; --path &lt;path&gt;
 
-<h1>Add an iSCSI storage</h1>
+# Add an iSCSI storage
 pvesm add iscsi &lt;storage&gt; --portal &lt;portal&gt; --target &lt;target&gt;
 
-<h1>Add a Ceph RBD storage</h1>
+# Add a Ceph RBD storage
 pvesm add rbd &lt;storage&gt; --pool &lt;pool&gt; --monhost &lt;monhost&gt;
 
-<h1>Add an LVM storage</h1>
+# Add an LVM storage
 pvesm add lvmthin &lt;storage&gt; --vgname &lt;vgname&gt; --thinpool &lt;thinpool&gt;
 
-<h1>Add a ZFS storage</h1>
+# Add a ZFS storage
 pvesm add zfspool &lt;storage&gt; --pool &lt;pool&gt;
 
-<h1>Remove a storage</h1>
+# Remove a storage
 pvesm remove &lt;storage&gt;</code></pre>
     </section>
     
@@ -310,13 +307,13 @@ pvesm remove &lt;storage&gt;</code></pre>
         <pre><code># Backup a single VM
 vzdump &lt;vmid&gt; --compress zstd --mode snapshot --storage &lt;storage&gt;
 
-<h1>Backup multiple VMs</h1>
+# Backup multiple VMs
 vzdump &lt;vmid1&gt;,&lt;vmid2&gt;,&lt;vmid3&gt; --compress zstd --mode snapshot --storage &lt;storage&gt;
 
-<h1>Backup all VMs</h1>
+# Backup all VMs
 vzdump --all --compress zstd --mode snapshot --storage &lt;storage&gt;
 
-<h1>Backup with specific options</h1>
+# Backup with specific options
 vzdump &lt;vmid&gt; --compress zstd --mode snapshot --storage &lt;storage&gt; --maxfiles 5 --mailto admin@example.com</code></pre>
         
         <h3>Restore from Backup</h3>
@@ -324,7 +321,7 @@ vzdump &lt;vmid&gt; --compress zstd --mode snapshot --storage &lt;storage&gt; --
         <pre><code># Restore a VM from backup
 qmrestore /var/lib/vz/dump/vzdump-qemu-&lt;vmid&gt;-&lt;date&gt;.vma.zst &lt;vmid&gt; --storage &lt;storage&gt;
 
-<h1>Restore a container from backup</h1>
+# Restore a container from backup
 pct restore &lt;ctid&gt; /var/lib/vz/dump/vzdump-lxc-&lt;ctid&gt;-&lt;date&gt;.tar.zst --storage &lt;storage&gt;</code></pre>
     </section>
     
@@ -338,16 +335,16 @@ pct restore &lt;ctid&gt; /var/lib/vz/dump/vzdump-lxc-&lt;ctid&gt;-&lt;date&gt;.t
         <pre><code># Create a new cluster
 pvecm create &lt;clustername&gt;
 
-<h1>Add a node to a cluster</h1>
+# Add a node to a cluster
 pvecm add &lt;hostname&gt;
 
-<h1>Show cluster status</h1>
+# Show cluster status
 pvecm status
 
-<h1>Show cluster nodes</h1>
+# Show cluster nodes
 pvecm nodes
 
-<h1>Remove a node from the cluster</h1>
+# Remove a node from the cluster
 pvecm delnode &lt;nodename&gt;</code></pre>
     </section>
     
@@ -359,13 +356,13 @@ pvecm delnode &lt;nodename&gt;</code></pre>
         <pre><code># Show firewall status
 pve-firewall status
 
-<h1>Start firewall</h1>
+# Start firewall
 pve-firewall start
 
-<h1>Stop firewall</h1>
+# Stop firewall
 pve-firewall stop
 
-<h1>Reload firewall configuration</h1>
+# Reload firewall configuration
 pve-firewall reload</code></pre>
         
         <h3>Firewall Rules Management</h3>
@@ -373,16 +370,16 @@ pve-firewall reload</code></pre>
         <pre><code># List firewall rules
 pvesh get /cluster/firewall/rules
 
-<h1>Add a firewall rule to allow SSH</h1>
+# Add a firewall rule to allow SSH
 pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 22 --enable 1
 
-<h1>Add a firewall rule to allow HTTP</h1>
+# Add a firewall rule to allow HTTP
 pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 80 --enable 1
 
-<h1>Add a firewall rule to allow HTTPS</h1>
+# Add a firewall rule to allow HTTPS
 pvesh create /cluster/firewall/rules --action accept --proto tcp --dport 443 --enable 1
 
-<h1>Delete a firewall rule</h1>
+# Delete a firewall rule
 pvesh delete /cluster/firewall/rules/&lt;pos&gt;</code></pre>
     </section>
     
@@ -396,25 +393,25 @@ pvesh delete /cluster/firewall/rules/&lt;pos&gt;</code></pre>
         <pre><code># Get API version
 pvesh get /version
 
-<h1>List all API paths</h1>
+# List all API paths
 pvesh get /
 
-<h1>Get cluster resources</h1>
+# Get cluster resources
 pvesh get /cluster/resources
 
-<h1>Get node status</h1>
+# Get node status
 pvesh get /nodes/&lt;node&gt;/status
 
-<h1>Get VM list</h1>
+# Get VM list
 pvesh get /nodes/&lt;node&gt;/qemu
 
-<h1>Get container list</h1>
+# Get container list
 pvesh get /nodes/&lt;node&gt;/lxc
 
-<h1>Get storage list</h1>
+# Get storage list
 pvesh get /storage
 
-<h1>Get task list</h1>
+# Get task list
 pvesh get /nodes/&lt;node&gt;/tasks</code></pre>
     </section>
     
@@ -426,22 +423,22 @@ pvesh get /nodes/&lt;node&gt;/tasks</code></pre>
         <pre><code># Show system status
 pveversion -v
 
-<h1>Show node status</h1>
+# Show node status
 pvesh get /nodes/&lt;node&gt;/status
 
-<h1>Show subscription status</h1>
+# Show subscription status
 pvesh get /nodes/&lt;node&gt;/subscription
 
-<h1>Update package lists</h1>
+# Update package lists
 apt update
 
-<h1>Upgrade packages</h1>
+# Upgrade packages
 apt dist-upgrade
 
-<h1>Reboot node</h1>
+# Reboot node
 reboot
 
-<h1>Shutdown node</h1>
+# Shutdown node
 shutdown -h now</code></pre>
     </section>
     
@@ -455,12 +452,14 @@ shutdown -h now</code></pre>
             <li><a href="https://forum.proxmox.com/" target="_blank">Proxmox VE Forum</a></li>
             <li><a href="/Documentation/proxmox/ip_configuration">Proxmox IP Configuration Guide</a></li>
         </ul>
+    </div>
     
     <div class="last-updated">
         Last updated: [% USE date; date.format(date.now, '%Y-%m-%d') %]
+    </div>
     
     <div class="navigation-links">
         <a href="[% c.uri_for('/Documentation') %]" class="back-link">← Back to Documentation Index</a>
-
-
+    </div>
 </div>
+

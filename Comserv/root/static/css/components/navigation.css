@@ -29,12 +29,15 @@ nav {
 }
 
 .dropdown-content {
-  display: none;
+  display: none !important;
   position: absolute;
   background-color: var(--dropdown-bg);
   min-width: 160px;
   box-shadow: var(--dropdown-shadow);
-  z-index: 1;
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 .dropdown-content a {
@@ -49,8 +52,11 @@ nav {
   background-color: var(--nav-hover-bg);
 }
 
+/* Ensure menus only show on hover, not always open */
 .horizontal-dropdown:hover .dropdown-content {
-  display: block;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Submenu Styles */
@@ -63,14 +69,17 @@ nav {
 }
 
 .submenu {
-  display: none;
+  display: none !important;
   position: absolute;
   top: 0;
   left: 100%;
   min-width: 160px;
   background-color: var(--dropdown-bg);
   box-shadow: var(--dropdown-shadow);
-  z-index: 1;
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
 /* Add a class for right-aligned submenus */
@@ -94,7 +103,9 @@ nav {
 }
 
 .submenu-item:hover .submenu {
-  display: block;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Enhanced Admin Menu Styles */
@@ -159,6 +170,12 @@ nav {
 }
 
 .submenu-header a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+a.submenu-header {
   text-decoration: none;
   color: inherit;
   display: block;
@@ -315,15 +332,66 @@ nav {
   padding-top: 0;
 }
 
-/* Login/User Menu Specific Styles */
-.horizontal-dropdown .dropbtn {
-  display: flex;
-  align-items: center;
-  padding: 8px 15px;
+/* User info display styles */
+.user-info {
+  padding: 8px 12px;
+  background-color: var(--user-info-bg, rgba(0, 0, 0, 0.05));
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 5px;
 }
 
+.user-info .username {
+  display: block;
+  font-weight: bold;
+  color: var(--text-color);
+  margin-bottom: 3px;
+}
+
+.user-info .user-roles {
+  display: block;
+  font-size: 0.85em;
+  color: var(--text-muted, #666);
+  font-style: italic;
+}
+
+.menu-separator {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 5px 0;
+}
+
+/* Style for add buttons in submenus */
+.submenu-add-button {
+  display: block;
+  padding: var(--spacing-small) var(--spacing-medium);
+  text-decoration: none;
+  background-color: var(--button-bg, #007bff);
+  color: var(--button-text, #fff);
+  border: 1px solid var(--button-border, #007bff);
+  border-radius: 3px;
+  margin: 5px 8px;
+  text-align: center;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.submenu-add-button:hover {
+  background-color: var(--button-hover-bg, #0069d9);
+  border-color: var(--button-hover-border, #0069d9);
+  color: var(--button-hover-text, #fff);
+}
+
+.submenu-add-button i {
+  margin-right: 5px;
+}
+
+/* =============================================================================
+   DROPDOWN MENU SPECIFIC STYLES
+   Moved from individual TopDropList*.tt files - Sun Oct 12 04:04:38 PM PDT 2025
+   ============================================================================= */
+
+/* Login Menu Specific Styles */
 .horizontal-dropdown .user-menu {
-  /* Use a more subtle background that will work with various themes */
   background-color: transparent;
   border-bottom: 2px solid rgba(0, 0, 0, 0.1);
 }
@@ -335,7 +403,6 @@ nav {
 
 .horizontal-dropdown .username {
   font-weight: bold;
-  margin-right: 8px;
   display: flex;
   align-items: center;
 }
@@ -354,22 +421,42 @@ nav {
   margin-right: 5px;
 }
 
-.horizontal-dropdown .role-badge {
+/* User info header in dropdown */
+.user-info-header {
+  padding: 10px 15px;
+  background-color: var(--dropdown-header-bg, #f8f9fa);
+  border-bottom: 1px solid var(--border-color, #e9ecef);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dropdown-username {
+  font-weight: bold;
+  color: var(--text-color, #495057);
+}
+
+.dropdown-role-badge {
   font-size: 0.8em;
-  color: #666;
+  color: var(--text-muted, #6c757d);
   font-style: italic;
-  margin-left: 5px;
-  opacity: 0.8;
+  background-color: var(--badge-bg, #e9ecef);
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
-.dropdown-content {
-  min-width: 200px;
-}
-
+/* Enhanced dropdown content styles */
 .dropdown-content .menu-item {
   padding: 10px 15px;
   display: flex;
   align-items: center;
+  text-decoration: none;
+  color: var(--text-color, #333);
+  transition: background-color 0.2s;
+}
+
+.dropdown-content .menu-item:hover {
+  background-color: var(--nav-hover-bg, #f8f9fa);
 }
 
 .dropdown-content .menu-item i {
@@ -379,28 +466,109 @@ nav {
 }
 
 .dropdown-content .logout {
-  color: #dc3545;
+  color: var(--danger-color, #dc3545);
 }
 
+.dropdown-content .logout:hover {
+  background-color: var(--light-gray, #f5f5f5);
+}
+
+/* Dropdown divider */
 .dropdown-divider {
   height: 1px;
   margin: 5px 0;
   overflow: hidden;
-  background-color: #e9ecef;
+  background-color: var(--border-color, #e9ecef);
 }
 
-.edit-link, .add-link {
+/* Submenu sections */
+.submenu-section {
+  border-top: 1px solid var(--border-color, #dee2e6);
+  margin-top: 5px;
+  padding-top: 5px;
+}
+
+.submenu-section-title {
+  display: block;
+  padding: 4px 25px;
   font-size: 0.8em;
-  color: #6c757d;
-  margin-left: 5px;
+  font-weight: bold;
+  color: var(--text-muted, #6c757d);
+  text-transform: uppercase;
 }
 
-/* Icon placeholders - replace with actual icons if available */
+/* Submenu links */
+.submenu-link {
+  padding: 8px 25px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text-color, #495057);
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.submenu-link:hover {
+  background-color: var(--nav-hover-bg, #e9ecef);
+}
+
+.submenu-link i {
+  margin-right: 6px;
+  width: 14px;
+  text-align: center;
+}
+
+/* Edit links */
+.edit-link {
+  font-size: 0.8em;
+  color: var(--text-muted, #6c757d);
+  margin-left: 10px;
+  text-decoration: none;
+  padding: 2px 5px;
+}
+
+.edit-link:hover {
+  color: var(--text-color, #495057);
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   ICON STYLES - Consolidated from all dropdown files
+   Using emoji fallbacks - replace with Font Awesome classes when available
+   ============================================================================= */
+
+/* User & Authentication Icons */
 .icon-user:before { content: "👤"; }
-.icon-cog:before { content: "⚙️"; }
-.icon-dashboard:before { content: "📊"; }
-.icon-refresh:before { content: "🔄"; }
-.icon-signout:before { content: "🚪"; }
-.icon-signin:before { content: "🔑"; }
-.icon-user-plus:before { content: "➕"; }
+.icon-sign-in-alt:before { content: "🔑"; }
+.icon-sign-out-alt:before { content: "🚪"; }
+.icon-user-plus:before { content: "👤➕"; }
 .icon-key:before { content: "🔑"; }
+
+/* Navigation & Management Icons */
+.icon-add:before { content: "➕"; }
+.icon-manage:before { content: "⚙️"; }
+.icon-cog:before { content: "⚙️"; }
+.icon-link:before { content: "🔗"; }
+.icon-sync:before { content: "🔄"; }
+
+/* HelpDesk & Support Icons */
+.icon-helpdesk:before { content: "🆘"; }
+.icon-ticket:before { content: "🎫"; }
+.icon-contact:before { content: "📞"; }
+.icon-status:before { content: "📊"; }
+
+/* Documentation & Knowledge Base Icons */
+.icon-docs:before { content: "📖"; }
+.icon-kb:before { content: "📚"; }
+.icon-faq:before { content: "❓"; }
+
+/* System & Admin Icons */
+.icon-home:before { content: "🏠"; }
+.icon-terminal:before { content: "💻"; }
+.icon-admin:before { content: "👨‍💼"; }
+.icon-admin-links:before { content: "⚙️"; }
+.icon-tachometer-alt:before { content: "📊"; }
+
+/* Member & User Management Icons */
+.icon-member:before { content: "👥"; }
+.icon-user-help:before { content: "👤🆘"; }

@@ -1,7 +1,6 @@
 [% META
-    title = 'Shanta\'s Workshop'
+    title = "Shanta's Workshop"
     description = 'Personal workshop and development area for Shanta'
-    roles = ['user', 'admin', 'developer']
     category = 'personal'
     page_version = 'v1.00'
     last_updated = '2025-01-19'

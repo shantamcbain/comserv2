@@ -41,7 +41,7 @@
   [%# Current value text field — accepts external URL or NFS path %]
   <input type="text" id="[% field_name %]" name="[% field_name %]"
          value="[% current_val | html %]"
-         placeholder="https://... or /home/shanta/nfs/..."
+         placeholder="https://... or /data/nfs/..."
          style="width:100%;max-width:480px;font-size:.88rem"
          class="form-input"
          oninput="encyClearPicker('[% field_name %]')">

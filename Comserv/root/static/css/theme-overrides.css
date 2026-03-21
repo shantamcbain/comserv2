@@ -2,7 +2,63 @@
 
 /* General theme overrides that apply to all themes */
 body[class*="theme-"] {
-  /* Allow each theme to control its own background */
+  background-color: var(--background-color) !important;
+  background-image: var(--background-image) !important;
+  background-repeat: var(--background-repeat, repeat) !important;
+  background-position: var(--background-position, top left) !important;
+  background-attachment: var(--background-attachment, fixed) !important;
+  background-size: var(--background-size, auto) !important;
+  color: var(--text-color) !important;
+}
+
+/* Transparent page container */
+body[class*="theme-"] .app-container,
+body[class*="theme-"] .content-container,
+body[class*="theme-"] .content-sections {
+  background-color: transparent !important;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 0px;
+  box-shadow: none !important;
+}
+
+/* Ensure data containers within are readable if needed, or keep them transparent too */
+body[class*="theme-"] .data-container,
+body[class*="theme-"] .content-primary,
+body[class*="theme-"] .content-section,
+body[class*="theme-"] .form-section,
+body[class*="theme-"] .table-container {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(2px);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.priority-summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.priority-summary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Specific transparency for workshop pages to show background image */
+body[class*="theme-"] .workshop-details,
+body[class*="theme-"] .workshop-list-container {
+    background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Ensure background image covers the whole page and is visible */
+html, body {
+  min-height: 100%;
+  background-attachment: fixed !important;
 }
 
 /* Link styles (excluding menu links) */
@@ -14,23 +70,21 @@ body[class*="theme-"] a:not(.dropbtn):not(.dropdown-content a):not(.submenu a):h
   color: var(--link-hover-color) !important;
 }
 
-/* Button styles - Removed conflicting overrides that interfere with base-containers.css */
-/* The .btn, .btn-primary, .btn-secondary classes are properly handled by base-containers.css */
-/* Only override legacy button elements that don't use the new button classes */
-body[class*="theme-"] button:not([class*="btn"]),
-body[class*="theme-"] .button:not([class*="btn"]),
-body[class*="theme-"] input[type="submit"]:not([class*="btn"]),
-body[class*="theme-"] input[type="button"]:not([class*="btn"]) {
-  background-color: var(--primary-color);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
+/* Button styles */
+body[class*="theme-"] button,
+body[class*="theme-"] .button,
+body[class*="theme-"] input[type="submit"],
+body[class*="theme-"] input[type="button"] {
+  background-color: var(--button-bg) !important;
+  color: var(--button-text) !important;
+  border: 1px solid var(--button-border) !important;
 }
 
-body[class*="theme-"] button:not([class*="btn"]):hover,
-body[class*="theme-"] .button:not([class*="btn"]):hover,
-body[class*="theme-"] input[type="submit"]:not([class*="btn"]):hover,
-body[class*="theme-"] input[type="button"]:not([class*="btn"]):hover {
-  background-color: var(--link-hover-color);
+body[class*="theme-"] button:hover,
+body[class*="theme-"] .button:hover,
+body[class*="theme-"] input[type="submit"]:hover,
+body[class*="theme-"] input[type="button"]:hover {
+  background-color: var(--button-hover-bg) !important;
 }
 
 /* Menu styles */
@@ -74,115 +128,4 @@ body[class*="theme-"] .submenu-item:hover .submenu {
 
 body[class*="theme-"] .submenu a {
   color: var(--nav-link-color) !important;
-}
-
-/* Weather Module Styles */
-body[class*="theme-"] .weather-test-preview,
-body[class*="theme-"] .location-test-preview {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: var(--card-bg, #f8f9fa);
-  border-radius: 5px;
-  border: 1px solid var(--border-color, #e9ecef);
-}
-
-body[class*="theme-"] .weather-test-preview h5,
-body[class*="theme-"] .location-test-preview h5 {
-  margin-bottom: 10px;
-  color: var(--text-color, #495057);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-body[class*="theme-"] .weather-data-grid,
-body[class*="theme-"] .location-data-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
-  font-size: 13px;
-}
-
-body[class*="theme-"] .weather-data-grid div,
-body[class*="theme-"] .location-data-grid div {
-  padding: 5px;
-  background-color: var(--input-bg, #ffffff);
-  border-radius: 3px;
-  border: 1px solid var(--border-color, #dee2e6);
-  color: var(--text-color);
-}
-
-body[class*="theme-"] .troubleshooting-tips {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: var(--warning-bg, #fff3cd);
-  border-radius: 5px;
-  border: 1px solid var(--warning-border, #ffeaa7);
-}
-
-body[class*="theme-"] .troubleshooting-tips h6 {
-  margin-bottom: 8px;
-  color: var(--warning-text, #856404);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-body[class*="theme-"] .troubleshooting-tips ul {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 12px;
-  color: var(--warning-text, #856404);
-}
-
-body[class*="theme-"] .troubleshooting-tips li {
-  margin-bottom: 3px;
-}
-
-/* Alert styles for weather module */
-body[class*="theme-"] .alert {
-  padding: 12px 15px;
-  margin-bottom: 15px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-}
-
-body[class*="theme-"] .alert-success {
-  color: var(--success-text, #155724);
-  background-color: var(--success-bg, #d4edda);
-  border-color: var(--success-border, #c3e6cb);
-}
-
-body[class*="theme-"] .alert-danger {
-  color: var(--danger-text, #721c24);
-  background-color: var(--danger-bg, #f8d7da);
-  border-color: var(--danger-border, #f5c6cb);
-}
-
-body[class*="theme-"] .alert-info {
-  color: var(--info-text, #0c5460);
-  background-color: var(--info-bg, #d1ecf1);
-  border-color: var(--info-border, #bee5eb);
-}
-
-body[class*="theme-"] .text-muted {
-  color: var(--muted-text, #6c757d) !important;
-  font-size: 12px;
-}
-
-/* Weather configuration setup guide */
-body[class*="theme-"] .setup-guide {
-  margin-top: 10px;
-  padding: 10px 15px;
-  background-color: var(--info-bg, #e7f3ff);
-  border: 1px solid var(--info-border, #b3d9ff);
-  border-radius: 5px;
-  font-size: 14px;
-}
-
-body[class*="theme-"] .setup-guide p {
-  margin: 0;
-  color: var(--info-text, #0066cc);
-}
-
-body[class*="theme-"] .setup-guide i {
-  margin-right: 5px;
 }

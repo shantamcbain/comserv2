@@ -1,0 +1,235 @@
+[% META
+   title = "Logging Administration"
+   description = "Manage application logs and alerts"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "0.02"
+   last_updated = "2026-03-13"
+%]
+[% PageVersion = 'admin/Logging/AdminLoggingIndex.tt,v 0.02 2026/03/13 Zencoder Exp Zencoder' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+<style>
+.page-header-actions { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+.filter-form-row     { display:flex; flex-wrap:wrap; gap:15px; align-items:flex-end; }
+.log-table-scroll    { max-height:400px; overflow-y:auto; }
+.nowrap              { white-space:nowrap; }
+.health-ok           { color:green;  font-weight:bold; }
+.health-warn         { color:orange; font-weight:bold; }
+.health-critical     { color:red;    font-weight:bold; }
+.form-inline         { display:inline; }
+tr.level-debug       { color:#888; }
+tr.level-info        { color:#000; }
+tr.level-warn        { background:#fff8e1; }
+tr.level-error       { background:#fdecea; }
+tr.level-critical    { background:#f8d7da; font-weight:bold; }
+</style>
+
+<div class="app-container">
+    <div class="page-header page-header-actions">
+        <h1>Logging Administration</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="[% c.uri_for('/admin/logging/audit') %]" class="btn btn-primary">
+                &#128202; Log Audit &amp; Health Dashboard
+            </a>
+            <a href="[% c.uri_for('/admin/hardware_monitor') %]" class="btn btn-secondary">
+                &#128268; Hardware Monitor
+            </a>
+        </div>
+    </div>
+
+    [% INCLUDE 'admin/HardwareMonitor/HealthDash.tt' %]
+
+    [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+    [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+            
+            <div class="content-section">
+                <h3>Current Configuration</h3>
+                <div class="data-container">
+                    <p><strong>NFS Log Directory:</strong> [% nfs_dir | html %]</p>
+                    <p><strong>Alert Level (Email Notification):</strong> <span class="badge">[% email_threshold | html %]</span></p>
+                    <div class="form-actions">
+                        <a href="[% c.uri_for('/admin/logging/settings') %]" class="btn btn-secondary">Change Settings</a>
+                        <form method="post" action="[% c.uri_for('/admin/logging/rotate') %]" class="form-inline">
+                            <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to rotate the log file manually?')">Rotate Log Now</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            [% IF health_status.score.defined %]
+            <div class="content-section">
+                <h3>Server Health Evaluation (last 30 min)</h3>
+                <div class="data-container">
+                    [% SET hs_class = health_status.status == 'OK' ? 'health-ok' : (health_status.status == 'WARN' ? 'health-warn' : 'health-critical') %]
+                    <p><strong>Status:</strong> <span class="[% hs_class %]">[% health_status.status | html %]</span>
+                       &nbsp; <strong>Score:</strong> [% health_status.score | html %] / 100</p>
+                    [% IF health_status.summary.size %]
+                    <ul>
+                        [% FOR item IN health_status.summary %]<li>[% item | html %]</li>[% END %]
+                    </ul>
+                    [% END %]
+                    [% IF health_status.eval_summary.size %]
+                    <h4>Top Event Groups (by severity score)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>Level</th><th>Category</th><th>Count</th><th>Score</th><th>Instance</th><th>Sample Message</th></tr></thead>
+                        <tbody>
+                        [% FOR ev IN health_status.eval_summary %]
+                            <tr>
+                                <td><strong>[% ev.lvl | html %]</strong></td>
+                                <td>[% ev.cat | html %]</td>
+                                <td>[% ev.count | html %]</td>
+                                <td>[% ev.score | html %]</td>
+                                <td><small>[% ev.inst | html %]</small></td>
+                                <td><small>[% ev.rec.message | html | truncate(80) %]</small></td>
+                            </tr>
+                        [% END %]
+                        </tbody>
+                    </table>
+                    [% END %]
+                </div>
+            </div>
+            [% END %]
+
+            <div class="content-section">
+                <h3>Database Logs — showing last 100 of [% total_count | html %] total records</h3>
+                [% IF db_error %]<div class="error"><strong>DB Error:</strong> [% db_error | html %]</div>[% END %]
+
+                <div class="data-container">
+                    <form method="get" action="[% c.uri_for('/admin/logging') %]" class="app-form">
+                        <div class="filter-form-row">
+                            <div class="form-field">
+                                <label for="filter_level">Level:</label>
+                                <select name="filter_level" id="filter_level" class="form-input">
+                                    <option value="">-- All --</option>
+                                    [% FOR level IN levels %]
+                                        <option value="[% level %]" [% IF level == filter_level %]selected[% END %]>[% level %]</option>
+                                    [% END %]
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label for="filter_sitename">Site:</label>
+                                <input type="text" name="filter_sitename" id="filter_sitename" value="[% filter_sitename | html %]" class="form-input" placeholder="CSC">
+                            </div>
+                            <div class="form-field">
+                                <label for="filter_username">User:</label>
+                                <input type="text" name="filter_username" id="filter_username" value="[% filter_username | html %]" class="form-input" placeholder="username">
+                            </div>
+                            <div class="form-field">
+                                <label for="search_text">Message Search:</label>
+                                <input type="text" name="search_text" id="search_text" value="[% search_text | html %]" class="form-input" placeholder="Search message text...">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Filter</button>
+                                <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">Reset</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="table-container log-table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Instance</th>
+                                <th>Site</th>
+                                <th>Level</th>
+                                <th>User</th>
+                                <th>Message</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            [% IF db_logs.size > 0 %]
+                                [% FOR log IN db_logs %]
+                                    <tr class="level-[% log.level | lower %]">
+                                        <td class="nowrap">[% log.timestamp | html %]</td>
+                                        <td><small>[% log.system_identifier | html %]</small></td>
+                                        <td>[% log.sitename | html %]</td>
+                                        <td><strong>[% log.level | html %]</strong></td>
+                                        <td>[% log.username | html %]</td>
+                                        <td>[% log.message | html %]</td>
+                                        <td><small>[% log.file | html %]:[% log.line | html %]</small></td>
+                                    </tr>
+                                [% END %]
+                            [% ELSE %]
+                                <tr>
+                                    <td colspan="7" class="empty-state">No logs found matching criteria.</td>
+                                </tr>
+                            [% END %]
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="content-section">
+                <h3>Current Log File</h3>
+                [% IF current_log.exists %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Path</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>[% current_log.path | html %]</td>
+                                    <td>[% current_log.size | html %]</td>
+                                    <td class="action-cell">
+                                        <a href="[% c.uri_for('/admin/logging/view', { path => current_log.path }) %]" class="btn btn-sm btn-primary">View Content</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                [% ELSE %]
+                    <p class="empty-state">Current log file not found at [% current_log.path | html %].</p>
+                [% END %]
+            </div>
+
+            <div class="content-section">
+                <h3>Archived Logs</h3>
+                [% IF archived_logs.size %]
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Size</th>
+                                    <th>Date Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% FOREACH log IN archived_logs %]
+                                    <tr>
+                                        <td>[% log.name | html %]</td>
+                                        <td>[% log.size | html %]</td>
+                                        <td>[% c.format_datetime(log.mtime) || log.mtime %]</td>
+                                        <td class="action-cell">
+                                            <a href="[% c.uri_for('/admin/logging/view', { path => log.path }) %]" class="btn btn-sm btn-secondary">View Content</a>
+                                        </td>
+                                    </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                [% ELSE %]
+                    <p class="empty-state">No archived log files found.</p>
+                [% END %]
+            </div>
+
+        </div>
+    </div>
+</div>

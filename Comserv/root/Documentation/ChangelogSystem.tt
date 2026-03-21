@@ -1,0 +1,127 @@
+[% META title = 'Changelog System Documentation' %]
+[% PageVersion = 'Documentation/changelog_system.tt,v 0.01 2025/10/20 Shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="changelog-top">Changelog System Documentation</h1>
+
+<nav>
+    <a href="#overview">Overview</a> |
+    <a href="#creating-entries">Creating Entries</a> |
+    <a href="#template-format">Template Format</a> |
+    <a href="#viewing-entries">Viewing Entries</a> |
+    <a href="#migration">Migration from MD</a>
+</nav>
+
+<h2 id="overview">Overview</h2>
+<p>The Changelog system provides a structured way to document changes to the application. It uses Template Toolkit (.tt) files to ensure consistent formatting and proper display of changelog entries in reverse chronological order (newest first).</p>
+<p><a href="#changelog-top">Back to top</a></p>
+
+<h2 id="creating-entries">Creating Changelog Entries</h2>
+<p>To create a new changelog entry:</p>
+<ol>
+    <li>Create a new .tt file in the <code>/Comserv/root/Documentation/changelog/</code> directory</li>
+    <li>Name the file with the date in YYYY-MM-DD format followed by a brief description, e.g., <code>2025-10-20-feature-name.tt</code></li>
+    <li>Use the template format described below</li>
+</ol>
+<p><a href="#changelog-top">Back to top</a></p>
+
+<h2 id="template-format">Template Format</h2>
+<p>Each changelog entry should follow this basic structure:</p>
+
+<pre><code>[% META title = 'Your Changelog Title' %]
+[% PageVersion = 'Documentation/changelog/your-file-name.tt,v 0.01 YYYY/MM/DD Author Exp author ' %]
+[% # Set metadata for this changelog entry %]
+[% SET 
+   entry_date = 'YYYY-MM-DD'
+   entry_author = 'Your Name'
+   entry_description = 'Brief description of the changes'
+%]
+
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+&lt;h1&gt;[% template.title %]&lt;/h1&gt;
+&lt;div class="changelog-meta"&gt;
+    &lt;span class="date"&gt;[% entry_date.replace('-', '/') %]&lt;/span&gt;
+    &lt;span class="author"&gt;by [% entry_author %]&lt;/span&gt;
+&lt;/div&gt;
+
+&lt;div class="changelog-content"&gt;
+    &lt;h2&gt;Overview&lt;/h2&gt;
+    &lt;p&gt;[% entry_description %]&lt;/p&gt;
+    
+    &lt;!-- Your changelog content here --&gt;
+&lt;/div&gt;
+
+&lt;div class="back-link"&gt;
+    &lt;a href="[% c.uri_for('/Documentation/all_changelog') %]"&gt;← Back to All Changelogs&lt;/a&gt;
+&lt;/div&gt;
+</code></pre>
+
+<p>A complete template file is available at <code>/Comserv/root/Documentation/changelog/changelog_template.tt</code> that you can copy and modify for new entries.</p>
+<p><a href="#changelog-top">Back to top</a></p>
+
+<h2 id="viewing-entries">Viewing Changelog Entries</h2>
+<p>Changelog entries can be viewed in two ways:</p>
+<ul>
+    <li><strong>Recent Entries:</strong> The most recent 5 entries are displayed on the main Documentation page</li>
+    <li><strong>All Entries:</strong> All changelog entries can be viewed on the <a href="[% c.uri_for('/Documentation/all_changelog') %]">All Changelogs</a> page, sorted by date (newest first)</li>
+</ul>
+<p><a href="#changelog-top">Back to top</a></p>
+
+<h2 id="migration">Migration from MD Format</h2>
+<p>The system is transitioning from Markdown (.md) files to Template Toolkit (.tt) files for changelog entries. To convert an existing .md file:</p>
+<ol>
+    <li>Create a new .tt file with the same base name (e.g., convert <code>2025-10-01-feature.md</code> to <code>2025-10-01-feature.tt</code>)</li>
+    <li>Use the template format described above</li>
+    <li>Copy the content from the .md file, converting Markdown syntax to HTML</li>
+    <li>Add the metadata section at the top of the file</li>
+    <li>Once verified, the original .md file can be removed</li>
+</ol>
+
+<p>An example of a converted file is available at <code>/Comserv/root/Documentation/changelog/2025-09-starman-restart-fix.tt</code>.</p>
+<p><a href="#changelog-top">Back to top</a></p>
+
+<style>
+    pre {
+        background-color: #f5f5f5;
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        margin: 20px 0;
+    }
+    
+    code {
+        font-family: monospace;
+    }
+    
+    nav {
+        margin: 20px 0;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    nav a {
+        margin: 0 5px;
+    }
+    
+    h2 {
+        margin-top: 30px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+    }
+    
+    ol, ul {
+        margin-left: 20px;
+        line-height: 1.6;
+    }
+    
+    .back-link {
+        font-size: 0.9em;
+        margin: 5px 0 20px 0;
+    }
+</style>

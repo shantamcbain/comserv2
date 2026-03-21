@@ -71,7 +71,7 @@
         <div class="col-50">
             <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Ollama Server:</strong> Local (localhost:11434) or remote (e.g., 192.168.1.171:11434)</li>
+                <li><strong>Ollama Server:</strong> Local (localhost:11434) or remote (e.g., 192.168.1.199:11434)</li>
                 <li><strong>Network Access:</strong> HTTP connectivity to Ollama API endpoint</li>
                 <li><strong>Perl Modules:</strong> LWP::UserAgent, JSON, Try::Tiny</li>
                 <li><strong>Model Installed:</strong> At least one LLM model pulled (e.g., llama3.1, mistral)</li>
@@ -141,14 +141,14 @@ my $ollama = Comserv::Model::Ollama->new(
 
 # Remote Ollama server
 my $ollama_remote = Comserv::Model::Ollama->new(
-    host => '192.168.1.171',
+    host => '192.168.1.199',
     model => 'mistral',
     timeout => 120
 );
 
 # Or specify endpoint directly (legacy)
 my $ollama_legacy = Comserv::Model::Ollama->new(
-    endpoint => 'http://192.168.1.171:11434/api/generate',
+    endpoint => 'http://192.168.1.199:11434/api/generate',
     model => 'llama3.1',
     timeout => 120
 );
@@ -311,7 +311,7 @@ try {
 $ollama->set_host('localhost');
 
 # Switch to remote server
-$ollama->set_host('192.168.1.171');
+$ollama->set_host('192.168.1.199');
 
 # Verify connection
 my $status = $ollama->get_connection_info();
@@ -335,7 +335,7 @@ print "Connected to: " . $status->{endpoint};
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Verify Ollama server is running: `curl http://localhost:11434/api/tags`</li>
                     <li>Check correct host and port configuration in Ollama instance</li>
-                    <li>For remote servers, verify network connectivity: `ping 192.168.1.171`</li>
+                    <li>For remote servers, verify network connectivity: `ping 192.168.1.199`</li>
                     <li>Check firewall rules allow port 11434 access</li>
                     <li>If using Docker, ensure container is running and port is exposed</li>
                 </ol>
