@@ -459,13 +459,11 @@
         <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
             <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
             <a href="[% c.uri_for('/Documentation/DailyPlan') %]#planning"
-               onclick="switchTab(event,'planning');return false;"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
                [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
             [% FOREACH site_row IN site_rs.all %]
             [% NEXT UNLESS site_row.sitename %]
             <a href="[% c.uri_for('/Documentation/DailyPlan') %]?filter_site=[% site_row.sitename %]#planning"
-               onclick="switchTab(event,'planning');return false;"
                style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
                [% IF filter_site == site_row.sitename %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
                 [% site_row.sitename %]
@@ -477,8 +475,11 @@
 
         [%# ── Project → Plan hierarchy ── %]
         [% TRY %]
-        [% SET proj_search = is_csc && !filter_site ? {} : {sitename => view_sitename} %]
-        [% SET projects_rs = c.model('DBEncy').resultset('Project').search(proj_search, { order_by => ['sitename','name'] }) %]
+        [% IF is_csc && !filter_site %]
+        [% SET projects_rs = c.model('DBEncy').resultset('Project').search({}, { order_by => ['sitename','name'] }) %]
+        [% ELSE %]
+        [% SET projects_rs = c.model('DBEncy').resultset('Project').search({sitename => view_sitename}, { order_by => ['sitename','name'] }) %]
+        [% END %]
         [% SET total_projects = projects_rs.count %]
 
         [% IF total_projects > 0 %]
@@ -551,8 +552,11 @@
         [% END %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
-        [% SET plan_search = is_csc && !filter_site ? {} : {sitename => view_sitename} %]
-        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search(plan_search, {order_by => 'created_at DESC'}) %]
+        [% IF is_csc && !filter_site %]
+        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search({}, {order_by => 'created_at DESC'}) %]
+        [% ELSE %]
+        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search({sitename => view_sitename}, {order_by => 'created_at DESC'}) %]
+        [% END %]
         [% SET orphan_plans = [] %]
         [% FOREACH pln IN all_plans_rs.all %]
             [% IF pln.dailyplan_projects.count == 0 %]
