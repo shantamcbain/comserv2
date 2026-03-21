@@ -1098,9 +1098,12 @@ sub logs :Path('/admin/logs') :Args(0) {
         return;
     }
     
-    # Get log file parameter
-    my $log_file = $c->req->param('file') || 'catalyst.log';
-    
+    # Get log file parameter — sanitize to basename only, no path traversal
+    my $log_file_raw = $c->req->param('file') || 'catalyst.log';
+    (my $log_file = $log_file_raw) =~ s{[/\\]}{}g;
+    $log_file =~ s/\.\.\///g;
+    $log_file = 'catalyst.log' unless $log_file =~ /^[\w.\-]+\.log$/;
+
     # Get available log files
     my @log_files = ();
     eval {
@@ -1111,15 +1114,22 @@ sub logs :Path('/admin/logs') :Args(0) {
             closedir($dh);
         }
     };
-    
+
+    # Validate that the requested file is actually in the list
+    my %valid_files = map { $_ => 1 } @log_files;
+    $log_file = 'catalyst.log' unless $valid_files{$log_file};
+
     # Get log content
     my $log_content = '';
     eval {
         my $log_path = $c->path_to('logs', $log_file);
         if (-f $log_path) {
-            # Get the last 1000 lines of the log file
-            my $tail_output = `tail -n 1000 $log_path`;
-            $log_content = $tail_output;
+            # Read last 1000 lines without shell interpolation
+            open(my $fh, '<', $log_path) or die "Cannot open log: $!";
+            my @lines = <$fh>;
+            close $fh;
+            my $start = @lines > 1000 ? @lines - 1000 : 0;
+            $log_content = join('', @lines[$start..$#lines]);
         }
     };
     
@@ -1247,6 +1257,7 @@ sub security_scan_start :Path('/admin/security-scan-start') :Args(0) {
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'security_scan_start')) {
+        $c->response->status(403);
         $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
@@ -1307,6 +1318,7 @@ sub security_scan_poll :Path('/admin/security-scan-poll') :Args(0) {
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'security_scan_poll')) {
+        $c->response->status(403);
         $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
@@ -1368,6 +1380,7 @@ sub security_scan_history :Path('/admin/security-scan-history') :Args(0) {
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'security_scan_history')) {
+        $c->response->status(403);
         $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
@@ -1407,6 +1420,7 @@ sub security_scan_load :Path('/admin/security-scan-load') :Args(0) {
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'security_scan_load')) {
+        $c->response->status(403);
         $c->response->body(encode_json({ error => 'Access denied' }));
         return;
     }
@@ -5094,6 +5108,7 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_list')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5145,6 +5160,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
 
     my $admin_auth_vol = Comserv::Util::AdminAuth->new();
     unless ($admin_auth_vol->check_admin_access($c, 'docker_volumes')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Authentication required"}');
         $c->response->content_type('application/json');
         return;
@@ -5214,6 +5230,7 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_restart')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5251,6 +5268,7 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_start')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5288,6 +5306,7 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_stop')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5325,6 +5344,7 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_up')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5362,6 +5382,7 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_logs')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5399,6 +5420,7 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_rebuild')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5436,6 +5458,7 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_prune')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5482,6 +5505,7 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_system_df')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5514,6 +5538,7 @@ sub docker_save_image :Path('/admin/docker-save-image') :Args(1) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_save_image')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5556,6 +5581,7 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_test_ssh')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5654,6 +5680,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_deploy_to_production')) {
+        $c->response->status(403);
         $c->response->body('{"success": false, "error": "Access denied: admin required"}');
         $c->response->content_type('application/json');
         return;
@@ -5721,6 +5748,7 @@ sub docker_ssh_terminal :Path('/admin/docker-ssh-terminal') :Args(0) {
     
     my $admin_auth = Comserv::Util::AdminAuth->new();
     unless ($admin_auth->check_admin_access($c, 'docker_ssh_terminal')) {
+        $c->response->status(403);
         $c->response->status(403);
         $c->response->body('Access denied: admin required');
         return;
