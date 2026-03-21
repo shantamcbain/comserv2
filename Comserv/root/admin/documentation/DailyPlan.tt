@@ -427,70 +427,171 @@
         [% END %]
     </div>
 
-    <!-- TAB: PLANNING — DB-driven for all sites; CSC also sees old text Planning.tt -->
+    <!-- TAB: PLANNING — Project→Plan hierarchy; DB-driven for all sites; CSC also sees legacy Planning.tt -->
     <div id="planning" class="tab-content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
-            <h2 style="margin:0;font-size:1.2em;">Plans: [% plan_sitename %]</h2>
-            <div style="display:flex;gap:8px;align-items:center;">
+
+        [%# ── Query: get filter param and determine visible sitenames ── %]
+        [% SET filter_site = c.req.params.filter_site || '' %]
+        [% SET view_sitename = filter_site || plan_sitename %]
+
+        [%# ── Header row ── %]
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+            <h2 style="margin:0;font-size:1.2em;">
+                📁 Projects &amp; Plans:
+                [% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]
+            </h2>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 [% IF is_csc %]
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning'); return false;"
-                   style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;">
-                    [text view below ↓]
-                </a>
+                <a href="#planning" onclick="switchTab(event,'planning');return false;"
+                   style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;">[text view ↓]</a>
                 [% END %]
                 [% IF is_admin %]
-                <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:5px 12px;border-radius:4px;text-decoration:none;font-size:0.9em;">+ New Plan</a>
+                <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:5px 12px;border-radius:4px;text-decoration:none;font-size:0.85em;">+ New Plan</a>
                 [% END %]
-                <a href="/todo" style="padding:5px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.9em;color:var(--text-color);">Todo System</a>
+                <a href="/todo" style="padding:5px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">Todos</a>
             </div>
         </div>
 
-        [% IF db_plans && db_plans.size %]
-        <div style="display:grid;gap:14px;">
-            [% FOREACH plan IN db_plans %]
-            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:14px;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-                    <div>
-                        <div style="font-size:1.05em;font-weight:bold;">
-                            <a href="/admin/plan/[% plan.id %]" style="color:var(--primary-color);text-decoration:none;">[% plan.plan_name %]</a>
-                        </div>
-                        <div style="font-size:0.8em;color:var(--text-muted-color);margin-top:2px;">
-                            [% IF plan.due_date %]Due: <span [% IF plan.is_overdue %]style="color:#dc3545;font-weight:bold"[% END %]>[% plan.due_date %][% IF plan.is_overdue %] ⚠[% END %]</span> &nbsp;·&nbsp;[% END %]
-                            Created: [% plan.created_at %][% IF plan.created_by %] by [% plan.created_by %][% END %]
-                            [% IF is_csc %]<span style="background:var(--primary-color);color:#fff;padding:1px 6px;border-radius:3px;font-size:0.85em;margin-left:6px;">[% plan.sitename %]</span>[% END %]
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        [% IF plan.priority %]<span style="font-size:0.8em;color:var(--text-muted-color);">P[% plan.priority %]</span>[% END %]
-                        <span style="padding:2px 8px;border-radius:3px;font-size:0.75em;font-weight:bold;
-                            [% IF plan.status == 'active' %]background:#28a745;color:#fff[% ELSIF plan.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
-                            [% plan.status || 'active' %]
-                        </span>
-                    </div>
-                </div>
-                [% IF plan.plan_description %]
-                <div style="font-size:0.88em;color:var(--text-color);margin:6px 0;">[% plan.plan_description | truncate(120) %]</div>
-                [% END %]
-                <div style="background:var(--border-color);border-radius:4px;height:6px;margin:8px 0;">
-                    <div style="background:var(--primary-color);height:6px;border-radius:4px;width:[% plan.progress_percentage || 0 %]%;"></div>
-                </div>
-                <div style="display:flex;gap:12px;align-items:center;font-size:0.8em;margin-top:6px;">
-                    <span>[% plan.completed_todo_count || 0 %]/[% plan.todo_count || 0 %] tasks &nbsp;·&nbsp; [% plan.progress_percentage || 0 %]% done</span>
-                    <span style="margin-left:auto;">
-                        <a href="/admin/plan/[% plan.id %]" style="color:var(--primary-color);">View</a>
-                        [% IF is_admin %] &nbsp;·&nbsp; <a href="/admin/plan/[% plan.id %]/edit" style="color:var(--primary-color);">Edit</a>[% END %]
+        [%# ── CSC admin: SiteName filter toggle ── %]
+        [% IF is_csc %]
+        [% TRY %]
+        [% SET site_rs = c.model('DBEncy').resultset('Project').search({}, { columns => ['sitename'], distinct => 1, order_by => 'sitename' }) %]
+        <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:0.85em;">
+            <span style="color:var(--text-muted-color);font-weight:bold;">Filter:</span>
+            <a href="[% c.uri_for('/Documentation/DailyPlan') %]#planning"
+               onclick="switchTab(event,'planning');return false;"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF !filter_site %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">All</a>
+            [% FOREACH site_row IN site_rs.all %]
+            [% NEXT UNLESS site_row.sitename %]
+            <a href="[% c.uri_for('/Documentation/DailyPlan') %]?filter_site=[% site_row.sitename %]#planning"
+               onclick="switchTab(event,'planning');return false;"
+               style="padding:2px 10px;border-radius:3px;text-decoration:none;border:1px solid var(--border-color);
+               [% IF filter_site == site_row.sitename %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+                [% site_row.sitename %]
+            </a>
+            [% END %]
+        </div>
+        [% CATCH %][% END %]
+        [% END %]
+
+        [%# ── Project → Plan hierarchy ── %]
+        [% TRY %]
+        [% SET proj_search = is_csc && !filter_site ? {} : {sitename => view_sitename} %]
+        [% SET projects_rs = c.model('DBEncy').resultset('Project').search(proj_search, { order_by => ['sitename','name'] }) %]
+        [% SET total_projects = projects_rs.count %]
+
+        [% IF total_projects > 0 %]
+        [% SET current_site_label = '' %]
+        [% FOREACH proj IN projects_rs.all %]
+            [% NEXT IF proj.parent_id %][%# top-level projects only %]
+
+            [%# Site group header for CSC all-sites view %]
+            [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% SET current_site_label = proj.sitename %]
+            <div style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
+                🌐 [% proj.sitename %]
+            </div>
+            [% END %]
+
+            [%# Project card %]
+            <details style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;margin-bottom:10px;" open>
+                <summary style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;list-style:none;">
+                    <span>
+                        <strong>[% proj.name %]</strong>
+                        [% IF proj.project_code %]<span style="font-size:0.8em;color:var(--text-muted-color);margin-left:6px;">[% proj.project_code %]</span>[% END %]
+                        [% IF proj.developer_name %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">· [% proj.developer_name %]</span>[% END %]
                     </span>
+                    <span style="display:flex;gap:6px;align-items:center;">
+                        [% IF proj.status %]
+                        <span style="padding:1px 7px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                            [% IF proj.status == 'In-Process' || proj.status == 'active' %]background:#17a2b8;color:#fff
+                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background:#28a745;color:#fff
+                            [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                            [% proj.status %]
+                        </span>
+                        [% END %]
+                        <a href="/project/details?project_id=[% proj.id %]" style="font-size:0.78em;color:var(--primary-color);text-decoration:none;" onclick="event.stopPropagation()">Details</a>
+                    </span>
+                </summary>
+                <div style="padding:0 14px 12px;">
+                    [% IF proj.description %]
+                    <div style="font-size:0.85em;color:var(--text-color);margin:6px 0 10px;">[% proj.description %]</div>
+                    [% END %]
+
+                    [%# Plans linked to this project %]
+                    [% SET proj_plans = proj.dailyplans %]
+                    [% IF proj_plans.count > 0 %]
+                    <div style="margin-left:8px;border-left:2px solid var(--primary-color);padding-left:10px;">
+                        [% FOREACH pln IN proj_plans.all %]
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                            <div>
+                                <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;font-size:0.9em;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                                [% IF pln.due_date %]<span style="font-size:0.78em;color:var(--text-muted-color);margin-left:6px;">due [% pln.due_date %]</span>[% END %]
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                [% IF pln.priority %]<span style="font-size:0.78em;color:var(--text-muted-color);">P[% pln.priority %]</span>[% END %]
+                                <span style="padding:1px 6px;border-radius:3px;font-size:0.72em;font-weight:bold;
+                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% pln.status || 'active' %]
+                                </span>
+                                <a href="/admin/plan/[% pln.id %]" style="font-size:0.78em;color:var(--primary-color);">View</a>
+                            </div>
+                        </div>
+                        [% END %]
+                    </div>
+                    [% ELSE %]
+                    <div style="font-size:0.82em;color:var(--text-muted-color);margin:4px 0 6px;">
+                        No plans linked.
+                        [% IF is_admin %]<a href="/admin/plan/create" style="color:var(--primary-color);">+ Add Plan</a>[% END %]
+                    </div>
+                    [% END %]
+                </div>
+            </details>
+        [% END %]
+
+        [%# ── Standalone plans (not linked to any project) ── %]
+        [% SET plan_search = is_csc && !filter_site ? {} : {sitename => view_sitename} %]
+        [% SET all_plans_rs = c.model('DBEncy').resultset('DailyPlan').search(plan_search, {order_by => {-desc => 'created_at'}}) %]
+        [% SET orphan_plans = [] %]
+        [% FOREACH pln IN all_plans_rs.all %]
+            [% IF pln.dailyplan_projects.count == 0 %]
+            [% orphan_plans.push(pln) %]
+            [% END %]
+        [% END %]
+        [% IF orphan_plans.size %]
+        <div style="margin-top:20px;">
+            <h3 style="font-size:0.95em;color:var(--text-muted-color);margin-bottom:8px;">📋 Standalone Plans (not yet linked to a project)</h3>
+            [% FOREACH pln IN orphan_plans %]
+            <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <a href="/admin/plan/[% pln.id %]" style="font-weight:bold;color:var(--primary-color);text-decoration:none;">[% pln.plan_name %]</a>
+                    <span style="font-size:0.8em;color:var(--text-muted-color);margin-left:8px;">[% pln.sitename %]</span>
+                    [% IF pln.plan_description %]<div style="font-size:0.82em;color:var(--text-color);margin-top:3px;">[% pln.plan_description | truncate(100) %]</div>[% END %]
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                    <span style="padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;
+                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                        [% pln.status || 'active' %]
+                    </span>
+                    <a href="/admin/plan/[% pln.id %]" style="font-size:0.82em;color:var(--primary-color);">View</a>
+                    [% IF is_admin %]<a href="/admin/plan/[% pln.id %]/edit" style="font-size:0.82em;color:var(--primary-color);">Edit</a>[% END %]
                 </div>
             </div>
             [% END %]
         </div>
+        [% END %]
+
         [% ELSE %]
         <div style="text-align:center;padding:40px;color:var(--text-muted-color);">
-            <p>No plans found for <strong>[% plan_sitename %]</strong>.</p>
+            <p>No projects found for <strong>[% view_sitename %]</strong>.</p>
             [% IF is_admin %]
             <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Create the first plan</a>
             [% END %]
         </div>
+        [% END %]
+        [% CATCH %]
+        <div style="background:#fee;border:1px solid #f88;padding:10px;border-radius:4px;font-size:0.85em;">Error loading projects: [% error %]</div>
         [% END %]
 
         [% IF is_csc %]
