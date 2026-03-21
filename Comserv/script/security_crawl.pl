@@ -192,16 +192,15 @@ while (@queue && $page_count < $max_pages) {
     next if $visited{$url}++;
     $page_count++;
 
-    print "  GET $url\n" if $verbose;
-
     my $resp = $ua->get($url, 'X-Sitename' => $sitename);
     my $finding = classify_response($url, $resp);
 
-    if ($finding->{result} ne 'OK_PUBLIC' && $finding->{result} ne 'NOT_FOUND') {
-        push @findings, { phase => 'crawl', %$finding };
-        my $icon = $finding->{result} =~ /EXPOSED|LEAK/ ? '!!' : '--';
-        printf "  %s [%s] %s => %s\n", $icon, $resp->code, $url, $finding->{result};
-    }
+    push @findings, { phase => 'crawl', %$finding };
+
+    my $icon = $finding->{result} =~ /EXPOSED|LEAK/ ? '!!' :
+               $finding->{result} eq 'PROTECTED'    ? 'ok' :
+               $finding->{result} eq 'NOT_FOUND'    ? '  ' : '--';
+    printf "  %s [%s] %-60s => %s\n", $icon, $resp->code, $url, $finding->{result};
 
     # Extract links only from public pages
     if ($resp->code == 200 && $resp->content_type =~ /html/) {
