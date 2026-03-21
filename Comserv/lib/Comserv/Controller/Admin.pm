@@ -1158,13 +1158,14 @@ sub security_scan :Path('/admin/security-scan') :Args(0) {
     }
 
     my @known_targets = (
-        { label => 'Localhost:3001 (dev)',          url => 'http://localhost:3001',                           site => 'none'  },
-        { label => 'coop.workstation:3000 (docker)', url => 'http://coop.workstation:3000',                   site => 'MCoop' },
-        { label => 'coop.workstation:3001 (main)',  url => 'http://coop.workstation:3001',                    site => 'MCoop' },
-        { label => 'Production coop.computersystemconsulting.ca', url => 'http://coop.computersystemconsulting.ca', site => 'MCoop' },
-        { label => 'usbm.local',                    url => 'http://usbm.local',                               site => 'USBM'  },
-        { label => 'bmaster.workstation',           url => 'http://bmaster.workstation',                      site => 'none'  },
-        { label => 've7tit.local',                  url => 'http://ve7tit.local',                              site => 'none'  },
+        { label => 'localhost:3001 (dev main)',                     url => 'http://localhost:3001',                           site => 'none'  },
+        { label => 'localhost:3001 as MCoop',                       url => 'http://localhost:3001',                           site => 'MCoop' },
+        { label => 'localhost:3000 (docker)',                       url => 'http://localhost:3000',                           site => 'none'  },
+        { label => 'localhost:3000 as MCoop (docker)',              url => 'http://localhost:3000',                           site => 'MCoop' },
+        { label => 'Production coop.computersystemconsulting.ca',  url => 'http://coop.computersystemconsulting.ca',         site => 'MCoop' },
+        { label => 'usbm.local',                                    url => 'http://usbm.local',                               site => 'USBM'  },
+        { label => 'bmaster.workstation',                           url => 'http://bmaster.workstation',                      site => 'none'  },
+        { label => 've7tit.local',                                  url => 'http://ve7tit.local',                              site => 'none'  },
     );
 
     my $scan_results = undef;
