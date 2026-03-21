@@ -8,7 +8,6 @@ use JSON;
 use Try::Tiny;
 use Comserv::Util::Logging;
 use File::Spec;
-use FindBin;
 
 # Singleton instance
 my $instance;
@@ -69,23 +68,7 @@ sub instance {
 sub load_config {
     my ($self) = @_;
 
-    # Use FindBin to get absolute path to config file
-    my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'documentation_config.json');
-    
-    # Log the config file path for debugging
-    Comserv::Util::Logging::log_to_file(
-        "Attempting to load documentation config from: $config_file",
-        undef, 'DEBUG'
-    );
-    
-    # Check if file exists
-    unless (-f $config_file) {
-        Comserv::Util::Logging::log_to_file(
-            "Documentation config file not found at: $config_file",
-            undef, 'ERROR'
-        );
-        return;
-    }
+    my $config_file = File::Spec->catfile('root', 'Documentation', 'config', 'DocumentationConfig.json');
 
     try {
         # Read the JSON file
@@ -101,15 +84,28 @@ sub load_config {
 
         # Store pages
         $self->{pages} = $config->{pages} || [];
+        
+        # Ensure pages is an array
+        unless (ref $self->{pages} eq 'ARRAY') {
+            Comserv::Util::Logging::log_to_file(
+                "Warning: pages field is not an array, converting to empty array",
+                undef, 'WARN'
+            );
+            $self->{pages} = [];
+        }
 
         # Index pages by ID
         foreach my $page (@{$self->{pages}}) {
+            next unless ref $page eq 'HASH' && $page->{id};
+            
             $self->{pages_by_id}->{$page->{id}} = $page;
 
-            # Index pages by category
-            foreach my $category (@{$page->{categories}}) {
-                $self->{pages_by_category}->{$category} ||= [];
-                push @{$self->{pages_by_category}->{$category}}, $page;
+            # Index pages by category (safely)
+            if (ref $page->{categories} eq 'ARRAY') {
+                foreach my $category (@{$page->{categories}}) {
+                    $self->{pages_by_category}->{$category} ||= [];
+                    push @{$self->{pages_by_category}->{$category}}, $page;
+                }
             }
 
             # Index pages by site
@@ -123,12 +119,6 @@ sub load_config {
                 scalar(keys %{$self->{categories}}) . " categories, " .
                 scalar(@{$self->{pages}}) . " pages",
             undef, 'INFO'
-        );
-        
-        # Debug log category keys
-        Comserv::Util::Logging::log_to_file(
-            "Category keys loaded: " . join(", ", keys %{$self->{categories}}),
-            undef, 'DEBUG'
         );
     } catch {
         Comserv::Util::Logging::log_to_file(
@@ -160,41 +150,6 @@ sub get_pages {
 sub get_page {
     my ($self, $page_id) = @_;
     return $self->{pages_by_id}->{$page_id};
-}
-
-# Alias for get_page for compatibility
-sub get_page_by_id {
-    my ($self, $page_id) = @_;
-    return $self->get_page($page_id);
-}
-
-# Check if user has access to a specific page
-sub user_has_access {
-    my ($self, $page_data, $user_role, $current_site) = @_;
-    
-    # Check if page data exists
-    return 0 unless $page_data;
-    
-    # Check site access
-    my $page_site = $page_data->{site} || 'all';
-    if ($page_site ne 'all' && $page_site ne $current_site) {
-        return 0;
-    }
-    
-    # Check role access
-    if ($page_data->{roles} && ref $page_data->{roles} eq 'ARRAY') {
-        my $has_role = 0;
-        foreach my $page_role (@{$page_data->{roles}}) {
-            if ($page_role eq $user_role || ($page_role eq 'normal' && $user_role)) {
-                $has_role = 1;
-                last;
-            }
-        }
-        return $has_role;
-    }
-    
-    # Default to allow access if no roles specified
-    return 1;
 }
 
 # Get pages by category
@@ -291,78 +246,6 @@ sub get_filtered_categories {
     }
 
     return \%filtered_categories;
-}
-
-# Add a new page to the configuration
-sub add_page {
-    my ($self, $page_data) = @_;
-    
-    # Validate required fields
-    die "Page data is required" unless $page_data;
-    die "Page ID is required" unless $page_data->{id};
-    die "Page path is required" unless $page_data->{path};
-    die "Page title is required" unless $page_data->{title};
-    
-    # Check if page already exists
-    if (exists $self->{pages_by_id}->{$page_data->{id}}) {
-        die "Page with ID '$page_data->{id}' already exists";
-    }
-    
-    # Add to pages array
-    push @{$self->{pages}}, $page_data;
-    
-    # Add to ID index
-    $self->{pages_by_id}->{$page_data->{id}} = $page_data;
-    
-    # Add to category index
-    if ($page_data->{categories}) {
-        foreach my $category (@{$page_data->{categories}}) {
-            $self->{pages_by_category}->{$category} ||= [];
-            push @{$self->{pages_by_category}->{$category}}, $page_data;
-        }
-    }
-    
-    # Add to site index
-    my $site = $page_data->{site} || 'all';
-    $self->{pages_by_site}->{$site} ||= [];
-    push @{$self->{pages_by_site}->{$site}}, $page_data;
-    
-    return 1;
-}
-
-# Save configuration to JSON file
-sub save_config {
-    my ($self) = @_;
-    
-    use FindBin;
-    my $config_file = File::Spec->catfile($FindBin::Bin, '..', 'root', 'Documentation', 'config', 'documentation_config.json');
-    
-    try {
-        # Prepare configuration data
-        my $config_data = {
-            categories => $self->{categories},
-            pages => $self->{pages}
-        };
-        
-        # Write to file
-        open my $fh, '>:encoding(UTF-8)', $config_file or die "Cannot write to $config_file: $!";
-        print $fh JSON->new->pretty->encode($config_data);
-        close $fh;
-        
-        Comserv::Util::Logging::log_to_file(
-            "Documentation configuration saved successfully to $config_file",
-            undef, 'INFO'
-        );
-        
-        return 1;
-    } catch {
-        my $error = $_;
-        Comserv::Util::Logging::log_to_file(
-            "Error saving documentation configuration: $error",
-            undef, 'ERROR'
-        );
-        die $error;
-    };
 }
 
 # Reload configuration from JSON file

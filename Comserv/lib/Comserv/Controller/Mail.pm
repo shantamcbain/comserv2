@@ -10,43 +10,51 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub auto :Private {
+    my ($self, $c) = @_;
+    return 1;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Accessing mail index page");
     
-    # Get statistics for admin users
-    if ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
-        my $site_id = $c->session->{site_id} || 1;
-        
-        try {
-            my $schema = $c->model('DBEncy');
-            
-            # Get user count for current site
-            my $user_count = $schema->resultset('User')->search({
-                'user_sites.site_id' => $site_id
-            }, {
-                join => 'user_sites'
-            })->count;
-            
-            # Get mailing list count
-            my $mailing_list_count = $schema->resultset('MailingList')->search({
-                site_id => $site_id
-            })->count;
-            
-            $c->stash(
-                user_count => $user_count,
-                mailing_list_count => $mailing_list_count
-            );
-        } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index', 
-                "Error loading mail statistics: $_");
-        };
+    my $username = $c->session->{username};
+    my $roles = $c->session->{roles} || [];
+    
+    # Convert roles to array if it's a string
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
     }
     
-    # Set the template to the new mail dashboard
-    $c->stash(template => 'mail/index.tt');
+    # Determine user type and permissions
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    my $is_developer = grep { $_ eq 'developer' } @$roles;
+    my $is_member = grep { $_ eq 'member' } @$roles;
+    my $is_logged_in = $username ? 1 : 0;
+    
+    # Check if user has a mail account (assume username-based for now)
+    my $has_mail_account = 0;
+    if ($is_logged_in) {
+        # TODO: Query actual mail account database when available
+        # For now, members, developers, and admins get mail access
+        $has_mail_account = $is_member || $is_developer || $is_admin;
+    }
+    
+    # Set stash variables for template
+    $c->stash(
+        is_admin => $is_admin,
+        is_developer => $is_developer,
+        is_member => $is_member,
+        is_logged_in => $is_logged_in,
+        has_mail_account => $has_mail_account,
+        template => 'mail/mail.index.tt'
+    );
+
+    # Forward to the TT view to render the template
+    $c->forward($c->view('TT'));
 }
 
 sub send_welcome_email :Local {
@@ -81,52 +89,488 @@ sub add_mail_config_form :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
         "Displaying mail configuration form");
     
-    $c->stash(template => 'mail/add_mail_config_form.tt');
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Non-admin user attempted to access mail config form");
+        $c->stash(
+            error_msg => 'Access denied. Admin privileges required.',
+            template => 'mail/mail.index.tt'
+        );
+        return;
+    }
+    
+    # Get current site name from stash or session
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+        "Current SiteName: '$current_sitename', Username: " . ($c->session->{username} || 'none'));
+    
+    # Determine if user is CSC admin (has access to all sites)
+    # CSC admin can be identified by SiteName='CSC' OR by having admin role
+    my $is_csc = ($current_sitename eq 'CSC') ? 1 : 0;
+    
+    # If SiteName is not set but user is admin, default to CSC
+    if (!$current_sitename && $is_admin) {
+        $current_sitename = 'CSC';
+        $is_csc = 1;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "No SiteName found for admin user, defaulting to CSC");
+    }
+    
+    # Load all sites if CSC user
+    my @all_sites = ();
+    if ($is_csc) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Loading all sites for CSC user");
+        
+        my $schema = $c->model('DBEncy');
+        my $sites_rs = $schema->resultset('Site')->search(
+            {},
+            { order_by => 'name' }
+        );
+        
+        while (my $site = $sites_rs->next) {
+            push @all_sites, {
+                id => $site->id,
+                name => $site->name,
+            };
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config_form', 
+            "Loaded " . scalar(@all_sites) . " sites");
+    }
+    
+    $c->stash(
+        current_sitename => $current_sitename,
+        is_csc => $is_csc,
+        all_sites => \@all_sites,
+        template => 'mail/add_mail_config_form.tt'
+    );
 }
 
 sub add_mail_config :Local {
     my ($self, $c) = @_;
     
-    my $params = $c->req->params;
-    my $site_id = $params->{site_id};
+    
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
-        "Processing mail configuration for site_id $site_id");
+        "add_mail_config action called - Method: " . $c->req->method);
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+        "User: " . ($c->session->{username} || 'not logged in') . ", Is Admin: " . ($is_admin ? 'yes' : 'no'));
+    
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_mail_config', 
+            "Non-admin user attempted to save mail config");
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    my $params = $c->req->params;
+    my $site_input = $params->{site_id};
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+        "Processing mail configuration for site input: '$site_input'");
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+        "Params: smtp_host=" . ($params->{smtp_host} || 'undef') . 
+        ", smtp_port=" . ($params->{smtp_port} || 'undef') .
+        ", smtp_username=" . ($params->{smtp_username} || 'undef'));
     
     # Validate required fields
+    unless ($site_input) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
+            "Missing site_id parameter");
+        $c->stash(
+            error_msg => "Please provide a Site ID or Site Name",
+            template => 'mail/add_mail_config_form.tt'
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+    
+    # Lookup site_id if user entered a site name instead of numeric ID
+    my $site_id;
+    if ($site_input =~ /^\d+$/) {
+        # It's already a numeric ID
+        $site_id = $site_input;
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+            "Using numeric site_id: $site_id");
+    } else {
+        # It's a site name, look it up
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+            "Looking up site by name: '$site_input'");
+        
+        my $schema = $c->model('DBEncy');
+        my $site = $schema->resultset('Site')->search(
+            { name => $site_input },
+            { rows => 1 }
+        )->single;
+        
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+            "Site lookup result: " . (defined $site ? "found" : "not found"));
+        
+        if ($site) {
+            $site_id = $site->id;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+                "Found site '$site_input' with ID: $site_id");
+        } else {
+            # Debug: List all available sites
+            my @all_site_names = ();
+            my $sites_rs = $schema->resultset('Site')->search({}, { order_by => 'name' });
+            while (my $s = $sites_rs->next) {
+                push @all_site_names, $s->name;
+            }
+            
+            my $available_sites = join(', ', @all_site_names);
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
+                "Site not found: '$site_input'. Available sites: $available_sites");
+            
+            # Reload the form with error and site list
+            my @all_sites_for_form = ();
+            my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+            my $is_csc = 1; # Assume CSC if we're in site lookup
+            
+            $sites_rs->reset; # Reset the iterator
+            while (my $s = $sites_rs->next) {
+                push @all_sites_for_form, {
+                    id => $s->id,
+                    name => $s->name,
+                };
+            }
+            
+            $c->stash(
+                error_msg => "Site '$site_input' not found. Available sites: $available_sites",
+                current_sitename => $current_sitename,
+                is_csc => $is_csc,
+                all_sites => \@all_sites_for_form,
+                template => 'mail/add_mail_config_form.tt'
+            );
+            $c->forward($c->view('TT'));
+            return;
+        }
+    }
+    
     unless ($params->{smtp_host} && $params->{smtp_port}) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
             "Incomplete SMTP config for site_id $site_id");
-        $c->stash->{debug_msg} = "Please provide SMTP host and port";
-        $c->stash(template => 'mail/add_mail_config_form.tt');
+        $c->stash(
+            error_msg => "Please provide SMTP host and port",
+            template => 'mail/add_mail_config_form.tt'
+        );
+        $c->forward($c->view('TT'));
         return;
     }
     
     try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
+            "Connecting to database to save SMTP config");
+        
         my $schema = $c->model('DBEncy');
         my $site_config_rs = $schema->resultset('SiteConfig');
         
         # Create or update SMTP configuration
+        my $saved_count = 0;
         for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
-            next unless defined $params->{$config_key};
+            # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+            my $value = $params->{$config_key};
             
-            $site_config_rs->update_or_create({
+            # For smtp_ssl, default to 0 if not checked
+            if ($config_key eq 'smtp_ssl' && !defined $value) {
+                $value = 0;
+            }
+            
+            next unless defined $value;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+                "Saving $config_key for site_id $site_id, value: " . (defined $value ? $value : 'undef'));
+            
+            my $result = $site_config_rs->update_or_create({
                 site_id => $site_id,
                 config_key => $config_key,
-                config_value => $params->{$config_key},
+                config_value => $value,
             });
+            $saved_count++;
+            
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'add_mail_config', 
+                "Saved $config_key: " . ($result->in_storage ? "exists" : "created"));
         }
         
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_mail_config', 
-            "SMTP config saved for site_id $site_id");
-        $c->stash->{status_msg} = "SMTP configuration saved successfully";
+            "SMTP config saved for site_id $site_id ($saved_count fields saved)");
+        $c->flash->{success_msg} = "SMTP configuration saved successfully for site ID $site_id ($saved_count settings)";
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
     } catch {
+        my $error = $_;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_mail_config', 
-            "Failed to save SMTP config: $_");
-        $c->stash->{debug_msg} = "Failed to save configuration: $_";
+            "Failed to save SMTP config: $error");
+        $c->flash->{error_msg} = "Failed to save configuration: $error";
+        $c->res->redirect($c->uri_for('/mail/add_mail_config_form'));
+        return;
+    };
+}
+
+sub edit_smtp_config :Local {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    my $site_id = $c->req->param('site_id');
+    
+    unless ($site_id) {
+        $c->flash->{error_msg} = 'Site ID is required';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # If this is a POST request, update the configuration
+    if ($c->req->method eq 'POST') {
+        
+        my $params = $c->req->params;
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
+            "Processing SMTP config update for site_id $site_id");
+        
+        try {
+            my $schema = $c->model('DBEncy');
+            my $site_config_rs = $schema->resultset('SiteConfig');
+            
+            # Update SMTP configuration
+            my $updated_count = 0;
+            for my $config_key (qw(smtp_host smtp_port smtp_username smtp_password smtp_from smtp_ssl)) {
+                # Handle checkbox: smtp_ssl will be '1' if checked, undefined if not
+                my $value = $params->{$config_key};
+                
+                # For smtp_ssl, default to 0 if not checked
+                if ($config_key eq 'smtp_ssl' && !defined $value) {
+                    $value = 0;
+                }
+                
+                next unless defined $value;
+                
+                # Skip password if it's empty (user wants to keep existing password)
+                if ($config_key eq 'smtp_password' && $value eq '') {
+                    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
+                        "Skipping empty password field (keeping existing)");
+                    next;
+                }
+                
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config', 
+                    "Updating $config_key for site_id $site_id, value: $value");
+                
+                $site_config_rs->update_or_create({
+                    site_id => $site_id,
+                    config_key => $config_key,
+                    config_value => $value,
+                });
+                $updated_count++;
+            }
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config', 
+                "SMTP config updated for site_id $site_id ($updated_count fields updated)");
+            $c->flash->{success_msg} = "SMTP configuration updated successfully ($updated_count settings)";
+            $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+            return;
+        } catch {
+            my $error = $_;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config', 
+                "Failed to update SMTP config: $error");
+            $c->flash->{error_msg} = "Failed to update configuration: $error";
+        };
+    }
+    
+    # Load existing configuration and site name
+    my %config;
+    my $site_name = '';
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
+            "Loading existing SMTP config for site_id $site_id");
+        
+        my $schema = $c->model('DBEncy');
+        
+        # Get site name
+        my $site = $schema->resultset('Site')->find($site_id);
+        if ($site) {
+            $site_name = $site->name;
+        }
+        
+        my $dbh = $schema->schema->storage->dbh;
+        my $sth = $dbh->prepare("
+            SELECT config_key, config_value 
+            FROM site_config 
+            WHERE site_id = ? AND config_key LIKE 'smtp_%'
+        ");
+        $sth->execute($site_id);
+        
+        my $row_count = 0;
+        while (my $row = $sth->fetchrow_hashref()) {
+            $row_count++;
+            $config{$row->{config_key}} = $row->{config_value};
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'edit_smtp_config',
+                "Loaded config: " . $row->{config_key});
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_smtp_config',
+            "Loaded $row_count SMTP config items for site_id $site_id ($site_name)");
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_smtp_config',
+            "Failed to load SMTP config: $error");
     };
     
-    $c->res->redirect($c->uri_for($self->action_for('add_mail_config_form')));
+    $c->stash(
+        site_id => $site_id,
+        site_name => $site_name,
+        smtp_config => \%config,
+        template => 'mail/EditSmtpConfig.tt'
+    );
+    
+    $c->forward($c->view('TT'));
+}
+
+sub test_smtp_config :Local {
+    my ($self, $c) = @_;
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
+    }
+    
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
+    
+    unless ($is_admin) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+    
+    my $site_id = $c->req->param('site_id');
+    
+    unless ($site_id) {
+        $c->flash->{error_msg} = 'Site ID is required';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # Load SMTP configuration
+    my %config;
+    try {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Loading SMTP config for testing site_id $site_id");
+        
+        my $schema = $c->model('DBEncy');
+        my $dbh = $schema->schema->storage->dbh;
+        my $sth = $dbh->prepare("
+            SELECT config_key, config_value 
+            FROM site_config 
+            WHERE site_id = ? AND config_key LIKE 'smtp_%'
+        ");
+        $sth->execute($site_id);
+        
+        my $row_count = 0;
+        while (my $row = $sth->fetchrow_hashref()) {
+            $row_count++;
+            $config{$row->{config_key}} = $row->{config_value};
+        }
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Loaded $row_count SMTP config items for testing");
+    } catch {
+        my $error = $_;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'test_smtp_config',
+            "Failed to load SMTP config: $error");
+        $c->flash->{error_msg} = "Failed to load SMTP configuration: $error";
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    };
+    
+    # Validate that we have the required config
+    unless ($config{smtp_host} && $config{smtp_port}) {
+        $c->flash->{error_msg} = 'SMTP host and port must be configured before testing';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+    
+    # Test SMTP connection
+    my $test_result = {
+        success => 0,
+        message => '',
+    };
+    
+    try {
+        my $use_ssl = $config{smtp_ssl} && $config{smtp_ssl} ne '0';
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+            "Testing SMTP: host=$config{smtp_host}, port=$config{smtp_port}, SSL=" . ($use_ssl ? 'yes' : 'no'));
+        
+        require Net::SMTP;
+        
+        my $smtp = Net::SMTP->new(
+            $config{smtp_host},
+            Port => $config{smtp_port},
+            Timeout => 10,
+            Debug => 1,
+            SSL => $use_ssl,
+        );
+        
+        if ($smtp) {
+            # Try to authenticate if credentials are provided
+            if ($config{smtp_username} && $config{smtp_password}) {
+                if ($smtp->auth($config{smtp_username}, $config{smtp_password})) {
+                    $test_result->{success} = 1;
+                    $test_result->{message} = "Successfully connected and authenticated to SMTP server";
+                } else {
+                    $test_result->{message} = "Connected but authentication failed: " . $smtp->message();
+                }
+            } else {
+                $test_result->{success} = 1;
+                $test_result->{message} = "Successfully connected to SMTP server (authentication not configured)";
+            }
+            $smtp->quit();
+        } else {
+            $test_result->{message} = "Failed to connect to SMTP server: $@";
+        }
+    } catch {
+        $test_result->{message} = "SMTP test error: $_";
+    };
+    
+    if ($test_result->{success}) {
+        $c->flash->{success_msg} = $test_result->{message};
+    } else {
+        $c->flash->{error_msg} = $test_result->{message};
+    }
+    
+    $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
 }
 
 # New method to create a mail account using Virtualmin API
@@ -183,449 +627,103 @@ sub create_mail_account :Local {
     }
 }
 
-# Mass Email Functionality
-sub mass_email_form :Path('mass_email') :Args(0) {
+sub mail_admin_dashboard :Local {
     my ($self, $c) = @_;
     
-    # Check admin permissions
-    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mass_email_form', 
-            "Unauthorized access attempt by user: " . ($c->user->username || 'unknown'));
-        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
-        $c->res->redirect($c->uri_for('/'));
-        return;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard', 
+        "Accessing mail admin dashboard");
+    
+    # Check if user is admin
+    my $roles = $c->session->{roles} || [];
+    if (!ref $roles) {
+        $roles = $roles ? [$roles] : [];
     }
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mass_email_form', 
-        "Accessing mass email form");
+    my $is_admin = grep { $_ eq 'admin' } @$roles;
     
-    my $site_id = $c->session->{site_id} || 1;
-    
-    try {
-        my $schema = $c->model('DBEncy');
-        
-        # Get user count for current site
-        my $user_count = $schema->resultset('User')->search({
-            'user_sites.site_id' => $site_id
-        }, {
-            join => 'user_sites'
-        })->count;
-        
-        # Get available mailing lists for tracking
-        my @mailing_lists = $schema->resultset('MailingList')->search(
-            { site_id => $site_id, is_active => 1 },
-            { order_by => 'name' }
-        )->all;
-        
-        $c->stash(
-            user_count => $user_count,
-            mailing_lists => \@mailing_lists,
-            template => 'mail/mass_email_form.tt'
-        );
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mass_email_form', 
-            "Error loading mass email form: $_");
-        $c->stash->{debug_msg} = "Error loading form: $_";
-    };
-}
-
-sub send_mass_email :Path('send_mass_email') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check admin permissions
-    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_mass_email', 
-            "Unauthorized mass email attempt by user: " . ($c->user->username || 'unknown'));
-        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
-        $c->res->redirect($c->uri_for('/'));
-        return;
-    }
-    
-    if ($c->req->method eq 'POST') {
-        my $params = $c->req->params;
-        my $site_id = $c->session->{site_id} || 1;
-        my $user_id = $c->session->{user_id} || 1;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
-            "Processing mass email request for site_id $site_id");
-        
-        # Validate required fields
-        unless ($params->{subject} && $params->{body}) {
-            $c->stash->{error_msg} = "Subject and message body are required";
-            $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
-            return;
-        }
-        
-        try {
-            my $schema = $c->model('DBEncy');
-            
-            # Get all users for the current site
-            my @users = $schema->resultset('User')->search({
-                'user_sites.site_id' => $site_id,
-                'email' => { '!=' => undef },
-                'email' => { '!=' => '' }
-            }, {
-                join => 'user_sites',
-                columns => [qw/id email first_name last_name/]
-            })->all;
-            
-            unless (@users) {
-                $c->stash->{error_msg} = "No users found with email addresses for this site";
-                $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
-                return;
-            }
-            
-            # Parse BCC addresses
-            my @bcc_addresses;
-            if ($params->{bcc_addresses}) {
-                @bcc_addresses = split(/[,;\s]+/, $params->{bcc_addresses});
-                @bcc_addresses = grep { $_ && $_ =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/ } @bcc_addresses;
-            }
-            
-            # Create campaign record for tracking (if table exists)
-            my $campaign;
-            eval {
-                $campaign = $schema->resultset('MailingListCampaign')->create({
-                    site_id => $site_id,
-                    name => "Mass Email: " . $params->{subject},
-                    subject => $params->{subject},
-                    body => $params->{body},
-                    created_by => $user_id,
-                    sent_at => \'NOW()',
-                    recipient_count => scalar(@users) + scalar(@bcc_addresses),
-                    status => 'sending'
-                });
-            };
-            
-            my $success_count = 0;
-            my $error_count = 0;
-            my @errors;
-            
-            # Send to all users
-            foreach my $user (@users) {
-                my $personalized_body = $params->{body};
-                $personalized_body =~ s/\[FIRST_NAME\]/$user->first_name || 'User'/g;
-                $personalized_body =~ s/\[LAST_NAME\]/$user->last_name || ''/g;
-                $personalized_body =~ s/\[EMAIL\]/$user->email/g;
-                
-                if ($c->model('Mail')->send_email($c, $user->email, $params->{subject}, $personalized_body, $site_id)) {
-                    $success_count++;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
-                        "Email sent successfully to " . $user->email);
-                } else {
-                    $error_count++;
-                    push @errors, "Failed to send to " . $user->email;
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
-                        "Failed to send email to " . $user->email);
-                }
-            }
-            
-            # Send to BCC addresses
-            foreach my $bcc_email (@bcc_addresses) {
-                if ($c->model('Mail')->send_email($c, $bcc_email, $params->{subject}, $params->{body}, $site_id)) {
-                    $success_count++;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
-                        "Email sent successfully to BCC: $bcc_email");
-                } else {
-                    $error_count++;
-                    push @errors, "Failed to send to BCC: $bcc_email";
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
-                        "Failed to send email to BCC: $bcc_email");
-                }
-            }
-            
-            # Update campaign status
-            if ($campaign) {
-                $campaign->update({
-                    status => $error_count > 0 ? 'completed_with_errors' : 'completed',
-                    success_count => $success_count,
-                    error_count => $error_count
-                });
-            }
-            
-            # Set status messages
-            if ($success_count > 0) {
-                $c->stash->{status_msg} = "Mass email sent successfully to $success_count recipients";
-            }
-            if ($error_count > 0) {
-                $c->stash->{error_msg} = "Failed to send to $error_count recipients";
-                if ($c->session->{debug_mode}) {
-                    $c->stash->{debug_msg} = \@errors;
-                }
-            }
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email', 
-                "Mass email completed: $success_count successful, $error_count failed");
-            
-        } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mass_email', 
-                "Error processing mass email: $_");
-            $c->stash->{error_msg} = "Error sending mass email: $_";
-        };
-    }
-    
-    $c->res->redirect($c->uri_for($self->action_for('mass_email_form')));
-}
-
-# Mailing List Management Actions
-
-sub mailing_lists :Path('lists') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Check admin permissions
-    unless ($c->check_user_roles('admin') || $c->check_user_roles('developer')) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mailing_lists', 
-            "Unauthorized access attempt by user: " . ($c->user->username || 'unknown'));
-        $c->stash->{error_msg} = "Access denied. Admin privileges required.";
+    unless ($is_admin) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mail_admin_dashboard', 
+            "Non-admin user attempted to access mail admin dashboard");
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
         $c->res->redirect($c->uri_for('/mail'));
         return;
     }
     
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mailing_lists', 
-        "Accessing mailing lists management");
+    # Get mail server statistics and configuration
+    my $mail_stats = {
+        total_domains => 0,
+        total_accounts => 0,
+        active_servers => 0,
+    };
     
-    # Get site_id from session or default
-    my $site_id = $c->session->{site_id} || 1;
+    my @smtp_servers = ();
     
     try {
         my $schema = $c->model('DBEncy');
-        my @lists = $schema->resultset('MailingList')->search(
-            { site_id => $site_id },
-            { order_by => 'name' }
-        )->all;
         
-        $c->stash(
-            mailing_lists => \@lists,
-            template => 'mail/mailing_lists.tt'
-        );
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mailing_lists', 
-            "Error fetching mailing lists: $_");
-        $c->stash->{debug_msg} = "Error loading mailing lists: $_";
-    };
-}
-
-sub create_list :Path('lists/create') :Args(0) {
-    my ($self, $c) = @_;
-    
-    if ($c->req->method eq 'POST') {
-        my $params = $c->req->params;
-        my $site_id = $c->session->{site_id} || 1;
-        my $user_id = $c->session->{user_id} || 1;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_list', 
-            "Creating mailing list: " . $params->{name});
-        
-        try {
-            my $schema = $c->model('DBEncy');
-            my $new_list = $schema->resultset('MailingList')->create({
-                site_id => $site_id,
-                name => $params->{name},
-                description => $params->{description},
-                list_email => $params->{list_email},
-                is_software_only => $params->{is_software_only} || 1,
-                is_active => 1,
-                created_by => $user_id,
-            });
-            
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_list', 
-                "Mailing list created successfully: " . $new_list->id);
-            $c->stash->{status_msg} = "Mailing list created successfully";
-            
-            $c->res->redirect($c->uri_for($self->action_for('mailing_lists')));
-            return;
-        } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_list', 
-                "Error creating mailing list: $_");
-            $c->stash->{debug_msg} = "Error creating mailing list: $_";
+        # Count mail domains
+        eval {
+            $mail_stats->{total_domains} = $schema->resultset('MailDomain')->count;
         };
-    }
-    
-    $c->stash(template => 'mail/create_list.tt');
-}
-
-
-
-sub get_available_lists :Private {
-    my ($self, $c, $site_id) = @_;
-    
-    try {
-        my $schema = $c->model('DBEncy');
-        my @lists = $schema->resultset('MailingList')->search(
-            { 
-                site_id => $site_id,
-                is_active => 1 
-            },
-            { order_by => 'name' }
-        )->all;
         
-        return \@lists;
-    } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_available_lists', 
-            "Error fetching available lists: $_");
-        return [];
-    };
-}
-
-# Enhanced Newsletter Signup with Duplicate Prevention
-sub newsletter_signup :Local {
-    my ($self, $c) = @_;
-    
-    if ($c->req->method eq 'POST') {
-        my $email = $c->req->params->{email};
-        my $site_id = $c->session->{site_id} || 1;
-        
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-            "Newsletter signup attempt for email: $email");
-        
-        # Validate email format
-        unless ($email && $email =~ /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) {
-            $c->stash->{error_msg} = "Please enter a valid email address";
-            $c->res->redirect($c->req->referer || '/');
-            return;
-        }
-        
-        try {
-            my $schema = $c->model('DBEncy');
+        # Load SMTP server configurations from SiteConfig with site names
+        eval {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Attempting to load SMTP configurations from site_config table");
             
-            # Find or create newsletter list
-            my $newsletter_list = $schema->resultset('MailingList')->find_or_create({
-                site_id => $site_id,
-                name => 'Newsletter',
-                description => 'Site newsletter subscription',
-                is_software_only => 1,
-                is_active => 1,
-                created_by => 1, # System created
-            });
+            my $dbh = $schema->schema->storage->dbh;
+            my $sth = $dbh->prepare("
+                SELECT sc.site_id, sc.config_key, sc.config_value, s.name as site_name
+                FROM site_config sc
+                LEFT JOIN sites s ON sc.site_id = s.id
+                WHERE sc.config_key LIKE 'smtp_%' 
+                ORDER BY sc.site_id, sc.config_key
+            ");
+            $sth->execute();
             
-            # Check if user exists
-            my $user = $schema->resultset('User')->find({ email => $email });
-            
-            if ($user) {
-                # Check for existing subscription
-                my $existing_subscription = $schema->resultset('MailingListSubscription')->find({
-                    mailing_list_id => $newsletter_list->id,
-                    user_id => $user->id,
-                });
+            my %servers_by_site;
+            my $row_count = 0;
+            while (my $row = $sth->fetchrow_hashref()) {
+                $row_count++;
+                my $site_id = $row->{site_id};
+                my $key = $row->{config_key};
+                my $value = $row->{config_value};
+                my $site_name = $row->{site_name} || "Unknown";
                 
-                if ($existing_subscription) {
-                    if ($existing_subscription->is_active) {
-                        $c->stash->{status_msg} = "You are already subscribed to our newsletter!";
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-                            "Duplicate subscription attempt for existing active user: $email");
-                    } else {
-                        # Reactivate inactive subscription
-                        $existing_subscription->update({ is_active => 1 });
-                        $c->stash->{status_msg} = "Welcome back! Your newsletter subscription has been reactivated.";
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-                            "Reactivated subscription for user: $email");
-                    }
-                } else {
-                    # Create new subscription for existing user
-                    $schema->resultset('MailingListSubscription')->create({
-                        mailing_list_id => $newsletter_list->id,
-                        user_id => $user->id,
-                        subscription_source => 'manual',
-                        is_active => 1,
-                    });
-                    $c->stash->{status_msg} = "You have been subscribed to our newsletter!";
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-                        "New subscription created for existing user: $email");
-                }
-            } else {
-                # Check if email is already stored for future registration
-                if ($c->session->{newsletter_email} && $c->session->{newsletter_email} eq $email) {
-                    $c->stash->{status_msg} = "We already have your email! Please register to complete your newsletter subscription.";
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-                        "Duplicate email storage attempt: $email");
-                } else {
-                    # Store email for future user creation
-                    $c->session->{newsletter_email} = $email;
-                    $c->stash->{status_msg} = "Thank you! Please register to complete your newsletter subscription.";
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'newsletter_signup', 
-                        "Email stored for future registration: $email");
-                }
-            }
-            
-        } catch {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup', 
-                "Error processing newsletter signup: $_");
-            $c->stash->{error_msg} = "Error processing signup. Please try again.";
-        };
-    }
-    
-    $c->res->redirect($c->req->referer || '/');
-}
-
-
-
-sub init_default_lists :Path('init_defaults') :Args(0) {
-    my ($self, $c) = @_;
-    
-    # Only allow admin users to initialize defaults
-    unless ($c->session->{roles} && grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}}) {
-        $c->response->status(403);
-        $c->response->body('Access denied');
-        return;
-    }
-    
-    my $site_id = $c->session->{site_id} || 1;
-    my $user_id = $c->session->{user_id} || 1;
-    
-    eval {
-        my $schema = $c->model('DBEncy');
-        
-        # Check if lists already exist
-        my $existing_count = $schema->resultset('MailingList')->search({
-            site_id => $site_id
-        })->count;
-        
-        if ($existing_count == 0) {
-            # Create default mailing lists
-            my @default_lists = (
-                {
-                    name => 'Newsletter',
-                    description => 'General newsletter with updates and announcements',
-                    is_software_only => 1,
-                },
-                {
-                    name => 'Workshop Notifications',
-                    description => 'Notifications about upcoming workshops and events',
-                    is_software_only => 1,
-                },
-                {
-                    name => 'System Updates',
-                    description => 'Important system updates and maintenance notifications',
-                    is_software_only => 1,
-                }
-            );
-            
-            foreach my $list_data (@default_lists) {
-                $schema->resultset('MailingList')->create({
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'mail_admin_dashboard',
+                    "Loaded SMTP config: site_id=$site_id ($site_name), key=$key");
+                
+                $servers_by_site{$site_id} ||= { 
                     site_id => $site_id,
-                    name => $list_data->{name},
-                    description => $list_data->{description},
-                    is_software_only => $list_data->{is_software_only},
-                    is_active => 1,
-                    created_by => $user_id,
-                });
+                    site_name => $site_name
+                };
+                $servers_by_site{$site_id}{$key} = $value;
             }
             
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'init_default_lists',
-                "Created " . scalar(@default_lists) . " default mailing lists for site $site_id");
+            @smtp_servers = sort { $a->{site_id} <=> $b->{site_id} } values %servers_by_site;
+            $mail_stats->{active_servers} = scalar @smtp_servers;
             
-            $c->response->body("Created " . scalar(@default_lists) . " default mailing lists");
-        } else {
-            $c->response->body("Mailing lists already exist ($existing_count found)");
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Loaded $row_count SMTP config rows, " . scalar(@smtp_servers) . " servers total");
+        };
+        
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard',
+                "Could not load SMTP configs: $@");
         }
+        
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard', 
+            "Error loading mail statistics: $_");
     };
     
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'init_default_lists',
-            "Error creating default mailing lists: $@");
-        $c->response->status(500);
-        $c->response->body("Error: $@");
-    }
+    $c->stash(
+        mail_stats => $mail_stats,
+        smtp_servers => \@smtp_servers,
+        template => 'mail/AdminDashboard.tt'
+    );
+    
+    $c->forward($c->view('TT'));
 }
 
 __PACKAGE__->meta->make_immutable;

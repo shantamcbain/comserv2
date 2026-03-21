@@ -1,10 +1,90 @@
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
+use JSON::MaybeXS;
 use Comserv::Util::Logging; # Import the logging utility
+use Comserv::Util::ApiTokenValidator;
 BEGIN { extends 'Catalyst::Controller'; }
+
+# Helper method to get status name from code
+sub get_status_name {
+    my ($self, $status_code) = @_;
+    my %status_map = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+    return $status_map{$status_code} // "Unknown ($status_code)";
+}
+
+# Helper method to get priority name from code (1-10 scale)
+sub get_priority_name {
+    my ($self, $priority_code) = @_;
+    my %priority_map = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    return $priority_map{$priority_code} // "Priority $priority_code";
+}
+
+# Helper method to convert numeric status to string for database storage
+sub convert_status_to_string {
+    my ($self, $status_code) = @_;
+    my %status_map = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS', 
+        3 => 'DONE'
+    );
+    return $status_map{$status_code} // $status_code;
+}
+
+# Helper method to filter todos by date range
+sub filter_todos_by_date_range {
+    my ($self, $c, $todos, $start_date, $end_date, $include_overdue) = @_;
+    
+    $include_overdue //= 1; # Default to include overdue todos
+    
+    my @filtered_todos = grep { 
+        my $todo = $_;
+        my $include_todo = 0;
+        
+        # Include if starting within date range
+        if ($todo->start_date && $todo->start_date ge $start_date && $todo->start_date le $end_date) {
+            $include_todo = 1;
+        }
+        
+        # Include if due within date range
+        if ($todo->due_date && $todo->due_date ge $start_date && $todo->due_date le $end_date) {
+            $include_todo = 1;
+        }
+        
+        # Include overdue todos if requested (overdue = due before start_date and not completed)
+        if ($include_overdue && $todo->due_date && $todo->due_date lt $start_date && $todo->status != 3) {
+            $include_todo = 1;
+        }
+        
+        # Include todos without any dates if they're not completed (for day view of today only)
+        my $today = DateTime->now->ymd;
+        if (!$todo->start_date && !$todo->due_date && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
+            $include_todo = 1;
+        }
+        
+        $include_todo;
+    } @$todos;
+    
+    return \@filtered_todos;
+}
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -17,68 +97,26 @@ sub begin :Private {
     # Log the path the user is accessing
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User accessing path: " . $c->req->uri);
 
-    # Fetch the user's roles from the session
-    my $roles = $c->session->{roles} || [];
+    # Fetch roles: prefer stash (set by Root::auto, includes site-specific admin detection)
+    my $roles = $c->stash->{user_roles} || $c->session->{roles} || [];
 
     # Ensure roles are an array reference
     if (ref $roles ne 'ARRAY') {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "Invalid or undefined roles in session for user: " . ($c->session->{username} || 'Guest'));
-
-        # Stash the current path so it can be used for redirection after login
-        $c->stash->{template} = $c->req->uri;
-
-        # Set error message for session problems
-        $c->stash->{error_msg} = "Session expired or invalid. Please log in again.";
-
-        # Redirect to login
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting to login page due to missing or invalid roles.");
-        $c->res->redirect($c->uri_for('/user/login'));
-        $c->detach;
+        $roles = [];
     }
 
-    # Check if the user has the 'admin' role
-    unless (grep { $_ eq 'admin' } @$roles) {
+    # Allow all roles above member: admin, developer, devops, editor, user, normal
+    # Also allow if Root::auto set is_admin (catches site-specific admins from UserSiteRole)
+    unless ($c->stash->{is_admin} || grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'begin', "Unauthorized access attempt by user: " . ($c->session->{username} || 'Guest'));
 
-        # Stash the current path for potential use
-        $c->stash->{redirect_to} = $c->req->uri;
-
-        # Redirect unauthorized users to the home page with an error message
-        $c->stash->{error_msg} = "Unauthorized access. You do not have permission to view this page.";
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "Redirecting unauthorized user to the home page.");
-        $c->res->redirect($c->uri_for('/'));
+        # Redirect unauthorized users to the login page with the return URL
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
     # If we get here, the user is authorized
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
-}
-
-sub index :Path(/todo) :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Use safe_search to retrieve all todo records - this will sync missing tables from production
-    my $schema = $c->model('DBEncy');
-    my @todos = $schema->safe_search($c, 'Todo', {}, {});
-    $c->stash(todos => \@todos);
-
-    # Set the TT template to use.
-    $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page using safe_search');
-    $c->forward($c->view('TT'));
-}
-sub auto :Private {
-    my ($self, $c) = @_;
-
-    # Check if the user is logged in and is an admin
-    unless (defined $c->session->{username} && grep { $_ eq 'admin' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
-        $c->response->redirect($c->uri_for('/'));
-        return 0;
-    }
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
-    return 1;
 }
 
 # Main todo action with filtering capabilities
@@ -91,96 +129,54 @@ sub todo :Path('/todo') :Args(0) {
     my $search_term = $c->request->query_parameters->{search} || '';
     my $project_id = $c->request->query_parameters->{project_id} || '';
     my $status_filter = $c->request->query_parameters->{status} || '';
+    my $sitename_filter = $c->request->query_parameters->{sitename} || '';
 
-    # ROUTING FIX: Redirect to dedicated views when using specific filters without other parameters
-    # This ensures consistency between /todo?filter=day and /todo/day
-    if (!$search_term && !$project_id && !$status_filter) {
-        if ($filter_type eq 'day' || $filter_type eq 'today') {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated day view');
-            $c->res->redirect($c->uri_for('/todo/day'));
-            $c->detach;
-        } elsif ($filter_type eq 'week') {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated week view');
-            $c->res->redirect($c->uri_for('/todo/week'));
-            $c->detach;
-        } elsif ($filter_type eq 'month') {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 'Redirecting to dedicated month view');
-            $c->res->redirect($c->uri_for('/todo/month'));
-            $c->detach;
-        }
-    }
-
-    # Get a DBIx::Class::Schema object with HybridDB backend integration
+    # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
-    
-    # Check user's backend preference and use appropriate schema
-    my $backend_preference = $schema->get_hybrid_backend_preference($c);
-    my $actual_backend = 'mysql';  # Default
-    
-    if ($backend_preference eq 'sqlite') {
-        my $sqlite_schema = $schema->get_sqlite_schema($c);
-        if ($sqlite_schema) {
-            $schema = $sqlite_schema;
-            $actual_backend = 'sqlite';
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'todo', 
-                "Using SQLite backend for database access");
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'todo', 
-                "SQLite backend requested but unavailable, falling back to MySQL");
-        }
-    } else {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'todo', 
-            "Using MySQL backend for database access");
-    }
-    
-    # Store backend info in stash for template display
-    $c->stash(
-        current_backend => $actual_backend,
-        backend_preference => $backend_preference,
-    );
+
+    # Get a DBIx::Class::ResultSet object
+    my $rs = $schema->resultset('Todo');
 
     # Build the search conditions
-    my $search_conditions = {
-        'me.sitename' => $c->session->{SiteName},  # filter by site (specify table alias)
-    };
+    my $search_conditions = {};
+    
+    # Handle sitename filtering
+    if ($sitename_filter && $sitename_filter ne 'all') {
+        $search_conditions->{sitename} = $sitename_filter;
+    } else {
+        # Default to user's current site if no specific site filter is applied
+        $search_conditions->{sitename} = $c->session->{SiteName};
+    }
 
     # Only show non-completed todos by default (unless explicitly filtering for completed)
     if ($status_filter eq 'completed') {
-        $search_conditions->{'me.status'} = 3;  # completed status
+        $search_conditions->{status} = 3;  # completed status (numeric)
     } elsif ($status_filter eq 'in_progress') {
-        $search_conditions->{'me.status'} = 2;  # in progress status
+        $search_conditions->{status} = 2;  # in progress status (numeric)
     } elsif ($status_filter eq 'new') {
-        $search_conditions->{'me.status'} = 1;  # new status
+        $search_conditions->{status} = 1;  # new status (numeric)
     } elsif ($status_filter ne 'all') {
-        $search_conditions->{'me.status'} = { '!=' => 3 };  # exclude completed todos
+        $search_conditions->{status} = { '!=' => 3 };  # exclude completed todos (numeric)
     }
 
     # Add project filter if specified
     if ($project_id) {
-        $search_conditions->{'me.project_id'} = $project_id;
+        $search_conditions->{project_id} = $project_id;
     }
 
-    # Add search term filter if specified
-    if ($search_term) {
-        $search_conditions->{'-or'} = [
-            { 'me.subject' => { 'like', "%$search_term%" } },
-            { 'me.description' => { 'like', "%$search_term%" } },
-            { 'me.comments' => { 'like', "%$search_term%" } }
-        ];
-    }
-
-    # Apply date filters
+    # Apply date filters first
     my $now = DateTime->now;
     my $today = $now->ymd;
+    my $date_conditions = [];
 
     if ($filter_type eq 'day' || $filter_type eq 'today') {
         # Today's todos: show todos that are due today, start today, or are active and overdue
-        $search_conditions->{'-or'} = [
-            { 'me.due_date' => $today },                    # Due today
-            { 'me.start_date' => $today },                  # Starting today
+        $date_conditions = [
+            { due_date => $today },                    # Due today
+            { start_date => $today },                  # Starting today
             { '-and' => [                              # Overdue but not completed
-                { 'me.due_date' => { '<' => $today } },
-                { 'me.status' => { '!=' => 3 } }
+                { due_date => { '<' => $today } },
+                { status => { '!=' => 3 } }
             ]}
         ];
     } elsif ($filter_type eq 'week') {
@@ -188,36 +184,58 @@ sub todo :Path('/todo') :Args(0) {
         my $start_of_week = $now->clone->subtract(days => $now->day_of_week - 1)->ymd;
         my $end_of_week = $now->clone->add(days => 7 - $now->day_of_week)->ymd;
 
-        $search_conditions->{'-and'} = [
-            { 'me.start_date' => { '<=' => $end_of_week } },
-            { '-or' => [
-                { 'me.due_date' => { '>=' => $start_of_week } },
-                { 'me.status' => { '!=' => 3 } }  # Not completed
-            ]}
-        ];
+        push @$date_conditions, {
+            '-and' => [
+                { start_date => { '<=' => $end_of_week } },
+                { '-or' => [
+                    { due_date => { '>=' => $start_of_week } },
+                    { status => { '!=' => 3 } }  # Not completed
+                ]}
+            ]
+        };
     } elsif ($filter_type eq 'month') {
         # This month's todos
         my $start_of_month = $now->clone->set_day(1)->ymd;
         my $end_of_month = $now->clone->set_day($now->month_length)->ymd;
 
-        $search_conditions->{'-and'} = [
-            { 'me.start_date' => { '<=' => $end_of_month } },
-            { '-or' => [
-                { 'me.due_date' => { '>=' => $start_of_month } },
-                { 'me.status' => { '!=' => 3 } }  # Not completed
-            ]}
-        ];
+        push @$date_conditions, {
+            '-and' => [
+                { start_date => { '<=' => $end_of_month } },
+                { '-or' => [
+                    { due_date => { '>=' => $start_of_month } },
+                    { status => { '!=' => 3 } }  # Not completed
+                ]}
+            ]
+        };
     }
 
-    # Fetch todos with the applied filters using safe search
-    my @todos = $schema->safe_search(
-        $c,
-        'Todo',
+    # Combine search and date conditions properly
+    if ($search_term && @$date_conditions) {
+        # Both search and date filters - combine with AND logic
+        $search_conditions->{'-and'} = [
+            { '-or' => [
+                { subject => { 'like', "%$search_term%" } },
+                { description => { 'like', "%$search_term%" } },
+                { comments => { 'like', "%$search_term%" } }
+            ]},
+            { '-or' => $date_conditions }
+        ];
+    } elsif ($search_term) {
+        # Only search term - use OR logic for search fields
+        $search_conditions->{'-or'} = [
+            { subject => { 'like', "%$search_term%" } },
+            { description => { 'like', "%$search_term%" } },
+            { comments => { 'like', "%$search_term%" } }
+        ];
+    } elsif (@$date_conditions) {
+        # Only date filter - use OR logic for date conditions
+        $search_conditions->{'-or'} = $date_conditions;
+    }
+
+    # Fetch todos with the applied filters
+    my @todos = $rs->search(
         $search_conditions,
-        { 
-            order_by => { -asc => ['me.priority', 'me.start_date'] },
-            prefetch => 'project'  # Include project data for better integration
-        }
+        { order_by => { -asc => ['priority', 'start_date'] } }
     );
 
     # Fetch all projects for the filter dropdown
@@ -234,19 +252,46 @@ sub todo :Path('/todo') :Args(0) {
             "Error fetching projects: $@");
     }
 
-    # Get overdue todos for dashboard
-    my $overdue_todos = $self->get_overdue_todos($c);
+    # Fetch all sites for the filter dropdown (only for CSC admins)
+    my $sites = [];
+    my $is_csc_admin = 0;
+    my $roles = $c->session->{roles} || [];
+    if (grep { $_ eq 'admin' } @$roles) {
+        $is_csc_admin = 1;
+        eval {
+            my $site_model = $c->model('Site');
+            if ($site_model) {
+                $sites = $site_model->get_all_sites($c) || [];
+            }
+        };
+
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'todo',
+                "Error fetching sites: $@");
+        }
+    }
+
+    # Process todos to add status and priority names
+    my @processed_todos;
+    foreach my $todo (@todos) {
+        my %todo_data = $todo->get_columns;
+        $todo_data{status_name} = $self->get_status_name($todo->status);
+        $todo_data{priority_name} = $self->get_priority_name($todo->priority);
+        push @processed_todos, \%todo_data;
+    }
 
     # Add the todos and filter info to the stash
     $c->stash(
-        todos => \@todos,
+        todos => \@processed_todos,
         sitename => $c->session->{SiteName},
         filter_type => $filter_type,
         search_term => $search_term,
         project_id => $project_id,
         status_filter => $status_filter,
+        sitename_filter => $sitename_filter,
         projects => $projects,
-        overdue_todos => $overdue_todos,
+        sites => $sites,
+        is_csc_admin => $is_csc_admin,
         template => 'todo/todo.tt',
     );
 
@@ -258,28 +303,14 @@ sub details :Path('/todo/details') :Args {
     # Get the record_id from the request parameters
     my $record_id = $c->request->parameters->{record_id};
 
-    # Get a DBIx::Class::Schema object with HybridDB backend integration
+    # Get a DBIx::Class::Schema object
     my $schema = $c->model('DBEncy');
-    
-    # Check user's backend preference and use appropriate schema
-    my $backend_preference = $schema->get_hybrid_backend_preference($c);
-    if ($backend_preference eq 'sqlite') {
-        my $sqlite_schema = $schema->get_sqlite_schema($c);
-        if ($sqlite_schema) {
-            $schema = $sqlite_schema;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'details', 
-                "Using SQLite backend for database access");
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details', 
-                "SQLite backend requested but unavailable, falling back to MySQL");
-        }
-    } else {
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'details', 
-            "Using MySQL backend for database access");
-    }
 
-    # Fetch the todo with the given record_id using safe find
-    my $todo = $schema->safe_find($c, 'Todo', $record_id);
+    # Get a DBIx::Class::ResultSet object
+    my $rs = $schema->resultset('Todo');
+
+    # Fetch the todo with the given record_id
+    my $todo = $rs->find($record_id);
 
     # Check if the todo was found
     if (defined $todo) {
@@ -294,8 +325,31 @@ sub details :Path('/todo/details') :Args {
         # Format the total time as 'HH:MM'
         my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
-        # Add the todo and accumulative_time to the stash
-        $c->stash(record => $todo, accumulative_time => $accumulative_time);
+        # Fetch project data for the project dropdown
+        my $project_controller = $c->controller('Project');
+        my $projects = [];
+        eval {
+            # Ensure we fetch projects for the same site as the todo record
+            my $orig_site = $c->session->{SiteName};
+            if ($todo && $todo->sitename) {
+                $c->session->{SiteName} = $todo->sitename;
+            }
+            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
+            # Restore original site after fetching
+            $c->session->{SiteName} = $orig_site;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'details',
+                "Error fetching projects: $@");
+        }
+
+        # Add the todo, accumulative_time, and projects to the stash
+        $c->stash(
+            record => $todo, 
+            accumulative_time => $accumulative_time,
+            projects => $projects,
+            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
+        );
 
         # Set the template to 'todo/details.tt'
         $c->stash(template => 'todo/details.tt');
@@ -303,6 +357,17 @@ sub details :Path('/todo/details') :Args {
         # Handle the case where the todo is not found
         $c->response->body('Todo not found');
     }
+}
+
+sub add_project :Path('/todo/add_project') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Log the action
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 
+        'Redirecting to add_project form from todo context');
+    
+    # Forward to the Project controller's add_project action
+    $c->forward('/project/addproject');
 }
 
 sub addtodo :Path('/todo/addtodo') :Args(0) {
@@ -314,19 +379,12 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     );
 
     # Fetch project data from the Project Controller
-    my $projects = [];
-    eval {
-        my $project_controller = $c->controller('Project');
-        if ($project_controller) {
-            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
-        }
-    };
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'addtodo',
-            "Error fetching projects: $@");
-    }
-
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
+    
     # Fetch the project_id from query parameters (if any)
     my $project_id = $c->request->query_parameters->{project_id};
     my $current_project;
@@ -334,21 +392,6 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     # Attempt to locate the current project based on project_id
     if ($project_id) {
         my $schema = $c->model('DBEncy');
-        
-        # Check user's backend preference and use appropriate schema
-        my $backend_preference = $schema->get_hybrid_backend_preference($c);
-        if ($backend_preference eq 'sqlite') {
-            my $sqlite_schema = $schema->get_sqlite_schema($c);
-            if ($sqlite_schema) {
-                $schema = $sqlite_schema;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 
-                    "Using SQLite backend for database access");
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'addtodo', 
-                    "SQLite backend requested but unavailable, falling back to MySQL");
-            }
-        }
-        
         $current_project = $schema->resultset('Project')->find($project_id);
         if ($current_project) {
             $self->logging->log_with_details(
@@ -365,23 +408,6 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Fetch all users to populate the user drop-down
     my $schema = $c->model('DBEncy');
-    
-    # Check user's backend preference and use appropriate schema (if not already done)
-    unless ($project_id) {  # Only check if we haven't already done it above
-        my $backend_preference = $schema->get_hybrid_backend_preference($c);
-        if ($backend_preference eq 'sqlite') {
-            my $sqlite_schema = $schema->get_sqlite_schema($c);
-            if ($sqlite_schema) {
-                $schema = $sqlite_schema;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addtodo', 
-                    "Using SQLite backend for database access");
-            } else {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'addtodo', 
-                    "SQLite backend requested but unavailable, falling back to MySQL");
-            }
-        }
-    }
-    
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
 
     # Log a message confirming users were fetched
@@ -390,11 +416,36 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
+    # Build priority and status mappings for dropdowns
+    my %priority_options = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    
+    my %status_options = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+
     # Add the projects, sitename, and users to the stash
     $c->stash(
         projects        => $projects,        # Parent projects with nested sub-projects
         current_project => $current_project, # Selected project for the form (if any)
         users           => \@users,          # List of users to populate dropdown
+        build_priority  => \%priority_options, # Priority options for dropdown
+        build_status    => \%status_options,   # Status options for dropdown
+        return_to       => $return_to,       # URL to return to after action
+        start_date      => $c->request->params->{start_date},
+        time_of_day     => $c->request->params->{time_of_day},
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -445,8 +496,8 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Initialize the schema to fetch data
     my $schema = $c->model('DBEncy');
 
-    # Fetch the todo item with the given record_id using safe find
-    my $todo = $schema->safe_find($c, 'Todo', $record_id);
+    # Fetch the todo item with the given record_id
+    my $todo = $schema->resultset('Todo')->find($record_id);
 
     if (!$todo) {
         $self->logging->log_with_details(
@@ -461,18 +512,11 @@ sub edit :Path('/todo/edit') :Args(1) {
     }
 
     # Fetch project data from the Project Controller
-    my $projects = [];
-    eval {
-        my $project_controller = $c->controller('Project');
-        if ($project_controller) {
-            $projects = $project_controller->fetch_projects_with_subprojects($c) || [];
-        }
-    };
+    my $project_controller = $c->controller('Project');
+    my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit',
-            "Error fetching projects: $@");
-    }
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
 
     # Fetch all users to populate the user drop-down
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
@@ -488,12 +532,35 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Format the total time as 'HH:MM'
     my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
+    # Build priority and status mappings for dropdowns
+    my %priority_options = (
+        1  => 'Critical',
+        2  => 'When we have time', 
+        3  => 'Urgent',
+        4  => 'High',
+        5  => 'Medium',
+        6  => 'Medium-Low', 
+        7  => 'Low',
+        8  => 'Very Low',
+        9  => 'Minimal',
+        10 => 'Optional'
+    );
+    
+    my %status_options = (
+        1 => 'NEW',
+        2 => 'IN PROGRESS',
+        3 => 'DONE'
+    );
+
     # Add the todo, projects, and users to the stash
     $c->stash(
         record           => $todo,
         projects         => $projects,
         users            => \@users,
         accumulative_time => $accumulative_time,
+        build_priority   => \%priority_options, # Priority options for dropdown
+        build_status     => \%status_options,   # Status options for dropdown
+        return_to        => $return_to,         # URL to return to after action
         template         => 'todo/edit.tt'
     );
 
@@ -602,58 +669,6 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
-    # Handle project_id properly - ensure it's a valid integer or find/create default project
-    my $project_id = $form_data->{project_id};
-    
-    # Convert empty string to undef, then handle undef case
-    if (!defined $project_id || $project_id eq '' || $project_id eq '0') {
-        # Try to get existing project_id from todo record
-        $project_id = $todo->project_id;
-        
-        # If still no valid project_id, find or create a default project
-        if (!defined $project_id || $project_id eq '' || $project_id eq '0') {
-            my $default_project = $schema->resultset('Project')->find_or_create({
-                sitename => $c->session->{SiteName},
-                project_name => 'Default Project',
-                project_code => 'DEFAULT',
-                description => 'Default project for todos without specific project assignment',
-                status => 'active',
-                created_by => $c->session->{username} || 'system',
-                created_date => DateTime->now->ymd,
-            });
-            $project_id = $default_project->id;
-            
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'modify.default_project',
-                "Using default project (ID: $project_id) for todo record $record_id"
-            );
-        }
-    }
-    
-    # Ensure user_id is valid integer
-    my $user_id = $form_data->{user_id};
-    if (!defined $user_id || $user_id eq '' || $user_id eq '0') {
-        $user_id = $todo->user_id || 1;  # Use existing or default to 1
-    }
-    
-    # Ensure estimated_man_hours is valid integer
-    my $estimated_hours = $form_data->{estimated_man_hours};
-    if (!defined $estimated_hours || $estimated_hours eq '') {
-        $estimated_hours = $todo->estimated_man_hours || 0;
-    }
-    
-    # Ensure priority is valid integer
-    my $priority = $form_data->{priority};
-    if (!defined $priority || $priority eq '') {
-        $priority = $todo->priority || 1;
-    }
-    
-    # Handle time_of_day field - convert empty string to undef for nullable time field
-    my $time_of_day = $form_data->{time_of_day};
-    if (defined $time_of_day && $time_of_day eq '') {
-        $time_of_day = undef;  # Convert empty string to NULL for database
-    }
-
     # Attempt to update the todo record
     eval {
         $todo->update({
@@ -663,7 +678,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             due_date             => $form_data->{due_date} || DateTime->now->add(days => 7)->ymd,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
-            estimated_man_hours  => $estimated_hours,
+            estimated_man_hours  => $form_data->{estimated_man_hours},
             comments             => $form_data->{comments},
             accumulative_time    => $accumulative_time,
             reporter             => $form_data->{reporter},
@@ -672,49 +687,30 @@ sub modify :Path('/todo/modify') :Args(1) {
             developer            => $form_data->{developer},
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
-            priority             => $priority,
+            priority             => $form_data->{priority},
+            time_of_day          => $form_data->{time_of_day},
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
-            user_id              => $user_id,
-            project_id           => $project_id,
+            user_id              => $form_data->{user_id} || 1,
+            project_id           => $form_data->{project_id},
             date_time_posted     => $form_data->{date_time_posted},
-            time_of_day          => $time_of_day,
         });
     };
     if ($@) {
-        my $error_msg = $@;
-        my $user_friendly_msg = "An error occurred while updating the record.";
-        
-        # Provide more specific error messages for common issues
-        if ($error_msg =~ /Incorrect integer value.*for column.*project_id/) {
-            $user_friendly_msg = "Invalid project selection. Please choose a valid project or leave it blank.";
-        } elsif ($error_msg =~ /Incorrect integer value.*for column.*user_id/) {
-            $user_friendly_msg = "Invalid user selection. Please choose a valid user.";
-        } elsif ($error_msg =~ /Data too long for column/) {
-            $user_friendly_msg = "One or more fields contain too much text. Please shorten your input.";
-        } elsif ($error_msg =~ /cannot be null/) {
-            $user_friendly_msg = "Required fields are missing. Please fill in all required information.";
-        }
-        
         $self->logging->log_with_details(
             $c,
             'error',
             __FILE__,
             __LINE__,
             'modify.update_failure',
-            "Failed to update todo item for record ID: $record_id. Error: $error_msg"
+            "Failed to update todo item for record ID: $record_id. Error: $@"
         );
-        
-        # Send email notification to admin for database errors
-        $self->_notify_admin_of_error($c, $record_id, $error_msg, $form_data);
-        
         $c->stash(
-            error_msg => $user_friendly_msg,
-            technical_error => $error_msg,      # For debugging if needed
-            form_data => $form_data,            # Preserve form values
-            record    => $todo,                 # Pass the current todo item
-            template  => 'todo/details.tt',     # Re-render the form
+            error_msg => "An error occurred while updating the record: $@",
+            form_data => $form_data,          # Preserve form values
+            record    => $todo,              # Pass the current todo item
+            template  => 'todo/details.tt',   # Re-render the form
         );
         return; # Early exit on database error
     }
@@ -730,8 +726,14 @@ sub modify :Path('/todo/modify') :Args(1) {
     );
 
     # Handle successful update
+    $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
+    
+    if ($form_data->{return_to}) {
+        $c->response->redirect($form_data->{return_to});
+        $c->detach();
+    }
+    
     $c->stash(
-        success_msg => "Todo item with ID $record_id has been successfully updated.",
         record      => $todo,             # Provide updated data
         template    => 'todo/details.tt',  # Redirect back to the form for review
     );
@@ -739,268 +741,483 @@ sub modify :Path('/todo/modify') :Args(1) {
 
 sub create :Local {
     my ( $self, $c ) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 'Creating new todo item');
 
-    # Retrieve the form data from the request
-    my $record_id = $c->request->params->{record_id};
-    my $sitename = $c->request->params->{sitename};
-    my $start_date = $c->request->params->{start_date};
-    my $parent_todo = $c->request->params->{parent_todo} || 0;
-    my $due_date = $c->request->params->{due_date} || DateTime->now->add(days => 7)->ymd; # Set default value if not provided
-    my $subject = $c->request->params->{subject};
+    # Retrieve and validate required fields
+    my @required_fields = ('subject', 'start_date', 'due_date', 'priority', 'status');
+    my $params = $c->request->params;
+    
+    # Log all received parameters for debugging
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+        "Received parameters: " . join(', ', map { "$_=" . ($params->{$_} // 'undef') } keys %$params));
+    
+    # Validate required fields
+    my @missing_fields = grep { !defined $params->{$_} || $params->{$_} eq '' } @required_fields;
+    if (@missing_fields) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Missing required fields: " . join(', ', @missing_fields));
+        $c->stash->{error_msg} = "Missing required fields: " . join(', ', @missing_fields);
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
+    }
+
+    # Set default values
     my $schema = $c->model('DBEncy');
-    my $description = $c->request->params->{description};
-    my $estimated_man_hours = $c->request->params->{estimated_man_hours};
-    my $comments = $c->request->params->{comments};
-    my $accumulative_time = $c->request->params->{accumulative_time};
-    my $reporter = $c->request->params->{reporter};
-    my $company_code = $c->request->params->{company_code};
-    my $owner = $c->request->params->{owner};
-    my $developer = $c->request->params->{developer};
-    my $username_of_poster = $c->session->{username} || 'Shanta';
-    my $status = $c->request->params->{status};
-    my $priority = $c->request->params->{priority};
-    my $share = $c->request->params->{share} || 0;
-    my $last_mod_by = $c->session->{username} || 'default_user';
-    my $last_mod_date = $c->request->params->{last_mod_date};
-    my $group_of_poster = $c->session->{roles} || 'default_group';
-    my $project_id = $c->request->params->{project_id};
-    my $manual_project_id = $c->request->params->{manual_project_id};
-    my $date_time_posted = $c->request->params->{date_time_posted};
-    my $time_of_day = $c->request->params->{time_of_day};
-
-    # If manual_project_id is not empty, use it as the project ID
-    my $selected_project_id = $manual_project_id ? $manual_project_id : $project_id;
-
-    # Ensure project_id is never null - find or create a default project
-    if (!$selected_project_id) {
-        # Try to find a default project or use the first available project
-        my $default_project = $schema->resultset('Project')->search(
-            { sitename => $sitename },
-            { order_by => 'id', rows => 1 }
-        )->first;
-        
-        if ($default_project) {
-            $selected_project_id = $default_project->id;
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'create.default_project',
-                "No project selected, using default project_id: $selected_project_id"
-            );
-        } else {
-            # Create a default project if none exists
-            $default_project = $schema->resultset('Project')->create({
-                project_name => 'Default Project',
-                project_code => 'DEFAULT',
-                sitename => $sitename,
-                description => 'Auto-created default project for todos',
-                status => 'active'
-            });
-            $selected_project_id = $default_project->id;
-            $self->logging->log_with_details(
-                $c, 'info', __FILE__, __LINE__, 'create.created_default_project',
-                "Created default project with project_id: $selected_project_id"
-            );
+    my $current_user = $c->session->{username} || 'system';
+    my $current_date = DateTime->now->ymd;
+    
+    # Process project information
+    my $selected_project_id = $params->{manual_project_id} || $params->{project_id};
+    my $project_code = 'default_code';
+    
+    # If no project ID provided, get a default project or create one
+    if (!$selected_project_id || $selected_project_id eq '') {
+        eval {
+            # Try to find a default project
+            my $default_project = $schema->resultset('Project')->search({
+                -or => [
+                    { project_name => 'Default' },
+                    { project_code => 'default_code' }
+                ]
+            })->first;
+            
+            if ($default_project) {
+                $selected_project_id = $default_project->id;
+                $project_code = $default_project->project_code;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+                    "Using default project ID: $selected_project_id, code: $project_code");
+            } else {
+                # Set to 1 as fallback (assume project ID 1 exists)
+                $selected_project_id = 1;
+                $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+                    "No project specified, using fallback project ID: $selected_project_id");
+            }
+        };
+        if ($@) {
+            $selected_project_id = 1; # Final fallback
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+                "Error finding default project, using fallback: $@");
+        }
+    } else {
+        eval {
+            my $project = $schema->resultset('Project')->find($selected_project_id);
+            $project_code = $project->project_code if $project;
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+                "Using project ID: $selected_project_id, code: $project_code");
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+                "Error fetching project: $@");
         }
     }
 
-    # Fetch the project_code using the selected_project_id
-    my $project_code;
-    if ($selected_project_id) {
-        my $project = $schema->resultset('Project')->find($selected_project_id);
-        $project_code = $project ? $project->project_code : 'default_code'; # Set a default code if not found
-    } else {
-        $project_code = 'default_code'; # Set a default code if no project ID is provided
+    # Validate and format dates
+    my ($start_date, $due_date);
+    eval {
+        # HTML date inputs come in YYYY-MM-DD format, no need to parse as ISO8601
+        if ($params->{start_date} && $params->{start_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $start_date = $params->{start_date};
+        }
+        if ($params->{due_date} && $params->{due_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $due_date = $params->{due_date};
+        }
+        
+        if ($start_date && $due_date && $start_date gt $due_date) {
+            die "Start date cannot be after due date";
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Date validation failed: $@");
+        $c->stash->{error_msg} = "Invalid date: $@";
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
     }
 
-    # Check if accumulative_time is a valid integer
-    $accumulative_time = $c->request->params->{accumulative_time};
-    if (!defined $accumulative_time || $accumulative_time !~ /^\d+$/) {
-        $accumulative_time = 0;
+    # Process accumulative time
+    my $accumulative_time = 0;
+    if (defined $params->{accumulative_time} && $params->{accumulative_time} =~ /^\d+$/) {
+        $accumulative_time = $params->{accumulative_time};
     }
 
-    # Get the current date
-    my $current_date = DateTime->now->ymd;
-
-    # Retrieve user_id from session or another reliable source
+    # Get user info
     my $user_id = $c->session->{user_id};
-    unless (defined $user_id) {
-        # Handle the case where user_id is not found
-        $c->response->body('User ID not found in session');
+    unless ($user_id) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            'User ID not found in session');
+        $c->stash->{error_msg} = 'User not authenticated';
+        $c->stash->{template} = 'user/login.tt';
+        $c->detach();
+    }
+
+    # Create a new todo record with error handling
+    my $todo;
+    
+    # Log the data being inserted for debugging
+    my $insert_data = {
+        sitename => $c->session->{SiteName} || 'default_site',
+        start_date => $start_date,
+        parent_todo => $params->{parent_todo} || '',
+        due_date => $due_date,
+        subject => $params->{subject},
+        description => $params->{description} || '',
+        estimated_man_hours => $params->{estimated_man_hours} || 0,
+        comments => $params->{comments} || '',
+        accumulative_time => $accumulative_time,
+        reporter => $params->{reporter} || $current_user,
+        company_code => $params->{company_code} || 'default',
+        owner => $params->{owner} || $current_user,
+        project_code => $project_code,
+        developer => $params->{developer} || $current_user,
+        username_of_poster => $current_user,
+        status => $self->convert_status_to_string($params->{status}) || 'NEW',
+        priority => $params->{priority} || 3, # Medium priority by default
+        time_of_day => $params->{time_of_day},
+        share => $params->{share} ? 1 : 0,
+        last_mod_by => $current_user,
+        last_mod_date => $current_date,
+        user_id => $user_id,
+        group_of_poster => (ref $c->session->{roles} eq 'ARRAY' && @{$c->session->{roles}}) 
+                          ? $c->session->{roles}->[0] 
+                          : 'user',
+        project_id => $selected_project_id,
+        date_time_posted => $params->{date_time_posted} || $current_date,
+    };
+    
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
+        "About to create todo with data: " . Dumper($insert_data));
+    
+    eval {
+        $todo = $schema->resultset('Todo')->create($insert_data);
+        
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create', 
+            "Successfully created todo with ID: " . $todo->id);
+            
+    };
+    
+    # Check for errors from eval
+    if ($@) {
+        my $error = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create', 
+            "Failed to create todo: $error");
+        $c->stash->{error_msg} = "Failed to create todo: $error";
+        $c->stash->{template} = 'todo/addtodo.tt';
+        $c->detach();
+    }
+
+    # Redirect to the todo list or return_to URL with success message
+    $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
+    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
+    
+    # Handle the case where the return_to URL might already have a fragment
+    # or ensure it's properly handled if coming from internal referer
+    $c->response->redirect($redirect_url);
+}
+
+=head2 update_time
+
+POST /todo/update_time - Update the time_of_day for a todo item (AJAX endpoint for drag-and-drop)
+
+=cut
+
+sub update_time :Path('/todo/update_time') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and time_of_day'
+            }
+        );
+        $c->forward('View::JSON');
         return;
     }
-
-    # Create a new todo record with retry logic for lock timeouts
-    my $todo;
-    my $max_retries = 3;
-    my $retry_count = 0;
     
-    while ($retry_count < $max_retries) {
-        eval {
-            $schema->txn_do(sub {
-                $todo = $schema->resultset('Todo')->create({
-                    record_id => $record_id,
-                    sitename => $sitename,
-                    start_date => $start_date,
-                    parent_todo => $parent_todo,
-                    due_date => $due_date,
-                    subject => $subject,
-                    description => $description,
-                    estimated_man_hours => $estimated_man_hours,
-                    comments => $comments,
-                    accumulative_time => $accumulative_time,
-                    reporter => $reporter,
-                    company_code => $company_code,
-                    owner => $owner,
-                    project_code => $project_code, # Ensure this is set
-                    developer => $developer,
-                    username_of_poster => $username_of_poster,
-                    status => $status,
-                    priority => $priority,
-                    share => $share,
-                    last_mod_by => $last_mod_by,
-                    last_mod_date => $current_date,
-                    user_id => $user_id, # Ensure this is set
-                    group_of_poster => $group_of_poster,
-                    project_id => $selected_project_id,
-                    date_time_posted => $date_time_posted,
-                    time_of_day => $time_of_day,
-                });
-            });
-        };
-        
-        if ($@) {
-            $retry_count++;
-            if ($@ =~ /Lock wait timeout exceeded/ && $retry_count < $max_retries) {
-                # Log the retry attempt
-                $self->logging->log_with_details(
-                    $c,
-                    'warn',
-                    __FILE__,
-                    __LINE__,
-                    'todo.create.retry',
-                    "Database lock timeout, retrying ($retry_count/$max_retries): $@"
-                );
-                # Wait briefly before retry (exponential backoff)
-                sleep(0.1 * (2 ** $retry_count));
-                next;
-            } else {
-                # Log the final error and re-throw
-                $self->logging->log_with_details(
-                    $c,
-                    'error',
-                    __FILE__,
-                    __LINE__,
-                    'todo.create.failed',
-                    "Failed to create todo after $retry_count retries: $@"
-                );
-                die $@;
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
             }
-        } else {
-            # Success - break out of retry loop
-            last;
-        }
+        );
+        $c->forward('View::JSON');
+        return;
     }
+    
+    # Update the time_of_day
+    eval {
+        $todo->update({ time_of_day => $time_of_day });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
+            "Updated time_of_day for todo $record_id to $time_of_day");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time',
+            "Failed to update time_of_day for todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day
+        }
+    );
+    $c->forward('View::JSON');
+}
 
-    # Redirect the user to the index action
-    $c->response->redirect($c->uri_for($self->action_for('index')));
+=head2 update_time_and_date
+
+POST /todo/update_time_and_date - Update both time_of_day and start_date for a todo item (AJAX endpoint for week view drag-and-drop)
+
+=cut
+
+sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $start_date = $c->request->params->{start_date};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day && $start_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id, time_of_day, and start_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update both time_of_day and start_date
+    eval {
+        $todo->update({ 
+            time_of_day => $time_of_day,
+            start_date => $start_date
+        });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
+            "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time_and_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time and date updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day,
+            new_date => $start_date
+        }
+    );
+    $c->forward('View::JSON');
+}
+
+=head2 update_display_date
+
+POST /todo/update_display_date - Update the display date for a todo (for month view drag-and-drop)
+Month view displays by due_date if present, otherwise start_date.
+This endpoint updates the appropriate field to move the todo to a new date.
+
+=cut
+
+sub update_display_date :Path('/todo/update_display_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $display_date = $c->request->params->{display_date};
+    
+    # Validate parameters
+    unless ($record_id && $display_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and display_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Month view displays by due_date if present, otherwise start_date
+    # Update the field that's being displayed
+    my $update_fields = {};
+    
+    if ($todo->due_date) {
+        # Todo has a due_date, so it's displayed by due_date - update due_date
+        $update_fields->{due_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating due_date to $display_date for todo $record_id (displayed by due_date)");
+    } else {
+        # Todo doesn't have due_date, so it's displayed by start_date - update start_date
+        $update_fields->{start_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating start_date to $display_date for todo $record_id (displayed by start_date)");
+    }
+    
+    # Also update time_of_day if provided
+    if ($time_of_day) {
+        $update_fields->{time_of_day} = $time_of_day;
+    }
+    
+    # Update the todo record
+    eval {
+        $todo->update($update_fields);
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_display_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo display date updated successfully',
+            todo_id => $record_id,
+            display_date => $display_date,
+            updated_field => $todo->due_date ? 'due_date' : 'start_date'
+        }
+    );
+    $c->forward('View::JSON');
 }
 
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
-    # Validate and parse the date_arg
+    # Validate the date_arg if it's defined
     my $date;
-    my $dt;
-    if (defined $date_arg && $date_arg =~ /^\d{4}-\d{2}-\d{2}$/) {
-        $date = $date_arg;
-        eval { $dt = DateTime->new(year => substr($date, 0, 4), month => substr($date, 5, 2), day => substr($date, 8, 2)) };
-        if ($@) {
-            $dt = DateTime->now;
-            $date = $dt->ymd;
-        }
+    if (defined $date_arg) {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        eval { $date = $iso8601->parse_datetime($date_arg) };
+        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid
     } else {
-        $dt = DateTime->now;
-        $date = $dt->ymd;
+        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
     }
     
     # Calculate the previous and next dates
-    my $previous_date = $dt->clone->subtract(days => 1)->ymd;
-    my $next_date = $dt->clone->add(days => 1)->ymd;
+    my $dt = DateTime::Format::ISO8601->parse_datetime($date);
+    my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
+    my $next_date = $dt->clone->add(days => 1)->strftime('%Y-%m-%d');
 
-    # Fetch ALL todos for the site directly from database (like month view)
-    my $schema = $c->model('DBEncy');
-    my @all_todos = $schema->resultset('Todo')->search(
-        {
-            'me.sitename' => $c->session->{SiteName},
-        },
-        { 
-            order_by => { -asc => 'me.start_date' },
-            prefetch => 'project'
-        }
-    );
+    # Get the Todo model
+    my $todo_model = $c->model('Todo');
 
-    # Filter todos for the given day: due today or starting today
-    my @filtered_todos = grep { 
-        ($_->due_date && $_->due_date eq $date) ||           # Due today
-        ($_->start_date && $_->start_date eq $date)          # Starting today  
-    } @all_todos;
+    # Fetch ALL todos for the site for calendar view
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Fetched " . scalar(@$todos) . " total todos for site " . $c->session->{SiteName});
+
+    # Filter todos for the given day using the shared method
+    my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
     
-    # Sort todos by time_of_day: NULL times first, then chronological order
-    @filtered_todos = sort {
-        # Handle NULL time_of_day values - put them at the top
-        return -1 if (!defined $a->time_of_day && defined $b->time_of_day);
-        return 1 if (defined $a->time_of_day && !defined $b->time_of_day);
-        return 0 if (!defined $a->time_of_day && !defined $b->time_of_day);
-        
-        # Both have time values - sort chronologically
-        return $a->time_of_day cmp $b->time_of_day;
-    } @filtered_todos;
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "After date filtering: " . scalar(@$filtered_todos) . " todos remain for date $date");
+
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
+    # Separate overdue and today's todos
+    my @overdue_todos;
+    my @today_todos;
     
-    # Organize todos by hour for time-slot display
-    my %todos_by_hour = ();
-    my @unscheduled_todos = ();
-    
-    foreach my $todo (@filtered_todos) {
-        # Safely check for time_of_day field (might not exist in database yet)
-        my $time_of_day;
-        eval { $time_of_day = $todo->time_of_day; };
-        
-        # Debug logging for this specific todo
-        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-            "Processing todo: " . $todo->subject . ", time_of_day: " . ($time_of_day || 'NULL') . 
-            ", length: " . (defined $time_of_day ? length($time_of_day) : 'N/A'));
-        
-        if (defined $time_of_day && $time_of_day ne '' && $time_of_day =~ /^(\d{1,2}):/) {
-            my $hour = int($1);
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-                "Scheduling todo '" . $todo->subject . "' at hour: $hour");
-            push @{$todos_by_hour{$hour}}, $todo;
+    foreach my $todo (@sorted_todos) {
+        if ($todo->due_date && $todo->due_date lt $date && $todo->status != 3) {
+            push @overdue_todos, $todo;
         } else {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-                "Adding todo '" . $todo->subject . "' to unscheduled (time: " . ($time_of_day || 'NULL') . ")");
-            push @unscheduled_todos, $todo;
+            push @today_todos, $todo;
         }
     }
-    
-    # Debug logging
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-        "Day view debug: Found " . scalar(@all_todos) . " total todos, " . scalar(@filtered_todos) . " filtered todos for date: $date");
-    
-    if ($c->session->{debug_mode}) {
-        foreach my $todo (@all_todos) {
-            my $time_of_day;
-            eval { $time_of_day = $todo->time_of_day; };
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-                "Todo: " . $todo->subject . ", Start: " . ($todo->start_date || 'NULL') . 
-                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status . 
-                ", Time: " . ($time_of_day || 'NULL'));
-        }
-    }
+
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
 
     # Add the todos to the stash
     $c->stash(
-        todos => \@filtered_todos,
-        todos_by_hour => \%todos_by_hour,
-        unscheduled_todos => \@unscheduled_todos,
+        todos => \@today_todos,
+        overdue_todos => \@overdue_todos,
         sitename => $c->session->{SiteName},
         date => $date,
         previous_date => $previous_date,
@@ -1023,52 +1240,52 @@ sub week :Path('/todo/week') :Args {
 
     # Calculate the start and end of the week
     my $dt = DateTime::Format::ISO8601->parse_datetime($date);
-    
-    # Calculate start of week (Sunday)
-    my $start_dt = $dt->clone;
-    if ($start_dt->day_of_week != 7) { # If not Sunday
-        $start_dt = $start_dt->subtract(days => $start_dt->day_of_week);
-    }
-    
-    my $start_of_week = $start_dt->strftime('%Y-%m-%d');
-    my $end_of_week = $start_dt->clone->add(days => 6)->strftime('%Y-%m-%d');
+    my $start_of_week = $dt->clone->subtract(days => $dt->day_of_week - 1)->strftime('%Y-%m-%d');
+    my $end_of_week = $dt->clone->add(days => 7 - $dt->day_of_week)->strftime('%Y-%m-%d');
 
     # Calculate previous and next week dates
-    my $prev_week_date = $start_dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
-    my $next_week_date = $start_dt->clone->add(days => 7)->strftime('%Y-%m-%d');
+    my $prev_week_date = $dt->clone->subtract(days => 7)->strftime('%Y-%m-%d');
+    my $next_week_date = $dt->clone->add(days => 7)->strftime('%Y-%m-%d');
     
-    # Create week calendar structure with all 7 days
-    my @week_days = ();
+    # Create the week start DateTime object adjusted to Sunday for template use
+    # start_of_week is Monday-based, so we need to go back to the Sunday before
+    my $start_dt = DateTime::Format::ISO8601->parse_datetime($start_of_week);
+    # Go back to Sunday (day_of_week 7, but we want to go back 1 day from Monday)
+    $start_dt = $start_dt->subtract(days => 1);
+    
+    # Generate array of dates for the week (7 days starting from Sunday)
+    my @week_dates = ();
     for my $day_offset (0..6) {
         my $current_date = $start_dt->clone->add(days => $day_offset);
-        push @week_days, {
-            date => $current_date->strftime('%Y-%m-%d'),
-            day_name => $current_date->day_name,
-            day_number => $current_date->day,
-            month_name => $current_date->month_name,
-            is_today => ($current_date->ymd eq DateTime->now->ymd) ? 1 : 0
+        push @week_dates, {
+            date_str => $current_date->strftime('%Y-%m-%d'),
+            day_num => $current_date->day,
+            is_today => ($current_date->strftime('%Y-%m-%d') eq DateTime->now->strftime('%Y-%m-%d')),
         };
     }
 
-    # Fetch todos for the site within the week, ordered by start_date
-    my $todos = $todo_model->get_top_todos($c, $c->session->{SiteName});
+    # Fetch ALL todos for the site for calendar view
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
 
-    # Filter todos for the given week: starting this week, due this week, or overdue but not completed
-    my @filtered_todos = grep { 
-        ($_->start_date && $_->start_date ge $start_of_week && $_->start_date le $end_of_week) ||  # Starting this week
-        ($_->due_date && $_->due_date ge $start_of_week && $_->due_date le $end_of_week) ||      # Due this week
-        ($_->due_date && $_->due_date lt $start_of_week && $_->status ne '3')                   # Overdue but not completed
-    } @$todos;
+    # Filter todos for the given week using the shared method
+    my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
+
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
 
     # Add the todos to the stash
     $c->stash(
-        todos => \@filtered_todos,
-        week_days => \@week_days,
+        todos => \@sorted_todos,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
         prev_week_date => $prev_week_date,
         next_week_date => $next_week_date,
+        week_dates => \@week_dates,
         template => 'todo/week.tt',
     );
 
@@ -1097,32 +1314,22 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    # Fetch ALL todos for the site directly from database
-    my $schema = $c->model('DBEncy');
-    my @all_todos = $schema->resultset('Todo')->search(
-        {
-            'me.sitename' => $c->session->{SiteName},
-        },
-        { 
-            order_by => { -asc => 'me.start_date' },
-            prefetch => 'project'
-        }
-    );
+    # Fetch ALL todos for the site for calendar view
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
 
-    # Filter todos for the given month: starting this month, due this month, or overdue but not completed
-    my @filtered_todos = grep { 
-        ($_->start_date && $_->start_date ge $start_of_month && $_->start_date le $end_of_month) ||  # Starting this month
-        ($_->due_date && $_->due_date ge $start_of_month && $_->due_date le $end_of_month) ||      # Due this month
-        ($_->due_date && $_->due_date lt $start_of_month && $_->status ne '3')                     # Overdue but not completed
-    } @all_todos;
+    # Filter todos for the given month using the shared method
+    my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
 
-    # Debug logging
-    $c->log->info("Month view debug: Found " . scalar(@all_todos) . " total todos, " . scalar(@filtered_todos) . " filtered todos for month $start_of_month to $end_of_month");
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
 
     # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
-    
-    foreach my $todo (@filtered_todos) {
+    foreach my $todo (@sorted_todos) {
         my $display_date = $todo->due_date || $todo->start_date;
         if ($display_date) {
             my $todo_date = DateTime::Format::ISO8601->parse_datetime($display_date);
@@ -1153,9 +1360,12 @@ sub month :Path('/todo/month') :Args {
         };
     }
 
+    # Get today's date for highlighting
+    my $today = DateTime->now->ymd;
+
     # Add the todos and calendar to the stash
     $c->stash(
-        todos => \@filtered_todos,
+        todos => \@sorted_todos,
         calendar => \@calendar,
         sitename => $c->session->{SiteName},
         month_name => $dt->month_name,
@@ -1164,415 +1374,289 @@ sub month :Path('/todo/month') :Args {
         end_of_month => $end_of_month,
         prev_month_date => $prev_month_date,
         next_month_date => $next_month_date,
+        today => $today,
         template => 'todo/month.tt',
     );
 
     $c->forward($c->view('TT'));
 }
 
-# Get overdue todos for dashboard display
-sub get_overdue_todos :Private {
+# REST API Endpoints (Dev-only: comserv_server.pl, NOT Starman production)
+# All API methods return JSON and require admin/developer roles
+
+sub _api_dev_only_check {
     my ($self, $c) = @_;
+    
+    unless ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'development') {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => 0,
+            error => 'API endpoints are development-only (comserv_server.pl). Not available in production.',
+            code => 'api_dev_only'
+        }));
+        $c->detach();
+    }
+}
+
+sub _api_validate_token {
+    my ($self, $c) = @_;
+    
+    my $result = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+    
+    unless ($result->{valid}) {
+        $self->_api_error($c, $result->{error}, 'invalid_token', $result->{code});
+    }
     
     my $schema = $c->model('DBEncy');
-    my $sitename = $c->session->{SiteName};
-    my $today = DateTime->now->ymd;
+    my $api_token = $schema->resultset('ApiToken')->find($result->{api_token_id});
+    my $user = $api_token->user if $api_token;
     
-    my @overdue_todos = $schema->safe_search($c, 'Todo', 
-        {
-            'me.sitename' => $sitename,
-            'me.due_date' => { '<' => $today },
-            'me.status' => { '!=' => 3 } # Not completed
-        },
-        { 
-            order_by => { -asc => 'me.due_date' },
-            prefetch => 'project'
-        }
-    );
+    $c->stash->{api_user} = $user;
+    $c->stash->{api_user_id} = $result->{user_id};
+    $c->stash->{api_token} = $api_token;
     
-    return \@overdue_todos;
+    return 1;
 }
 
-# AI-driven todo creation from natural language prompts
-sub ai_create_todo :Path('/todo/ai_create') :Args(0) {
+sub _api_error {
+    my ($self, $c, $error, $code, $status) = @_;
+    $status //= 400;
+    
+    $c->res->status($status);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 0,
+        error => $error,
+        code => $code
+    }));
+    $c->detach();
+}
+
+sub _api_success {
+    my ($self, $c, $message, $data) = @_;
+    
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    my $response = {
+        success => 1,
+        message => $message,
+    };
+    $response = { %$response, %$data } if $data;
+    $c->res->body(encode_json($response));
+    $c->detach();
+}
+
+=head2 api_todo_create
+
+POST /api/todo/create - Create a new todo via API
+
+Required JSON fields: subject, start_date, due_date, priority, status
+Optional JSON fields: description, project_id, assigned_to
+
+Dev-only: comserv_server.pl only, requires admin/developer role
+=cut
+
+sub api_todo_create :Local :Args(0) {
     my ($self, $c) = @_;
     
-    # Get the AI prompt from request parameters
-    my $ai_prompt = $c->request->params->{prompt} || '';
-    my $auto_assign = $c->request->params->{auto_assign} || 0;
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
     
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'ai_create_todo',
-        "AI todo creation requested with prompt: $ai_prompt"
-    );
-    
-    # Validate input
-    unless ($ai_prompt) {
-        $c->stash(
-            error_msg => 'AI prompt is required for todo creation.',
-            template => 'todo/ai_create.tt'
-        );
-        return;
-    }
-    
-    # Parse the AI prompt to extract todo details
-    my $todo_data = $self->_parse_ai_prompt($c, $ai_prompt);
-    
-    if ($todo_data->{error}) {
-        $c->stash(
-            error_msg => $todo_data->{error},
-            template => 'todo/ai_create.tt'
-        );
-        return;
-    }
-    
-    # Create the todo using parsed data
-    my $result = $self->_create_todo_from_data($c, $todo_data, 'ai_prompt');
-    
-    if ($result->{success}) {
-        $c->stash(
-            success_msg => "Todo successfully created from AI prompt. Record ID: " . $result->{record_id},
-            todo_record => $result->{todo},
-            template => 'todo/ai_create.tt'
-        );
-        
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'ai_create_todo.success',
-            "AI todo created successfully with ID: " . $result->{record_id}
-        );
-    } else {
-        $c->stash(
-            error_msg => $result->{error},
-            template => 'todo/ai_create.tt'
-        );
-    }
-}
-
-# Parse AI prompt to extract todo details
-sub _parse_ai_prompt :Private {
-    my ($self, $c, $prompt) = @_;
-    
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'parse_ai_prompt',
-        "Parsing AI prompt: $prompt"
-    );
-    
-    # Initialize default values
-    my $todo_data = {
-        sitename => $c->session->{SiteName} || 'default',
-        start_date => DateTime->now->ymd,
-        due_date => DateTime->now->add(days => 7)->ymd,
-        priority => 2, # Medium priority by default
-        status => 1,   # New status
-        username_of_poster => $c->session->{username} || 'AI_System',
-        last_mod_by => $c->session->{username} || 'AI_System',
-        user_id => $c->session->{user_id} || 1,
-        project_id => undef,
-        share => 0,
-        accumulative_time => 0,
-        estimated_man_hours => 1,
-        parent_todo => '', # Default empty parent_todo to fix database constraint
-        project_code => 'default', # Default project_code to fix database constraint
-    };
-    
-    # Extract subject from prompt
-    if ($prompt =~ /create\s+(?:a\s+)?todo\s+(?:for\s+)?(.+?)(?:\s+to\s+(.+))?$/i) {
-        my $subject_part = $1;
-        my $description_part = $2 || '';
-        
-        # Clean up subject
-        $subject_part =~ s/\s+for\s+(.+?)$//i;
-        my $assignee_part = $1 || '';
-        
-        $todo_data->{subject} = $subject_part;
-        $todo_data->{description} = $description_part;
-        
-        # Try to extract assignee information
-        if ($assignee_part) {
-            $todo_data->{owner} = $assignee_part;
-            $todo_data->{developer} = $assignee_part;
-        }
-    } else {
-        # Fallback: use the entire prompt as subject
-        $todo_data->{subject} = $prompt;
-        $todo_data->{description} = "Auto-generated todo from AI prompt: $prompt";
-    }
-    
-    # Extract priority keywords
-    if ($prompt =~ /\b(urgent|critical|high|important)\b/i) {
-        $todo_data->{priority} = 1; # High priority
-        $todo_data->{due_date} = DateTime->now->add(days => 1)->ymd; # Due tomorrow
-    } elsif ($prompt =~ /\b(low|minor|later)\b/i) {
-        $todo_data->{priority} = 3; # Low priority
-        $todo_data->{due_date} = DateTime->now->add(days => 14)->ymd; # Due in 2 weeks
-    }
-    
-    # Extract specific assignees
-    if ($prompt =~ /\b(?:for|assign(?:ed)?\s+to)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)/i) {
-        my $assignee = $1;
-        $todo_data->{owner} = $assignee;
-        $todo_data->{developer} = $assignee;
-        
-        # Try to find user_id for the assignee
-        my $schema = $c->model('DBEncy');
-        my $user = $schema->resultset('User')->search({ username => $assignee })->first;
-        if ($user) {
-            $todo_data->{user_id} = $user->id;
-        }
-    }
-    
-    # Extract project information
-    if ($prompt =~ /\b(?:project|for)\s+([A-Za-z0-9_\-]+)/i) {
-        my $project_name = $1;
-        my $schema = $c->model('DBEncy');
-        my $project = $schema->safe_search($c, 'Project', { 
-            -or => [
-                { name => { 'like', "%$project_name%" } },
-                { project_code => { 'like', "%$project_name%" } }
-            ]
-        }, {})->first;
-        
-        if ($project) {
-            $todo_data->{project_id} = $project->id;
-            $todo_data->{project_code} = $project->project_code;
-        }
-    }
-    
-    # Validate required fields
-    unless ($todo_data->{subject}) {
-        return { error => "Could not extract a valid subject from the AI prompt." };
-    }
-    
-    $self->logging->log_with_details(
-        $c, 'debug', __FILE__, __LINE__, 'parse_ai_prompt.result',
-        "Parsed todo data: Subject=" . $todo_data->{subject} . 
-        ", Priority=" . $todo_data->{priority} . 
-        ", Assignee=" . ($todo_data->{owner} || 'none')
-    );
-    
-    return $todo_data;
-}
-
-# Create todo from structured data (used by both AI and error systems)
-sub _create_todo_from_data :Private {
-    my ($self, $c, $todo_data, $source) = @_;
-    
-    $source ||= 'manual';
-    
-    $self->logging->log_with_details(
-        $c, 'info', __FILE__, __LINE__, 'create_todo_from_data',
-        "Creating todo from $source with subject: " . $todo_data->{subject}
-    );
-    
-    # Get current date for timestamps
-    my $current_date = DateTime->now->ymd;
-    
-    # Ensure required fields have defaults
-    $todo_data->{sitename} ||= $c->session->{SiteName} || 'default';
-    $todo_data->{start_date} ||= $current_date;
-    $todo_data->{due_date} ||= DateTime->now->add(days => 7)->ymd;
-    $todo_data->{last_mod_date} = $current_date;
-    $todo_data->{date_time_posted} ||= DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
-    $todo_data->{username_of_poster} ||= $c->session->{username} || 'System';
-    $todo_data->{last_mod_by} ||= $c->session->{username} || 'System';
-    $todo_data->{user_id} ||= $c->session->{user_id} || 1;
-    $todo_data->{group_of_poster} ||= join(',', @{$c->session->{roles} || ['system']});
-    $todo_data->{parent_todo} ||= ''; # Ensure parent_todo is always set to avoid database constraint error
-    $todo_data->{project_code} ||= 'default'; # Ensure project_code is always set to avoid database constraint error
-    
-    # Set project_code if project_id is provided but project_code is missing
-    if ($todo_data->{project_id} && !$todo_data->{project_code}) {
-        my $schema = $c->model('DBEncy');
-        my $project = $schema->resultset('Project')->find($todo_data->{project_id});
-        $todo_data->{project_code} = $project ? $project->project_code : 'default_code';
-    }
-    
-    # Attempt to create the todo record
+    my $params;
     eval {
-        my $schema = $c->model('DBEncy');
-        my $todo = $schema->resultset('Todo')->create($todo_data);
-        
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'create_todo_from_data.success',
-            "Todo created successfully with ID: " . $todo->record_id . " from source: $source"
-        );
-        
-        return {
-            success => 1,
-            record_id => $todo->record_id,
-            todo => $todo
-        };
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
     };
-    
     if ($@) {
-        my $error_msg = $@;
-        $self->logging->log_with_details(
-            $c, 'error', __FILE__, __LINE__, 'create_todo_from_data.failure',
-            "Failed to create todo from $source. Error: $error_msg"
-        );
-        
-        return {
-            success => 0,
-            error => "Failed to create todo: $error_msg"
-        };
-    }
-}
-
-# Enhanced error notification that also creates todos for critical errors
-sub _notify_admin_of_error :Private {
-    my ($self, $c, $record_id, $error_msg, $form_data) = @_;
-    
-    # Log the notification attempt
-    $self->logging->log_with_details(
-        $c,
-        'info',
-        __FILE__,
-        __LINE__,
-        'notify_admin',
-        "Attempting to notify admin of database error for record ID: $record_id"
-    );
-    
-    # Prepare error details for admin notification
-    my $user = $c->session->{username} || 'Unknown User';
-    my $sitename = $c->session->{SiteName} || 'Unknown Site';
-    my $timestamp = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
-    my $url = $c->req->uri;
-    
-    # Create a summary of form data (excluding sensitive information)
-    my $form_summary = '';
-    if ($form_data && ref $form_data eq 'HASH') {
-        for my $key (sort keys %$form_data) {
-            next if $key =~ /password|token|session/i; # Skip sensitive fields
-            my $value = $form_data->{$key} || '';
-            $value = substr($value, 0, 100) . '...' if length($value) > 100; # Truncate long values
-            $form_summary .= "  $key: $value\n";
-        }
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
     }
     
-    my $error_details = qq{
-Database Error in Todo System
-
-Time: $timestamp
-User: $user
-Site: $sitename
-URL: $url
-Record ID: $record_id
-
-Error Message:
-$error_msg
-
-Form Data Submitted:
-$form_summary
-
-This error has been logged and requires administrator attention.
-    };
+    my $schema = $c->model('DBEncy');
+    my $current_user = $c->stash->{api_user}->username || 'system';
     
-    # Create a todo for critical database errors
-    $self->_create_error_todo($c, $error_msg, $record_id, $user, $sitename, $url);
+    my @required = qw(subject start_date due_date priority status);
+    my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
+    if (@missing) {
+        $self->_api_error($c, "Missing required fields: " . join(', ', @missing), 'validation_error');
+    }
     
-    # Try to send email notification if email system is available
+    my $start_date = $params->{start_date};
+    my $due_date = $params->{due_date};
+    if ($start_date gt $due_date) {
+        $self->_api_error($c, "Start date cannot be after due date", 'date_validation_error');
+    }
+    
+    my $project_id = $params->{project_id} || 1;
     eval {
-        if ($c->can('model') && $c->model('Email')) {
-            $c->model('Email')->send(
-                to      => 'admin@' . ($c->config->{domain} || 'localhost'),
-                subject => "Database Error in Todo System - Record ID: $record_id",
-                body    => $error_details,
-            );
-            
-            $self->logging->log_with_details(
-                $c,
-                'info',
-                __FILE__,
-                __LINE__,
-                'notify_admin.email_sent',
-                "Admin notification email sent for record ID: $record_id"
-            );
+        my $project = $schema->resultset('Project')->find($project_id);
+        unless ($project) {
+            die "Project $project_id not found";
         }
     };
-    
     if ($@) {
-        $self->logging->log_with_details(
-            $c,
-            'warn',
-            __FILE__,
-            __LINE__,
-            'notify_admin.email_failed',
-            "Failed to send admin notification email: $@"
-        );
+        $self->_api_error($c, "Invalid project_id: $@", 'invalid_project');
     }
     
-    # Always log the full error details for admin review
-    $self->logging->log_with_details(
-        $c,
-        'error',
-        __FILE__,
-        __LINE__,
-        'notify_admin.full_details',
-        $error_details
-    );
-}
-
-# Create a todo for system errors
-sub _create_error_todo :Private {
-    my ($self, $c, $error_msg, $record_id, $user, $sitename, $url) = @_;
+    my $sitename = $c->session->{SiteName} || 'default';
     
-    # Determine if this is a critical error that needs immediate attention
-    my $is_critical = $error_msg =~ /\b(database|connection|timeout|deadlock|constraint|foreign key)\b/i;
-    
-    my $priority = $is_critical ? 1 : 2; # High priority for critical errors
-    my $due_days = $is_critical ? 1 : 3; # Due tomorrow for critical, 3 days for others
-    
-    # Create todo data for the error
-    my $todo_data = {
+    my $todo = $schema->resultset('Todo')->create({
+        subject => $params->{subject},
+        description => $params->{description} || '',
+        project_id => $project_id,
+        start_date => $start_date,
+        due_date => $due_date,
+        priority => $params->{priority},
+        status => $params->{status},
+        assigned_to => $params->{assigned_to} || $current_user,
         sitename => $sitename,
-        start_date => DateTime->now->ymd,
-        due_date => DateTime->now->add(days => $due_days)->ymd,
-        subject => "System Error: " . substr($error_msg, 0, 100),
-        description => qq{
-AUTOMATED TODO: System Error Detected
-
-Error Details:
-- Time: } . DateTime->now->strftime('%Y-%m-%d %H:%M:%S') . qq{
-- User: $user
-- Site: $sitename
-- URL: $url
-- Record ID: $record_id
-
-Error Message:
-$error_msg
-
-This todo was automatically created by the error handling system.
-Please investigate and resolve this issue.
-        },
-        priority => $priority,
-        status => 1, # New
-        owner => 'admin',
-        developer => 'admin',
-        reporter => 'System',
-        username_of_poster => 'Error_System',
-        last_mod_by => 'Error_System',
-        user_id => 1, # Default admin user
-        estimated_man_hours => $is_critical ? 4 : 2,
-        comments => "Auto-generated from system error. Priority: " . ($is_critical ? "CRITICAL" : "Normal"),
-    };
+        date_time_posted => DateTime->now,
+        posted_by => $current_user,
+    });
     
-    # Create the error todo
-    my $result = $self->_create_todo_from_data($c, $todo_data, 'error_system');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
+        "Todo created via API: ID=$todo->id, Subject=$params->{subject}, Project=$project_id");
     
-    if ($result->{success}) {
-        $self->logging->log_with_details(
-            $c, 'info', __FILE__, __LINE__, 'create_error_todo.success',
-            "Error todo created successfully with ID: " . $result->{record_id} . 
-            " for error: " . substr($error_msg, 0, 50)
-        );
-    } else {
-        $self->logging->log_with_details(
-            $c, 'warn', __FILE__, __LINE__, 'create_error_todo.failure',
-            "Failed to create error todo: " . $result->{error}
-        );
+    $self->_api_success($c, 'Todo created successfully', {
+        todo_id => $todo->id,
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_read
+
+GET /api/todo/:id - Retrieve a single todo by ID
+=cut
+
+sub api_todo_read :Local :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
     }
     
-    return $result;
+    $self->_api_success($c, 'Todo retrieved', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_update
+
+PUT /api/todo/:id - Update a todo (partial update allowed)
+=cut
+
+sub api_todo_update :Path('/api/todo/update') :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
+    }
+    
+    my $update_data = {};
+    my %allowed_fields = map { $_ => 1 } qw(status priority description assigned_to);
+    
+    foreach my $field (keys %$params) {
+        if ($allowed_fields{$field}) {
+            $update_data->{$field} = $params->{$field};
+        }
+    }
+    
+    if (keys %$update_data) {
+        $todo->update($update_data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
+            "Todo updated via API: ID=$todo_id, Fields=" . join(',', keys %$update_data));
+    }
+    
+    $self->_api_success($c, 'Todo updated successfully', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_project_read
+
+GET /api/project/:id - Retrieve a project by ID
+=cut
+
+sub api_project_read :Path('/api/project') :Args(1) {
+    my ($self, $c, $project_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+    
+    unless ($project) {
+        $self->_api_error($c, "Project not found: $project_id", 'not_found', 404);
+    }
+    
+    $self->_api_success($c, 'Project retrieved', {
+        project => $self->_project_to_hash($project)
+    });
+}
+
+=head2 Helper: _todo_to_hash
+
+Convert Todo DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _todo_to_hash {
+    my ($self, $todo) = @_;
+    
+    return {
+        id => $todo->id,
+        subject => $todo->subject,
+        description => $todo->description,
+        project_id => $todo->project_id,
+        start_date => $todo->start_date,
+        due_date => $todo->due_date,
+        priority => $todo->priority,
+        status => $todo->status,
+        assigned_to => $todo->assigned_to,
+        sitename => $todo->sitename,
+        date_time_posted => $todo->date_time_posted ? $todo->date_time_posted->iso8601 : undef,
+        posted_by => $todo->posted_by,
+        accumulative_time => $todo->accumulative_time || 0,
+    };
+}
+
+=head2 Helper: _project_to_hash
+
+Convert Project DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _project_to_hash {
+    my ($self, $project) = @_;
+    
+    return {
+        id => $project->id,
+        name => $project->name,
+        project_code => $project->project_code,
+        description => $project->description,
+        sitename => $project->sitename,
+        status => $project->status,
+    };
 }
 
 1;

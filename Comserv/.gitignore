@@ -5,14 +5,6 @@ workspace.xml
 .idea/vcs.xml
 /db_config.json
 
-# Application runtime directories and files
-local/
-logs/
-../logs/
-
-# Backup files created by the application
-*.bak
-root/static/config/theme_mappings.json.bak
-
-# Application backup directory (not tracked to avoid blocking updates)
-backups/
+# AI session history and working files (not tracked)
+root/Documentation/session_history/
+*.md
