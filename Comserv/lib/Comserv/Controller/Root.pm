@@ -262,10 +262,19 @@ sub auto :Private {
                                     push @$user_roles, 'admin';
                                     $c->session->{roles} = $user_roles;
                                 }
+                                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+                                    "UserSiteRole admin granted for $username on site $site_name_check");
                             }
+                        } else {
+                            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                                "Site not found in Site table: $site_name_check (user: $username)");
                         }
                     }
                 };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+                        "UserSiteRole check failed for $username: $@");
+                }
             }
         }
         
