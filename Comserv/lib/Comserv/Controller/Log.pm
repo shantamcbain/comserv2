@@ -82,6 +82,13 @@ sub index :Path('/log') :Args(0) {
 sub details :Path('/log/details') :Args(0) {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_details')) {
+        $c->flash->{error_msg} = 'You must be an administrator to view log details.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $record_id = $c->request->body_parameters->{record_id};
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
@@ -104,6 +111,13 @@ sub details :Path('/log/details') :Args(0) {
 }
 sub update :Path('/log/update') :Args(0) {
     my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'log_update')) {
+        $c->flash->{error_msg} = 'You must be an administrator to update log entries.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
     # Get the record_id from the form data
     my $record_id = $c->request->body_parameters->{record_id};

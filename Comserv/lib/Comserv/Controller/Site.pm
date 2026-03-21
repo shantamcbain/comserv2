@@ -511,6 +511,13 @@ sub delete :Path('delete') :Args(0) {
 sub modify :Local {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'site_modify')) {
+        $c->flash->{error_msg} = 'You must be an administrator to modify sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Get the site id from the query parameters
     my $site_id = $c->request->query_parameters->{id};
 
