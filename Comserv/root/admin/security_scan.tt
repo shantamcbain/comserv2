@@ -9,21 +9,25 @@
 %]
 
 <style>
-    .finding-PROTECTED       { background-color: #d4edda; }
-    .finding-FORBIDDEN       { background-color: #d4edda; }
-    .finding-EXPOSED_SENSITIVE { background-color: #f8d7da; font-weight: bold; }
-    .finding-LEAK_STACK_TRACE  { background-color: #f5c6cb; font-weight: bold; }
-    .finding-LINK_LEAK         { background-color: #fff3cd; font-weight: bold; }
-    .finding-SERVER_ERROR      { background-color: #ffeeba; }
-    .finding-NOT_FOUND         { background-color: #e2e3e5; color: #6c757d; }
-    .scan-output { font-family: monospace; font-size: 0.78em; background: #1a1a1a; color: #00ff00; padding: 1em; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
-    .badge-EXPOSED_SENSITIVE { background-color: #dc3545; color: #fff; }
-    .badge-LEAK_STACK_TRACE  { background-color: #c82333; color: #fff; }
-    .badge-LINK_LEAK         { background-color: #e0a800; color: #212529; }
-    .badge-SERVER_ERROR      { background-color: #fd7e14; color: #fff; }
-    .badge-PROTECTED         { background-color: #28a745; color: #fff; }
-    .badge-FORBIDDEN         { background-color: #28a745; color: #fff; }
-    .badge-NOT_FOUND         { background-color: #6c757d; color: #fff; }
+    .finding-PROTECTED            { background-color: #d4edda; }
+    .finding-FORBIDDEN            { background-color: #d4edda; }
+    .finding-OK_PUBLIC            { background-color: #f8f9fa; }
+    .finding-EXPOSED_SENSITIVE    { background-color: #f8d7da; font-weight: bold; }
+    .finding-EXPOSED_POST_ACCEPTED{ background-color: #f8d7da; font-weight: bold; }
+    .finding-LEAK_STACK_TRACE     { background-color: #f5c6cb; font-weight: bold; }
+    .finding-LINK_LEAK            { background-color: #fff3cd; font-weight: bold; }
+    .finding-SERVER_ERROR         { background-color: #ffeeba; }
+    .finding-NOT_FOUND            { background-color: #e2e3e5; color: #6c757d; }
+    .scan-output { font-family: monospace; font-size: 0.78em; background: #1a1a1a; color: #00ff00; padding: 1em; border-radius: 4px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
+    .badge-EXPOSED_SENSITIVE     { background-color: #dc3545; color: #fff; }
+    .badge-EXPOSED_POST_ACCEPTED { background-color: #dc3545; color: #fff; }
+    .badge-LEAK_STACK_TRACE      { background-color: #c82333; color: #fff; }
+    .badge-LINK_LEAK             { background-color: #e0a800; color: #212529; }
+    .badge-SERVER_ERROR          { background-color: #fd7e14; color: #fff; }
+    .badge-PROTECTED             { background-color: #28a745; color: #fff; }
+    .badge-FORBIDDEN             { background-color: #28a745; color: #fff; }
+    .badge-OK_PUBLIC             { background-color: #6c757d; color: #fff; }
+    .badge-NOT_FOUND             { background-color: #adb5bd; color: #fff; }
 </style>
 
 <div class="container">
@@ -82,11 +86,12 @@
             &nbsp;Site: <code>[% scan_site | html %]</code>
         </div>
         <div class="card-body">
-            [% SET critical = 0; SET warning = 0; SET ok = 0 %]
+            [% SET critical = 0; SET warning = 0; SET ok = 0; SET scanned = 0 %]
             [% FOREACH f IN scan_results %]
-                [% IF f.result == 'EXPOSED_SENSITIVE' || f.result == 'LEAK_STACK_TRACE' %][% critical = critical + 1 %][% END %]
+                [% IF f.result == 'EXPOSED_SENSITIVE' || f.result == 'LEAK_STACK_TRACE' || f.result == 'EXPOSED_POST_ACCEPTED' %][% critical = critical + 1 %][% END %]
                 [% IF f.result == 'LINK_LEAK' || f.result == 'SERVER_ERROR' %][% warning = warning + 1 %][% END %]
                 [% IF f.result == 'PROTECTED' || f.result == 'FORBIDDEN' %][% ok = ok + 1 %][% END %]
+                [% IF f.result == 'OK_PUBLIC' || f.result == 'NOT_FOUND' %][% scanned = scanned + 1 %][% END %]
             [% END %]
 
             <div class="row mb-3">
@@ -107,19 +112,21 @@
                 </div>
                 <div class="col-md-3">
                     <div class="card text-white bg-secondary text-center p-2">
-                        <h3>[% scan_results.size %]</h3><small>Total Findings</small>
+                        <h3>[% scanned %]</h3><small>Scanned OK / 404</small>
                     </div>
                 </div>
             </div>
 
             <div class="mb-2">
                 <strong>Filter:</strong>
-                <button class="btn btn-sm btn-danger ml-1"   onclick="filterTable('EXPOSED_SENSITIVE')">Exposed</button>
-                <button class="btn btn-sm btn-danger ml-1"   onclick="filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
-                <button class="btn btn-sm btn-warning ml-1"  onclick="filterTable('LINK_LEAK')">Link Leak</button>
-                <button class="btn btn-sm btn-secondary ml-1" onclick="filterTable('SERVER_ERROR')">Server Error</button>
-                <button class="btn btn-sm btn-success ml-1"  onclick="filterTable('PROTECTED')">Protected</button>
-                <button class="btn btn-sm btn-light ml-1"    onclick="filterTable('')">All</button>
+                <button class="btn btn-sm btn-danger ml-1"    onclick="filterTable('EXPOSED')">Exposed</button>
+                <button class="btn btn-sm btn-danger ml-1"    onclick="filterTable('LEAK_STACK_TRACE')">Stack Trace</button>
+                <button class="btn btn-sm btn-warning ml-1"   onclick="filterTable('LINK_LEAK')">Link Leak</button>
+                <button class="btn btn-sm btn-warning ml-1"   onclick="filterTable('SERVER_ERROR')">Server Error</button>
+                <button class="btn btn-sm btn-success ml-1"   onclick="filterTable('PROTECTED')">Protected</button>
+                <button class="btn btn-sm btn-secondary ml-1" onclick="filterTable('OK_PUBLIC')">Scanned OK</button>
+                <button class="btn btn-sm btn-light ml-1"     onclick="filterTable('NOT_FOUND')">404</button>
+                <button class="btn btn-sm btn-dark ml-1"      onclick="filterTable('')">All</button>
             </div>
 
             <div class="table-responsive">
@@ -188,12 +195,12 @@ function applyPreset(sel) {
 function filterTable(result) {
     var rows = document.querySelectorAll('#findings-table tbody tr');
     rows.forEach(function(row) {
-        if (!result || row.getAttribute('data-result') === result ||
-            (result === 'PROTECTED' && (row.getAttribute('data-result') === 'PROTECTED' || row.getAttribute('data-result') === 'FORBIDDEN'))) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
+        var r = row.getAttribute('data-result');
+        var show = !result
+            || r === result
+            || (result === 'PROTECTED' && (r === 'PROTECTED' || r === 'FORBIDDEN'))
+            || (result === 'EXPOSED'   && r.indexOf('EXPOSED') === 0);
+        row.style.display = show ? '' : 'none';
     });
 }
 </script>
