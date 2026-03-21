@@ -480,7 +480,12 @@
         [% ELSE %]
         [% SET projects_rs = c.model('DBEncy').resultset('Project').search({sitename => view_sitename}, { order_by => ['sitename','name'] }) %]
         [% END %]
-        [% SET total_projects = projects_rs.count %]
+        [% SET total_projects = projects_rs ? projects_rs.count : 0 %]
+        [% IF c.session.debug_mode == 1 %]
+        <div style="background:#e8f4f8;border:1px solid #aaa;padding:6px 10px;font-size:0.78em;border-radius:3px;margin-bottom:8px;">
+            DEBUG: is_csc=[% is_csc %] filter_site=[% filter_site %] view_sitename=[% view_sitename %] total_projects=[% total_projects %]
+        </div>
+        [% END %]
 
         [% IF total_projects > 0 %]
         [% SET current_site_label = '' %]
@@ -588,14 +593,18 @@
 
         [% ELSE %]
         <div style="text-align:center;padding:40px;color:var(--text-muted-color);">
-            <p>No projects found for <strong>[% view_sitename %]</strong>.</p>
+            <p>No projects found for <strong>[% IF is_csc && !filter_site %]All Sites[% ELSE %][% view_sitename %][% END %]</strong>.</p>
+            <p style="font-size:0.82em;margin-top:4px;">(is_csc=[% is_csc %] filter=[% filter_site || 'none' %] count=[% total_projects %])</p>
             [% IF is_admin %]
+            <p>You can add projects at <a href="/project/addproject" style="color:var(--primary-color);">/project/addproject</a> or create a plan:</p>
             <a href="/admin/plan/create" style="background:var(--primary-color);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;">Create the first plan</a>
             [% END %]
         </div>
         [% END %]
         [% CATCH %]
-        <div style="background:#fee;border:1px solid #f88;padding:10px;border-radius:4px;font-size:0.85em;">Error loading projects: [% error %]</div>
+        <div style="background:#fee;border:1px solid #f88;padding:10px;border-radius:4px;font-size:0.85em;">
+            ⚠️ Error loading projects: <strong>[% error.type %]</strong> — [% error.info %]
+        </div>
         [% END %]
 
         [% IF is_csc %]
