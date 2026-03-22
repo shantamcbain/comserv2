@@ -94,6 +94,24 @@
                             </div>
                             
                             <div class="form-field">
+                                <label for="sitename">Site:</label>
+                                [% IF all_sites && all_sites.size > 0 %]
+                                <select id="sitename" name="sitename" class="form-input">
+                                    [% FOR site IN all_sites %]
+                                    <option value="[% site.name | html %]"
+                                        [% IF workshop.sitename == site.name %]selected[% END %]>
+                                        [% site.name | html %]
+                                    </option>
+                                    [% END %]
+                                </select>
+                                [% ELSE %]
+                                <input type="text" id="sitename" name="sitename" class="form-input"
+                                       value="[% workshop.sitename | html %]">
+                                [% END %]
+                                <small>The site this workshop belongs to.</small>
+                            </div>
+                            
+                            <div class="form-field">
                                 <label for="share">Site Sharing:</label>
                                 <select id="share" name="share" class="form-input">
                                     <option value="private" [% IF workshop.share == 'private' %]selected[% END %]>My Site Only</option>
