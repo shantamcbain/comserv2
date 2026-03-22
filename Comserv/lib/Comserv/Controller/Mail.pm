@@ -544,17 +544,26 @@ sub test_smtp_config :Local {
         );
         
         if ($smtp) {
-            # Try to authenticate if credentials are provided
-            if ($config{smtp_user} && $config{smtp_password}) {
-                if ($smtp->auth($config{smtp_user}, $config{smtp_password})) {
+            # Check both smtp_user and legacy smtp_username key
+            my $smtp_user = $config{smtp_user} || $config{smtp_username} || '';
+            my $smtp_pass = $config{smtp_password} || '';
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_smtp_config',
+                "Auth check: user='" . ($smtp_user ? $smtp_user : '(none)') . "' password=" . ($smtp_pass ? '(set)' : '(not set)'));
+
+            if ($smtp_user && $smtp_pass) {
+                require Authen::SASL;
+                if ($smtp->auth($smtp_user, $smtp_pass)) {
                     $test_result->{success} = 1;
-                    $test_result->{message} = "Successfully connected and authenticated to SMTP server";
+                    $test_result->{message} = "Connected and authenticated as $smtp_user on $config{smtp_host}:$config{smtp_port}";
                 } else {
-                    $test_result->{message} = "Connected but authentication failed: " . $smtp->message();
+                    $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} but AUTH failed for $smtp_user: " . $smtp->message();
                 }
+            } elsif ($smtp_user && !$smtp_pass) {
+                $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} but password not set for $smtp_user — save the password first";
             } else {
                 $test_result->{success} = 1;
-                $test_result->{message} = "Successfully connected to SMTP server (authentication not configured)";
+                $test_result->{message} = "Connected to $config{smtp_host}:$config{smtp_port} (no credentials configured — OK for PMG relay)";
             }
             $smtp->quit();
         } else {
@@ -702,6 +711,17 @@ sub mail_admin_dashboard :Local {
             
             @smtp_servers = sort { $a->{site_id} <=> $b->{site_id} } values %servers_by_site;
             $mail_stats->{active_servers} = scalar @smtp_servers;
+
+            # Auto-migrate legacy 'smtp_username' key → 'smtp_user' in DB
+            eval {
+                my $migrated = $dbh->do(
+                    "UPDATE site_config SET config_key='smtp_user' WHERE config_key='smtp_username'"
+                );
+                if ($migrated && $migrated > 0) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
+                        "Migrated $migrated row(s): smtp_username → smtp_user in site_config");
+                }
+            };
             
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'mail_admin_dashboard',
                 "Loaded $row_count SMTP config rows, " . scalar(@smtp_servers) . " servers total");
