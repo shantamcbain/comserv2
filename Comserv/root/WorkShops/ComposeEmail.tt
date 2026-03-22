@@ -4,11 +4,11 @@
    roles = "admin,workshop_leader"
    TemplateType = "Application"
    category = "WorkShops"
-   page_version = "0.04"
+   page_version = "0.05"
    last_updated = "2026-03-22"
 %]
 
-[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.04 2026/03/22 shanta Exp shanta' %]
+[% PageVersion = 'WorkShops/ComposeEmail.tt,v 0.05 2026/03/22 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     <div class="debug-info">PageVersion: [% PageVersion %]</div>
 [% END %]
@@ -30,10 +30,11 @@
             [% END %]
             
             <div class="content-section">
-                <p><strong>Recipients:</strong> [% recipient_count %] registered participant(s)</p>
+                <p><strong>Primary Workshop:</strong> [% workshop.title | html %]
+                   &mdash; [% recipient_count %] registered participant(s)</p>
             </div>
-            
-            [% IF recipient_count == 0 %]
+
+            [% IF recipient_count == 0 && leader_workshops.size == 0 %]
             <div class="warning">
                 <p>There are no registered participants to email.</p>
             </div>
@@ -84,8 +85,29 @@
             [% END %]
 
             <div class="form-container">
-                <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form">
-                    
+                <form method="POST" action="/workshop/send_email/[% workshop.id %]" class="app-form" id="compose-form">
+
+                    [% IF leader_workshops.size > 0 %]
+                    <div class="form-section">
+                        <h3>Send To</h3>
+                        <label style="display:block;margin-bottom:4px;">
+                            <input type="checkbox" checked disabled>
+                            <strong>[% workshop.title | html %]</strong>
+                            <small>([% recipient_count %] registered) &mdash; always included</small>
+                        </label>
+                        [% FOR ws IN leader_workshops %]
+                        [% ws_count = ws.participants.search({ status => 'registered' }).count %]
+                        <label style="display:block;margin-bottom:4px;">
+                            <input type="checkbox" name="extra_workshop_ids" value="[% ws.id %]"
+                                   class="extra-ws-check" data-count="[% ws_count %]">
+                            [% ws.title | html %]
+                            <small>([% ws_count %] registered)</small>
+                        </label>
+                        [% END %]
+                        <p style="margin-top:8px;"><strong>Approximate total:</strong> <span id="total-count">[% recipient_count %]</span> recipients (duplicates removed at send time)</p>
+                    </div>
+                    [% END %]
+
                     <div class="form-section">
                         <div class="form-row">
                             <div class="form-field">
@@ -99,7 +121,7 @@
                             <div class="form-field">
                                 <label for="body">Message:</label>
                                 <textarea id="body" name="body" rows="15" cols="80" class="form-input" required>[% form_data.body OR '' %]</textarea>
-                                <small>This message will be sent to all registered participants.</small>
+                                <small>This message will be sent to all registered participants of selected workshops.</small>
                             </div>
                         </div>
                     </div>
@@ -127,6 +149,21 @@
                 document.getElementById('subject').value = opt.getAttribute('data-subject');
                 document.getElementById('body').value    = opt.getAttribute('data-body');
             }
+
+            var baseCount = [% recipient_count %];
+            function updateTotal() {
+                var total = baseCount;
+                document.querySelectorAll('.extra-ws-check').forEach(function(cb) {
+                    if (cb.checked) total += parseInt(cb.getAttribute('data-count') || 0, 10);
+                });
+                var el = document.getElementById('total-count');
+                if (el) el.textContent = total;
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('.extra-ws-check').forEach(function(cb) {
+                    cb.addEventListener('change', updateTotal);
+                });
+            });
             </script>
             
             [% END %]
