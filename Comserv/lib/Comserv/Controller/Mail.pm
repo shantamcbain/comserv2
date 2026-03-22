@@ -757,8 +757,19 @@ sub send_test_email :Local {
         return;
     }
 
-    my $site_id = $c->req->param('site_id') // $c->session->{site_id};
-    my $to      = $c->req->param('to')      // '';
+    my $site_id = $c->req->param('site_id') || $c->session->{site_id} || $c->stash->{site_id};
+
+    # If still no site_id, resolve from SiteName in stash
+    if (!$site_id && $c->stash->{SiteName}) {
+        eval {
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $c->stash->{SiteName} });
+            $site_id = $site->id if $site;
+        };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+            "Resolved site_id=" . ($site_id // 'undef') . " from SiteName=" . $c->stash->{SiteName});
+    }
+
+    my $to = $c->req->param('to') || '';
 
     unless ($to) {
         $c->flash->{error_msg} = 'Please provide a recipient email address.';
@@ -769,9 +780,14 @@ sub send_test_email :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
         "Admin test-send requested: to=$to site_id=" . ($site_id // 'undef'));
 
+    my $smtp_config = $c->model('Mail')->get_smtp_config($c, $site_id);
+    my $via = $smtp_config
+        ? ($smtp_config->{host} . ':' . $smtp_config->{port} . ' (' . ($smtp_config->{user} || 'no-auth') . ')')
+        : 'fallback (no DB config)';
+
     my $body = "This is a test email from the Comserv Unified Mail System.\n\n"
-             . "Sent via: PMG relay (192.168.1.128:25)\n"
-             . "Site ID: " . ($site_id // 'default fallback') . "\n"
+             . "Sent via: $via\n"
+             . "Site ID: " . ($site_id // 'none — used fallback') . "\n"
              . "Time: " . scalar(localtime()) . "\n\n"
              . "If you received this, the mail path is working correctly.";
 
