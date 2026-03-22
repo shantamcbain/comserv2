@@ -457,7 +457,18 @@ sub get_smtp_config {
             $config{$cfg->config_key} = $cfg->config_value;
         }
     }
-    
+
+    # Force all outbound mail through the PMG relay — never connect to external SMTP servers directly
+    if ($config{smtp_host} && $config{smtp_host} !~ /^192\.168\.1\.(128|129)$/) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+            "Redirecting smtp_host '$config{smtp_host}' through PMG relay 192.168.1.128");
+        $config{smtp_host}     = '192.168.1.128';
+        $config{smtp_port}     = 25;
+        $config{smtp_ssl}      = 0;
+        $config{smtp_username} = '';
+        $config{smtp_password} = '';
+    }
+
     return \%config;
 }
 
