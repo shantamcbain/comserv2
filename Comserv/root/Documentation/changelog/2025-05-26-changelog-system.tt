@@ -1,0 +1,174 @@
+[% PageVersion = 'Comserv/root/Documentation/changelog/2025-05-26-changelog-system.tt,v 0.01 2025/06/10 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Changelog System Improvements' %]
+
+<!-- Documentation page for 2025-05-26-changelog-system -->
+<div class="documentation-content">
+
+
+
+
+<!-- Documentation CSS is now included in the theme system -->
+
+<div class="markdown-content">
+
+
+**File:** /home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog/2025-05-26-changelog-system.md  
+
+**Date:** May 26, 2025  
+
+**Author:** System Administrator  
+
+**Status:** Implemented
+
+
+
+<h2>Overview</h2>
+
+
+
+This document details the improvements made to the changelog system to ensure consistent display of changelog entries, proper sorting by date, and consolidation of changelog files into a single directory.
+
+
+
+<h2>Issues Addressed</h2>
+
+
+
+<ol><li>**Inconsistent Changelog Display**: Changelog entries were not being properly displayed in the documentation system</li></ol>
+
+<ol><li>**Scattered Changelog Files**: Changelog entries were scattered across multiple directories</li></ol>
+
+<ol><li>**Sorting Issues**: Changelog entries were not being properly sorted by date</li></ol>
+
+<ol><li>**Missing Entries**: Some changelog entries were not being included in the documentation system</li></ol>
+
+
+
+<h2>Changes Made</h2>
+
+
+
+<h3>1. Fixed the all_changelog Controller Method</h3>
+
+
+
+<ul><li>Removed references to non-existent methods (<code>_prepare_categories_for_user</code> and <code>_prepare_structured_pages</code>)</li></ul>
+
+<ul><li>Implemented proper user role and page filtering based on the index method</li></ul>
+
+<ul><li>Added proper stash variables for the template</li></ul>
+
+
+
+<h3>2. Consolidated Changelog Entries</h3>
+
+
+
+<ul><li>Moved changelog entries from the <code>docs</code> directory to the <code>Documentation/changelog</code> directory</li></ul>
+
+<ul><li>Created new changelog entries for items mentioned in the main CHANGELOG.md file</li></ul>
+
+<ul><li>Standardized the naming convention for changelog files (YYYY-MM-DD-description.md)</li></ul>
+
+
+
+<h3>3. Improved Changelog Templates</h3>
+
+
+
+<h4>all_changelog.tt</h4>
+
+<ul><li>Updated to find all pages in the Documentation/changelog directory</li></ul>
+
+<ul><li>Added code to extract dates from filenames for proper sorting</li></ul>
+
+<ul><li>Implemented sorting by date in reverse order (newest first)</li></ul>
+
+<ul><li>Enhanced display of all changelog entries with proper formatting</li></ul>
+
+
+
+<h4>changelog.tt</h4>
+
+<ul><li>Updated to use the same approach to find and sort changelog entries</li></ul>
+
+<ul><li>Modified to display only the 5 most recent entries</li></ul>
+
+<ul><li>Added a message when no entries are available</li></ul>
+
+
+
+<h4>index.tt (Recent Updates Section)</h4>
+
+<ul><li>Updated to use the same approach for finding and sorting changelog entries</li></ul>
+
+<ul><li>Modified to display only the 5 most recent entries</li></ul>
+
+<ul><li>Added a message when no entries are available</li></ul>
+
+
+
+<h2>Benefits</h2>
+
+
+
+<ol><li>**Consistent Display**: All changelog entries are now displayed consistently across the system</li></ol>
+
+<ol><li>**Proper Sorting**: Entries are sorted by date in the filename (YYYY-MM-DD format)</li></ol>
+
+<ol><li>**Centralized Storage**: All changelog entries are now stored in a single directory</li></ol>
+
+<ol><li>**Improved User Experience**: Users can easily find and read changelog entries</li></ol>
+
+<ol><li>**Better Organization**: The changelog system is now more organized and maintainable</li></ol>
+
+
+
+<h2>Testing</h2>
+
+
+
+The changes were tested to ensure:
+
+
+
+<ol><li>The all_changelog page displays all changelog entries sorted by date</li></ol>
+
+<ol><li>The changelog section on the documentation index shows the 5 most recent entries</li></ol>
+
+<ol><li>The Recent Updates section on the index page shows the 5 most recent entries</li></ol>
+
+<ol><li>New changelog entries are properly detected and displayed</li></ol>
+
+<ol><li>Date extraction and sorting works correctly for all filename formats</li></ol>
+
+
+
+<h2>Affected Files</h2>
+
+
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/all_changelog.tt</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/changelog.tt</code></li></ul>
+
+<ul><li><code>/home/shanta/PycharmProjects/comserv2/Comserv/root/Documentation/index.tt</code></li></ul>
+
+
+
+<h2>Related Documentation</h2>
+
+
+
+<ul><li><a href="/Documentation/documentation_system_overview">Documentation System Overview</a></li></ul>
+
+<ul><li><a href="/Documentation/documentation_workflow">Documentation Workflow</a></li></ul>
+
+
+</div>
