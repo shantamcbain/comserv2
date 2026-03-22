@@ -1,9 +1,6 @@
 package Comserv::Model::Mail;
 use Moose;
 use namespace::autoclean;
-use Email::Simple;
-use Email::Sender::Simple qw(sendmail);
-use Email::Sender::Transport::SMTP;
 use Try::Tiny;
 use LWP::UserAgent;
 use HTTP::Request;
@@ -15,260 +12,244 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
-# Enhanced email sending with detailed logging and error handling
 sub send_email {
-    my ($self, $c, $to, $subject, $body, $site_id) = @_;
-    
-    # Use site_id from parameter or session
-    $site_id //= $c->session->{site_id};
-    
-    # Log the email attempt
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
-        "Attempting to send email to $to for site_id $site_id");
+    my ($self, $c, $to, $subject, $body, $site_id_or_name, $opts) = @_;
+    $opts //= {};
 
-    # Retrieve SMTP configuration from the database
-    my $smtp_config = $self->get_smtp_config($c, $site_id);
+    my $site_identifier = $site_id_or_name
+        // $c->session->{SiteName}
+        // $c->session->{site_id};
 
-    # Check if SMTP configuration is available
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Attempting to send email to $to (site: " . ($site_identifier // 'undef') . ")");
+
+    my $smtp_config = $self->get_smtp_config($c, $site_identifier);
+
     unless ($smtp_config) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
-            "No SMTP config for site_id $site_id");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+            "No SMTP config available for site: " . ($site_identifier // 'undef'));
         $c->stash->{debug_msg} = "Missing SMTP configuration";
         return;
     }
 
-    # Use Net::SMTP for more reliable email sending
     require Net::SMTP;
     require MIME::Lite;
-    require Authen::SASL;
-    
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-        "Using Net::SMTP for email sending");
-    
-    # Create a MIME::Lite message
+
+    my $from_addr = $opts->{from} || $smtp_config->{from};
+    my $reply_to  = $opts->{reply_to};
+
     my $msg = MIME::Lite->new(
-        From    => $smtp_config->{from},
+        From    => $from_addr,
         To      => $to,
         Subject => $subject,
         Type    => 'text/plain',
         Data    => $body
     );
-    
+    $msg->add('Reply-To' => $reply_to) if $reply_to;
+
     try {
-        # Log SMTP settings for debugging
+        my $ssl_setting = lc($smtp_config->{ssl} // '');
+
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "SMTP settings: " . $smtp_config->{host} . ":" . $smtp_config->{port} . 
-            ", SSL: " . ($smtp_config->{ssl} // 'none'));
-        
-        # Connect to the SMTP server with debug enabled
-        my $smtp = Net::SMTP->new(
-            $smtp_config->{host},
-            Port => $smtp_config->{port},
-            Debug => 1,
-            Timeout => 30
+            "SMTP: " . $smtp_config->{host} . ":" . $smtp_config->{port} . " ssl=" . ($ssl_setting || 'none'));
+
+        my %smtp_args = (
+            Port    => $smtp_config->{port},
+            Debug   => 1,
+            Timeout => 30,
         );
-        
+
+        if ($ssl_setting eq 'ssl') {
+            $smtp_args{SSL} = 1;
+        }
+
+        my $smtp = Net::SMTP->new($smtp_config->{host}, %smtp_args);
         unless ($smtp) {
             die "Could not connect to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port} . ": $!";
         }
-        
+
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-            "Connected to SMTP server " . $smtp_config->{host} . ":" . $smtp_config->{port});
-        
-        # Start TLS if needed
-        my $ssl_setting = $smtp_config->{ssl} // '';
-        if ($ssl_setting eq 'starttls' || $ssl_setting eq '1') {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "Starting TLS");
+            "Connected to SMTP server");
+
+        if ($ssl_setting eq 'starttls') {
             $smtp->starttls() or die "STARTTLS failed: " . $smtp->message();
         }
-        
-        # Authenticate if credentials are provided
+
         if ($smtp_config->{username} && $smtp_config->{password}) {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'send_email',
-                "Authenticating as " . $smtp_config->{username});
-            $smtp->auth($smtp_config->{username}, $smtp_config->{password}) 
+            require Authen::SASL;
+            $smtp->auth($smtp_config->{username}, $smtp_config->{password})
                 or die "Authentication failed: " . $smtp->message();
         }
-        
-        # Send the email
+
         $smtp->mail($smtp_config->{from}) or die "FROM failed: " . $smtp->message();
-        $smtp->to($to) or die "TO failed: " . $smtp->message();
-        $smtp->data() or die "DATA failed: " . $smtp->message();
+        $smtp->to($to)                    or die "TO failed: "   . $smtp->message();
+        $smtp->data()                     or die "DATA failed: " . $smtp->message();
         $smtp->datasend($msg->as_string()) or die "DATASEND failed: " . $smtp->message();
-        $smtp->dataend() or die "DATAEND failed: " . $smtp->message();
-        $smtp->quit() or die "QUIT failed: " . $smtp->message();
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email', 
+        $smtp->dataend()                  or die "DATAEND failed: " . $smtp->message();
+        $smtp->quit();
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
             "Email sent successfully to $to");
         return 1;
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
             "Failed to send email to $to: $_");
         $c->stash->{debug_msg} = "Email sending failed: $_";
         return;
     };
 }
 
-# Renamed from _get_smtp_config to get_smtp_config for better accessibility
 sub get_smtp_config {
-    my ($self, $c, $site_id) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-        "Retrieving SMTP config for site_id $site_id");
-    
-    # Use system database access through DBEncy model (database server connection)
+    my ($self, $c, $site_id_or_name) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
+        "Retrieving SMTP config for: " . ($site_id_or_name // 'undef'));
+
+    my $site_id;
+
+    if (defined $site_id_or_name && $site_id_or_name !~ /^\d+$/) {
+        eval {
+            my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $site_id_or_name });
+            $site_id = $site->id if $site;
+        };
+        if ($@ || !defined $site_id) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+                "Could not resolve site_name '$site_id_or_name' to site_id: " . ($@ // 'not found'));
+            return $self->_get_fallback_smtp_config($c, $site_id_or_name);
+        }
+    } else {
+        $site_id = $site_id_or_name;
+    }
+
+    unless (defined $site_id) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+            "No site_id available, using fallback");
+        return $self->_get_fallback_smtp_config($c, 'unknown');
+    }
+
     my $config_rs;
     eval {
         $config_rs = $c->model('DBEncy')->resultset('SiteConfig');
     };
-    
     if ($@) {
-        # Enhanced error logging for specific database issues
-        my $error_msg = $@;
-        
-        if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "CRITICAL: Database connection error - Table 'ency.site_config' doesn't exist. " .
-                "This indicates the mail system is connecting to localhost instead of production database server (192.168.1.198). " .
-                "Full error: $error_msg");
-        } elsif ($error_msg =~ /Can.*t connect to.*server/i) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "CRITICAL: Cannot connect to database server. " .
-                "Check if database server (192.168.1.198) is accessible. " .
-                "Full error: $error_msg");
-        } elsif ($error_msg =~ /Access denied for user/i) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "CRITICAL: Database authentication failed. " .
-                "Check database credentials in db_config.json or fallback settings. " .
-                "Full error: $error_msg");
-        } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "Database access error when retrieving SMTP config: $error_msg");
-        }
-        
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config',
+            "Database access error: $@");
         return $self->_get_fallback_smtp_config($c, $site_id);
     }
 
-    # Retrieve SMTP configuration for the given site_id
     my %smtp_config;
-    for my $key (qw(host port username password from ssl)) {
+    my %key_map = (
+        host     => 'smtp_host',
+        port     => 'smtp_port',
+        username => 'smtp_user',
+        password => 'smtp_password',
+        from     => 'smtp_from',
+        ssl      => 'smtp_ssl',
+    );
+
+    for my $internal_key (sort keys %key_map) {
+        my $db_key = $key_map{$internal_key};
         my $config;
         eval {
-            $config = $config_rs->find({ site_id => $site_id, config_key => "smtp_$key" });
+            $config = $config_rs->find({ site_id => $site_id, config_key => $db_key });
         };
-        
         if ($@) {
-            my $error_msg = $@;
-            
-            if ($error_msg =~ /Table.*ency\.site_config.*doesn.*exist/i) {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                    "CRITICAL: Table 'ency.site_config' doesn't exist when accessing smtp_$key for site_id $site_id. " .
-                    "Mail system is incorrectly connecting to localhost instead of production database server (192.168.1.198). " .
-                    "Full error: $error_msg");
-            } else {
-                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                    "Database error accessing smtp_$key for site_id $site_id: $error_msg");
-            }
-            
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config',
+                "Error accessing $db_key for site_id $site_id: $@");
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
-        # Skip optional fields like ssl
-        next if !$config && $key eq 'ssl';
-        
-        # Return fallback if any required config is missing
+
+        next if !$config && ($internal_key eq 'ssl' || $internal_key eq 'username' || $internal_key eq 'password');
+
         unless ($config) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_smtp_config', 
-                "Missing SMTP config key: smtp_$key for site_id $site_id");
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_smtp_config',
+                "Missing required SMTP config key: $db_key for site_id $site_id, using fallback");
             return $self->_get_fallback_smtp_config($c, $site_id);
         }
-        
-        $smtp_config{$key} = $config->config_value;
-        
-        # If host is mail1.ht.home, replace it with the mail server IP address
-        if ($key eq 'host' && $smtp_config{$key} eq 'mail1.ht.home') {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
-                "Replacing mail1.ht.home with mail server IP 192.168.1.129");
-            $smtp_config{$key} = '192.168.1.129';
-        }
+
+        $smtp_config{$internal_key} = $config->config_value;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_smtp_config',
         "Successfully retrieved SMTP config for site_id $site_id");
-    
+
     return \%smtp_config;
 }
 
-# Fallback SMTP configuration when database config is unavailable
 sub _get_fallback_smtp_config {
-    my ($self, $c, $site_id) = @_;
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Using fallback SMTP config for site_id $site_id");
-    
-    # Provide default mail server configuration
-    my $fallback_config = {
-        host => '192.168.1.129',  # Mail server IP
-        port => 587,
-        username => '',  # Will need to be configured
-        password => '',  # Will need to be configured  
-        from => "noreply\@comserv.local",
-        ssl => 'starttls'
+    my ($self, $c, $site_identifier) = @_;
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+        "Using fallback SMTP config for: " . ($site_identifier // 'undef'));
+
+    my $app_cfg = $c->config->{FallbackSMTP} // {};
+
+    return {
+        host     => $app_cfg->{host}     // 'harper.whc.ca',
+        port     => $app_cfg->{port}     // 465,
+        username => $app_cfg->{username} // '',
+        password => $app_cfg->{password} // '',
+        from     => $app_cfg->{from}     // $c->stash->{mail_from} // 'noreply@localhost',
+        ssl      => $app_cfg->{ssl}      // 'ssl',
     };
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Fallback config provided - mail server: " . $fallback_config->{host});
-    
-    return $fallback_config;
 }
 
-# New method to create mail accounts via Virtualmin API
+sub test_send_email {
+    my ($self, $c, $site_name, $to) = @_;
+
+    $to //= $c->session->{email} || 'admin@localhost';
+
+    return $self->send_email(
+        $c,
+        $to,
+        'SMTP Test Email',
+        "This is a test email from the Comserv mail system.\n\nIf you received this, SMTP is configured correctly for site: $site_name\n",
+        $site_name
+    );
+}
+
 sub create_mail_account {
     my ($self, $c, $email, $password, $domain) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account',
         "Creating mail account $email for domain $domain");
 
-    # Get Virtualmin credentials from configuration - use mail server IP
     my $virtualmin_host = $c->config->{Virtualmin}->{host} // '192.168.1.129';
     my $virtualmin_user = $c->config->{Virtualmin}->{username} // 'admin';
     my $virtualmin_pass = $c->config->{Virtualmin}->{password};
-    
+
     unless ($virtualmin_pass) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
             "Virtualmin password not configured");
         $c->stash->{debug_msg} = "Virtualmin API credentials not configured";
         return;
     }
 
-    # Use mail server IP address directly if hostname is mail1.ht.home
     if ($virtualmin_host eq 'mail1.ht.home') {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
-            "Replacing mail1.ht.home with mail server IP 192.168.1.129 for Virtualmin API");
         $virtualmin_host = '192.168.1.129';
     }
-    
-    my $ua = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });
+
+    my $ua  = LWP::UserAgent->new(ssl_opts => { verify_hostname => 0 });
     my $req = HTTP::Request->new(POST => "https://$virtualmin_host:10000/virtual-server/remote.cgi");
     $req->authorization_basic($virtualmin_user, $virtualmin_pass);
-    
+
     my ($user) = split(/@/, $email);
     $req->content("program=create-user&domain=$domain&user=$user&pass=$password&mail=on");
 
     try {
         my $res = $ua->request($req);
         if ($res->is_success) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account',
                 "Created mail account $email successfully");
             return 1;
         } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
                 "Failed to create mail account $email: " . $res->status_line);
             $c->stash->{debug_msg} = "Mail account creation failed: " . $res->status_line;
             return;
         }
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
             "Virtualmin API error: $_");
         $c->stash->{debug_msg} = "Virtualmin API error: $_";
         return;
