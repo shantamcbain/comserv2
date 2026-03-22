@@ -726,5 +726,62 @@ sub mail_admin_dashboard :Local {
     $c->forward($c->view('TT'));
 }
 
+sub send_test_email :Local {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->flash->{error_msg} = 'Access denied. Admin privileges required.';
+        $c->res->redirect($c->uri_for('/mail'));
+        return;
+    }
+
+    my $site_id = $c->req->param('site_id') // $c->session->{site_id};
+    my $to      = $c->req->param('to')      // '';
+
+    unless ($to) {
+        $c->flash->{error_msg} = 'Please provide a recipient email address.';
+        $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+        "Admin test-send requested: to=$to site_id=" . ($site_id // 'undef'));
+
+    my $body = "This is a test email from the Comserv Unified Mail System.\n\n"
+             . "Sent via: PMG relay (192.168.1.128:25)\n"
+             . "Site ID: " . ($site_id // 'default fallback') . "\n"
+             . "Time: " . scalar(localtime()) . "\n\n"
+             . "If you received this, the mail path is working correctly.";
+
+    my $result = eval {
+        $c->model('Mail')->send_email(
+            $c, $to,
+            'Comserv Mail System Test',
+            $body,
+            $site_id,
+        );
+    };
+    my $err = $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_test_email',
+            "send_test_email threw exception: $err");
+        $c->flash->{error_msg} = "Test email failed (exception): $err";
+    } elsif ($result) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_test_email',
+            "Test email sent successfully to $to");
+        $c->flash->{success_msg} = "Test email sent to $to — check your inbox and the application log for SMTP transcript.";
+    } else {
+        my $debug = $c->stash->{debug_msg} || 'see application log for SMTP transcript';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_test_email',
+            "Test email send returned failure for $to");
+        $c->flash->{error_msg} = "Test email failed to $to — $debug";
+    }
+
+    $c->res->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
