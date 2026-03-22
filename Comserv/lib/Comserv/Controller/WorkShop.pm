@@ -3418,7 +3418,7 @@ sub compose_email :Local :Args(1) {
     # Fetch ALL unique participants across primary + all leader workshops for the recipient checklist
     my @all_ids = ($id, map { $_->{workshop}->id } @leader_workshops);
     my @all_participants_rs = $c->model('DBEncy::Participant')->search(
-        { workshop_id => \@all_ids, status => 'registered' },
+        { workshop_id => \@all_ids, 'me.status' => 'registered' },
         { prefetch => 'user', order_by => [\'me.name', \'me.email'] }
     )->all;
 
@@ -3500,7 +3500,7 @@ sub send_email :Local :Args(1) {
         next unless $email && $email =~ /\@/;
         next if $seen_emails{lc $email}++;
         my $p = $c->model('DBEncy::Participant')->search(
-            { email => $email, status => 'registered' },
+            { 'me.email' => $email, 'me.status' => 'registered' },
             { rows => 1, prefetch => 'user' }
         )->first;
         my $name = '';
