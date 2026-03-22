@@ -30,7 +30,6 @@
             
             <div class="form-container">
                 <form method="POST" action="/workshop/edit/[% workshop.id %]" class="app-form">
-                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
                     
                     <div class="form-section">
                         <h3>Workshop Information</h3>
@@ -92,6 +91,24 @@
                             <div class="form-field">
                                 <label for="max_participants">Max Participants:</label>
                                 <input type="number" id="max_participants" name="max_participants" value="[% workshop.max_participants | html %]" class="form-input" min="1">
+                            </div>
+                            
+                            <div class="form-field">
+                                <label for="sitename">Site:</label>
+                                [% IF all_sites && all_sites.size > 0 %]
+                                <select id="sitename" name="sitename" class="form-input">
+                                    [% FOR site IN all_sites %]
+                                    <option value="[% site.name | html %]"
+                                        [% IF workshop.sitename == site.name %]selected[% END %]>
+                                        [% site.name | html %]
+                                    </option>
+                                    [% END %]
+                                </select>
+                                [% ELSE %]
+                                <input type="text" id="sitename" name="sitename" class="form-input"
+                                       value="[% workshop.sitename | html %]">
+                                [% END %]
+                                <small>The site this workshop belongs to.</small>
                             </div>
                             
                             <div class="form-field">
