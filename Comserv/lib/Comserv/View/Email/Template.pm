@@ -1,6 +1,7 @@
 package Comserv::View::Email::Template;
 use Moose;
 use namespace::autoclean;
+use Comserv::Util::Logging;
 
 # Array to store debug messages
 has '_debug_msgs' => (
@@ -16,21 +17,10 @@ sub add_debug_msg {
     return;
 }
 
-# Helper method for detailed logging
-sub log_with_details {
-    my ($self, $c, $message, $details) = @_;
-    
-    # Log the main message
-    $c->log->info($message);
-    
-    # Log each detail on a separate line
-    if ($details && ref($details) eq 'HASH') {
-        foreach my $key (sort keys %$details) {
-            my $value = defined $details->{$key} ? $details->{$key} : 'undef';
-            $c->log->info("  $key: $value");
-        }
-    }
-}
+has '_app_logging' => (
+    is      => 'ro',
+    default => sub { Comserv::Util::Logging->instance }
+);
 
 BEGIN {
     # Try to load the real module
@@ -68,49 +58,30 @@ BEGIN {
                     return $self->$orig($c, $args);
                 };
                 if ($@) {
-                    my $error = $@;
-                    $c->log->warn("Failed to send email using Catalyst::View::Email::Template: $error");
+                    my $error = "$@";
+                    $self->_app_logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Email::Template',
+                        "SMTP send failed (Catalyst::View::Email::Template): $error");
                     $self->add_debug_msg("Failed to send email: $error");
-                    # Fall through to the fallback implementation
+                    # Fall through to the fallback/log-only implementation
                 } else {
-                    # If it worked, return success
+                    $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
+                        "SMTP send OK via Catalyst::View::Email::Template to=" . ($args->{to} || '?'));
                     return 1;
                 }
             } else {
+                $self->_app_logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'Email::Template',
+                    "EMAIL NOT SENT - Catalyst::View::Email::Template not installed. Running in log-only mode.");
                 $self->add_debug_msg("Email template functionality not available: Catalyst::View::Email::Template not installed");
             }
-            
-            # Fallback implementation - just log the email details
-            $c->log->info("Email template would be sent (fallback mode):");
-            $c->log->info("  To: " . ($args->{to} || 'not specified'));
-            $c->log->info("  Subject: " . ($args->{subject} || 'not specified'));
-            $c->log->info("  Template: " . ($args->{template} || 'not specified'));
-            
-            # Try to render the template if Template Toolkit is available
-            my $body = '';
-            eval {
-                require Template;
-                $self->add_debug_msg("Template Toolkit loaded, attempting to render template");
-                my $tt = Template->new({
-                    INCLUDE_PATH => [
-                        eval { Comserv->path_to('root') } || 'root',
-                    ],
-                    WRAPPER => 'email/wrapper.tt',
-                });
-                my $template = $args->{template};
-                my $vars = $args->{template_vars} || {};
-                $tt->process($template, $vars, \$body) || die $tt->error();
-            };
-            if ($@) {
-                my $tt_error = $@;
-                $c->log->warn("Failed to render email template: $tt_error");
-                $self->add_debug_msg("Template rendering failed: $tt_error");
-                $body = "Template rendering failed. Template: " . ($args->{template} || 'not specified');
-            }
-            
-            $c->log->info("  Body: " . substr($body, 0, 100) . "...");
-            
-            return 1;  # Return success even if sending failed
+
+            # Fallback: log-only mode — email is NOT actually sent
+            $self->_app_logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'Email::Template',
+                "LOG-ONLY MODE: to=" . ($args->{to} || '?') .
+                " subject=" . ($args->{subject} || '?') .
+                " template=" . ($args->{template} || '?'));
+
+            # Return 0 so caller knows email was NOT sent
+            return 0;
         };
     }
 }
