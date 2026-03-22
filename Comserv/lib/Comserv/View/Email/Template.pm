@@ -3,20 +3,6 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 
-# Array to store debug messages
-has '_debug_msgs' => (
-    is => 'rw',
-    isa => 'ArrayRef',
-    default => sub { [] }
-);
-
-# Helper method to add debug messages
-sub add_debug_msg {
-    my ($self, $msg) = @_;
-    push @{$self->_debug_msgs}, $msg;
-    return;
-}
-
 has '_app_logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -39,49 +25,30 @@ BEGIN {
         # Override process method to add debugging and fallback
         # ONLY when the parent class is successfully loaded
         around 'process' => sub {
-            my ($orig, $self, $c, $args) = @_;
-            
-            # Store debug messages in stash for debugging
-            $c->stash->{debug_msg} = $self->_debug_msgs;
-            
-            # Log with details for debugging
-            $self->log_with_details($c, "Processing email template request", {
-                to => $args->{to},
-                subject => $args->{subject},
-                template => $args->{template},
-            });
-            
-            # If we're using the real module, try to use it
-            if ($self->can($orig)) {
-                eval {
-                    $self->add_debug_msg("Attempting to send email using Catalyst::View::Email::Template");
-                    return $self->$orig($c, $args);
-                };
-                if ($@) {
-                    my $error = "$@";
-                    $self->_app_logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Email::Template',
-                        "SMTP send failed (Catalyst::View::Email::Template): $error");
-                    $self->add_debug_msg("Failed to send email: $error");
-                    # Fall through to the fallback/log-only implementation
-                } else {
-                    $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
-                        "SMTP send OK via Catalyst::View::Email::Template to=" . ($args->{to} || '?'));
-                    return 1;
-                }
-            } else {
-                $self->_app_logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'Email::Template',
-                    "EMAIL NOT SENT - Catalyst::View::Email::Template not installed. Running in log-only mode.");
-                $self->add_debug_msg("Email template functionality not available: Catalyst::View::Email::Template not installed");
+            my ($orig, $self, $c) = @_;
+
+            # Email config comes from $c->stash->{email}
+            my $email_stash = $c->stash->{email} || {};
+            my $to       = $email_stash->{to}       || '?';
+            my $subject  = $email_stash->{subject}  || '?';
+            my $template = $email_stash->{template} || '?';
+
+            $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
+                "Processing email: to=$to subject=$subject template=$template");
+
+            eval {
+                $self->$orig($c);
+            };
+            if ($@) {
+                my $error = "$@";
+                $self->_app_logging->log_with_details($c, 'error', __FILE__, __LINE__, 'Email::Template',
+                    "SMTP send failed: to=$to subject=$subject error=$error");
+                # Do NOT re-throw — let caller's eval catch success/failure via return value
+                return 0;
             }
-
-            # Fallback: log-only mode — email is NOT actually sent
-            $self->_app_logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'Email::Template',
-                "LOG-ONLY MODE: to=" . ($args->{to} || '?') .
-                " subject=" . ($args->{subject} || '?') .
-                " template=" . ($args->{template} || '?'));
-
-            # Return 0 so caller knows email was NOT sent
-            return 0;
+            $self->_app_logging->log_with_details($c, 'info', __FILE__, __LINE__, 'Email::Template',
+                "SMTP send OK via PMG: to=$to subject=$subject");
+            return 1;
         };
     }
 }
@@ -100,7 +67,7 @@ if (__PACKAGE__->can('config')) {
         sender => {
             mailer => 'SMTP',
             mailer_args => {
-                host => 'localhost',
+                host => '192.168.1.128',  # PMG relay
                 port => 25,
             }
         },
