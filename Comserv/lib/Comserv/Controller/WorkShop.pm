@@ -3352,11 +3352,22 @@ sub compose_email :Local :Args(1) {
         workshop_id => $id,
         status => 'registered'
     })->count;
-    
+
+    my @workshop_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => $id, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+    my @global_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => undef, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
     $c->stash(
-        workshop => $workshop,
-        recipient_count => $registered_count,
-        template => 'WorkShops/ComposeEmail.tt',
+        workshop           => $workshop,
+        recipient_count    => $registered_count,
+        workshop_templates => \@workshop_templates,
+        global_templates   => \@global_templates,
+        template           => 'WorkShops/ComposeEmail.tt',
     );
 }
 
@@ -3608,6 +3619,206 @@ sub _send_error_notification {
     }
 }
 
+
+sub mail_templates :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my @workshop_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => $id, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    my @global_templates = $c->model('DBEncy::WorkshopMailTemplate')->search(
+        { workshop_id => undef, is_active => 1 },
+        { order_by => { -asc => 'name' } }
+    )->all;
+
+    $c->stash(
+        workshop          => $workshop,
+        workshop_templates => \@workshop_templates,
+        global_templates  => \@global_templates,
+        template          => 'WorkShops/MailTemplates.tt',
+    );
+}
+
+sub add_mail_template :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(
+        workshop => $workshop,
+        template => 'WorkShops/AddMailTemplate.tt',
+    );
+}
+
+sub save_mail_template :Local :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $params = $c->request->body_parameters;
+    my $name          = $params->{name} || '';
+    my $subject       = $params->{subject} || '';
+    my $body_text     = $params->{body_text} || '';
+    my $body_html     = $params->{body_html} || '';
+    my $template_type = $params->{template_type} || 'custom';
+    my $is_global     = $params->{is_global} ? 1 : 0;
+    my $template_id   = $params->{template_id} || '';
+
+    unless ($name && $subject && $body_text) {
+        $c->stash(
+            workshop      => $workshop,
+            error_msg     => 'Name, subject, and body are required.',
+            form_data     => $params,
+            template      => 'WorkShops/AddMailTemplate.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $err;
+    eval {
+        my $workshop_id = $is_global ? undef : $id;
+
+        if ($template_id) {
+            my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+            if ($tmpl) {
+                $tmpl->update({
+                    name          => $name,
+                    subject       => $subject,
+                    body_text     => $body_text,
+                    body_html     => $body_html,
+                    template_type => $template_type,
+                    workshop_id   => $workshop_id,
+                });
+            }
+        } else {
+            $c->model('DBEncy::WorkshopMailTemplate')->create({
+                name          => $name,
+                subject       => $subject,
+                body_text     => $body_text,
+                body_html     => $body_html,
+                template_type => $template_type,
+                workshop_id   => $workshop_id,
+                created_by    => $c->session->{user_id},
+                is_active     => 1,
+            });
+        }
+    };
+    $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'save_mail_template',
+            "Error saving mail template: $err");
+        $c->stash(
+            workshop  => $workshop,
+            error_msg => "Error saving template: $err",
+            form_data => $params,
+            template  => 'WorkShops/AddMailTemplate.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_mail_template',
+        "Mail template '$name' saved for workshop $id");
+    $c->flash->{success_msg} = "Template '$name' saved successfully.";
+    $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$id]));
+}
+
+sub edit_mail_template :Local :Args(2) {
+    my ($self, $c, $workshop_id, $template_id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($workshop_id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+    unless ($tmpl) {
+        $c->flash->{error_msg} = 'Template not found.';
+        $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$workshop_id]));
+        return;
+    }
+
+    $c->stash(
+        workshop     => $workshop,
+        mail_template => $tmpl,
+        template     => 'WorkShops/AddMailTemplate.tt',
+    );
+}
+
+sub delete_mail_template :Local :Args(2) {
+    my ($self, $c, $workshop_id, $template_id) = @_;
+
+    my $workshop = $c->model('DBEncy::WorkShop')->find($workshop_id);
+    unless ($workshop) {
+        $c->flash->{error_msg} = 'Workshop not found.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    unless ($self->_check_workshop_access($c, $workshop, 'leader')) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    my $err;
+    eval {
+        my $tmpl = $c->model('DBEncy::WorkshopMailTemplate')->find($template_id);
+        $tmpl->update({ is_active => 0 }) if $tmpl;
+    };
+    $err = "$@" if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_mail_template',
+            "Error deleting template $template_id: $err");
+        $c->flash->{error_msg} = "Error deleting template: $err";
+    } else {
+        $c->flash->{success_msg} = 'Template deleted.';
+    }
+    $c->response->redirect($c->uri_for($self->action_for('mail_templates'), [$workshop_id]));
+}
 
 __PACKAGE__->meta->make_immutable;
 
