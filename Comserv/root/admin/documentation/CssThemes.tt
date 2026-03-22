@@ -1,0 +1,254 @@
+[% META title = 'CSS Theme System — Admin Guide'
+   description = 'Complete guide for site admins on how to choose, modify and create CSS themes from within the browser.'
+   roles = 'admin'
+   category = 'themes,css,admin-guide,how-to'
+   page_version = '1.0'
+   last_updated = '2026/03/04'
+%]
+
+<div class="container">
+    <h1>CSS Theme System — Admin Guide</h1>
+    <p class="lead text-muted">This guide explains how to manage the visual appearance of your site using the built-in theme system — no file-system access required.</p>
+
+    <nav class="sticky-top bg-white border rounded p-2 mb-4" style="top:60px; z-index:1200;">
+        <strong>Quick Jump:</strong>
+        <a href="#overview"      class="ms-2">Overview</a> |
+        <a href="#choose-theme"  class="ms-2">Choose a Theme</a> |
+        <a href="#modify-theme"  class="ms-2">Modify a Theme</a> |
+        <a href="#create-theme"  class="ms-2">Create a Theme</a> |
+        <a href="#variables-ref" class="ms-2">CSS Variable Reference</a> |
+        <a href="#faq"           class="ms-2">FAQ</a>
+    </nav>
+
+    <!-- Overview -->
+    <section id="overview" class="mb-5">
+        <h2>Overview</h2>
+        <p>The theme system lets site admins control every visual aspect of the application — colours, fonts, navigation styles — directly from the browser.
+        Themes are stored in a central JSON file (<code>static/config/theme_definitions.json</code>) and compiled into CSS files in <code>static/css/themes/</code>.
+        The active theme for each site is recorded in the same JSON file under <code>site_themes</code>.</p>
+
+        <div class="row text-center g-3 mt-1">
+            <div class="col-sm-3">
+                <div class="card h-100 border-info">
+                    <div class="card-body">
+                        <h5 class="card-title">1. Choose</h5>
+                        <p class="card-text small">Pick an existing theme from the list and apply it instantly.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="card h-100 border-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">2. Modify</h5>
+                        <p class="card-text small">Edit colour variables or raw CSS with the interactive editor.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="card h-100 border-success">
+                    <div class="card-body">
+                        <h5 class="card-title">3. Create</h5>
+                        <p class="card-text small">Build a brand-new theme from scratch or based on an existing one.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="card h-100 border-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">4. Apply</h5>
+                        <p class="card-text small">Assign the finished theme to your site — changes are immediate.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p class="mt-3">
+            <a href="[% c.uri_for('/admin/theme') %]" class="btn btn-primary">Go to Theme Management</a>
+        </p>
+    </section>
+
+    <!-- Choose -->
+    <section id="choose-theme" class="mb-5">
+        <h2>Step 1 — Choosing a Theme</h2>
+
+        <ol>
+            <li>Navigate to <strong>Admin → Theme Management</strong> (or click the button above).</li>
+            <li>Under <em>Step 1 – Active Theme</em> you will see your site's current theme highlighted.</li>
+            <li>Open the <strong>Switch to a different theme</strong> drop-down and select the theme you want.</li>
+            <li>Click <strong>Apply Theme</strong>. The page will reload and your site will immediately use the selected theme.</li>
+        </ol>
+
+        <h4>Available Built-in Themes</h4>
+        <table class="table table-bordered table-sm">
+            <thead class="table-light">
+                <tr><th>Key</th><th>Name</th><th>Best For</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>default</code></td><td>Default Theme</td><td>General-purpose; light cyan navigation</td></tr>
+                <tr><td><code>csc</code></td><td>CSC Theme</td><td>Computer System Consulting sites</td></tr>
+                <tr><td><code>apis</code></td><td>APIS Theme</td><td>Beekeeping / BMaster sites; amber/honeycomb look</td></tr>
+                <tr><td><code>usbm</code></td><td>USBM Theme</td><td>Green branding for USBM sites</td></tr>
+                <tr><td><code>mcoop</code></td><td>MCoop Theme</td><td>Co-operative sites; orange palette</td></tr>
+                <tr><td><code>dark</code></td><td>Dark Theme</td><td>Low-light environments</td></tr>
+                <tr><td><code>ve7tit</code></td><td>VE7TIT Theme</td><td>Amateur radio club sites</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Modify -->
+    <section id="modify-theme" class="mb-5">
+        <h2>Step 2 — Modifying an Existing Theme</h2>
+        <p>You have two editors available:</p>
+
+        <h4>A) Interactive CSS Editor (recommended)</h4>
+        <ol>
+            <li>In <em>Step 2 – Modify an Existing Theme</em>, click <strong>Interactive Editor</strong> next to the theme you want to change.</li>
+            <li>The editor opens with a split view: colour pickers on the left, live preview on the right.</li>
+            <li>Adjust any variable. The preview updates in real time.</li>
+            <li>Click <strong>Save Changes</strong> when satisfied. The CSS file and JSON definition are updated automatically.</li>
+        </ol>
+
+        <h4>B) Raw CSS Editor</h4>
+        <ol>
+            <li>Click <strong>Edit CSS</strong> next to the theme name.</li>
+            <li>You see the raw <code>.css</code> file in a text area. Edit the CSS directly.</li>
+            <li>Use the <em>All Theme Attributes</em> panel below the editor to copy CSS variable declarations with one click.</li>
+            <li>Click <strong>Save Changes</strong>.</li>
+        </ol>
+
+        <div class="alert alert-warning">
+            <strong>Note:</strong> Editing a shared theme affects every site that uses it.
+            If you only want to change the appearance for <em>your</em> site without affecting others, use <strong>Create a New Theme</strong> (Step 3) based on the existing one, then apply it to your site only.
+        </div>
+
+        <h4>Adding a Background Image</h4>
+        <p>In the raw CSS editor, scroll down to the <em>Add Background Image</em> section.
+        Browse available images, select one, choose the target element and background options, then click <strong>Generate CSS Code</strong>.
+        The resulting snippet is inserted into the editor at the cursor position. Save when done.</p>
+    </section>
+
+    <!-- Create -->
+    <section id="create-theme" class="mb-5">
+        <h2>Step 3 — Creating a New Theme</h2>
+
+        <h4>Option A — Theme Creator (full control)</h4>
+        <ol>
+            <li>Click <strong>Open Theme Creator</strong> in the <em>Step 3</em> panel, or navigate to <a href="[% c.uri_for('/admin/theme/create') %]">Admin → Theme → Create</a>.</li>
+            <li>Fill in:
+                <ul>
+                    <li><strong>Theme Key</strong> — a unique lowercase identifier, e.g. <code>mysite-2026</code>.</li>
+                    <li><strong>Display Name</strong> — human-friendly label shown in drop-downs.</li>
+                    <li><strong>Base Theme</strong> (optional) — inherit all variables from an existing theme, then override individually.</li>
+                    <li><strong>Description</strong> — short note visible in the theme list.</li>
+                </ul>
+            </li>
+            <li>Set colour values using the colour pickers. The live preview updates as you go.</li>
+            <li>Adjust font settings if needed.</li>
+            <li>Click <strong>Create Theme &amp; Open CSS Editor</strong>. The new theme is saved and you are redirected to the CSS editor for further refinement.</li>
+            <li>Return to Theme Management and apply the new theme to your site.</li>
+        </ol>
+
+        <h4>Option B — Quick Custom Theme (colour pickers only)</h4>
+        <ol>
+            <li>In the <em>Step 3</em> panel expand <strong>Quick Custom Theme (colour pickers)</strong>.</li>
+            <li>Pick five key colours (primary, secondary, accent, text, link).</li>
+            <li>Click <strong>Generate &amp; Apply Custom Theme</strong>.</li>
+            <li>A theme named <code>&lt;sitename&gt;_custom</code> is created and immediately applied to your site.</li>
+        </ol>
+    </section>
+
+    <!-- Variable Reference -->
+    <section id="variables-ref" class="mb-5">
+        <h2>CSS Variable Reference</h2>
+        <p>All variables are declared in <code>:root { }</code> so they are available globally via <code>var(--variable-name)</code>.</p>
+
+        <table class="table table-bordered table-sm table-striped">
+            <thead class="table-dark">
+                <tr><th>Variable</th><th>Default</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>--background-color</code></td><td>#ffffff</td><td>Page/body background</td></tr>
+                <tr><td><code>--primary-color</code></td><td>#ccffff</td><td>Primary brand colour (nav, headers)</td></tr>
+                <tr><td><code>--secondary-color</code></td><td>#f9f9f9</td><td>Secondary background panels</td></tr>
+                <tr><td><code>--accent-color</code></td><td>#FF9900</td><td>Highlights, badges, icons</td></tr>
+                <tr><td><code>--text-color</code></td><td>#000000</td><td>Body text</td></tr>
+                <tr><td><code>--link-color</code></td><td>#0000FF</td><td>Hyperlink colour</td></tr>
+                <tr><td><code>--link-hover-color</code></td><td>#000099</td><td>Hyperlink hover colour</td></tr>
+                <tr><td><code>--nav-bg</code></td><td>#ccffff</td><td>Navigation bar background</td></tr>
+                <tr><td><code>--nav-text</code></td><td>#000000</td><td>Navigation bar text</td></tr>
+                <tr><td><code>--nav-hover-bg</code></td><td>rgba(0,0,0,0.1)</td><td>Nav item hover highlight</td></tr>
+                <tr><td><code>--button-bg</code></td><td>#f2f2f2</td><td>Button background</td></tr>
+                <tr><td><code>--button-text</code></td><td>#000000</td><td>Button text colour</td></tr>
+                <tr><td><code>--button-border</code></td><td>#cccccc</td><td>Button border colour</td></tr>
+                <tr><td><code>--button-hover-bg</code></td><td>#e0e0e0</td><td>Button hover background</td></tr>
+                <tr><td><code>--border-color</code></td><td>#cccccc</td><td>General border colour</td></tr>
+                <tr><td><code>--table-header-bg</code></td><td>#f2f2f2</td><td>Table header row background</td></tr>
+                <tr><td><code>--success-color</code></td><td>#009900</td><td>Success messages</td></tr>
+                <tr><td><code>--warning-color</code></td><td>#ff0000</td><td>Warning messages</td></tr>
+                <tr><td><code>--body-font</code></td><td>Verdana, Helvetica, sans-serif</td><td>Body typeface stack</td></tr>
+                <tr><td><code>--header-font</code></td><td>Verdana, Helvetica, sans-serif</td><td>Heading typeface stack</td></tr>
+                <tr><td><code>--font-size-base</code></td><td>16px</td><td>Default font size</td></tr>
+                <tr><td><code>--font-size-small</code></td><td>14px</td><td>Small/caption font size</td></tr>
+                <tr><td><code>--font-size-large</code></td><td>20px</td><td>Large heading font size</td></tr>
+            </tbody>
+        </table>
+
+        <h4>Using Variables in Custom CSS</h4>
+        <pre class="bg-light p-3 rounded"><code>/* Example: style a custom component with theme variables */
+.my-widget {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    font-family: var(--body-font);
+    font-size: var(--font-size-base);
+}
+
+.my-widget:hover {
+    background-color: var(--accent-color);
+}</code></pre>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="mb-5">
+        <h2>Frequently Asked Questions</h2>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">Will my theme changes affect other sites on this server?</summary>
+            <p class="mt-2">Modifying a shared theme (e.g. <em>default</em>) affects all sites using that theme.
+            To avoid this, create a new theme based on the shared one and apply it only to your site.</p>
+        </details>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">Where are themes stored?</summary>
+            <p class="mt-2">Theme definitions and site mappings are in <code>Comserv/root/static/config/theme_definitions.json</code>.
+            Compiled CSS files land in <code>Comserv/root/static/css/themes/&lt;theme-name&gt;.css</code>.</p>
+        </details>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">How do I revert to a previous theme?</summary>
+            <p class="mt-2">Go to <strong>Step 1</strong> on the Theme Management page, select the previous theme from the drop-down and click <em>Apply Theme</em>.</p>
+        </details>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">Can I add a background image?</summary>
+            <p class="mt-2">Yes — use the Raw CSS Editor for a theme and scroll to the <em>Add Background Image</em> section. Select an image, target element and options, then click <em>Generate CSS Code</em>.</p>
+        </details>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">My colours look wrong after switching themes — what happened?</summary>
+            <p class="mt-2">Some pages may cache old CSS. Try a hard-refresh (<kbd>Ctrl+Shift+R</kbd> / <kbd>Cmd+Shift+R</kbd>).
+            Also confirm the new theme has all the expected CSS variables; missing variables fall back to browser defaults.</p>
+        </details>
+
+        <details class="mb-2 border rounded p-3">
+            <summary class="fw-bold cursor-pointer">Can non-admin users change the theme?</summary>
+            <p class="mt-2">No. Theme management requires the <strong>admin</strong> role. Regular users see the theme the admin has selected for the site.</p>
+        </details>
+    </section>
+
+    <hr>
+    <p class="text-muted small">
+        Theme Management is at <a href="[% c.uri_for('/admin/theme') %]">/admin/theme</a> &nbsp;|&nbsp;
+        Version 1.0 — 2026-03-04
+    </p>
+</div>

@@ -18,6 +18,7 @@
         <li><a href="/USBM/Introduction">Introduction to USBM</a></li>
         <li><a href="/USBM/Courses">Courses Offered</a></li>
         <li><a href="/USBM/Events">Upcoming Events</a></li>
+        <li><a href="/workshop">Workshops</a></li>
     </ul>
 
     <h2>Get Involved</h2>
@@ -25,4 +26,3 @@
     <p>Contact us at: <a href="mailto:info@usbm.ca">info@usbm.ca</a></p>
 
 [% END %]
-

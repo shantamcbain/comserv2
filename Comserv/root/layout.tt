@@ -43,10 +43,10 @@
             </div>
         </footer>
     [% END %]
-    
 
-    
-    <script src="/static/js/local-chat.js"></script>
+    <!-- Chat widget — loaded here (outside footer TRY/CATCH) so it appears on every page regardless of site or module -->
+    <script src="/static/js/local-chat.js?v=[% USE date; date.format(date.now, '%s') %]"></script>
+
 </body>
 
 </html>

@@ -8,6 +8,7 @@
         <li><a href="[% c.uri_for('/forager') %]">Forager Home</a></li>
         <li><a href="[% c.uri_for('/documentation') %]">Documentation</a></li>
         <li><a href="[% c.uri_for('/coop') %]">Coop</a></li>
+        <li><a href="[% c.uri_for('/workshop') %]">Workshops</a></li>
         <!-- Add more navigation links as needed -->
     </ul>
 </nav>

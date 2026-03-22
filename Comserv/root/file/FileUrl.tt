@@ -1,0 +1,52 @@
+[%#
+  FileUrl.tt — shared macro for resolving a file record's display URL.
+
+  USAGE in any .tt file:
+    [% INCLUDE 'file/FileUrl.tt' %]
+
+    [%# Get just the URL string: %]
+    [% SET src = file_url(f) %]
+
+    [%# Render an <img> tag: %]
+    [% file_img(f, 'Alt text', 'max-width:200px') %]
+
+    [%# Render an <a> link: %]
+    [% file_link(f, 'Download') %]
+
+  PARAMETERS:
+    f  — a row object from the files table (has nfs_path, external_url, file_url, file_path columns)
+
+  PRIORITY:
+    1. external_url  — used directly (http://... or https://...)
+    2. nfs_path      — streamed via /file/fs_preview (auth-checked, correct MIME)
+    3. file_path     — streamed via /file/fs_preview
+    4. file_url      — used directly (legacy static URL)
+%]
+
+[% MACRO file_url(f) BLOCK %]
+[%- IF f.external_url && f.external_url.match('^https?://') -%]
+[% f.external_url %]
+[%- ELSIF f.nfs_path && f.nfs_path.length -%]
+[% c.uri_for('/file/fs_preview', {path => f.nfs_path}) %]
+[%- ELSIF f.file_path && f.file_path.length -%]
+[% c.uri_for('/file/fs_preview', {path => f.file_path}) %]
+[%- ELSIF f.file_url && f.file_url.length -%]
+[% f.file_url %]
+[%- END -%]
+[% END %]
+
+[% MACRO file_img(f, alt, style) BLOCK %]
+[% SET src = file_url(f) %]
+[% IF src %]
+<img src="[% src %]"
+     alt="[% alt || f.file_name | html %]"
+     [% IF style %]style="[% style | html %]"[% END %]>
+[% END %]
+[% END %]
+
+[% MACRO file_link(f, label) BLOCK %]
+[% SET src = file_url(f) %]
+[% IF src %]
+<a href="[% src %]">[% label || f.file_name | html %]</a>
+[% END %]
+[% END %]

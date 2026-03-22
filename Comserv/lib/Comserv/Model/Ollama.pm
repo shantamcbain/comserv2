@@ -80,8 +80,8 @@ if not explicitly provided.
 has 'host' => (
     is => 'rw',
     isa => 'Str',
-    default => 'localhost',
-    documentation => 'Ollama server host (localhost or 192.168.1.199)'
+    default => '192.168.1.199',
+    documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
 has 'port' => (
@@ -266,6 +266,7 @@ sub query {
         options => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 8192,
         }
     };
     
@@ -404,6 +405,7 @@ sub chat {
         options => {
             temperature => $self->temperature,
             num_predict => $self->max_tokens,
+            num_ctx     => 8192,
         }
     };
     

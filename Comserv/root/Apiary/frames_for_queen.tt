@@ -1,4 +1,5 @@
-[% META title = 'Frames for Queen ' _ queen_tag_number %]
+[% META title = 'Frames for Queen ' %]
+[% title = 'Frames for Queen ' _ queen_tag_number %]
 
 <div class="container">
     <div class="row">

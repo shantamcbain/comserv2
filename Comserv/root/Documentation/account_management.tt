@@ -1,0 +1,213 @@
+[% PageVersion = 'Comserv/root/Documentation/account_management.tt,v 0.01 2024/05/31 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Account Management' %]
+
+<div class="documentation-page">
+    <div class="doc-header">
+        <h1>Account Management</h1>
+        
+        <div class="doc-meta">
+            <span class="version">Version: 1.0</span>
+            <span class="updated">Last Updated: May 31, 2024</span>
+            <span class="author">Author: Support Team</span>
+        </div>
+    </div>
+
+    <div class="doc-section">
+        <h2>Overview</h2>
+        <p>This guide will help you manage your Comserv account, including how to log in, log out, update your profile information, and change your account settings.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2>Logging In</h2>
+        <ol>
+            <li>Click on the "Login" link in the top navigation bar</li>
+            <li>Enter your username and password</li>
+            <li>Click the "Login" button</li>
+        </ol>
+        <p>If you've forgotten your password, click the "Forgot Password" link on the login page to reset it.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2>Logging Out</h2>
+        <p>To securely end your session:</p>
+        <ol>
+            <li>Click on your username in the top navigation bar</li>
+            <li>Select "Logout" from the dropdown menu</li>
+        </ol>
+        <p><strong>Important:</strong> Always log out when using a shared or public computer to protect your account.</p>
+    </div>
+
+    <div class="doc-section">
+        <h2>Viewing Your Profile</h2>
+        <p>Your profile contains your personal information and account details:</p>
+        <ol>
+            <li>Click on your username in the top navigation bar</li>
+            <li>Select "My Profile" from the dropdown menu</li>
+        </ol>
+        <p>The profile page displays:</p>
+        <ul>
+            <li>Your name and username</li>
+            <li>Email address</li>
+            <li>Account roles and permissions</li>
+            <li>Recent activity (if enabled)</li>
+        </ul>
+    </div>
+
+    <div class="doc-section">
+        <h2>Managing Account Settings</h2>
+
+        <h3>Accessing Settings</h3>
+        <ol>
+            <li>Click on your username in the top navigation bar</li>
+            <li>Select "Account Settings" from the dropdown menu</li>
+        </ol>
+
+        <h3>Updating Personal Information</h3>
+        <p>To update your name or email address:</p>
+        <ol>
+            <li>Go to Account Settings</li>
+            <li>In the "Personal Information" section, modify the relevant fields</li>
+            <li>Click "Save Changes"</li>
+        </ol>
+
+        <h3>Changing Your Password</h3>
+        <p>For security reasons, you should change your password periodically:</p>
+        <ol>
+            <li>Go to Account Settings</li>
+            <li>Click "Change Password" in the Danger Zone section</li>
+            <li>Enter your current password</li>
+            <li>Enter and confirm your new password</li>
+            <li>Click "Update Password"</li>
+        </ol>
+        <p>Password requirements:</p>
+        <ul>
+            <li>Minimum 8 characters</li>
+            <li>At least one uppercase letter</li>
+            <li>At least one number</li>
+            <li>At least one special character</li>
+        </ul>
+
+        <h3>Appearance Preferences</h3>
+        <p>Customize your experience with theme settings:</p>
+        <ol>
+            <li>Go to Account Settings</li>
+            <li>In the "Preferences" section, select your preferred theme</li>
+            <li>Click "Save Changes"</li>
+        </ol>
+    </div>
+
+    <div class="doc-section">
+        <h2>Account Security Best Practices</h2>
+        <ol>
+            <li><strong>Strong Passwords:</strong> Use unique, complex passwords</li>
+            <li><strong>Regular Updates:</strong> Change your password every 3-6 months</li>
+            <li><strong>Secure Access:</strong> Avoid logging in from public or unsecured networks</li>
+            <li><strong>Session Management:</strong> Always log out when finished</li>
+            <li><strong>Email Verification:</strong> Keep your email address current for account recovery</li>
+        </ol>
+    </div>
+
+    <div class="doc-section">
+        <h2>Troubleshooting</h2>
+
+        <h3>Login Issues</h3>
+        <p>If you cannot log in:</p>
+        <ol>
+            <li>Verify you're using the correct username and password</li>
+            <li>Check if Caps Lock is enabled</li>
+            <li>Clear your browser cookies and cache</li>
+            <li>Try using a different browser</li>
+            <li>Contact support if problems persist</li>
+        </ol>
+
+        <h3>Profile Update Problems</h3>
+        <p>If you encounter errors when updating your profile:</p>
+        <ol>
+            <li>Ensure all required fields are completed</li>
+            <li>Verify your email address is in the correct format</li>
+            <li>Check that your password meets all requirements</li>
+            <li>Try again after a few minutes</li>
+        </ol>
+    </div>
+
+    <div class="doc-section">
+        <h2>Getting Help</h2>
+        <p>If you need assistance with your account:</p>
+        <ol>
+            <li>Check the <a href="/Documentation/FAQ">FAQ section</a> for common questions</li>
+            <li>Click the "Help" link in the footer</li>
+            <li>Contact support through your site's help desk system</li>
+        </ol>
+    </div>
+</div>
+
+<style>
+    .documentation-page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    
+    .doc-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .doc-header h1 {
+        margin-bottom: 10px;
+        color: #0056b3;
+    }
+    
+    .doc-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        font-size: 0.9em;
+        color: #666;
+    }
+    
+    .doc-section {
+        margin-bottom: 30px;
+    }
+    
+    .doc-section h2 {
+        color: #0056b3;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .doc-section h3 {
+        color: #333;
+        margin: 20px 0 10px 0;
+    }
+    
+    ul, ol {
+        margin-left: 20px;
+        margin-bottom: 15px;
+    }
+    
+    li {
+        margin-bottom: 5px;
+    }
+    
+    strong {
+        font-weight: bold;
+    }
+    
+    a {
+        color: #0056b3;
+        text-decoration: none;
+    }
+    
+    a:hover {
+        text-decoration: underline;
+    }
+</style>

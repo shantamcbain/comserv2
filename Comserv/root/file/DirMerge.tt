@@ -1,0 +1,256 @@
+[% META
+   title = "Merge Directories"
+   description = "Review and resolve conflicts when merging two directories"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-03-02"
+%]
+[% PageVersion = 'file/DirMerge.tt,v 0.01 2026/03/02 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+
+[% MACRO fmt_size(b) BLOCK %]
+[% IF    b >= 1073741824 %][% b / 1073741824 | format('%.1f') %]&nbsp;GB
+[% ELSIF b >= 1048576    %][% b / 1048576    | format('%.1f') %]&nbsp;MB
+[% ELSIF b >= 1024       %][% b / 1024       | format('%.1f') %]&nbsp;KB
+[% ELSIF b               %][% b %]&nbsp;B
+[% ELSE %]—[% END %]
+[% END %]
+
+<style>
+.dm-table     { width:100%; border-collapse:collapse; font-size:.85rem; }
+.dm-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
+                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
+.dm-table tbody tr:nth-child(even) { background:#fafafa; }
+.dm-table tbody tr:hover { background:#f0f5ff; }
+.dm-table td  { padding:6px 10px; vertical-align:top; border-bottom:1px solid #f0f0f0; }
+.dm-rel       { word-break:break-all; max-width:280px; }
+.dm-num       { text-align:right; color:#555; font-size:.8rem; white-space:nowrap; }
+
+.dm-badge     { display:inline-block; padding:2px 8px; border-radius:3px;
+                font-size:.72rem; font-weight:bold; color:#fff; white-space:nowrap; }
+.dm-new       { background:#1565c0; }
+.dm-identical { background:#2e7d32; }
+.dm-same-size { background:#e65100; }
+.dm-conflict  { background:#c62828; }
+
+.dm-action    { display:flex; gap:4px; flex-wrap:wrap; }
+.dm-action label { display:flex; align-items:center; gap:3px; font-size:.8rem;
+                   padding:2px 8px; border-radius:3px; cursor:pointer;
+                   border:1px solid #ccc; white-space:nowrap; }
+.dm-action input[type=radio] { margin:0; }
+.dm-action label.act-move     { border-color:#1565c0; color:#1565c0; }
+.dm-action label.act-rename   { border-color:#e65100; color:#e65100; }
+.dm-action label.act-skip     { border-color:#78909c; color:#78909c; }
+.dm-action label.act-delete   { border-color:#c62828; color:#c62828; }
+.dm-action label:has(input:checked) { color:#fff !important; }
+.dm-action label.act-move:has(input:checked)   { background:#1565c0; }
+.dm-action label.act-rename:has(input:checked) { background:#e65100; }
+.dm-action label.act-skip:has(input:checked)   { background:#78909c; }
+.dm-action label.act-delete:has(input:checked) { background:#c62828; }
+
+.dm-size-warn { font-size:.75rem; color:#c62828; margin-top:2px; }
+
+.btn { display:inline-block; padding:5px 12px; border:none; border-radius:4px;
+       cursor:pointer; font-size:.85rem; text-decoration:none; line-height:1.4;
+       vertical-align:middle; font-weight:500; }
+.btn:hover { opacity:.86; text-decoration:none; }
+.btn-sm        { padding:2px 8px !important; font-size:.75rem !important; }
+.btn-primary   { background:#007bff !important; color:#fff !important; }
+.btn-secondary { background:#6c757d !important; color:#fff !important; }
+</style>
+
+<div class="app-container">
+
+  <div class="page-header">
+    <h1>&#128256; Merge Directories</h1>
+  </div>
+
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#b71c1c">
+    <strong>Error:</strong> [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:10px;color:#1b5e20">
+    <strong>Done:</strong> [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+
+  <div class="content-section">
+
+    <div style="margin-bottom:12px;font-size:.88rem">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <strong>Source (moving from):</strong><br>
+          <code style="font-size:.82rem;color:#1565c0">[% src | html %]</code>
+        </div>
+        <div>
+          <strong>Destination (merging into):</strong><br>
+          <code style="font-size:.82rem;color:#2e7d32">[% dest | html %]</code>
+        </div>
+      </div>
+      <a href="[% c.uri_for('/file/admin_browser', { dir_path => back }) %]"
+         class="btn btn-sm btn-secondary">&#8592; Cancel / Back</a>
+    </div>
+
+    [%# ── Legend ── %]
+    [% SET cnt_new = 0; SET cnt_id = 0; SET cnt_ss = 0; SET cnt_cf = 0 %]
+    [% FOREACH e IN entries %]
+      [% IF e.status == 'new'       %][% cnt_new = cnt_new + 1 %][% END %]
+      [% IF e.status == 'identical' %][% cnt_id  = cnt_id  + 1 %][% END %]
+      [% IF e.status == 'same_size' %][% cnt_ss  = cnt_ss  + 1 %][% END %]
+      [% IF e.status == 'conflict'  %][% cnt_cf  = cnt_cf  + 1 %][% END %]
+    [% END %]
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:.83rem;align-items:center">
+      <span><span class="dm-badge dm-new">[% cnt_new %] New</span> — only in source, will be moved</span>
+      <span><span class="dm-badge dm-identical">[% cnt_id %] Identical</span> — same SHA256, safe to skip</span>
+      <span><span class="dm-badge dm-same-size">[% cnt_ss %] Same size</span> — same size, different content</span>
+      <span><span class="dm-badge dm-conflict">[% cnt_cf %] Conflict</span> — different size</span>
+    </div>
+
+    <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm btn-primary" onclick="dmSetAll('new','move')">Move all New</button>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="dmSetAll('identical','skip')">Skip all Identical</button>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="dmSetAll('conflict','rename')">Rename all Conflicts</button>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="dmSetAll('same_size','skip')">Skip all Same-size</button>
+    </div>
+
+    [% IF !entries.size %]
+    <p class="empty-state">Source directory is empty — nothing to merge.</p>
+    [% ELSE %]
+    <form method="post" action="[% c.uri_for('/file/dir_merge_submit') %]" id="dm-form">
+      <input type="hidden" name="src"  value="[% src  | html %]">
+      <input type="hidden" name="dest" value="[% dest | html %]">
+      <input type="hidden" name="back" value="[% back | html %]">
+
+      <div style="overflow-x:auto">
+      <table class="dm-table">
+        <thead>
+          <tr>
+            <th>File (relative path)</th>
+            <th>Source size</th>
+            <th>Dest size</th>
+            <th>Status</th>
+            <th style="min-width:280px">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH e IN entries %]
+          [% SET eid = loop.count %]
+          [% SET s_label = e.status == 'new'       ? 'New'
+                         : e.status == 'identical' ? 'Identical'
+                         : e.status == 'same_size' ? 'Same size'
+                         : 'Conflict' %]
+          [% SET s_css   = e.status == 'new'       ? 'dm-new'
+                         : e.status == 'identical' ? 'dm-identical'
+                         : e.status == 'same_size' ? 'dm-same-size'
+                         : 'dm-conflict' %]
+          <tr class="dm-row dm-row-[% e.status | html %]" data-status="[% e.status | html %]">
+            <td class="dm-rel">
+              <input type="hidden" name="rel" value="[% e.rel | html %]">
+              [% e.rel | html %]
+            </td>
+            <td class="dm-num">[% fmt_size(e.src_size) %]</td>
+            <td class="dm-num">
+              [% IF e.dest_size.defined %]
+                [% fmt_size(e.dest_size) %]
+                [% IF e.src_size != e.dest_size %]
+                <div class="dm-size-warn">&#9888; sizes differ</div>
+                [% END %]
+              [% ELSE %]
+              <span style="color:#aaa">—</span>
+              [% END %]
+            </td>
+            <td><span class="dm-badge [% s_css %]">[% s_label | html %]</span></td>
+            <td>
+              <div class="dm-action" id="dm-act-[% eid %]">
+                [% IF e.status == 'new' %]
+                <label class="act-move">
+                  <input type="radio" name="action_[% e.rel | html %]" value="move" checked> Move
+                </label>
+                <label class="act-skip">
+                  <input type="radio" name="action_[% e.rel | html %]" value="skip"> Skip
+                </label>
+                [% ELSIF e.status == 'identical' %]
+                <label class="act-skip">
+                  <input type="radio" name="action_[% e.rel | html %]" value="skip" checked> Skip
+                </label>
+                <label class="act-delete">
+                  <input type="radio" name="action_[% e.rel | html %]" value="delete_src"> Del src
+                </label>
+                [% ELSE %]
+                <label class="act-skip">
+                  <input type="radio" name="action_[% e.rel | html %]" value="skip" checked> Skip
+                </label>
+                <label class="act-move">
+                  <input type="radio" name="action_[% e.rel | html %]" value="move"> Overwrite
+                </label>
+                <label class="act-rename">
+                  <input type="radio" name="action_[% e.rel | html %]" value="rename"> Keep both
+                </label>
+                <label class="act-delete">
+                  <input type="radio" name="action_[% e.rel | html %]" value="delete_src"> Del src
+                </label>
+                [% END %]
+              </div>
+              [% IF e.status == 'conflict' %]
+              <div style="font-size:.72rem;color:#888;margin-top:3px">
+                Overwrite replaces dest. Keep&nbsp;both saves src as <em>name_conflict_1</em>.
+                Del&nbsp;src deletes source copy.
+              </div>
+              [% END %]
+              [% IF e.status == 'same_size' %]
+              <div style="font-size:.72rem;color:#888;margin-top:3px">
+                Same size but different SHA256 — likely modified. Review before overwriting.
+              </div>
+              [% END %]
+            </td>
+          </tr>
+          [% END %]
+        </tbody>
+      </table>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <button type="submit" class="btn btn-primary">&#128256; Execute Merge</button>
+        <a href="[% c.uri_for('/file/admin_browser', { dir_path => back }) %]"
+           class="btn btn-secondary">Cancel</a>
+        <span id="dm-summary" style="font-size:.82rem;color:#666"></span>
+      </div>
+    </form>
+    [% END %]
+
+  </div>
+</div>
+
+<script>
+function dmSetAll(status, action) {
+    document.querySelectorAll('.dm-row-' + status + ' input[type=radio]').forEach(function(radio) {
+        if (radio.value === action) radio.checked = true;
+    });
+    dmUpdateSummary();
+}
+
+function dmUpdateSummary() {
+    var counts = { move: 0, rename: 0, skip: 0, delete_src: 0 };
+    document.querySelectorAll('.dm-row').forEach(function(row) {
+        var checked = row.querySelector('input[type=radio]:checked');
+        if (checked) counts[checked.value] = (counts[checked.value] || 0) + 1;
+    });
+    var parts = [];
+    if (counts.move)       parts.push(counts.move + ' move');
+    if (counts.rename)     parts.push(counts.rename + ' keep-both');
+    if (counts.skip)       parts.push(counts.skip + ' skip');
+    if (counts.delete_src) parts.push(counts.delete_src + ' delete-src');
+    document.getElementById('dm-summary').textContent = parts.join(', ');
+}
+
+document.querySelectorAll('input[type=radio]').forEach(function(r) {
+    r.addEventListener('change', dmUpdateSummary);
+});
+dmUpdateSummary();
+</script>

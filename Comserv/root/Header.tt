@@ -29,7 +29,12 @@
     [% ELSE %]
         <meta name="description" content="[% http_header_description %]">
     [% END %]
+    [%- SET site_favicon = c.stash.site_favicon || '' -%]
+    [% IF site_favicon %]
+    <link rel="shortcut icon" href="[% site_favicon %]">
+    [% ELSE %]
     <link rel="shortcut icon" href="/static/images/favicon.ico">
+    [% END %]
     [% IF SiteName == "CSC" %]
         [% embed('CSCWHMCSInterface') %]
     [% END %]
@@ -85,9 +90,9 @@
     <!-- Menu CSS (part of theme system) -->
     <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
 
-    <!-- Debug: Using theme system only, removed old CSS references -->
-    [% IF c.session.debug_mode == 1 %]
-    <!-- Removed old CSS references: css_view_name, log_css, menu_css, todo_css -->
+    <!-- Site-specific CSS (background images, site branding) -->
+    [% IF css_view_name %]
+    <link rel="stylesheet" type="text/css" href="[% css_view_name %]">
     [% END %]
 
     <!-- Local SVG icon solution (no external dependencies) -->
@@ -97,16 +102,26 @@
     <link rel="stylesheet" type="text/css" href="/static/css/icon-fix.css">
     
     <!-- Component-specific CSS -->
-    [% IF template.match('ApiCredentials/') %]
+    [% IF c.stash.template.match('ApiCredentials/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/themes/api_credentials.css">
     [% END %]
     
-    [% IF template.match('todo/') %]
+    [% IF c.stash.template.match('todo/') %]
     <link rel="stylesheet" type="text/css" href="/static/css/todo.css">
+    [% END %]
+
+    [% IF c.stash.template.match('membership/') %]
+    <link rel="stylesheet" type="text/css" href="/static/css/membership.css">
     [% END %]
 
     <!-- Back to Top Button CSS -->
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
+
+    [% IF is_admin %]
+    <!-- Admin-only Health Monitoring -->
+    <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    <script src="/static/js/HealthMonitor.js"></script>
+    [% END %]
 
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>
@@ -125,4 +140,6 @@
             }
         }
     </script>
+    <!-- AI utilities - loaded globally so the chat widget works on all pages -->
+    <script src="/static/js/ai-common.js"></script>
 </head>

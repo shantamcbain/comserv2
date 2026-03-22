@@ -1,0 +1,430 @@
+[% META 
+   title = "Result Files without Tables - Database Schema Comparison"
+   description = "Display result files that do not have corresponding database tables"
+   roles = "admin,developer"
+   TemplateType = "Application"
+   category = "Database Administration"
+   page_version = "1.0"
+   last_updated = "Mon Oct 20 08:47:30 PM PDT 2025 AI_Assistant Initial_Creation"
+%]
+
+[% PageVersion = 'admin/result_without_tables.tt,v 1.0 2025/10/20 AI_Assistant Initial_Creation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1><i class="fas fa-file-code"></i> Result Files without Tables</h1>
+        <div class="page-actions">
+            <span class="context-item"><strong>Database:</strong> [% database_name || 'Unknown' %]</span>
+            <span class="context-item"><strong>Status:</strong> Active</span>
+            <button type="button" class="btn btn-secondary" onclick="history.back()">
+                <i class="fas fa-arrow-left"></i> Back to Schema Comparison
+            </button>
+        </div>
+    </div>
+    
+    <div class="content-container">
+        <div class="content-primary">
+            <p class="intro">Result files that exist but do not have corresponding database tables. These may represent tables that need to be created or result files that should be removed.</p>
+            
+            <!-- Statistics Summary -->
+            <div class="data-container">
+                <div class="stat-card">
+                    <div class="stat-icon orphaned"><i class="fas fa-file-code"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Orphaned Results</span>
+                        <span class="stat-number">[% results_without_tables.size || 0 %]</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Action Required</span>
+                        <span class="stat-number">[% results_without_tables.size || 0 %]</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon size"><i class="fas fa-database"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Total Size</span>
+                        <span class="stat-number">[% total_result_size || '0 KB' %]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Files without Tables Container -->
+            <div class="data-container">
+                [% IF results_without_tables.size > 0 %]
+                    <div class="bulk-actions">
+                        <div class="bulk-actions-header">
+                            <h3>Bulk Actions</h3>
+                            <div class="bulk-actions-controls">
+                                <button class="btn btn-secondary" onclick="selectAllResults()">
+                                    <i class="fas fa-check-square"></i> Select All
+                                </button>
+                                <button class="btn btn-secondary" onclick="deselectAllResults()">
+                                    <i class="fas fa-square"></i> Deselect All
+                                </button>
+                                <button class="btn btn-primary" onclick="createTablesForSelected()">
+                                    <i class="fas fa-plus"></i> Create Tables for Selected
+                                </button>
+                                <button class="btn btn-danger" onclick="removeSelectedResults()">
+                                    <i class="fas fa-trash"></i> Remove Selected Results
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    [% FOREACH result_file IN results_without_tables %]
+                        <div class="result-file-card" data-result="[% result_file.name | html %]" data-database="[% database_key %]">
+                            <div class="result-file-header">
+                                <div class="result-file-selector">
+                                    <input type="checkbox" class="result-checkbox" value="[% result_file.name | html %]" id="result_[% loop.index %]">
+                                    <label for="result_[% loop.index %]" class="sr-only">Select [% result_file.name | html %]</label>
+                                </div>
+                                <div class="result-file-info">
+                                    <div class="result-file-title">
+                                        <i class="fas fa-file-code"></i>
+                                        <h3>[% result_file.name | html %]</h3>
+                                        <span class="result-type-badge">[% result_file.type || 'Result' %]</span>
+                                    </div>
+                                    <div class="result-file-meta">
+                                        [% IF result_file.file_size %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-weight-hanging"></i> [% result_file.file_size %]
+                                            </span>
+                                        [% END %]
+                                        [% IF result_file.last_modified %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-clock"></i> Modified [% result_file.last_modified %]
+                                            </span>
+                                        [% END %]
+                                        [% IF result_file.field_count %]
+                                            <span class="meta-item">
+                                                <i class="fas fa-columns"></i> [% result_file.field_count %] fields
+                                            </span>
+                                        [% END %]
+                                    </div>
+                                </div>
+                                <div class="result-file-actions">
+                                    <button class="action-btn primary" onclick="createTableFromResult('[% result_file.name | html %]', '[% database_key %]')" title="Create table from this result file">
+                                        <i class="fas fa-plus"></i> Create Table
+                                    </button>
+                                    <button class="action-btn secondary" onclick="viewResultFile('[% result_file.name | html %]', '[% database_key %]')" title="View result file contents">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+                                    <button class="action-btn danger" onclick="removeResultFile('[% result_file.name | html %]', '[% database_key %]')" title="Remove this result file">
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                    <button class="toggle-details-btn" onclick="toggleResultDetails(this)" title="Show/hide details">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Result File Details -->
+                            <div class="result-file-details" style="display: none;">
+                                [% IF result_file.fields %]
+                                    <div class="field-preview">
+                                        <h4>Field Structure Preview</h4>
+                                        <div class="field-preview-grid">
+                                            <div class="field-preview-header">
+                                                <div class="field-header">Field Name</div>
+                                                <div class="field-header">Suggested Type</div>
+                                                <div class="field-header">Properties</div>
+                                                <div class="field-header">Sample Data</div>
+                                            </div>
+                                            [% FOREACH field IN result_file.fields %]
+                                                <div class="field-preview-row">
+                                                    <div class="field-name">
+                                                        <i class="fas fa-columns"></i>
+                                                        [% field.name | html %]
+                                                    </div>
+                                                    <div class="field-type">
+                                                        [% field.suggested_type | html %]
+                                                    </div>
+                                                    <div class="field-properties">
+                                                        [% IF field.nullable %]<span class="prop nullable">NULL</span>[% ELSE %]<span class="prop not-null">NOT NULL</span>[% END %]
+                                                        [% IF field.max_length %]<span class="prop">Max: [% field.max_length %]</span>[% END %]
+                                                        [% IF field.is_primary_key %]<span class="prop primary">PRIMARY</span>[% END %]
+                                                    </div>
+                                                    <div class="field-sample">
+                                                        [% IF field.sample_data %]
+                                                            <code>[% field.sample_data | html | truncate(50) %]</code>
+                                                        [% ELSE %]
+                                                            <span class="no-sample">No sample data</span>
+                                                        [% END %]
+                                                    </div>
+                                                </div>
+                                            [% END %]
+                                        </div>
+                                    </div>
+                                [% END %]
+                            </div>
+                        </div>
+                    [% END %]
+                [% ELSE %]
+                    <div class="empty-state">
+                        <i class="fas fa-file-code"></i>
+                        <h3>No Orphaned Result Files</h3>
+                        <p>All result files in the current database have corresponding tables.</p>
+                    </div>
+                [% END %]
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.result-file-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    background-color: var(--surface-primary);
+    transition: all 0.2s ease;
+}
+
+.result-file-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-light);
+}
+
+.result-file-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+.result-file-selector {
+    flex-shrink: 0;
+}
+
+.result-file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.result-file-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.result-file-title h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: var(--text-lg);
+}
+
+.result-type-badge {
+    background-color: var(--primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--border-radius-full);
+    font-size: var(--text-xs);
+    font-weight: 600;
+}
+
+.result-file-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.result-file-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--surface-primary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.action-btn.primary {
+    background-color: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.action-btn.secondary {
+    background-color: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+.action-btn.danger {
+    background-color: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+.toggle-details-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    transition: transform 0.2s ease;
+}
+
+.result-file-details {
+    border-top: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    background-color: var(--surface-secondary);
+}
+
+.field-preview-grid {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 2fr 2fr;
+    gap: 1px;
+    background-color: var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.field-preview-grid > div {
+    background-color: var(--surface-primary);
+    padding: var(--spacing-sm);
+}
+
+.field-header {
+    background-color: var(--surface-secondary);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.field-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.prop {
+    display: inline-block;
+    font-size: var(--text-xs);
+    padding: 2px 6px;
+    border-radius: var(--border-radius-sm);
+    background-color: var(--surface-secondary);
+    color: var(--text-muted);
+    margin-right: var(--spacing-xs);
+}
+
+.prop.primary {
+    background-color: var(--primary);
+    color: white;
+}
+
+.prop.nullable {
+    background-color: var(--warning);
+    color: white;
+}
+
+.prop.not-null {
+    background-color: var(--success);
+    color: white;
+}
+
+.bulk-actions {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background-color: var(--surface-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.bulk-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.bulk-actions-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+</style>
+
+<script>
+function toggleResultDetails(button) {
+    const card = button.closest('.result-file-card');
+    const details = card.querySelector('.result-file-details');
+    const isExpanded = details.style.display !== 'none';
+    
+    if (isExpanded) {
+        details.style.display = 'none';
+        button.classList.remove('expanded');
+    } else {
+        details.style.display = 'block';
+        button.classList.add('expanded');
+    }
+}
+
+function createTableFromResult(resultName, databaseKey) {
+    if (!confirm(`Create a database table from result file "${resultName}"?`)) {
+        return;
+    }
+    
+    const button = event.target.closest('.action-btn');
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    button.disabled = true;
+    
+    fetch('/admin/schema_comparison/create_table_from_result', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            result_file: resultName,
+            database: databaseKey
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const card = button.closest('.result-file-card');
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+        } else {
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        button.innerHTML = originalContent;
+        button.disabled = false;
+    });
+}
+
+function selectAllResults() {
+    document.querySelectorAll('.result-checkbox').forEach(checkbox => checkbox.checked = true);
+}
+
+function deselectAllResults() {
+    document.querySelectorAll('.result-checkbox').forEach(checkbox => checkbox.checked = false);
+}
+</script>

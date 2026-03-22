@@ -2,7 +2,7 @@ package Comserv::Controller::Site;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use Comserv::Util::CSRF;
+use Comserv::Util::AdminAuth;
 BEGIN { extends 'Catalyst::Controller'; }
 # In your controller or script file
 use Try::Tiny;
@@ -11,13 +11,6 @@ has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
-
-sub auto :Private {
-    my ($self, $c) = @_;
-    Comserv::Util::CSRF::ensure_token($c);
-    return 1;
-}
-
 sub index :Path :Args(0) {
     my ( $self, $c ) = @_;
 
@@ -132,11 +125,10 @@ sub index :Path :Args(0) {
 sub add_site :Local {
     my ($self, $c) = @_;
 
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_site',
-            'CSRF token validation failed');
-        $c->flash->{error_msg} = 'Invalid form submission. Please try again.';
-        $c->response->redirect($c->uri_for($self->action_for('add_site_form')));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_site')) {
+        $c->flash->{error_msg} = 'You must be an administrator to add sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -168,9 +160,13 @@ sub add_site :Local {
 sub add_site_form :Local {
     my ($self, $c) = @_;
 
-    # Your code here...
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_site_form')) {
+        $c->flash->{error_msg} = 'You must be an administrator to add sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
-    # Set the template to site/add_site_form.tt
     $c->stash(template => 'site/add_site_form.tt');
 }
 sub details :Local {
@@ -250,14 +246,7 @@ sub details :Local {
     $c->stash->{domains} = \@site_domains;
 
     # If domain is defined in the form parameters, insert a new row into the SiteDomain table
-    if ($c->request->method eq 'POST' && (my $domain = $c->request->parameters->{domain})) {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
-                'CSRF token validation failed for adding domain');
-            $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
-            $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
-            return;
-        }
+    if (my $domain = $c->request->parameters->{domain}) {
         eval {
             $c->model('DBEncy::SiteDomain')->create({
                 site_id => $site_id,
@@ -285,18 +274,15 @@ sub details :Local {
 sub add_domain :Local {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_domain')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Get the site_id from the request parameters
     my $site_id = $c->request->parameters->{site_id};
-
-    if ($c->request->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_domain',
-                'CSRF token validation failed');
-            $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
-            $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
-            return;
-        }
-    }
 
     # Get the new_domain from the request parameters
     my $new_domain = $c->request->parameters->{new_domain};
@@ -338,18 +324,15 @@ sub get_site_details {
 sub delete_domain :Local {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'delete_domain')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     my $domain_id = $c->request->parameters->{domain_id};
     my $site_id = $c->request->parameters->{site_id};
-
-    if ($c->request->method eq 'POST') {
-        unless (Comserv::Util::CSRF::validate_token($c)) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'delete_domain',
-                'CSRF token validation failed');
-            $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
-            $c->res->redirect($c->uri_for($self->action_for('details'), { id => $site_id }));
-            return;
-        }
-    }
 
     eval {
         my $domain = $c->model('DBEncy::SiteDomain')->find($domain_id);
@@ -373,6 +356,13 @@ sub delete_domain :Local {
 sub delete :Path('delete') :Args(0) {
     my ($self, $c) = @_;
     
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'delete_site')) {
+        $c->flash->{error_msg} = 'You must be an administrator to delete sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Log entry into the delete method
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 'Entered site delete method');
     
@@ -525,6 +515,13 @@ sub delete :Path('delete') :Args(0) {
 sub modify :Local {
     my ($self, $c) = @_;
 
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'site_modify')) {
+        $c->flash->{error_msg} = 'You must be an administrator to modify sites.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
     # Get the site id from the query parameters
     my $site_id = $c->request->query_parameters->{id};
 
@@ -669,11 +666,10 @@ sub fetch_available_sites :Private {
 sub add_domain_post :Local {
     my ($self, $c) = @_;
 
-    unless (Comserv::Util::CSRF::validate_token($c)) {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'add_domain_post',
-            'CSRF token validation failed');
-        $c->flash->{error_msg} = 'Invalid form submission (CSRF). Please try again.';
-        $c->res->redirect($c->uri_for($self->action_for('add_domain')));
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'add_domain_post')) {
+        $c->flash->{error_msg} = 'You must be an administrator to manage domains.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 

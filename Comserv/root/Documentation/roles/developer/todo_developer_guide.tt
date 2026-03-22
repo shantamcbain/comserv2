@@ -1,0 +1,500 @@
+[% PageVersion = 'Comserv/root/Documentation/roles/developer/todo_developer_guide.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+[% META title = 'Todo System Developer Guide' %]
+
+<!-- Todo developer guide for developers -->
+<div class="documentation-content">
+
+<div class="markdown-content">
+
+# Todo System Developer Guide
+
+This comprehensive guide provides developers with technical details for extending, maintaining, and troubleshooting the Todo system.
+
+## System Architecture
+
+### Core Components
+```
+Comserv::Controller::Todo    - Main controller handling HTTP requests
+Comserv::Model::Todo         - Data access layer and business logic
+Comserv::Model::Schema::*    - DBIx::Class schema definitions
+Templates (*.tt)             - Template Toolkit presentation layer
+Static Assets               - CSS, JavaScript, and theme integration
+```
+
+### Database Schema
+```sql
+-- Core todo table structure
+todo (
+    record_id       INT PRIMARY KEY AUTO_INCREMENT,
+    sitename        VARCHAR(255),
+    subject         TEXT,
+    description     TEXT,
+    project_code    VARCHAR(100),
+    priority        INT,
+    status          INT,
+    start_date      DATE,
+    due_date        DATE,
+    user_id         INT,
+    accumulative_time DECIMAL(10,2)
+)
+```
+
+### Integration Points
+- **Project System** - Foreign key relationships with project tables
+- **User Management** - User ID associations and role-based access
+- **Logging System** - Related log entries for time tracking
+- **Calendar System** - Date-based queries and display logic
+
+## Controller Implementation
+
+### Key Actions and Methods
+
+#### Core CRUD Operations
+```perl
+# Main todo listing with filtering
+sub todo : Chained('base') PathPart('todo') Args(0) {
+    my ($self, $c) = @_;
+    
+    # Fetch todos excluding completed (status 3)
+    my $todos = $c->model('Todo')->get_top_todos($c->session->{sitename});
+    
+    # Project integration for filtering
+    my $projects = $c->forward('/project/fetch_projects_with_subprojects');
+    
+    $c->stash(
+        todos => $todos,
+        projects => $projects,
+        template => 'todo/todo.tt'
+    );
+}
+```
+
+#### Edit Functionality
+```perl
+sub edit : Chained('base') PathPart('edit') Args(1) {
+    my ($self, $c, $record_id) = @_;
+    
+    # Fetch todo record with error handling
+    my $todo = $c->model('Todo')->fetch_todo_record($record_id);
+    
+    unless ($todo) {
+        $c->response->redirect($c->uri_for('/todo'));
+        return;
+    }
+    
+    # Calculate accumulative time
+    my $total_time = $self->calculate_accumulative_time($c, $record_id);
+    
+    $c->stash(
+        todo => $todo,
+        accumulative_time => $total_time,
+        template => 'todo/edit.tt'
+    );
+}
+```
+
+#### Calendar Views
+```perl
+sub month : Chained('base') PathPart('month') Args() {
+    my ($self, $c, $year, $month) = @_;
+    
+    # Date handling with proper validation
+    $year  ||= DateTime->now->year;
+    $month ||= DateTime->now->month;
+    
+    # Fetch todos and logs for the month
+    my $todos = $self->get_todos_for_month($c, $year, $month);
+    my $logs = $self->get_logs_for_month($c, $year, $month);
+    
+    $c->stash(
+        todos => $todos,
+        logs => $logs,
+        year => $year,
+        month => $month,
+        template => 'todo/month.tt'
+    );
+}
+```
+
+### Error Handling Patterns
+```perl
+# Proper error handling with logging
+sub modify : Chained('base') PathPart('modify') Args(0) {
+    my ($self, $c) = @_;
+    
+    eval {
+        # Database operations
+        my $todo = $c->model('Todo')->update_todo($params);
+        
+        # Success response
+        $c->response->redirect($c->uri_for('/todo'));
+    };
+    
+    if ($@) {
+        $c->log->error("Todo modification failed: $@");
+        $c->stash(error => "Failed to update todo: $@");
+    }
+}
+```
+
+## Model Implementation
+
+### Data Access Patterns
+```perl
+package Comserv::Model::Todo;
+
+sub get_top_todos {
+    my ($self, $sitename) = @_;
+    
+    return $self->resultset('Todo')->search(
+        {
+            'me.sitename' => $sitename,
+            'me.status'   => { '!=' => 3 }  # Exclude completed
+        },
+        {
+            order_by => ['me.priority', 'me.start_date'],
+            prefetch => ['project'],  # Efficient project loading
+            rows     => 10
+        }
+    );
+}
+```
+
+### Project Integration
+```perl
+sub fetch_projects_with_subprojects {
+    my ($self, $c) = @_;
+    
+    # Avoid deep prefetch issues - fetch explicitly
+    my @projects;
+    
+    eval {
+        my $main_projects = $c->model('Project')->search({
+            'me.sitename' => $c->session->{sitename},
+            'me.parent_id' => undef
+        });
+        
+        while (my $project = $main_projects->next) {
+            my $project_data = {
+                id => $project->id,
+                name => $project->name,
+                code => $project->code,
+                sub_projects => []
+            };
+            
+            # Fetch sub-projects separately
+            my $sub_projects = $project->sub_projects;
+            while (my $sub = $sub_projects->next) {
+                push @{$project_data->{sub_projects}}, {
+                    id => $sub->id,
+                    name => $sub->name,
+                    code => $sub->code
+                };
+            }
+            
+            push @projects, $project_data;
+        }
+    };
+    
+    if ($@) {
+        $c->log->error("Project fetching failed: $@");
+        return [];
+    }
+    
+    return \@projects;
+}
+```
+
+## Template Development
+
+### Template Structure
+```html
+<!-- todo/todo.tt - Main todo listing -->
+[% WRAPPER 'layouts/main.tt' %]
+
+<div class="todo-container">
+    <!-- Overdue section - high priority -->
+    [% IF overdue_todos.size > 0 %]
+    <div class="overdue-section">
+        <h2>Overdue Tasks</h2>
+        [% FOREACH todo IN overdue_todos %]
+            [% INCLUDE 'todo/todo_item.tt' %]
+        [% END %]
+    </div>
+    [% END %]
+    
+    <!-- Active todos -->
+    <div class="active-todos">
+        [% FOREACH todo IN todos %]
+            [% INCLUDE 'todo/todo_item.tt' %]
+        [% END %]
+    </div>
+</div>
+
+[% END %]
+```
+
+### Calendar Template Patterns
+```html
+<!-- todo/month.tt - Monthly calendar view -->
+[% FOREACH day IN calendar_days %]
+<div class="calendar-day" data-date="[% day.date %]">
+    <div class="day-number">[% day.day %]</div>
+    
+    <!-- Todos section - prominent display -->
+    [% IF day.todos.size > 0 %]
+    <div class="day-todos">
+        [% FOREACH todo IN day.todos %]
+        <div class="todo-item [% todo.status_class %]">
+            <span class="todo-subject">[% todo.subject %]</span>
+            [% IF todo.is_due %]
+            <span class="due-indicator">Due</span>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+    
+    <!-- Logs section - subtle display -->
+    [% IF day.logs.size > 0 %]
+    <div class="day-logs">
+        [% FOREACH log IN day.logs %]
+        <div class="log-item">
+            <span class="log-time">[% log.duration %]</span>
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+</div>
+[% END %]
+```
+
+## CSS and Theme Integration
+
+### Theme System Compliance
+```css
+/* todo.css - Theme-compliant styling */
+.todo-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.overdue-section {
+    background: var(--danger-color);
+    color: white;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+}
+
+.todo-item {
+    background: var(--bg-color);
+    border-left: 4px solid var(--primary-color);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.todo-item.due {
+    animation: pulse 2s infinite;
+    border-left-color: var(--warning-color);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+```
+
+### Responsive Design Patterns
+```css
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+    .calendar-grid {
+        grid-template-columns: repeat(1, 1fr);
+    }
+    
+    .todo-item {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .calendar-day {
+        min-height: 80px;
+    }
+}
+```
+
+## Database Optimization
+
+### Query Optimization
+```perl
+# Efficient queries with proper indexing
+sub get_todos_for_date_range {
+    my ($self, $start_date, $end_date, $sitename) = @_;
+    
+    return $self->resultset('Todo')->search(
+        {
+            'me.sitename' => $sitename,
+            'me.start_date' => {
+                '>=' => $start_date,
+                '<=' => $end_date
+            },
+            'me.status' => { '!=' => 3 }
+        },
+        {
+            # Use table aliases to avoid ambiguity
+            order_by => ['me.start_date', 'me.priority'],
+            prefetch => {
+                'project' => 'parent_project'
+            }
+        }
+    );
+}
+```
+
+### Index Recommendations
+```sql
+-- Recommended indexes for performance
+CREATE INDEX idx_todo_sitename_status ON todo (sitename, status);
+CREATE INDEX idx_todo_start_date ON todo (start_date);
+CREATE INDEX idx_todo_due_date ON todo (due_date);
+CREATE INDEX idx_todo_project_code ON todo (project_code);
+CREATE INDEX idx_todo_user_id ON todo (user_id);
+```
+
+## Testing Strategies
+
+### Unit Testing
+```perl
+# t/controller_Todo.t
+use Test::More;
+use Catalyst::Test 'Comserv';
+
+# Test todo listing
+{
+    my $response = request('/todo');
+    ok($response->is_success, 'Todo page loads successfully');
+    like($response->content, qr/todo-container/, 'Contains todo container');
+}
+
+# Test todo creation
+{
+    my $response = request(POST '/todo/create', [
+        subject => 'Test Todo',
+        description => 'Test Description',
+        priority => 3,
+        sitename => 'TEST'
+    ]);
+    is($response->code, 302, 'Todo creation redirects');
+}
+```
+
+### Integration Testing
+```perl
+# Test calendar integration
+{
+    my $response = request('/todo/month/2025/1');
+    ok($response->is_success, 'Month view loads');
+    like($response->content, qr/calendar-day/, 'Contains calendar structure');
+}
+```
+
+## Recent Bug Fixes and Enhancements
+
+### Database Ambiguity Fix (2025-01-15)
+```perl
+# BEFORE - Caused ambiguous column errors
+my $todos = $self->search({
+    sitename => $sitename,
+    status => { '!=' => 3 }
+}, {
+    order_by => ['start_date', 'priority']  # Ambiguous!
+});
+
+# AFTER - Proper table aliases
+my $todos = $self->search({
+    'me.sitename' => $sitename,
+    'me.status' => { '!=' => 3 }
+}, {
+    order_by => ['me.start_date', 'me.priority']  # Clear!
+});
+```
+
+### Project Fetching Fix
+```perl
+# BEFORE - Complex prefetch causing constraint issues
+my $projects = $self->search({}, {
+    prefetch => {
+        'sub_projects' => {
+            'sub_sub_projects' => 'related_data'
+        }
+    }
+});
+
+# AFTER - Explicit fetching with error handling
+my $projects = $self->fetch_projects_with_subprojects($c);
+```
+
+## Development Best Practices
+
+### Code Standards
+- **Use table aliases** in all database queries to avoid ambiguity
+- **Implement proper error handling** with try/catch blocks
+- **Follow theme system** for all CSS styling
+- **Use Template Toolkit best practices** for template development
+- **Maintain backward compatibility** when making changes
+
+### Performance Guidelines
+- **Optimize database queries** with appropriate indexes
+- **Use efficient prefetching** but avoid deep nested prefetch
+- **Implement caching** for frequently accessed data
+- **Monitor query performance** in production
+
+### Security Considerations
+- **Validate all user inputs** before database operations
+- **Use parameterized queries** to prevent SQL injection
+- **Implement proper access controls** based on user roles
+- **Sanitize output** in templates to prevent XSS
+
+## Debugging and Troubleshooting
+
+### Common Issues
+1. **Calendar not loading** - Check JavaScript console for errors
+2. **Project selection failing** - Verify project hierarchy integrity
+3. **Database errors** - Check for proper table aliases in queries
+4. **Template errors** - Validate Template Toolkit syntax
+
+### Debugging Tools
+```perl
+# Enable detailed logging
+$c->log->debug("Todo query: " . $query->as_query);
+$c->log->info("Processing todo ID: $record_id");
+
+# Template debugging
+[% IF c.session.debug_mode %]
+    [% USE Dumper %]
+    [% Dumper.dump(todos) %]
+[% END %]
+```
+
+### Performance Monitoring
+```perl
+# Query timing
+my $start_time = time();
+my $todos = $self->get_todos();
+my $duration = time() - $start_time;
+$c->log->info("Todo query took ${duration}s");
+```
+
+Remember: Always test thoroughly, follow existing patterns, and maintain comprehensive documentation for any changes made to the Todo system.
+
+</div>
+</div>
