@@ -3536,9 +3536,9 @@ sub send_email :Local :Args(1) {
         return;
     }
     
-    my $from_address = $c->config->{mail_from} || 'noreply@computersystemconsulting.ca';
-    my $reply_to = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
-    
+    my $from_address    = $c->config->{mail_from}    || 'noreply@computersystemconsulting.ca';
+    my $default_replyto = $c->config->{mail_replyto} || 'helpdesk@computersystemconsulting.ca';
+
     my $workshop_url = $c->uri_for($self->action_for('details'), { id => $id });
     my $base_uri = $c->req->base;
     my $full_url = $base_uri . $workshop_url;
@@ -3553,17 +3553,21 @@ sub send_email :Local :Args(1) {
     };
     my $formatted_end_time = $workshop->end_time || '';
 
-    # Build leader name for [[leader.name]] placeholder
-    my $leader_name = '';
+    # Build leader name and email for [[leader.name]] placeholder and Reply-To
+    my $leader_name  = '';
+    my $leader_email = '';
     if ($workshop->created_by) {
         my $leader_user = $c->model('DBEncy::User')->find($workshop->created_by);
         if ($leader_user) {
             $leader_name = $leader_user->first_name || $leader_user->username || '';
             $leader_name .= ' ' . $leader_user->last_name if $leader_user->last_name;
-            $leader_name =~ s/^\s+|\s+$//g;
+            $leader_name  =~ s/^\s+|\s+$//g;
+            $leader_email = $leader_user->email || '';
         }
     }
     $leader_name ||= $workshop->instructor || '';
+    # Reply-To is leader's real email (may be gmail etc.); SMTP FROM stays as system address
+    my $reply_to = $leader_email || $default_replyto || $from_address;
 
     # Process workshop-level [[placeholders]] in subject (same for all recipients)
     (my $processed_subject = $subject) =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;
@@ -3609,6 +3613,7 @@ sub send_email :Local :Args(1) {
                 $processed_subject,
                 $processed_body,
                 undef,
+                { reply_to => $reply_to, leader_name => $leader_name },
             );
         };
         $send_err = "$@" if $@;
