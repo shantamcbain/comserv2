@@ -3676,11 +3676,7 @@ sub send_email :Local :Args(1) {
             "Failed to record email in database: $db_err");
     }
     
-    # Detect if running in log-only mode (no real SMTP)
-    my $mail_mode = $c->config->{mail_mode} || '';
-    my $mode_note = ($mail_mode eq 'test' || !$c->config->{mail_host})
-        ? ' NOTE: Server is in test/log-only mode — emails were logged but NOT delivered via SMTP.'
-        : '';
+    my $mode_note = '';
 
     if ($failed_count > 0 && $sent_count == 0) {
         my $failed_list = join(', ', @failed_emails);
