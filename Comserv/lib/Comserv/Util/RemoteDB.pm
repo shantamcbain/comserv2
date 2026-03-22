@@ -36,7 +36,7 @@ sub get_row {
     my ($self, $c, $conn_name, $table, $where, $params) = @_;
     
     # Build the query
-    my $query = "SELECT * FROM $table WHERE ";
+    my $query = "SELECT * FROM `$table` WHERE ";
     my @conditions;
     my @bind_params;
     
@@ -63,7 +63,7 @@ sub get_rows {
     my ($self, $c, $conn_name, $table, $where, $params) = @_;
     
     # Build the query
-    my $query = "SELECT * FROM $table";
+    my $query = "SELECT * FROM `$table`";
     my @bind_params;
     
     if ($where && %$where) {
@@ -101,7 +101,7 @@ sub insert_row {
     my ($self, $c, $conn_name, $table, $data) = @_;
     
     # Build the query
-    my $query = "INSERT INTO $table (";
+    my $query = "INSERT INTO `$table` (";
     my @columns;
     my @placeholders;
     my @values;
@@ -123,7 +123,7 @@ sub update_row {
     my ($self, $c, $conn_name, $table, $data, $where) = @_;
     
     # Build the query
-    my $query = "UPDATE $table SET ";
+    my $query = "UPDATE `$table` SET ";
     my @set_clauses;
     my @values;
     
@@ -151,7 +151,7 @@ sub delete_row {
     my ($self, $c, $conn_name, $table, $where) = @_;
     
     # Build the query
-    my $query = "DELETE FROM $table WHERE ";
+    my $query = "DELETE FROM `$table` WHERE ";
     my @conditions;
     my @values;
     

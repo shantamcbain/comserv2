@@ -1,0 +1,445 @@
+[% META 
+   title = "DailyPlan System - Project Documentation"
+   description = "Comprehensive planning and task management feature for Comserv. Multi-phase implementation: database schema, DBIC models, controller, views, testing, documentation. Includes navigation menu with anchor links to all sections. ApplicationTtTemplate.tt compliant with theme-compatible CSS classes."
+   roles = "admin,developer"
+   TemplateType = "Project"
+   category = "planning,dailyplan,feature"
+   page_version = "0.003"
+   last_updated = "2026-01-17"
+%]
+[% PageVersion = 'Documentaton/DailyPlanSystem.tt, v 0.05 2026/01/17 02:15:00 Reorganized Phase 1: Result files first (DailyPlan.pm, DailyPlanProject.pm), update Todo.pm, then browser-based schema system. Removed script references. Added API token blocker note. Tasks managed via browser until API configured.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .project-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 30px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    
+    .project-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .meta-item {
+        background: rgba(255,255,255,0.1);
+        padding: 10px;
+        border-radius: 4px;
+    }
+    
+    .phase-container {
+        background: #f9f9f9;
+        border-left: 4px solid var(--primary-color);
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 4px;
+    }
+    
+    .success-criteria {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 15px 0;
+    }
+    
+    .criteria-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: #f0f0f0;
+        border-radius: 4px;
+    }
+    
+    .navigation-menu {
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .navigation-menu h3 {
+        margin-top: 0;
+        color: #333;
+        font-size: 1.1em;
+    }
+    
+    .navigation-menu ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .navigation-menu li {
+        display: inline;
+    }
+    
+    .navigation-menu a {
+        color: var(--primary-color, #2196F3);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        padding-bottom: 3px;
+        transition: border-color 0.2s ease;
+    }
+    
+    .navigation-menu a:hover {
+        border-bottom-color: var(--primary-color, #2196F3);
+    }
+</style>
+
+<div class="container">
+    <div class="project-header">
+        <h1>DailyPlan System</h1>
+        <p>Comprehensive planning and task management feature for administrators</p>
+        <div class="project-meta">
+            <div class="meta-item">
+                <strong>Project ID:</strong> #12
+            </div>
+            <div class="meta-item">
+                <strong>Status:</strong> NEW
+            </div>
+            <div class="meta-item">
+                <strong>Start Date:</strong> 2026-01-16
+            </div>
+            <div class="meta-item">
+                <strong>Due Date:</strong> 2026-02-13
+            </div>
+            <div class="meta-item">
+                <strong>Priority:</strong> Urgent (3)
+            </div>
+            <div class="meta-item">
+                <strong>Type:</strong> Feature
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <nav id="toc" class="navigation-menu">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><a href="#overview" title="Project overview and key features">Overview</a></li>
+                    <li><a href="#architecture" title="Database schema, models, and permission model">Architecture</a></li>
+                    <li><a href="#phases" title="5-phase implementation roadmap">Phases</a></li>
+                    <li><a href="#decisions" title="Key architectural choices and rationale">Decisions</a></li>
+                    <li><a href="#workflow" title="Admin step-by-step workflow guide">Workflow</a></li>
+                    <li><a href="#criteria" title="Success criteria and completion checklist">Success</a></li>
+                    <li><a href="#references" title="Documentation and specification links">References</a></li>
+                    <li><a href="#notes" title="Implementation notes and philosophy">Notes</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="overview">Overview</h2>
+            <p>The <strong>DailyPlan System</strong> is a comprehensive planning and task management feature enabling administrators to create and manage development plans for the Comserv application and specific modules (e.g., BMaster beekeeping operations).</p>
+            
+            <h3>Key Features</h3>
+            <ul>
+                <li><strong>Plan Management</strong>: Create, edit, delete, and organize plans by project</li>
+                <li><strong>Task Linking</strong>: Associate todos with plans for tracking work items</li>
+                <li><strong>Task Dependencies</strong>: Block tasks and prevent circular dependencies</li>
+                <li><strong>Project Integration</strong>: Link plans to projects for organizational context</li>
+                <li><strong>Admin-Only Access</strong>: Restricted to CSC admins and SiteName admins</li>
+                <li><strong>Code Reuse</strong>: Leverages existing Todo, Project, and Calendar systems</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="architecture">Architecture Overview</h2>
+            
+            <h3>Database Schema</h3>
+            <p><strong>New Tables:</strong></p>
+            <ul>
+                <li><code>dailyplan</code>: Aggregator table storing plan metadata</li>
+                <li><code>dailyplan_project</code>: Link table (many-to-many) connecting plans to projects</li>
+            </ul>
+            
+            <p><strong>Extended Tables:</strong></p>
+            <ul>
+                <li><code>todo</code>: Add <code>plan_id</code> (foreign key to dailyplan) and <code>blocked_by_todo_id</code> (self-reference for dependencies)</li>
+            </ul>
+            
+            <h3>Permission Model</h3>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Access Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CSC Admin</td>
+                        <td>All plans, all sites</td>
+                    </tr>
+                    <tr>
+                        <td>SiteName Admin</td>
+                        <td>Plans for their site only</td>
+                    </tr>
+                    <tr>
+                        <td>Developer</td>
+                        <td>No access</td>
+                    </tr>
+                    <tr>
+                        <td>User</td>
+                        <td>No access</td>
+                    </tr>
+                    <tr>
+                        <td>Not Logged In</td>
+                        <td>No access</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="hierarchy">Project Hierarchy</h2>
+            <p>The DailyPlan system sits within a larger project hierarchy to ensure proper organization and reporting:</p>
+            <div style="background: #f0f4f7; padding: 20px; border-radius: 8px; border: 1px solid #d0d7de;">
+                <ul style="list-style-type: none; padding-left: 0;">
+                    <li style="font-weight: bold; margin-bottom: 10px;">📂 Project Management (Primary Parent)</li>
+                    <li style="margin-left: 20px; margin-bottom: 10px;">└─ 📂 DailyPlan System (Sub-project)</li>
+                    <li style="margin-left: 40px; color: #57606a;">└─ 📂 Daily Priorities (Active execution sub-project)</li>
+                </ul>
+                <p style="margin-top: 15px; font-size: 0.9em;"><strong>Purpose of "Daily Priorities":</strong> This sub-project is the specific container for tasks generated daily. It allows for high-granularity tracking of daily work without cluttering the main DailyPlan system metadata.</p>
+            </div>
+
+            <h2 id="phases">Implementation Phases</h2>
+            
+            <div class="phase-container">
+                <h3 id="phase-1">Phase 1: Database Schema & Models (2-3 hours)</h3>
+                <p><strong>Status:</strong> ⏳ PENDING</p>
+                <ul>
+                    <li><strong>1. Create Result Files First (Required - blocking other tasks)</strong>
+                        <ul>
+                            <li>Create <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DailyPlan.pm</code> - Aggregator table definition</li>
+                            <li>Create <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/DailyPlanProject.pm</code> - Link table (many-to-many)</li>
+                            <li>Update <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Todo.pm</code> - Add <code>plan_id</code> and <code>blocked_by_todo_id</code> relationships</li>
+                        </ul>
+                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                            <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Creating Result Files:</strong></p>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">Result_Class_Development_Guide.tt</a> - Step-by-step guide for creating DBIC Result classes</li>
+                                <li><a href="/Documentation/DBIDocument" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">DBIDocument.tt</a> - DBIx::Class ORM reference and patterns</li>
+                                <li><a href="/Documentation/models/Todo" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">models/Todo.tt</a> - Existing Todo model example (study this as reference)</li>
+                                <li><a href="/Documentation/Schema" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">Schema.tt</a> - Database schema overview and naming conventions</li>
+                                <li><a href="/Documentation/AI_Chat_Schema_Documentation" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">AI_Chat_Schema_Documentation.tt</a> - Advanced schema patterns and relationship examples</li>
+                            </ul>
+                        </div>
+                    </li>
+                    <li>2. Create tables via browser-based schema system (Comserv Admin > Database > Schema Designer)
+                        <div style="background: #f5f9ff; border-left: 3px solid var(--secondary-color); padding: 12px; margin: 12px 0; border-radius: 3px;">
+                            <p style="margin: 0 0 10px 0; font-size: 0.95em;"><strong>📚 Resources for Schema Management:</strong></p>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">DBSchemaManager_Usage_Guide.tt</a> - How to use the schema management browser tools</li>
+                                <li><a href="/Documentation/controllers/Todo" style="color: var(--secondary-color); text-decoration: none; border-bottom: 1px dashed var(--secondary-color);">controllers/Todo.tt</a> - Todo controller example showing Result class usage</li>
+                            </ul>
+                        </div>
+                    </li>
+                    <li>3. Verify schema relationships in database</li>
+                </ul>
+                <p style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 4px; margin-top: 10px;"><strong>⚠️ Blocker:</strong> API token/key system not yet configured for programmatic database access. Tasks will be managed via browser interface until API endpoints are available.</p>
+            </div>
+
+            <div class="phase-container">
+                <h3>Phase 2: Controller & Business Logic (3-4 hours)</h3>
+                <p><strong>Status:</strong> ⏳ PENDING</p>
+                <ul>
+                    <li>Create DailyPlan.pm controller with admin-only authorization</li>
+                    <li>Implement plan CRUD actions (index, view, create, edit, delete)</li>
+                    <li>Implement plan-todo linking (add_todo_to_plan, remove_todo_from_plan)</li>
+                    <li>Reuse existing Todo controller for task management</li>
+                    <li>Add business logic layer (get_plans_for_user, create_plan, etc.)</li>
+                    <li>Add unit tests for controller and model</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>Phase 3: Views & Frontend (3-4 hours)</h3>
+                <p><strong>Status:</strong> ⏳ PENDING</p>
+                <ul>
+                    <li>Analyze and extend existing <code>/admin/documentation/DailyPlan.tt</code></li>
+                    <li>Add admin-only "Plan Management" tab</li>
+                    <li>Create plan list view with filtering and sorting</li>
+                    <li>Integrate existing Calendar component</li>
+                    <li>Create plan detail view with todos and blocking status</li>
+                    <li>Reuse existing components (todo items, project selector, calendar)</li>
+                    <li>Apply theme integration and responsive design</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>Phase 4: Integration & Testing (2 hours)</h3>
+                <p><strong>Status:</strong> ⏳ PENDING</p>
+                <ul>
+                    <li>Test Todo system integration (plan_id associations, cascading deletes)</li>
+                    <li>Test Project associations (many-to-many linking)</li>
+                    <li>Update navigation menu (add DailyPlan link)</li>
+                    <li>Verify backward compatibility with existing DailyPlan.tt documentation</li>
+                    <li>Run full test suite</li>
+                    <li>Manual verification checklist (create plans, link todos, test permissions)</li>
+                    <li>Cross-browser and responsive testing</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>Phase 5: Documentation & Closure (1-2 hours)</h3>
+                <p><strong>Status:</strong> ⏳ PENDING</p>
+                <ul>
+                    <li>Update existing documentation in DailyPlan.tt with planning sections</li>
+                    <li>Create/update API documentation for DailyPlan endpoints</li>
+                    <li>Create database schema documentation</li>
+                    <li>Create implementation report</li>
+                    <li>Final code review and cleanup</li>
+                    <li>Verify backward compatibility</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="decisions">Key Architectural Decisions</h2>
+            <ol>
+                <li><strong>✅ Todo/Task Unification</strong>: Extend existing <code>todo</code> table instead of creating separate <code>DailyPlanTask</code> table</li>
+                <li><strong>✅ Project Relationship</strong>: Plans link to Projects via <code>dailyplan_project</code> link table</li>
+                <li><strong>✅ Admin-Only Access</strong>: Restricted to CSC and SiteName admins</li>
+                <li><strong>✅ Task Dependencies</strong>: Add <code>blocked_by_todo_id</code> for blocking relationships</li>
+                <li><strong>✅ Calendar Integration</strong>: Reuse existing Todo Calendar component</li>
+                <li><strong>✅ View Repurposing</strong>: Extend <code>/admin/documentation/DailyPlan.tt</code> instead of creating new templates</li>
+                <li><strong>✅ Code Reuse Philosophy</strong>: Leverage existing Todo, Project, Calendar, Authorization systems</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="workflow">Admin Workflow</h2>
+            
+            <div class="phase-container">
+                <h3>1. Create a Plan</h3>
+                <p>Navigate to Admin > DailyPlan > Create Plan</p>
+                <ul>
+                    <li>Name the plan (e.g., "Q1 2026 Development")</li>
+                    <li>Set date range (plan_date_start, plan_date_end)</li>
+                    <li>Select associated project(s)</li>
+                    <li>Set priority and visibility</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>2. Add Todos to Plan</h3>
+                <p>Link existing todos to the plan</p>
+                <ul>
+                    <li>Select plan</li>
+                    <li>Browse available todos</li>
+                    <li>Assign to plan (sets plan_id on todo)</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>3. Manage Dependencies</h3>
+                <p>Block todos based on other tasks</p>
+                <ul>
+                    <li>Set <code>blocked_by_todo_id</code> on dependent tasks</li>
+                    <li>System prevents circular blocking</li>
+                </ul>
+            </div>
+
+            <div class="phase-container">
+                <h3>4. Track Progress</h3>
+                <p>View plan status</p>
+                <ul>
+                    <li>See all todos in the plan</li>
+                    <li>Identify blocked tasks</li>
+                    <li>Update todo status from plan view</li>
+                    <li>See project context</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="criteria">Success Criteria</h2>
+            <div class="success-criteria">
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Database schema created without errors</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>DBIC models load and relationships work</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>DailyPlan controller responds to HTTP requests</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Plans can be created, edited, deleted</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Todos can be linked to plans</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Task dependencies work (circular prevention)</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Authorization enforced (admin-only)</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Backward compatibility maintained</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>All tests pass</span>
+                </div>
+                <div class="criteria-item">
+                    <span>✅</span>
+                    <span>Documentation complete</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="references">Documentation References</h2>
+            <ul>
+                <li><strong>Specification</strong>: <code>.zencoder/chats/f1ab716d-44a5-40f6-b243-196179e16ee3/spec.md</code></li>
+                <li><strong>Architecture Decisions</strong>: <code>.zencoder/chats/f1ab716d-44a5-40f6-b243-196179e16ee3/ARCHITECTURE_DECISIONS.md</code></li>
+                <li><strong>Implementation Plan</strong>: <code>.zencoder/chats/f1ab716d-44a5-40f6-b243-196179e16ee3/plan.md</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 id="notes">Notes</h2>
+            <p>This project emphasizes <strong>code reuse</strong> and <strong>minimal schema changes</strong>. Backward compatibility is critical — existing functionality must not break. Admin-only access simplifies permission model. Task dependencies benefit entire Todo system, not just DailyPlan.</p>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,353 @@
+[% META
+        title = "AiModelConfig Result Class"
+   description = "DBIx::Class Result class for managing AI model configurations with encryption, feature flags, and site-specific settings"
+   roles = "admin,developer"
+   TemplateType = "model"
+   category = "models"
+   page_version = "0.01"
+   last_updated = "2026-01-11 16:02:00 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/AiModelConfig.tt,v 0.01 2026/01/11 DocumentationSyncAgent Exp - New Result class documentation from AiModelConfig.pm' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AiModelConfig Result Class Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 16:02:00 UTC |
+        Version: 0.01 |
+        Author: Zencoder / DocumentationSyncAgent |
+        Status: New Result class documentation created from AiModelConfig.pm code audit
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
+                <a href="#constraints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Constraints</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>AiModelConfig Result Class</strong> (Comserv::Model::Schema::Ency::Result::AiModelConfig) is a DBIx::Class Result class that manages configurations for AI models integrated into Comserv. It stores model-specific settings including API endpoints, encrypted API keys, model parameters (temperature, max tokens), feature flags for documentation search and web search, and role-based access control.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This class supports multi-site, multi-role, multi-agent-type configurations, allowing different AI models to be available for different user roles and agent types within each site. It includes built-in encryption support for API keys and automatic timestamp management.</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of AiModelConfig Result class including schema definition, field descriptions, methods, and usage patterns.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Perl 5.20 or later</li>
+                <li>DBIx::Class ORM (v0.08194 or later)</li>
+                <li>Comserv application instance with ENCY database</li>
+                <li>Encryption library (Crypt::CBC for API key encryption)</li>
+                <li>MariaDB/MySQL with ai_model_config table</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Multi-Tenancy Support</strong>: Site-specific configurations with site_id field</li>
+                <li><strong>Role-Based Configuration</strong>: Different models for admin, developer, and other roles</li>
+                <li><strong>Agent Type Support</strong>: Separate configurations for different agent types</li>
+                <li><strong>Encrypted API Keys</strong>: Secure storage of API keys with encryption</li>
+                <li><strong>Model Parameters</strong>: Temperature and max_tokens controls for LLM tuning</li>
+                <li><strong>Feature Flags</strong>: Fine-grained control over documentation search, web search, and code search</li>
+                <li><strong>Priority System</strong>: Configurable priority for model selection</li>
+                <li><strong>Automatic Timestamps</strong>: Created and updated timestamps managed automatically</li>
+                <li><strong>Unique Constraints</strong>: Prevent duplicate configurations for same site/role/agent/model combination</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SCHEMA SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="schema" style="color: var(--text-color); font-family: var(--header-font);">4. Schema Definition</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Table: ai_model_config</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Primary table: <code>ai_model_config</code></p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Column Definitions</h3>
+            <table border="1" style="width: 100%; border-collapse: collapse;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="padding: 8px; text-align: left;">Column</th>
+                    <th style="padding: 8px; text-align: left;">Type</th>
+                    <th style="padding: 8px; text-align: left;">Nullable</th>
+                    <th style="padding: 8px; text-align: left;">Default</th>
+                    <th style="padding: 8px; text-align: left;">Description</th>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>id</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">Auto-increment</td>
+                    <td style="padding: 8px;">Primary key - unique configuration identifier</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>site_id</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">References site for multi-tenancy</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>role</code></td>
+                    <td style="padding: 8px;">VARCHAR(100)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">User role (e.g., 'admin', 'developer')</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>agent_type</code></td>
+                    <td style="padding: 8px;">VARCHAR(100)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Type of agent using this config (e.g., 'daily-audit', 'documentation-sync')</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>model_name</code></td>
+                    <td style="padding: 8px;">VARCHAR(100)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Name of the AI model (e.g., 'gpt-4', 'claude-3', 'grok')</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>enabled</code></td>
+                    <td style="padding: 8px;">BOOLEAN</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">1 (true)</td>
+                    <td style="padding: 8px;">Whether this configuration is active</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>api_endpoint</code></td>
+                    <td style="padding: 8px;">VARCHAR(500)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">API endpoint URL for the model provider</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>api_key_encrypted</code></td>
+                    <td style="padding: 8px;">VARCHAR(512)</td>
+                    <td style="padding: 8px;">YES</td>
+                    <td style="padding: 8px;">NULL</td>
+                    <td style="padding: 8px;">Encrypted API key for authentication</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>temperature</code></td>
+                    <td style="padding: 8px;">FLOAT</td>
+                    <td style="padding: 8px;">YES</td>
+                    <td style="padding: 8px;">NULL</td>
+                    <td style="padding: 8px;">Temperature parameter for LLM (0.0 to 2.0 typically)</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>max_tokens</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">YES</td>
+                    <td style="padding: 8px;">NULL</td>
+                    <td style="padding: 8px;">Maximum number of tokens for response</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>search_docs_automatically</code></td>
+                    <td style="padding: 8px;">BOOLEAN</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">1 (true)</td>
+                    <td style="padding: 8px;">Enable automatic documentation search during model queries</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>allow_web_search</code></td>
+                    <td style="padding: 8px;">BOOLEAN</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">0 (false)</td>
+                    <td style="padding: 8px;">Allow model to perform web searches</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>allow_code_search</code></td>
+                    <td style="padding: 8px;">BOOLEAN</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">0 (false)</td>
+                    <td style="padding: 8px;">Allow model to search codebase for relevant code examples</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>priority</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">1</td>
+                    <td style="padding: 8px;">Priority order when multiple models available for role</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>created_at</code></td>
+                    <td style="padding: 8px;">TIMESTAMP</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">CURRENT_TIMESTAMP</td>
+                    <td style="padding: 8px;">Configuration creation timestamp</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>updated_at</code></td>
+                    <td style="padding: 8px;">TIMESTAMP</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP</td>
+                    <td style="padding: 8px;">Last modification timestamp</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Result Class Methods</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.1 is_enabled</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Check if this configuration is currently enabled.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$is_enabled = $config->is_enabled();
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Boolean value (1 if enabled, 0 if disabled).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.2 get_decrypted_api_key</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Decrypt and return the API key for secure use.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$api_key = $config->get_decrypted_api_key($encryption_key);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$encryption_key: Encryption key for decryption (string)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Decrypted API key string or undef if no encrypted key exists.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE EXAMPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">6. Usage Examples</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.1 Retrieve Model Configuration for Role</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">use Comserv::Model::Schema::Ency::Result::AiModelConfig;
+
+# Get configuration for admin role in site 1
+my $schema = $c->model('DBEncy')->schema;
+my $config = $schema->resultset('AiModelConfig')->search({
+    site_id => 1,
+    role => 'admin',
+    enabled => 1
+}, { order_by => 'priority' })->first;
+
+if ($config) {
+    print "Model: " . $config->model_name . "\n";
+    print "Endpoint: " . $config->api_endpoint . "\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.2 Get Decrypted API Key</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $config = $schema->resultset('AiModelConfig')->find(1);
+
+# Decrypt API key using application's encryption key
+my $encryption_key = $c->config->{api_encryption_key};
+my $api_key = $config->get_decrypted_api_key($encryption_key);
+
+if ($api_key) {
+    # Use API key for authentication
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.3 Find All Configurations for Agent Type</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema = $c->model('DBEncy')->schema;
+
+# Find all configs for 'documentation-sync' agent in all sites
+my @configs = $schema->resultset('AiModelConfig')->search({
+    agent_type => 'documentation-sync',
+    enabled => 1
+}, { order_by => ['site_id', 'priority'] })->all;
+
+foreach my $config (@configs) {
+    print "Site " . $config->site_id . ": " . $config->model_name . "\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.4 Check if Code Search is Allowed</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $config = $schema->resultset('AiModelConfig')->find($id);
+
+if ($config->is_enabled && $config->allow_code_search) {
+    # Perform code search with this model
+    my @code_results = search_codebase($query);
+}
+</pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CONSTRAINTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="constraints" style="color: var(--text-color); font-family: var(--header-font);">7. Database Constraints</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.1 Primary Key</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><code>id</code> - Auto-incrementing primary key</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.2 Unique Constraint</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Composite unique constraint on: <code>(site_id, role, agent_type, model_name)</code></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Prevents duplicate configurations for the same site, role, agent type, and model combination. Ensures configuration uniqueness across multi-dimensional key space.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">8. See Also</h2>
+            <div style="background-color: var(--success-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/models/DBEncy" style="color: var(--link-color);">DBEncy Model</a> - ENCY database schema and operations</li>
+                    <li><a href="/Documentation/system/AiIntegration" style="color: var(--link-color);">AI Integration</a> - Overall AI integration architecture</li>
+                    <li><a href="/Documentation/utilities/Encryption" style="color: var(--link-color);">Encryption Utilities</a> - API key encryption and decryption</li>
+                    <li>DBIx::Class Documentation - ORM framework reference</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row" style="margin-top: var(--spacing-xlarge); padding-top: var(--spacing-large); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+                Documentation for Comserv::Model::Schema::Ency::Result::AiModelConfig | Version 0.01 | Last Updated: 2026-01-11 16:02:00 UTC | Maintained by DocumentationSyncAgent
+            </p>
+        </div>
+    </div>
+</div>

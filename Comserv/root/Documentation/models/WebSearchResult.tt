@@ -1,0 +1,542 @@
+[% META
+    title = 'WebSearchResult Model - Web Search Result Storage and Verification'
+    description = 'Comprehensive documentation for WebSearchResult model covering database schema, source types, verification workflow, user associations, and usage examples for managing web search results'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,search-integration,verification'
+    page_version = '0.03'
+    last_updated = '2026-01-11'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/WebSearchResult.tt,v 0.03 2026/01/11 DocumentationSyncAgent Exp - Version consolidation from 1.00; all API methods and schema validated against HEAD' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="websearchresult-model">WebSearchResult Model - Web Search Result Storage and Verification</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#source-types">Supported Source Types</a></li>
+                    <li><a href="#verification-workflow">Verification Workflow</a></li>
+                    <li><a href="#relationships">User Relationships & References</a></li>
+                    <li><a href="#api-methods">API Methods & Helpers</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v0.03 - Jan 11, 2026)</h3>
+                <p><strong>Version Consolidation Update:</strong> Consolidated from v1.00 to v0.03. All database schema relationships verified against HEAD. Verification workflow and user association methods confirmed current.</p>
+                <p><strong>Previous v1.00 Changes (Jan 9, 2026):</strong></p>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for WebSearchResult model</li>
+                    <li><strong>Verification Workflow:</strong> Documented multi-state verification system (pending/verified/rejected)</li>
+                    <li><strong>Source Types:</strong> Documented support for 5 source types (web, public_domain_book, arxiv, github, stackoverflow)</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>WebSearchResult</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm) 
+                    provides a database schema for storing and managing web search results in the Comserv application. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Capture and storage of search results from multiple sources (web, arxiv, GitHub, StackOverflow, etc.)</li>
+                    <li>Multi-stage verification workflow (unverified → verified/rejected)</li>
+                    <li>User association (who found the result, who verified it)</li>
+                    <li>Rich content storage (snippet + full content)</li>
+                    <li>Integration with AI messages for citation tracking</li>
+                    <li>Automatic timestamp management (created_at, verified_at)</li>
+                    <li>Role-based verification permissions (admin-only verification)</li>
+                </ul>
+                <p>
+                    WebSearchResult serves as a critical component of the Documentation and Knowledge Management System (E.2 integration), 
+                    allowing the application to store, verify, and cite external web sources in AI-generated responses.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: websearchresult</h3>
+                <p><strong>Purpose:</strong> Store web search results, source metadata, and verification status</p>
+                <p><strong>Primary Key:</strong> id (auto-increment)</p>
+                <p><strong>Key Indexes:</strong> None explicitly defined (consider adding on found_by_user_id, verified_by_user_id)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>auto_increment</td>
+                        <td>Primary key - auto-generated result ID</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>query</td>
+                        <td>VARCHAR(500)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Search query that produced this result (REQUIRED, up to 500 chars)</td>
+                    </tr>
+                    <tr>
+                        <td>result_title</td>
+                        <td>VARCHAR(512)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Title/heading of the search result (REQUIRED, up to 512 chars)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>result_url</td>
+                        <td>VARCHAR(1000)</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>URL of the search result (REQUIRED, up to 1000 chars)</td>
+                    </tr>
+                    <tr>
+                        <td>result_snippet</td>
+                        <td>LONGTEXT</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Short excerpt from result (REQUIRED, unlimited length)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>full_content</td>
+                        <td>LONGTEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Complete content from the result page (optional, populated after full fetch)</td>
+                    </tr>
+                    <tr>
+                        <td>source_type</td>
+                        <td>ENUM</td>
+                        <td>NO</td>
+                        <td>'web'</td>
+                        <td>Source type: 'web', 'public_domain_book', 'arxiv', 'github', 'stackoverflow' (default: 'web')</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>found_by_user_id</td>
+                        <td>INTEGER</td>
+                        <td>NO</td>
+                        <td>REQUIRED</td>
+                        <td>Foreign key to User table - who discovered this result (REQUIRED)</td>
+                    </tr>
+                    <tr>
+                        <td>is_verified</td>
+                        <td>BOOLEAN</td>
+                        <td>NO</td>
+                        <td>0</td>
+                        <td>Verification status: 0=unverified, 1=verified, -1=rejected (default: 0)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>verified_by_user_id</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Foreign key to User table - admin who verified this result (optional)</td>
+                    </tr>
+                    <tr>
+                        <td>verification_notes</td>
+                        <td>TEXT</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Notes from verifier (reason for verification/rejection)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>created_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>NO</td>
+                        <td>CURRENT_TIMESTAMP</td>
+                        <td>Timestamp when result was discovered (auto-set)</td>
+                    </tr>
+                    <tr>
+                        <td>verified_at</td>
+                        <td>TIMESTAMP</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Timestamp when result was verified/rejected (optional)</td>
+                    </tr>
+                    <tr style="background-color: var(--secondary-color);">
+                        <td>used_in_ai_message_id</td>
+                        <td>INTEGER</td>
+                        <td>YES</td>
+                        <td>NULL</td>
+                        <td>Foreign key to AiMessage table - if cited in AI response (optional)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <section id="source-types">
+                <h2>Supported Source Types</h2>
+                <p>WebSearchResult supports 5 different source types to handle diverse information sources:</p>
+                
+                <h3>Web Sources</h3>
+                <ul>
+                    <li><strong>'web':</strong> Standard web pages from search engines (default)</li>
+                    <li><strong>'public_domain_book':</strong> Results from Project Gutenberg or similar public domain sources</li>
+                    <li><strong>'arxiv':</strong> Academic papers from arXiv.org (preprints and published papers)</li>
+                    <li><strong>'github':</strong> Code repositories and documentation from GitHub</li>
+                    <li><strong>'stackoverflow':</strong> Questions and answers from StackOverflow</li>
+                </ul>
+                
+                <h3>Source Type Usage</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $result = $schema->resultset('WebSearchResult')->create({
+    query => 'Perl Catalyst authentication',
+    result_title => 'Authentication in Catalyst',
+    result_url => 'https://github.com/Catalyst/Catalyst-Runtime',
+    result_snippet => 'Catalyst provides built-in authentication plugins...',
+    source_type => 'github',
+    found_by_user_id => 42
+});
+
+# Query by source type
+my @academic = $schema->resultset('WebSearchResult')->search({
+    source_type => 'arxiv'
+})->all;</code></pre>
+                </div>
+            </section>
+
+            <section id="verification-workflow">
+                <h2>Verification Workflow</h2>
+                
+                <h3>Verification States</h3>
+                <ul>
+                    <li><strong>is_verified = 0 (UNVERIFIED):</strong> Initial state when result is discovered. Requires admin review.</li>
+                    <li><strong>is_verified = 1 (VERIFIED):</strong> Result approved by admin. Safe to cite in AI responses.</li>
+                    <li><strong>is_verified = -1 (REJECTED):</strong> Result flagged as inaccurate or inappropriate. Should not be cited.</li>
+                </ul>
+
+                <h3>Typical Verification Flow</h3>
+                <ol>
+                    <li><strong>Discovery:</strong> Search result captured → is_verified = 0 (unverified)</li>
+                    <li><strong>Admin Review:</strong> Admin evaluates result quality and accuracy</li>
+                    <li><strong>Decision:</strong> Admin approves (verified=1) or rejects (verified=-1) with notes</li>
+                    <li><strong>Timestamping:</strong> verified_at and verified_by_user_id recorded</li>
+                    <li><strong>Citation:</strong> Only verified results (is_verified=1) can be cited in AI messages</li>
+                </ol>
+
+                <h3>Helper Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>is_pending_verification():</strong> Check if result needs admin review</p>
+                    <pre><code>if ($result->is_pending_verification) {
+    print "Waiting for admin approval\n";
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>can_be_verified($user_role):</strong> Check if user can verify results</p>
+                    <pre><code>if ($result->can_be_verified($user->role)) {
+    # Show verification UI
+}</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>mark_as_verified($user_id, $notes):</strong> Approve result</p>
+                    <pre><code>$result->mark_as_verified(42, 'Accurate and relevant source');</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>mark_as_rejected($user_id, $notes):</strong> Reject result</p>
+                    <pre><code>$result->mark_as_rejected(42, 'Outdated information - 2015 version');</code></pre>
+                </div>
+            </section>
+
+            <section id="relationships">
+                <h2>User Relationships & References</h2>
+                
+                <h3>Many-to-One Relationships</h3>
+                <ul>
+                    <li><strong>belongs_to 'found_by_user':</strong> User who discovered this result
+                        <ul>
+                            <li>Foreign Key: WebSearchResult.found_by_user_id → User.id</li>
+                            <li>Usage: <code>my $finder = $result->found_by_user;</code></li>
+                            <li>Purpose: Audit trail of who added the result</li>
+                        </ul>
+                    </li>
+                    <li><strong>belongs_to 'verified_by_user':</strong> Admin who approved/rejected result (optional, left join)
+                        <ul>
+                            <li>Foreign Key: WebSearchResult.verified_by_user_id → User.id (LEFT JOIN)</li>
+                            <li>Usage: <code>my $approver = $result->verified_by_user;</code></li>
+                            <li>Purpose: Track who made verification decision</li>
+                        </ul>
+                    </li>
+                    <li><strong>belongs_to 'ai_message':</strong> AI message that cited this result (optional, left join)
+                        <ul>
+                            <li>Foreign Key: WebSearchResult.used_in_ai_message_id → AiMessage.id (LEFT JOIN)</li>
+                            <li>Usage: <code>my $citation = $result->ai_message;</code></li>
+                            <li>Purpose: Track where results are used in AI responses</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods & Helpers</h2>
+                
+                <h3>Standard DBIx::Class Methods</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Creating Results:</strong></p>
+                    <pre><code>my $result = $schema->resultset('WebSearchResult')->create({
+    query => 'Perl DBI tutorial',
+    result_title => 'DBI Perl Database Interface',
+    result_url => 'https://dbi.perl.org/',
+    result_snippet => 'The DBI is the standard Perl interface to databases...',
+    source_type => 'web',
+    found_by_user_id => 42
+});</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Retrieving Results:</strong></p>
+                    <pre><code>my $result = $schema->resultset('WebSearchResult')->find(100);
+
+my @unverified = $schema->resultset('WebSearchResult')->search({
+    is_verified => 0
+})->all;
+
+my @verified = $schema->resultset('WebSearchResult')->search({
+    is_verified => 1
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Updating Results:</strong></p>
+                    <pre><code>$result->update({
+    full_content => $fetched_page_content
+});
+
+$result->result_snippet('Updated snippet...');
+$result->source_type('arxiv');
+$result->update;</code></pre>
+                </div>
+
+                <h3>Query Patterns</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Find by Query:</strong></p>
+                    <pre><code>my @results = $schema->resultset('WebSearchResult')->search({
+    query => 'Catalyst web framework'
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Find Cited Results:</strong></p>
+                    <pre><code>my @cited = $schema->resultset('WebSearchResult')->search({
+    used_in_ai_message_id => { '!=' => undef }
+})->all;</code></pre>
+                </div>
+
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <p><strong>Find Awaiting Verification:</strong></p>
+                    <pre><code>my @pending = $schema->resultset('WebSearchResult')->search({
+    is_verified => 0
+}, {
+    order_by => { -asc => 'created_at' }
+})->all;</code></pre>
+                </div>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Store Search Result from Web Search</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use JSON::MaybeXS;
+
+my $search_result = {
+    title => 'Introduction to Perl Regular Expressions',
+    url => 'https://perldoc.perl.org/perlre',
+    snippet => 'Perl regular expressions are powerful pattern matching...',
+    query => 'Perl regex tutorial'
+};
+
+my $stored = $schema->resultset('WebSearchResult')->create({
+    query => $search_result->{query},
+    result_title => $search_result->{title},
+    result_url => $search_result->{url},
+    result_snippet => $search_result->{snippet},
+    source_type => 'web',
+    found_by_user_id => $current_user->id
+});
+
+print "Stored result #" . $stored->id . " awaiting verification\n";</code></pre>
+                </div>
+
+                <h3>Example 2: Admin Verification Workflow</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my @pending = $schema->resultset('WebSearchResult')->search({
+    is_verified => 0
+}, { 
+    order_by => { -asc => 'created_at' },
+    rows => 10
+})->all;
+
+foreach my $result (@pending) {
+    my $finder = $result->found_by_user;
+    print "Result: " . $result->result_title . "\n";
+    print "Found by: " . $finder->username . "\n";
+    print "Source: " . $result->source_type . "\n";
+    
+    if ($is_admin && $is_valid) {
+        $result->mark_as_verified(
+            $admin_user->id,
+            'Verified - reputable source'
+        );
+    }
+}</code></pre>
+                </div>
+
+                <h3>Example 3: Citation in AI Message</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $verified = $schema->resultset('WebSearchResult')->search({
+    is_verified => 1,
+    source_type => 'arxiv'
+})->first;
+
+if ($verified) {
+    my $ai_message = $schema->resultset('AiMessage')->create({
+        conversation_id => $conv_id,
+        role => 'assistant',
+        content => 'According to the paper...',
+        sources_cited => JSON::MaybeXS::encode_json([$verified->id])
+    });
+    
+    $verified->update({
+        used_in_ai_message_id => $ai_message->id
+    });
+}</code></pre>
+                </div>
+
+                <h3>Example 4: Reject Inaccurate Result</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>my $result = $schema->resultset('WebSearchResult')->find(456);
+
+if ($result->is_pending_verification) {
+    my $admin = $schema->resultset('User')->find(10);
+    
+    $result->mark_as_rejected(
+        $admin->id,
+        'Source no longer maintained - last update 2018'
+    );
+    
+    print "Result rejected: " . $result->verification_notes . "\n";
+}</code></pre>
+                </div>
+
+                <h3>Example 5: Fetch and Update Full Content</h3>
+                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                    <pre><code>use LWP::UserAgent;
+
+my $result = $schema->resultset('WebSearchResult')->find(200);
+
+my $ua = LWP::UserAgent->new;
+my $response = $ua->get($result->result_url);
+
+if ($response->is_success) {
+    $result->update({
+        full_content => $response->content
+    });
+    print "Content fetched and stored\n";
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <div class="alert alert-warning">
+                    <h3>Issue 1: Verification Status Not Updating</h3>
+                    <p><strong>Problem:</strong> After calling mark_as_verified(), the result still shows is_verified=0</p>
+                    <p><strong>Cause:</strong> Helper method doesn't explicitly save; need to verify update() succeeded</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $success = $result->mark_as_verified($admin_id, 'notes');
+if (!$success) {
+    warn "Update failed: " . $result->error;
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 2: NULL verified_by_user Relationship</h3>
+                    <p><strong>Problem:</strong> Calling $result->verified_by_user returns undef for unverified results</p>
+                    <p><strong>Cause:</strong> verified_by_user_id is NULL until verified; relationship uses LEFT JOIN</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $verifier = $result->verified_by_user;
+my $verifier_name = $verifier ? $verifier->username : 'Pending';</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 3: Large Snippets Causing Display Issues</h3>
+                    <p><strong>Problem:</strong> result_snippet with 10K+ characters breaks UI layout</p>
+                    <p><strong>Cause:</strong> LONGTEXT field allows unlimited size; no truncation in model</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $preview = substr($result->result_snippet, 0, 500) . '...';
+# Or add method to model for consistent truncation</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 4: Orphaned Results (used_in_ai_message_id points to deleted message)</h3>
+                    <p><strong>Problem:</strong> Result references AI message that was deleted</p>
+                    <p><strong>Cause:</strong> No cascade delete; manual cleanup needed</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code># Find orphaned results
+my @orphaned = $schema->resultset('WebSearchResult')->search({
+    used_in_ai_message_id => { '!=' => undef }
+})->all;
+
+foreach my $result (@orphaned) {
+    unless ($result->ai_message) {
+        $result->update({ used_in_ai_message_id => undef });
+    }
+}</code></pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <h3>Issue 5: URL Length Exceeding 1000 Characters</h3>
+                    <p><strong>Problem:</strong> Error: "result_url exceeds max length 1000"</p>
+                    <p><strong>Cause:</strong> Some URLs with query strings are very long</p>
+                    <p><strong>Solution:</strong></p>
+                    <pre><code>my $url = $long_url;
+if (length($url) > 1000) {
+    # Store short URL, full URL in metadata
+    my $short = substr($url, 0, 990);
+    $result->result_url($short);
+}
+# Or use URL shortening service</code></pre>
+                </div>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/AiMessage">AiMessage Model</a> - Messages citing search results</li>
+                        <li><a href="/Documentation/models/AiConversation">AiConversation Model</a> - Conversation context for searches</li>
+                        <li><a href="/Documentation/models/User">User Model</a> - User associations (finders, verifiers)</li>
+                        <li><a href="/Documentation/features">Feature: Web Search Integration</a> - High-level search workflows</li>
+                    </ul>
+                </div>
+            </section>
+
+            <div class="last-updated">
+                <small>Last updated: <span id="update-date">2026-01-09</span></small>
+            </div>
+        </div>
+    </div>
+</div>

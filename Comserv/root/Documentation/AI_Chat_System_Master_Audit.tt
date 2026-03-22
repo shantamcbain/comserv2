@@ -1,0 +1,603 @@
+[% META
+   title = "AI Chat System - Master Audit & Implementation Status"
+   description = "Comprehensive unified audit of Comserv AI Chat System including current implementation status, all involved files, phase breakdown, requirements matrix, and documentation index. Single source of truth for AI Chat scope and progress."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "ai,audit,implementation,architecture"
+   page_version = "0.01"
+   last_updated = "Tue Jan 06 05:15:00 UTC 2026"
+   site_specific = "false"
+   author = "MainAgent / Zencoder"
+%]
+[% PageVersion = 'Documentation/AI_Chat_System_Master_Audit.tt,v 0.01 2026/01/06 05:15:00 zencoder Exp - Comprehensive master audit consolidating 7 existing AI Chat docs into single source of truth' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Chat System - Master Audit & Implementation Status</h1>
+    <h2 style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-large); margin-top: 0;">Comprehensive Consolidation of AI Chat Documentation</h2>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Created: 2026-01-06 05:15 UTC | 
+        Version: 0.01 (Master Index) | 
+        Status: Phase 1 COMPLETE, Phases 2-4 PLANNED | 
+        Consolidates: 7 existing documentation files + codebase scan + status tracking
+    </div>
+
+    <!-- QUICK NAVIGATION -->
+    <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <h3 style="color: #1976d2; margin-top: 0;">📋 Quick Navigation (Jump to Section)</h3>
+        <ul style="margin: 10px 0; color: #1976d2;">
+            <li><a href="#executive-summary" style="color: #2196f3; text-decoration: none;">Executive Summary</a> - Current status snapshot</li>
+            <li><a href="#phase-status" style="color: #2196f3; text-decoration: none;">Phase Implementation Status</a> - What's done, what's planned</li>
+            <li><a href="#files-involved" style="color: #2196f3; text-decoration: none;">All Files Involved</a> - Code, documentation, models</li>
+            <li><a href="#feature-requirements" style="color: #2196f3; text-decoration: none;">Feature Requirements Matrix</a> - 12 requirements breakdown</li>
+            <li><a href="#database-schema" style="color: #2196f3; text-decoration: none;">Database Tables</a> - 6 tables with field definitions</li>
+            <li><a href="#documentation-index" style="color: #2196f3; text-decoration: none;">Documentation Index</a> - Map of 7+ docs</li>
+            <li><a href="#implementation-timeline" style="color: #2196f3; text-decoration: none;">Implementation Timeline</a> - Phases 2-5 schedule</li>
+        </ul>
+    </div>
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div class="content-section">
+        <h2 id="executive-summary" style="color: var(--text-color); font-family: var(--header-font);">1. Executive Summary</h2>
+        
+        <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #155724;">✅ Current Status: Phase 1 COMPLETE</h3>
+            <p style="color: #155724; margin: 5px 0;"><strong>Database & Model Layer:</strong> All 6 Result classes created, tables initialized at startup, automated in production</p>
+            <p style="color: #155724; margin: 5px 0;"><strong>Timeline:</strong> Phase 1 complete (Dec 25, 2025), Phases 2-5 planned for 8-10 weeks starting Jan 2026</p>
+            <p style="color: #155724; margin: 5px 0;"><strong>Scope:</strong> Intelligent AI Chat widget with doc search, code search, web search, role-based access, multi-model support, conversation resume, Grok API integration, admin controls</p>
+        </div>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">The AI Chat System</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);">Comserv is implementing an advanced AI Chat system that enables users to:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Chat Widget:</strong> Access AI in lower-right corner (visible to all users)</li>
+            <li><strong>Documentation Search:</strong> AI automatically searches /Documentation/ metadata index</li>
+            <li><strong>Code Search:</strong> Developers/admins can search application source code</li>
+            <li><strong>Web Search:</strong> Optional web search with admin verification workflow</li>
+            <li><strong>Multi-Model:</strong> Ollama (all users), XAI/Grok (dev/admin)</li>
+            <li><strong>Role-Based:</strong> Users only see documentation they have permission to access</li>
+            <li><strong>Conversation Resume:</strong> Users can search past conversations and resume with full context</li>
+            <li><strong>Audit Trail:</strong> All Q&A logged with user, timestamp, model, sources</li>
+        </ul>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Two Chat Systems in Comserv</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #d4edda; padding: 15px; border-radius: 4px; border-left: 4px solid #28a745;">
+                <h4 style="margin-top: 0; color: #155724;">✅ AI Chat (Modern)</h4>
+                <p style="color: #155724; margin: 5px 0;"><strong>Status:</strong> Implemented & active</p>
+                <p style="color: #155724; margin: 5px 0;"><strong>Tables:</strong> ai_conversations, ai_messages</p>
+                <p style="color: #155724; margin: 5px 0;"><strong>Controller:</strong> Comserv::Controller::AI</p>
+                <p style="color: #155724; margin: 5px 0;"><strong>Models:</strong> Full ORM, relationships working</p>
+                <p style="color: #155724; margin: 5px 0;"><strong>Data Persistence:</strong> ✅ Working</p>
+            </div>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 4px; border-left: 4px solid #ff9800;">
+                <h4 style="margin-top: 0; color: #856404;">⚠️ Basic Chat (Legacy)</h4>
+                <p style="color: #856404; margin: 5px 0;"><strong>Status:</strong> Implemented but no ORM</p>
+                <p style="color: #856404; margin: 5px 0;"><strong>Table:</strong> chat_messages</p>
+                <p style="color: #856404; margin: 5px 0;"><strong>Controller:</strong> Comserv::Controller::Chat</p>
+                <p style="color: #856404; margin: 5px 0;"><strong>Models:</strong> ❌ Missing ORM model</p>
+                <p style="color: #856404; margin: 5px 0;"><strong>Data Access:</strong> Raw SQL queries</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHASE STATUS -->
+    <div class="content-section">
+        <h2 id="phase-status" style="color: var(--text-color); font-family: var(--header-font);">2. Phase Implementation Status</h2>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Phase</th>
+                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Status</th>
+                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Duration</th>
+                    <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Key Deliverables</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #d4edda;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Phase 1:<br>Database & Model Layer</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #155724;"><strong>✅ COMPLETE</strong><br><br>Completed Dec 25, 2025</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">Completed</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #155724;">
+                        ✅ AiMessage.pm (extended)<br>
+                        ✅ DocumentationMetadataIndex.pm<br>
+                        ✅ CodeSearchIndex.pm<br>
+                        ✅ WebSearchResult.pm<br>
+                        ✅ AiModelConfig.pm<br>
+                        ✅ DocumentationRoleAccess.pm<br>
+                        ✅ All tables auto-initialized
+                    </td>
+                </tr>
+                <tr style="background: #fff3cd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Phase 2:<br>Backend Services</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #856404;"><strong>🔄 PLANNED</strong><br><br>Start Jan 8-15</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2-3 weeks</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #856404;">
+                        • DocumentationIndexer service<br>
+                        • LLMOllama service<br>
+                        • LLMXAI service (encrypted)<br>
+                        • LLMGrok service (NEW)<br>
+                        • Extend AI controller<br>
+                        • Role-based filtering<br>
+                        • Model config endpoints
+                    </td>
+                </tr>
+                <tr style="background: #e3f2fd;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Phase 3:<br>Frontend & UI</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #1976d2;"><strong>🔄 PLANNED</strong><br><br>Start Jan 15+</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2-3 weeks</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #1976d2;">
+                        • Chat widget HTML/CSS<br>
+                        • Grok.ai UI design (NEW)<br>
+                        • JavaScript logic<br>
+                        • Model selector dropdown<br>
+                        • /ai/conversations page (NEW)<br>
+                        • Conversation resume (NEW)<br>
+                        • Widget injection
+                    </td>
+                </tr>
+                <tr style="background: #f3e5f5;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Phase 4:<br>Admin & Verification</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #7b1fa2;"><strong>🔄 PLANNED</strong><br><br>Start Jan 22+</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">2-3 weeks</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #7b1fa2;">
+                        • Admin panel for config<br>
+                        • Dynamic model assignment (NEW)<br>
+                        • Agent config UI (NEW)<br>
+                        • Grok API key mgmt (NEW)<br>
+                        • Web search approval<br>
+                        • Analytics dashboard
+                    </td>
+                </tr>
+                <tr style="background: #fce4ec;">
+                    <td style="padding: 12px; border: 1px solid #ddd;"><strong>Phase 5:<br>Integration & Polish</strong></td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #c2185b;"><strong>🔄 PLANNED</strong><br><br>Start Feb+</td>
+                    <td style="padding: 12px; border: 1px solid #ddd;">1-2 weeks</td>
+                    <td style="padding: 12px; border: 1px solid #ddd; color: #c2185b;">
+                        • Docker/K8s setup<br>
+                        • Encryption testing<br>
+                        • Code indexing<br>
+                        • Performance tuning<br>
+                        • Unit/integration tests
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FILES INVOLVED -->
+    <div class="content-section">
+        <h2 id="files-involved" style="color: var(--text-color); font-family: var(--header-font);">3. All Files Involved</h2>
+        
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">3.1 Controllers (Backend Entry Points)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">File</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Purpose</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>lib/Comserv/Controller/AI.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Main AI Chat controller - handles /ai/* routes, documentation search, code search</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Implemented</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>lib/Comserv/Controller/Chat.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Legacy Basic Chat controller - separate system</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Implemented</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">3.2 Result Classes / Models (Database ORM)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Result Class</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Database Table</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Purpose</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/AiMessage.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">ai_messages</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Stores individual messages in conversations</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Extended</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/AiConversation.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">ai_conversations</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Stores conversation sessions</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Exists</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/DocumentationMetadataIndex.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">documentation_metadata_index</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Metadata + searchable excerpts of .tt files</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Created</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/CodeSearchIndex.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">code_search_index</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Index of .pm and .tt code for search</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Created</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/WebSearchResult.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">web_search_results</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Stores unverified web search results</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Created</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/AiModelConfig.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">ai_model_config</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Admin config for model access per role</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Created</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>Ency/Result/DocumentationRoleAccess.pm</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">documentation_role_access</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Fine-grained doc access by role</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Created</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">3.3 Templates (Frontend UI)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Template</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Purpose</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>root/ai/index.tt</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Chat widget template (injected on all pages)</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">🔄 Phase 3</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>root/ai/conversations.tt</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Conversation browser/resume page</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">🔄 Phase 3</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><code>root/admin/ai_config.tt</code></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Admin panel for model/agent config</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">🔄 Phase 4</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- FEATURE REQUIREMENTS -->
+    <div class="content-section">
+        <h2 id="feature-requirements" style="color: var(--text-color); font-family: var(--header-font);">4. Feature Requirements Matrix (12 Total)</h2>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Requirement</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Priority</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Phase</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Visible</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-1</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Chat widget in lower right (all users)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🔴 Critical</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">3</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Yes</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">AI searches documentation metadata index</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🔴 Critical</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Citations</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-3</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Role-based doc filtering</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🔴 Critical</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Transparent</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-4</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">All Q&A logged (user/time/model/sources)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🔴 Critical</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Admin only</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-5</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Model selection: Ollama for all; XAI/Grok for dev/admin</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">3</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Dropdown</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-6</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Web search with verification workflow</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">4</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Config</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-7</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Code search (dev/admin only)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Special</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-8</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Real-time doc index updates</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Backend</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-9</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Conversation resume page (/ai/conversations)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">3</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Yes</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-10</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Chat widget UI (Grok.ai aesthetic)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">3</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Yes</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-11</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Admin model/agent config (dynamic)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">4</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Admin</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">FR-12</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">Grok API integration (encrypted keys)</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">🟠 High</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">2</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">Config</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: #1976d2;">📊 Requirement Summary</h4>
+            <p style="color: #1976d2; margin: 5px 0;"><strong>4 Critical (FR-1 to FR-4):</strong> Core widget functionality, documentation search, role-based filtering, audit logging</p>
+            <p style="color: #1976d2; margin: 5px 0;"><strong>8 High (FR-5 to FR-12):</strong> Advanced features including model selection, web/code search, conversation resume, Grok API, admin controls</p>
+        </div>
+    </div>
+
+    <!-- DATABASE SCHEMA -->
+    <div class="content-section">
+        <h2 id="database-schema" style="color: var(--text-color); font-family: var(--header-font);">5. Database Tables & Schema</h2>
+        
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h4 style="margin-top: 0;">6 Tables Created / Extended</h4>
+            <p style="color: #666; margin: 5px 0; font-size: 13px;">All stored in <code>ENCY</code> database. Auto-initialized via DBIx::Class schema on startup.</p>
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">1. ai_messages (Extended)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Primary Key:</strong> id<br>
+            <strong>New Fields:</strong> agent_type, model_used, search_context (json), sources_cited (json), user_role, response_time_ms, tokens_used, is_verified
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">2. documentation_metadata_index (New)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Purpose:</strong> Metadata + searchable excerpts of .tt files (full content stays on disk)<br>
+            <strong>Key Fields:</strong> file_path (UNIQUE), title, searchable_text (FULLTEXT), content_hash, role_access (json), last_file_modified
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">3. code_search_index (New)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Purpose:</strong> Index of .pm and .tt code for developer/admin search<br>
+            <strong>Key Fields:</strong> file_path (UNIQUE), code_elements (json - functions/classes/line_numbers), searchable_code (FULLTEXT), min_role
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">4. web_search_results (New)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Purpose:</strong> Stores unverified web search results (before admin approval)<br>
+            <strong>Key Fields:</strong> query, result_url, is_verified (boolean), verified_by_user_id, used_in_ai_message_id
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">5. ai_model_config (New)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Purpose:</strong> Admin configuration for model access by role<br>
+            <strong>Key Fields:</strong> role, agent_type, model_name, api_endpoint, api_key_encrypted, enabled, priority
+        </div>
+
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">6. documentation_role_access (New)</h4>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 12px; overflow-x: auto;">
+            <strong>Purpose:</strong> Fine-grained role-based access to documentation sections<br>
+            <strong>Key Fields:</strong> role, doc_section_pattern (e.g., 'admin/*'), can_access (boolean)
+        </div>
+    </div>
+
+    <!-- DOCUMENTATION INDEX -->
+    <div class="content-section">
+        <h2 id="documentation-index" style="color: var(--text-color); font-family: var(--header-font);">6. Documentation Files Index (Complete Map)</h2>
+        
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 20px;">This master audit consolidates information from 7+ existing AI Chat documentation files into a single source of truth. Below is the complete map with links to each file and what it contains.</p>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+                <tr style="background: #0066cc; color: white;">
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Documentation File</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Version</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Size</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Primary Content</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #d4edda;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" target="_blank" style="color: #155724; text-decoration: none;">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">0.05 (Jan 6)</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">57K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>PRIMARY PLAN:</strong> 12 feature requirements, 5-phase implementation, architecture overview, security specs</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/ai_chat_system_audit" target="_blank" style="color: #0066cc; text-decoration: none;">ai_chat_system_audit.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">1.01 (Jan 2)</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">53K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>SYSTEM AUDIT:</strong> Complete audit of both chat systems (AI Chat modern + Basic Chat legacy), schema analysis, data flow</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_Chat_Interface_Architecture_Audit" target="_blank" style="color: #0066cc; text-decoration: none;">AI_Chat_Interface_Architecture_Audit.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">0.02 (Jan 6)</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">46K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>ARCHITECTURE VERIFIED:</strong> Widget persistence, database schema verification, widget vs admin interface verification</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_Chat_Schema_Documentation" target="_blank" style="color: #0066cc; text-decoration: none;">AI_Chat_Schema_Documentation.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">0.01</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">25K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>SCHEMA DETAILS:</strong> Result class definitions, field documentation, type specifications</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_Chat_System_Fixes_Dec26" target="_blank" style="color: #0066cc; text-decoration: none;">AI_Chat_System_Fixes_Dec26.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">1.0</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">24K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>FIX HISTORY:</strong> Fixes applied Dec 25-26 (metadata column, initialization issues)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_Chat_Conversation_Saving_Fix" target="_blank" style="color: #0066cc; text-decoration: none;">AIChatConversationSavingFix.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">1.0</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">15K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>SPECIFIC FIX:</strong> Conversation persistence fix (metadata storage regression)</td>
+                </tr>
+                <tr style="background: #f5f5f5;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong><a href="/Documentation/AI_Chat_Multi_Turn_Conversation_Fix" target="_blank" style="color: #0066cc; text-decoration: none;">AI_Chat_Multi_Turn_Conversation_Fix.tt</a></strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">1.0</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">16K</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>SPECIFIC FIX:</strong> Multi-turn conversation handling and context preservation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: #856404;">📌 Documentation Navigation Guide</h4>
+            <ul style="color: #856404; margin: 10px 0;">
+                <li><strong>Want the Plan?</strong> → Read <a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" style="color: #ff6f00; text-decoration: none;">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</a> (Requirements, phases, timeline)</li>
+                <li><strong>Want Current State?</strong> → Read <a href="/Documentation/ai_chat_system_audit" style="color: #ff6f00; text-decoration: none;">ai_chat_system_audit.tt</a> (What works, what doesn't, schema status)</li>
+                <li><strong>Want Architecture Details?</strong> → Read <a href="/Documentation/AI_Chat_Interface_Architecture_Audit" style="color: #ff6f00; text-decoration: none;">AI_Chat_Interface_Architecture_Audit.tt</a> (Verified architecture, database design)</li>
+                <li><strong>Want Quick Reference?</strong> → This file (<a href="/Documentation/AI_Chat_System_Master_Audit" style="color: #ff6f00; text-decoration: none;">AI_Chat_System_Master_Audit.tt</a>) consolidates all 7 docs into one index</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- IMPLEMENTATION TIMELINE -->
+    <div class="content-section">
+        <h2 id="implementation-timeline" style="color: var(--text-color); font-family: var(--header-font);">7. Implementation Timeline (Phases 2-5)</h2>
+        
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h4 style="margin-top: 0;">Total Duration: 8-10 weeks (Jan 8 → Mar 1, 2026)</h4>
+            <p style="color: #666; font-size: 13px; margin: 5px 0;"><strong>Note:</strong> Phase 1 (Database & Model Layer) is already complete. Phases 2-5 begin Jan 8 and run in sequence.</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+            <div style="display: grid; grid-template-columns: 1fr 3fr; gap: 20px; margin-bottom: 20px;">
+                <div style="background: #fff3cd; padding: 15px; border-radius: 4px; border-left: 4px solid #ff9800;">
+                    <h4 style="margin-top: 0; color: #856404;">Phase 2 (Backend)</h4>
+                    <p style="color: #856404; margin: 5px 0;"><strong>Duration:</strong> 2-3 weeks</p>
+                    <p style="color: #856404; margin: 5px 0;"><strong>Start:</strong> Jan 8-15</p>
+                </div>
+                <div style="background: #f0f8f4; padding: 15px; border-radius: 4px;">
+                    <p style="margin: 0; color: #333;"><strong>Services to implement:</strong></p>
+                    <ul style="margin: 10px 0; color: #333; font-size: 13px;">
+                        <li>DocumentationIndexer (scan .tt files, build metadata index)</li>
+                        <li>LLMOllama service (local model via API)</li>
+                        <li>LLMXAI service (encrypted API key management)</li>
+                        <li>LLMGrok service (Grok API integration)</li>
+                        <li>Extend AI controller with search/response logic</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 3fr; gap: 20px; margin-bottom: 20px;">
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; border-left: 4px solid #2196f3;">
+                    <h4 style="margin-top: 0; color: #1976d2;">Phase 3 (Frontend)</h4>
+                    <p style="color: #1976d2; margin: 5px 0;"><strong>Duration:</strong> 2-3 weeks</p>
+                    <p style="color: #1976d2; margin: 5px 0;"><strong>Start:</strong> Jan 15+</p>
+                </div>
+                <div style="background: #f0f8f4; padding: 15px; border-radius: 4px;">
+                    <p style="margin: 0; color: #333;"><strong>UI to implement:</strong></p>
+                    <ul style="margin: 10px 0; color: #333; font-size: 13px;">
+                        <li>Chat widget HTML/CSS (theme-compatible, Grok.ai aesthetic)</li>
+                        <li>JavaScript message handling + model selector dropdown</li>
+                        <li>/ai/conversations page (search, filter, resume conversation)</li>
+                        <li>Inject widget on all pages</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 3fr; gap: 20px; margin-bottom: 20px;">
+                <div style="background: #f3e5f5; padding: 15px; border-radius: 4px; border-left: 4px solid #7b1fa2;">
+                    <h4 style="margin-top: 0; color: #7b1fa2;">Phase 4 (Admin)</h4>
+                    <p style="color: #7b1fa2; margin: 5px 0;"><strong>Duration:</strong> 2-3 weeks</p>
+                    <p style="color: #7b1fa2; margin: 5px 0;"><strong>Start:</strong> Jan 22+</p>
+                </div>
+                <div style="background: #f0f8f4; padding: 15px; border-radius: 4px;">
+                    <p style="margin: 0; color: #333;"><strong>Admin features:</strong></p>
+                    <ul style="margin: 10px 0; color: #333; font-size: 13px;">
+                        <li>Model configuration UI (enable/disable per role)</li>
+                        <li>Agent configuration (enable/disable agents, default models)</li>
+                        <li>Grok API key management (encrypted storage)</li>
+                        <li>Web search approval workflow dashboard</li>
+                        <li>Analytics dashboard (usage, performance, errors)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 3fr; gap: 20px;">
+                <div style="background: #fce4ec; padding: 15px; border-radius: 4px; border-left: 4px solid #c2185b;">
+                    <h4 style="margin-top: 0; color: #c2185b;">Phase 5 (Polish)</h4>
+                    <p style="color: #c2185b; margin: 5px 0;"><strong>Duration:</strong> 1-2 weeks</p>
+                    <p style="color: #c2185b; margin: 5px 0;"><strong>Start:</strong> Feb+</p>
+                </div>
+                <div style="background: #f0f8f4; padding: 15px; border-radius: 4px;">
+                    <p style="margin: 0; color: #333;"><strong>Final integration:</strong></p>
+                    <ul style="margin: 10px 0; color: #333; font-size: 13px;">
+                        <li>Docker networking (prod Ollama at 192.168.1.199)</li>
+                        <li>Kubernetes encryption testing</li>
+                        <li>Code search indexing</li>
+                        <li>Performance tuning</li>
+                        <li>Unit & integration tests</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="content-section" style="margin-top: 40px; border-top: 2px solid #ddd; padding-top: 20px;">
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Document Management</h3>
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 4px;">
+            <p style="color: #666; font-size: 13px; margin: 5px 0;"><strong>This Master Audit (v0.01)</strong> consolidates information from 7 existing documentation files into a single unified source of truth for the AI Chat system. Updated regularly as phases progress.</p>
+            <p style="color: #666; font-size: 13px; margin: 5px 0;"><strong>Next Update:</strong> When Phase 2 begins (Jan 8) or significant changes occur. Will increment to v0.02.</p>
+            <p style="color: #666; font-size: 13px; margin: 5px 0;"><strong>Related Documents:</strong> For detailed information on specific topics, refer to the 7 source files listed in Section 6.</p>
+        </div>
+    </div>
+</div>

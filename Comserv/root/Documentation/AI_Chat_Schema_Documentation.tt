@@ -1,0 +1,318 @@
+[% META
+        title = "AI Chat Schema Documentation"
+   description = "Comprehensive documentation of AI Chat system database schema. ✅ COMPLETE - All Result classes created, tables generated, startup automation implemented (Dec 25, 2025)."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "database"
+   page_version = "0.02"
+   last_updated = "Thu Dec 25 22:06:00 UTC 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/AI_Chat_Schema_Documentation.tt,v 0.02 22:06:00 2025/12/25 zencoder Exp - Phase 1 COMPLETE: All Result classes created, tables generated in ENCY database, startup automation implemented' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">AI Chat Schema Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-25 22:06 UTC | 
+        Version: 0.02 |
+        Author: Shanta / Zencoder AI | 
+        Status: ✅ COMPLETE - All 6 tables created & automated startup initialized (Phase 1 Done)
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
+                <a href="#table-specs" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Table Specifications</a>
+                <a href="#data-flow" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Data Flow</a>
+                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access Control</a>
+                <a href="#relationships" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Relationships</a>
+                <a href="#performance" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Performance</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The AI Chat system uses a relational database schema to manage conversations, messages, documentation indexing, code searching, and AI model configuration. This schema is built using <strong>DBIx::Class Result classes</strong> (not raw SQL files) for type safety and version control.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Core Objectives</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Store AI conversations and messages with rich context</li>
+                <li>Index documentation for full-text search integration</li>
+                <li>Support code searching for developers</li>
+                <li>Manage web search results with verification workflow</li>
+                <li>Configure AI models per user role</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ARCHITECTURE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">2. System Architecture</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Database: ENCY (Primary)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">All AI Chat tables are in the ENCY database, collocated with other application tables.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Tables (6 Total)</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Table Name</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Purpose</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Status</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>ai_messages</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Chat messages with conversation context</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Result class exists</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>documentation_metadata_index</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Full-text search index with metadata</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Result class exists</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>documentation_role_access</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Role-based access control</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Result class exists</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>code_search_index</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Code search for developers</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Result class needed</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>web_search_results</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Web search results pending verification</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Result class needed</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>ai_model_config</strong></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AI model configuration by role</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Result class needed</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TABLE SPECIFICATIONS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="table-specs" style="color: var(--text-color); font-family: var(--header-font);">3. Table Specifications</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">✅ Implementation Status - COMPLETE (Dec 25, 2025)</h3>
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; margin: var(--spacing-small) 0; border-left: 4px solid var(--success-color); border-radius: 4px;">
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>✅ All AI Chat database tables created and automated startup initialization implemented</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0;">
+                    <li>✅ <strong>ai_messages</strong> - Result class with all fields and relationships</li>
+                    <li>✅ <strong>documentation_metadata_index</strong> - Full-text search with UNIQUE constraint on file_path</li>
+                    <li>✅ <strong>documentation_role_access</strong> - Fine-grained access control for documentation sections</li>
+                    <li>✅ <strong>code_search_index</strong> - Result class created with searchable code and metadata</li>
+                    <li>✅ <strong>web_search_results</strong> - Result class created with verification workflow support</li>
+                    <li>✅ <strong>ai_model_config</strong> - Result class created for per-role model configuration</li>
+                    <li>✅ <strong>DBSchemaManager Integration</strong> - Automated table creation from Result classes on startup</li>
+                    <li>✅ <strong>Database Verification</strong> - All tables present in ENCY database with correct columns</li>
+                </ul>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0; font-size: var(--font-size-small);"><strong>Last Updated:</strong> Thu Dec 25 2025 22:06 UTC | <strong>Completion Chats:</strong> 12-15 | <strong>Status:</strong> Phase 1 Complete, Ready for Backend Services (Phase 2)</p>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">See Result Class Development Guide</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Detailed information about creating Result classes is available in the <a href="/Documentation/Result_Class_Development_Guide" style="color: var(--link-color);">Result Class Development Guide</a>, which provides complete specifications for all table columns, indexes, relationships, and helper methods.</p>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- DATA FLOW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="data-flow" style="color: var(--text-color); font-family: var(--header-font);">4. Data Flow</h2>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>User Chat Input
+    ↓
+ai_messages (role='user')
+    ↓
+AI Processing (using ai_model_config)
+    ├─→ Search documentation_metadata_index
+    ├─→ Search code_search_index
+    └─→ Fetch web_search_results (if verified)
+    ↓
+ai_messages (role='assistant' with sources_cited)
+    ↓
+Document sources_cited JSON which references:
+    - documentation_metadata_index.file_path
+    - code_search_index.file_path
+    - web_search_results.id
+                </code></pre>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ACCESS CONTROL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="access-control" style="color: var(--text-color); font-family: var(--header-font);">5. Access Control</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">documentation_role_access Usage</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
+# Check if user can access documentation section
+my $index = $c->model('DBEncy')->resultset('DocumentationMetadataIndex')
+              ->find({file_path => 'admin/settings'});
+
+# Returns true/false based on documentation_role_access rules
+my $can_access = $index->can_user_access(['developer', 'user']);
+                </code></pre>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEARCH FUNCTIONALITY SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="relationships" style="color: var(--text-color); font-family: var(--header-font);">6. Search & Relationships</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Full-Text Search Examples</h3>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Documentation Search</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>SELECT * FROM documentation_metadata_index
+WHERE MATCH(searchable_text) AGAINST('user authentication' IN BOOLEAN MODE);
+                </code></pre>
+            </div>
+
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Code Search (developer only)</strong>:</p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>SELECT * FROM code_search_index
+WHERE min_role IN ('developer', 'admin')
+  AND MATCH(searchable_code) AGAINST('sub login_check' IN BOOLEAN MODE);
+                </code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Relationships Summary</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>ai_conversations
+    ↓
+    └─→ has_many ai_messages
+
+ai_messages
+    ├─→ belongs_to ai_conversations
+    ├─→ belongs_to users (optional)
+    └─→ has_many web_search_results (via used_in_ai_message_id)
+
+documentation_metadata_index
+    └─→ has_many ai_messages (reverse relation, via sources_cited)
+
+web_search_results
+    ├─→ belongs_to users (found_by_user_id)
+    ├─→ belongs_to users (verified_by_user_id)
+    └─→ belongs_to ai_messages (used_in_ai_message_id)
+
+code_search_index
+    └─→ [independent - referenced by ai_messages.sources_cited]
+
+ai_model_config
+    └─→ [independent - configuration lookup by (role, agent_type)]
+
+documentation_role_access
+    └─→ [independent - access control lookup by (role, doc_section_pattern)]
+                </code></pre>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PERFORMANCE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="performance" style="color: var(--text-color); font-family: var(--header-font);">7. Performance Considerations</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Indexes Enabled</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>FULLTEXT indexes on <code>searchable_text</code> and <code>searchable_code</code> for fast searches</li>
+                <li>UNIQUE constraints on file_path to prevent duplicates</li>
+                <li>Regular indexes on frequently filtered columns</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Query Optimization</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Pre-index documentation files before large-scale use</li>
+                <li>Cache ai_model_config lookups (rarely changes)</li>
+                <li>Archive old web_search_results to maintain performance</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--link-color);">Result Class Development Guide</a> - Creating Result classes for tables</li>
+                    <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--link-color);">DBSchemaManager Usage Guide</a> - Schema management and discovery</li>
+                    <li><a href="/Documentation/DATABASE_CONNECTION_STRATEGY" style="color: var(--link-color);">Database Connection Strategy</a> - Multi-database connection patterns</li>
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a> - Admin panel for schema management</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">7. See Also</h2>
+            
+            <div style="background: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 3px;">
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">📚 Related Schema Management Documentation</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0;"><strong>Comprehensive Schema Management Trilogy:</strong></p>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/Schema" style="color: var(--link-color);">Database Schema Management (Result Classes Approach)</a> - Overview, architecture, best practices for code-first schema management</li>
+                    <li><a href="/Documentation/DBSchemaManager_Usage_Guide" style="color: var(--link-color);">DBSchemaManager Usage Guide</a> - API reference and usage patterns for the schema management engine</li>
+                    <li><strong>AI Chat Schema Documentation (this file)</strong> - Real-world example of Result class implementation for the AI Chat System</li>
+                </ul>
+
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">🔗 Supporting Documentation</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" style="color: var(--link-color);">AI Chat Feature Specification</a> - Complete architecture with Section 3.3 Documentation Audit Status</li>
+                    <li><a href="/Documentation/Result_Class_Development_Guide" style="color: var(--link-color);">Result Class Development Guide</a> - Patterns and examples for creating Result classes</li>
+                    <li><a href="/Documentation/DATABASE_CONNECTION_STRATEGY" style="color: var(--link-color);">Database Connection Strategy</a> - Multi-database configuration</li>
+                </ul>
+
+                <h3 style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large);">🛠️ Tools & Administration</h3>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/admin" style="color: var(--link-color);">Administrative Interface</a> - Schema administration tools</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

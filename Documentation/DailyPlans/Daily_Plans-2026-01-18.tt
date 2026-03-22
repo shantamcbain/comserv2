@@ -1,0 +1,150 @@
+[% META 
+   title = "Daily Plan - January 18, 2026 (Sunday Week 3)"
+   description = "Sunday Week 3: Weekly retrospective and Week 4 planning Real todos from Todo System, tabbed interface with resources and completed tasks tracking."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,documentation,planning,audits"
+   page_version = "0.11"
+   last_updated = "Sun Jan 11 19:45:00 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/DailyPlans-2026-01-18.tt,v 0.11 2026/01/11 19:45:00 zencoder Exp - Full Template Sync' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+    .daily-plan-header { position: sticky; top: 0; background-color: rgba(255, 255, 255, 0.98); border-bottom: 3px solid var(--primary-color); padding: 10px 15px; margin: -20px -20px 20px -20px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .daily-plan-header h1 { margin: 0 0 5px 0; font-size: 1.4em; color: var(--text-color); }
+    .header-nav { display: flex; gap: 20px; justify-content: space-between; align-items: center; font-size: 0.85em; }
+    .header-nav-links { display: flex; gap: 15px; }
+    .header-nav-links a { color: var(--primary-color); text-decoration: none; padding: 5px 10px; border-radius: 3px; }
+    .header-nav-links a:hover { background-color: var(--bg-secondary); }
+    .tab-navigation { display: flex; border-bottom: 2px solid #ddd; margin: 20px 0 0 0; gap: 5px; }
+    .tab-button { padding: 12px 24px; border: none; background: transparent; cursor: pointer; font-size: 1em; font-weight: 500; color: var(--text-muted-color); border-bottom: 3px solid transparent; transition: all 0.2s ease; }
+    .tab-button:hover { color: var(--text-color); background-color: #f5f5f5; }
+    .tab-button.active { color: var(--text-color) !important; background-color: var(--bg-secondary) !important; border-bottom-color: var(--primary-color) !important; border-bottom-width: 4px !important; font-weight: bold; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .task-list { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0; overflow: hidden; }
+    .task-list-header { padding: 15px; background: #f0f0f0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; }
+    .task-list-header:hover { background: #e8e8e8; }
+    .task-list-toggle { font-size: 0.85em; background: var(--primary-color); color: white; padding: 4px 8px; border-radius: 3px; font-weight: bold; cursor: pointer; }
+    .task-list-toggle.collapsed { background: #999; }
+    .task-item.dragging { opacity: 0.5; background: #f0f0f0; }
+    .task-item.drag-over { border-top: 3px solid var(--primary-color); padding-top: 7px; }
+    .task-item.sortable { cursor: move; }
+    .task-list-items { padding: 10px; }
+    .task-list-items.hidden { display: none; }
+    .task-item { padding: 10px 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
+    .task-item:last-child { border-bottom: none; }
+    .task-item input[type="checkbox"] { cursor: pointer; width: 18px; height: 18px; }
+    .task-label { flex: 1; cursor: pointer; }
+    .task-label.completed { text-decoration: line-through; color: #999; }
+    .task-add-button { padding: 10px 15px; background-color: var(--success-color); color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; margin: 10px 10px 0 10px; }
+    .task-add-button:hover { background-color: #45a049; }
+    .master-plan-header { background: linear-gradient(to right, #e3f2fd, #f0f0f0); border-left: 4px solid #2196f3; }
+    .app-todos-header { background: linear-gradient(to right, #e8f5e9, #f0f0f0); border-left: 4px solid #4caf50; }
+    .focus-area { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0; }
+</style>
+
+<div class="container">
+    <div class="daily-plan-header">
+        <h1>[DAILY PLAN] [% day_name %], [% month_name %] [% day %], [% year %]</h1>
+        <div class="header-nav">
+            <div class="header-nav-links">
+                <span><strong>Status:</strong> Week 3 - Final Review</span>
+                <span>|</span>
+                [% IF today_date %]<a href="/Documentation/DailyPlans-[% today_date %]">[Jump to Today]</a>[% ELSE %]<a href="#today-work">[Jump to Today]</a>[% END %]
+                <a href="/Documentation/MASTER_PLAN_COORDINATION" target="_blank">Master Plans</a>
+                <a href="/Documentation">All Docs</a>
+                <a href="/todo">Todo System</a>
+            </div>
+            <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+[% IF prev_date_str %]<a href="/Documentation/DailyPlans-[% prev_date_str %]">← Prev Day</a> | Today ([% curr_month_day %]) | <a href="/Documentation/DailyPlans">All Daily Plans →</a>[% ELSE %]← Prev Day | Today | All Daily Plans →[% END %]
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-navigation">
+        <button class="tab-button active" onclick="switchTab(event, 'today-work')">[TODAY'S WORK] (Active)</button>
+        <button class="tab-button" onclick="switchTab(event, 'resources')">[RESOURCES & CONTEXT]</button>
+        <button class="tab-button" onclick="switchTab(event, 'completed')">[COMPLETED] (0)</button>
+    </div>
+
+    <div id="today-work" class="tab-content active">
+        <div id="today-work-content">
+            <div class="task-list">
+                <div class="task-list-header master-plan-header" onclick="toggleTaskList(this)">
+                    <span>[MASTER PLAN PRIORITIES] NEXT 5 ITEMS</span>
+                    <span class="task-list-toggle">HIDE</span>
+                </div>
+                <div class="task-list-items" id="master-plan-items">
+                    <div class="task-item sortable" draggable="true" ondragstart="handleDragStart(event)"><input type="checkbox" id="task-mp-1"><label for="task-mp-1" class="task-label">[1] A.3: Credentials Audit (CRITICAL - Quick Win)</label></div>
+                    <div class="task-item sortable" draggable="true" ondragstart="handleDragStart(event)"><input type="checkbox" id="task-mp-2"><label for="task-mp-2" class="task-label">[2] B.3: Theme Handling (HIGH - Quick Win)</label></div>
+                    <div class="task-item sortable" draggable="true" ondragstart="handleDragStart(event)"><input type="checkbox" id="task-mp-3"><label for="task-mp-3" class="task-label">[3] B.1: Docker Secrets (HIGH - Strategic)</label></div>
+                    <div class="task-item sortable" draggable="true" ondragstart="handleDragStart(event)"><input type="checkbox" id="task-mp-4"><label for="task-mp-4" class="task-label">[4] B.2: Authentication Fixes (HIGH - Strategic)</label></div>
+                    <div class="task-item sortable" draggable="true" ondragstart="handleDragStart(event)"><input type="checkbox" id="task-mp-5"><label for="task-mp-5" class="task-label">[5] E.1: AI Chat System Phase 1 (CRITICAL - Strategic)</label></div>
+                </div>
+                <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add Task to Plan</button>
+            </div>
+
+            <div class="task-list">
+                <div class="task-list-header app-todos-header" onclick="toggleTaskList(this)">
+                    <span>[APP TODOS FOR TODAY] FROM TODO SYSTEM [% IF todos_for_today && todos_for_today.size %]([% todos_for_today.size %])[% END %]</span>
+                    <span class="task-list-toggle">HIDE</span>
+                </div>
+                <div class="task-list-items" id="app-todo-items">
+                    [% IF todos_for_today && todos_for_today.size %]
+                        [% FOREACH todo IN todos_for_today %]
+                            <div class="task-item">
+                                <input type="checkbox" id="todo-[% todo.record_id %]">
+                                <label for="todo-[% todo.record_id %]" class="task-label" style="flex: 1;">
+                                    <a href="javascript:void(0)" onclick="window.open('/todo/details?record_id=[% todo.record_id %]', '_blank'); return false;" style="color: var(--link-color); text-decoration: none; cursor: pointer;">
+                                        <strong>[% todo.sitename || 'CSC' %]:</strong>
+                                        [% todo.subject || '(No subject)' %]
+                                        [% IF todo.priority %]<span style="color: #f0ad4e; margin-left: 10px;">(P[% todo.priority %])</span>[% END %]
+                                    </a>
+                                </label>
+                            </div>
+                        [% END %]
+                    [% ELSE %]
+                        <div style="padding: 15px; text-align: center; color: #666;">
+                            <p>No todos scheduled for today.</p>
+                            <p>Create a new todo for today using the button below.</p>
+                        </div>
+                    [% END %]
+                </div>
+                <button class="task-add-button" onclick="window.open('/todo/addtodo', '_blank')">+ Add New Todo from Todo System</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="resources" class="tab-content">
+        <h3>[RESOURCES & SUPPORTING CONTEXT]</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 4px;">
+                <h4>Quick Links</h4>
+                <ul><li><a href="/Documentation/MASTER_PLAN_COORDINATION" style="color: var(--primary-color);">Master Plan Coordination</a></li><li><a href="/Documentation/session_history/development_plan.md" style="color: var(--primary-color);">Development Plan</a></li><li><a href="/todo" style="color: var(--primary-color);">Todo System</a></li></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="completed" class="tab-content">
+        <h3>[COMPLETED TASKS] TODAY (0)</h3>
+        <div style="background: #e8f4f8; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p><strong>Day has just started.</strong></p>
+        </div>
+    </div>
+</div>
+
+<script>
+let draggedElement = null;
+function switchTab(e, t) { document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active')); const s = document.getElementById(t); if (s) s.classList.add('active'); e.target.classList.add('active'); }
+function toggleTaskList(h) { const t = h.nextElementSibling; const tgl = h.querySelector('.task-list-toggle'); if (t) { t.classList.toggle('hidden'); if (tgl) tgl.textContent = t.classList.contains('hidden') ? 'SHOW' : 'HIDE'; } }
+function handleDragStart(e) { draggedElement = e.currentTarget; e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (e.currentTarget !== draggedElement) e.currentTarget.classList.add('drag-over'); }
+function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function handleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); if (draggedElement !== e.currentTarget) { const dp = draggedElement.parentNode; const tp = e.currentTarget.parentNode; if (dp === tp) tp.insertBefore(draggedElement, e.currentTarget); } }
+function handleDragEnd(e) { draggedElement.classList.remove('dragging'); document.querySelectorAll('.task-item').forEach(i => i.classList.remove('drag-over')); }
+</script>

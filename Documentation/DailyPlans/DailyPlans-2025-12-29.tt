@@ -1,0 +1,201 @@
+[% META title = 'Daily Plan - December 29, 2025' %]
+[% PageVersion = 'Documentation/DailyPlans/Daily_Plans-2025-12-29.tt,v 0.02 2025/12/29 15:28 zencoder Exp - Executed: Daily Plan Automator workflow (8 steps); Master plan updated v0.11→v0.12; Daily plans verified & generated (10 total); Session archival infrastructure in place' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+[% END %]
+
+<h1>Daily Plan: Monday, December 29, 2025</h1>
+
+<h2>Overview</h2>
+
+<p><strong>Context:</strong> Following successful Dec 26-28 sprint (A.3 Credentials Audit complete, E.1 AI Chat message persistence FIXED). Today establishes sustainable daily workflow and begins Phase 3 frontend widget development.</p>
+
+<p><strong>Objectives:</strong> 4 Priority Tasks - Validate message persistence fix, execute daily audit workflow, begin widget scaffold, document planning process.</p>
+
+<h2>Priority 1: Validate E.1 Message Persistence Fix (Testing & QA)</h2>
+
+<p><strong>Objective:</strong> Confirm metadata JSON encoding fix works end-to-end; test message persistence to database.</p>
+
+<ol>
+<li><strong>Test Setup:</strong>
+<ul>
+<li>Start Comserv application (local or ZeroTier access)</li>
+<li>Verify Ollama service running and accessible</li>
+<li>Open AI Chat widget (right sidebar or /ai endpoint)</li>
+</ul>
+</li>
+<li><strong>Functional Testing:</strong>
+<ul>
+<li>Send 3-5 test messages to AI</li>
+<li>Verify responses return correctly</li>
+<li>Check application logs for no errors (grep "Error" in logs)</li>
+</ul>
+</li>
+<li><strong>Database Verification:</strong>
+<ul>
+<li>Query database: Check if messages saved in ai_message table</li>
+<li>Verify metadata field contains valid JSON (not Perl hashref string)</li>
+<li>Confirm all 6 required metadata fields present: timestamp, user_id, session_id, context, role, status</li>
+</ul>
+</li>
+<li><strong>Document Results:</strong>
+<ul>
+<li>If passing: Update E.1 status in MasterPlanCoordination.tt → "Phase 3 Ready (Message Persistence Verified)"</li>
+<li>If failing: Document errors, check audit_2025-12-28.md for Chat 18 changes, verify both endpoints updated</li>
+</ul>
+</li>
+</ol>
+
+<p><strong>Time Estimate:</strong> 1-2 hours | <strong>Blocker:</strong> ZeroTier/login access required</p>
+
+<h2>Priority 2: Execute Daily Audit Workflow (First Automated Run)</h2>
+
+<p><strong>Objective:</strong> Test three-agent audit pipeline designed in Chat 22-23; ensure audit file generation works automatically.</p>
+
+<ol>
+<li><strong>Trigger Daily Audit Agent:</strong>
+<ul>
+<li>Open IDE chat interface</li>
+<li>Type: <code>/daily-audit</code> command</li>
+<li>Agent should read current_session.md.archivenotused (Chat 25 work from today). As we move to a session handoff at the end of a day we may have to look into the current_session history files as well</li>
+</ul>
+</li>
+<li><strong>Verify Audit Output:</strong>
+<ul>
+<li>Check if audit_2025-12-29.md created in /Documentation/session_history/audit_logs/</li>
+<li>Verify audit contains: Chat summary, code changes list, test results, status of each task</li>
+<li>Confirm file format matches audit_2025-12-28.md pattern</li>
+</ul>
+</li>
+<li><strong>Test Agent Handoff:</strong>
+<ul>
+<li>If Daily Audit Agent completes, it should pass to DocumentationSyncAgent</li>
+<li>DocumentationSyncAgent updates cross-referenced docs (E.1.tt, message_persistence.tt if they exist)</li>
+<li>Then pass to Master Plan Updater Agent</li>
+</ul>
+</li>
+<li><strong>Validate Master Plan Update:</strong>
+<ul>
+<li>Check if MasterPlanCoordination.tt updated with Dec 29 progress</li>
+<li>Verify E.1 status reflects testing results</li>
+</ul>
+</li>
+</ol>
+
+<p><strong>Time Estimate:</strong> 1-1.5 hours | <strong>Success Criteria:</strong> All 3 agents execute without IDE crash; audit file generated</p>
+
+<h2>Priority 3: Begin E.1 Phase 3 - Frontend Widget Scaffold</h2>
+
+<p><strong>Objective:</strong> Create basic HTML/CSS/JS structure for AI Chat widget (non-functional skeleton).</p>
+
+<ol>
+<li><strong>Create Widget HTML Template:</strong>
+<ul>
+<li>File: <code>Comserv/root/ai/widget.tt</code> (or update existing if present)</li>
+<li>Structure: Chat message list area, input box, send button, settings toggle</li>
+<li>Use existing styling patterns from conversations.tt (compact layout from Chat 13)</li>
+</ul>
+</li>
+<li><strong>Add Widget Styling:</strong>
+<ul>
+<li>Float widget on right side of screen (position: fixed; right: 20px; bottom: 20px;)</li>
+<li>Z-index: 9999 (ensure it sits above all other content)</li>
+<li>Responsive: Hide on mobile (< 768px width)</li>
+</ul>
+</li>
+<li><strong>Initialize Widget JavaScript:</strong>
+<ul>
+<li>File: <code>Comserv/root/static/js/ai-widget.js</code></li>
+<li>Setup: Load widget on page ready; add event listeners for user interactions (send button, expand/collapse)</li>
+<li>Stub out API endpoints (don't call them yet, just log to console)</li>
+</ul>
+</li>
+<li><strong>Integration Point:</strong>
+<ul>
+<li>Update <code>Comserv/root/layout.tt</code> to include widget template</li>
+<li>Add script tag for ai-widget.js</li>
+</ul>
+</li>
+</ol>
+
+<p><strong>Time Estimate:</strong> 1.5-2 hours | <strong>Deliverable:</strong> Visual widget appears on all pages (non-functional)</p>
+
+<h2>Priority 4: Document Daily Plan Workflow (Establish Process)</h2>
+
+<p><strong>Objective:</strong> Record lessons learned from first daily audit cycle; establish sustainable daily planning process.</p>
+
+<ol>
+<li><strong>Create Daily Planning Guidelines:</strong>
+<ul>
+<li>File: <code>/Comserv/root/Documentation/daily_planning_workflow.md</code></li>
+<li>Document: How daily audit works, when plans are updated, what to expect from three-agent pipeline</li>
+<li>Include: Timing (morning: audit previous day, afternoon: generate next day's plan), handoff protocol, expected output</li>
+</ul>
+</li>
+<li><strong>Update current_session.md.archivenotused:</strong>
+<ul>
+<li>Add Chat 25 entry (this work) in reverse chronological order</li>
+<li>Record execution of first daily audit workflow</li>
+<li>Note any issues or improvements needed for three-agent architecture</li>
+</ul>
+</li>
+<li><strong>Verify Audit Report Quality:</strong>
+<ul>
+<li>Compare audit_2025-12-29.md format to audit_2025-12-28.md</li>
+<li>Confirm all required sections present: Summary, Work by Chat, Code Changes, Testing Status</li>
+</ul>
+</li>
+</ol>
+
+<p><strong>Time Estimate:</strong> 45 mins - 1 hour | <strong>Deliverable:</strong> Daily workflow documented; ready for Dec 30</p>
+
+<h2>Time Allocation</h2>
+
+<table border="1">
+<tr style="background: #f5f5f5;">
+<th>Task</th>
+<th>Duration</th>
+<th>Cumulative</th>
+</tr>
+<tr>
+<td>Priority 1: Message Persistence Testing</td>
+<td>1-2 hrs</td>
+<td>1-2 hrs</td>
+</tr>
+<tr style="background: #f9f9f9;">
+<td>Priority 2: Daily Audit Workflow</td>
+<td>1-1.5 hrs</td>
+<td>2-3.5 hrs</td>
+</tr>
+<tr>
+<td>Priority 3: Widget Scaffold</td>
+<td>1.5-2 hrs</td>
+<td>3.5-5.5 hrs</td>
+</tr>
+<tr style="background: #f9f9f9;">
+<td>Priority 4: Documentation</td>
+<td>45 mins - 1 hr</td>
+<td>4.25-6.5 hrs</td>
+</tr>
+</table>
+
+<p><strong>Total Expected:</strong> 4.25-6.5 hours (one developer, one day)</p>
+
+<h2>Related Plans & Dependencies</h2>
+
+<ul>
+<li><strong>Plan E.1 (AI Chat System):</strong> Phase 3 widget development begins; depends on successful message persistence validation</li>
+<li><strong>Plan F.1 (Daily Audit Infrastructure):</strong> First full test of three-agent architecture; success validates future daily workflows</li>
+<li><strong>Plan A.3 (Credentials Audit):</strong> Complete; no blocking dependencies today</li>
+</ul>
+
+<h2>Notes for Developers</h2>
+
+<ul>
+<li><strong>Testing Access:</strong> Message persistence testing requires ZeroTier access or local development environment with valid credentials</li>
+<li><strong>Widget Scaffold:</strong> Create non-functional UI first; implement API calls on Dec 30-31</li>
+<li><strong>Daily Audit:</strong> This is first automated run of three-agent pipeline; document any issues for improvement</li>
+<li><strong>If Blocked:</strong> Message persistence testing blocked without access? Create dummy test data in database and verify widget UI rendering instead</li>
+</ul>

@@ -8,6 +8,7 @@ extends 'Catalyst::Model';
 use Comserv::Util::Logging;
 use JSON;
 use File::Slurp;
+use File::Basename;
 use FindBin;
 use DBI;
 use Try::Tiny;
@@ -22,63 +23,64 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+has 'db_config' => (
+    is      => 'rw',
+    isa     => 'HashRef',
+    lazy    => 1,
+    builder => '_build_db_config',
+);
+
 # Initialize logger
 Log::Log4perl->easy_init($DEBUG);
 
-# Load the database configuration from db_config.json
-my $config_file;
-my $json_text;
-
-# Try to load the config file using Catalyst::Utils if the application is initialized
-eval {
-    $config_file = Catalyst::Utils::path_to('db_config.json');
-};
-
-# Fallback to FindBin if Catalyst::Utils fails (during application initialization)
-if ($@ || !defined $config_file) {
+sub _build_db_config {
+    my ($self) = @_;
+    
     use File::Basename;
     
-    # Get the application root directory (one level up from script or lib)
-    my $bin_dir = $FindBin::Bin;
-    my $app_root;
+    my $config_file;
+    my $json_text;
     
-    # If we're in a script directory, go up one level to find app root
-    if ($bin_dir =~ /\/script$/) {
-        $app_root = dirname($bin_dir);
-    }
-    # If we're somewhere else, try to find the app root
-    else {
-        # Check if we're already in the app root
-        if (-f "$bin_dir/db_config.json") {
-            $app_root = $bin_dir;
+    try {
+        eval {
+            $config_file = Catalyst::Utils::path_to('db_config.json');
+        };
+        
+        if ($@ || !defined $config_file || ! -f $config_file) {
+            my $bin_dir = $FindBin::Bin;
+            my $app_root;
+            
+            if ($bin_dir =~ /\/script$/) {
+                $app_root = dirname($bin_dir);
+            } else {
+                if (-f "$bin_dir/Comserv/db_config.json") {
+                    $app_root = "$bin_dir/Comserv";
+                } elsif (-f "$bin_dir/db_config.json") {
+                    $app_root = $bin_dir;
+                } elsif (-f dirname($bin_dir) . "/Comserv/db_config.json") {
+                    $app_root = dirname($bin_dir) . "/Comserv";
+                } elsif (-f dirname($bin_dir) . "/db_config.json") {
+                    $app_root = dirname($bin_dir);
+                } else {
+                    $app_root = $bin_dir;
+                }
+            }
+            
+            $config_file = "$app_root/db_config.json";
         }
-        # Otherwise, try one level up
-        elsif (-f dirname($bin_dir) . "/db_config.json") {
-            $app_root = dirname($bin_dir);
-        }
-        # If all else fails, assume we're in lib and need to go up one level
-        else {
-            $app_root = dirname($bin_dir);
-        }
-    }
-    
-    $config_file = "$app_root/db_config.json";
-    warn "Using FindBin fallback for config file: $config_file";
+        
+        local $/;
+        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+        $json_text = <$fh>;
+        close $fh;
+        
+        my $config = decode_json($json_text);
+        return $config;
+    } catch {
+        warn "Warning: Could not load db_config.json at initialization: $_";
+        return {};
+    };
 }
-
-# Load the configuration file
-eval {
-    local $/;    # Enable 'slurp' mode
-    open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-    $json_text = <$fh>;
-    close $fh;
-};
-
-if ($@) {
-    die "Error loading config file $config_file: $@";
-}
-
-my $config = decode_json($json_text);
 
 # List tables in the appropriate database
 sub list_tables {
@@ -230,9 +232,9 @@ sub create_table_from_sql {
     # Get database configuration
     my $db_config;
     if ($database eq 'ENCY') {
-        $db_config = $config->{shanta_ency};
+        $db_config = $self->db_config->{shanta_ency};
     } elsif ($database eq 'FORAGER') {
-        $db_config = $config->{shanta_forager};
+        $db_config = $self->db_config->{shanta_forager};
     } else {
         die "Unknown database: $database";
     }
@@ -345,9 +347,9 @@ sub table_exists {
     # Get database configuration
     my $db_config;
     if ($database eq 'ENCY') {
-        $db_config = $config->{shanta_ency};
+        $db_config = $self->db_config->{shanta_ency};
     } elsif ($database eq 'FORAGER') {
-        $db_config = $config->{shanta_forager};
+        $db_config = $self->db_config->{shanta_forager};
     } else {
         die "Unknown database: $database";
     }
@@ -369,9 +371,10 @@ sub table_exists {
     return $exists;
 }
 
-# Create table from field definitions (used by SchemaComparison controller)
+# Create table from field definitions (used by SchemaComparison controller and startup)
+# Optional $dbh parameter: if provided, use it; otherwise create a new connection
 sub create_table_from_fields {
-    my ($self, $table_name, $fields, $schema_model) = @_;
+    my ($self, $table_name, $fields, $schema_model, $dbh) = @_;
     
     my $result = {
         success => 0,
@@ -379,24 +382,31 @@ sub create_table_from_fields {
     };
     
     try {
-        # Get database configuration
-        my $db_config;
-        if ($schema_model eq 'DBEncy') {
-            $db_config = $config->{shanta_ency};
-        } elsif ($schema_model eq 'DBForager') {
-            $db_config = $config->{shanta_forager};
-        } else {
-            $result->{error} = "Unknown schema model: $schema_model";
-            return $result;
-        }
+        my $should_disconnect = 0;
         
-        # Connect to database
-        my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
-        my $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
-            RaiseError => 1,
-            AutoCommit => 1,
-            mysql_enable_utf8 => 1
-        }) or die "Cannot connect to database: $DBI::errstr";
+        # Use provided dbh or create a new connection
+        unless ($dbh) {
+            # Get database configuration
+            my $db_config;
+            if ($schema_model eq 'DBEncy') {
+                $db_config = $self->db_config->{shanta_ency};
+            } elsif ($schema_model eq 'DBForager') {
+                $db_config = $self->db_config->{shanta_forager};
+            } else {
+                $result->{error} = "Unknown schema model: $schema_model";
+                return $result;
+            }
+            
+            # Connect to database
+            my $dsn = "DBI:mysql:database=$db_config->{database};host=$db_config->{host};port=$db_config->{port}";
+            $dbh = DBI->connect($dsn, $db_config->{username}, $db_config->{password}, {
+                RaiseError => 1,
+                AutoCommit => 1,
+                mysql_enable_utf8 => 1
+            }) or die "Cannot connect to database: $DBI::errstr";
+            
+            $should_disconnect = 1;
+        }
         
         # Build CREATE TABLE statement
         my $sql = "CREATE TABLE `$table_name` (\n";
@@ -445,7 +455,10 @@ sub create_table_from_fields {
         
         # Execute the CREATE TABLE statement
         $dbh->do($sql);
-        $dbh->disconnect();
+        
+        if ($should_disconnect) {
+            $dbh->disconnect();
+        }
         
         $result->{success} = 1;
         $result->{message} = "Table $table_name created successfully";
@@ -471,9 +484,9 @@ sub sync_table_with_result_fields {
         # Get database configuration
         my $db_config;
         if ($schema_model eq 'DBEncy') {
-            $db_config = $config->{shanta_ency};
+            $db_config = $self->db_config->{shanta_ency};
         } elsif ($schema_model eq 'DBForager') {
-            $db_config = $config->{shanta_forager};
+            $db_config = $self->db_config->{shanta_forager};
         } else {
             $result->{error} = "Unknown schema model: $schema_model";
             return $result;
@@ -607,6 +620,219 @@ sub convert_dbic_to_mysql_type {
     );
     
     return $type_mapping{lc($dbic_type)} || 'VARCHAR';
+}
+
+# Parse field definitions from a Result file
+# Used by both SchemaComparison controller and startup behavior
+sub parse_result_file_fields {
+    my ($self, $file_path) = @_;
+    
+    my @fields = ();
+    
+    try {
+        my $content = read_file($file_path);
+        
+        # Extract field definitions from DBIx::Class result file
+        if ($content =~ /__PACKAGE__->add_columns\(\s*(.*?)\s*\);/s) {
+            my $columns_text = $1;
+            
+            # Parse individual column definitions using character-by-character scanning
+            # This avoids position tracking conflicts when dealing with nested braces
+            my $i = 0;
+            my $len = length($columns_text);
+            
+            while ($i < $len) {
+                # Skip whitespace and commas
+                while ($i < $len && substr($columns_text, $i, 1) =~ /[\s,]/) {
+                    $i++;
+                }
+                
+                if ($i >= $len) {
+                    last;
+                }
+                
+                # Look for field name pattern: word => {
+                # Match 'word' or 'word' or "word"
+                if (substr($columns_text, $i) =~ /^(?:['"])?(\w+)(?:['"])?\s*=>\s*\{/) {
+                    my $field_name = $1;
+                    
+                    # Skip past the field name and =>  to the opening {
+                    while ($i < $len && substr($columns_text, $i, 1) ne '{') {
+                        $i++;
+                    }
+                    
+                    if ($i >= $len) {
+                        last;
+                    }
+                    
+                    $i++; # Skip the opening {
+                    my $field_def_start = $i;
+                    my $brace_count = 1;
+                    
+                    # Find the matching closing brace
+                    while ($i < $len && $brace_count > 0) {
+                        my $char = substr($columns_text, $i, 1);
+                        $brace_count++ if $char eq '{';
+                        $brace_count-- if $char eq '}';
+                        $i++;
+                    }
+                    
+                    # Extract field definition (contents between braces)
+                    my $field_def = substr($columns_text, $field_def_start, $i - $field_def_start - 1);
+                    
+                    # Parse field attributes from definition
+                    my $field_info = {
+                        name => $field_name,
+                        type => 'varchar',
+                        nullable => 1,
+                        size => undef,
+                        is_auto_increment => 0,
+                        default => undef
+                    };
+                    
+                    # Extract data_type
+                    if ($field_def =~ /data_type\s*=>\s*['"]([^'"]+)['"]/) {
+                        $field_info->{type} = $1;
+                    }
+                    
+                    # Extract is_nullable
+                    if ($field_def =~ /is_nullable\s*=>\s*(\d+|['"]?(true|false)['"]?)/) {
+                        $field_info->{nullable} = ($1 eq '1' || $1 eq 'true') ? 1 : 0;
+                    }
+                    
+                    # Extract is_auto_increment
+                    if ($field_def =~ /is_auto_increment\s*=>\s*(\d+|['"]?(true|false)['"]?)/) {
+                        $field_info->{is_auto_increment} = ($1 eq '1' || $1 eq 'true') ? 1 : 0;
+                    }
+                    
+                    # Extract size
+                    if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                        $field_info->{size} = $1;
+                    }
+                    
+                    # Extract default_value (handle both quoted and backslash-escaped formats)
+                    if ($field_def =~ /default_value\s*=>\s*\\?['"]?([^'"\s,]+)/) {
+                        $field_info->{default} = $1;
+                    }
+                    
+                    push @fields, $field_info;
+                } else {
+                    # Skip unrecognized content
+                    $i++;
+                }
+            }
+        }
+        
+    } catch {
+        return [];
+    };
+    
+    return \@fields;
+}
+
+# Extract table name from Result filename
+# Converts CamelCase filename to snake_case table name
+# Used by both SchemaComparison controller and startup behavior
+sub extract_table_name_from_result_file {
+    my ($self, $file_path) = @_;
+    
+    my $filename = basename($file_path);
+    $filename =~ s/\.pm$//;
+    
+    # Convert CamelCase to snake_case
+    my $table_name = lc($filename);
+    $table_name =~ s/([a-z])([A-Z])/$1_$2/g;
+    
+    return $table_name;
+}
+
+# Create AI Chat tables from Result classes if they don't exist
+# Called from startup behavior to auto-create missing tables
+# $dbh parameter is the database handle from DBEncy schema
+sub create_ai_chat_tables_from_results {
+    my ($self, $c, $dbh) = @_;
+    
+    my $result = {
+        created => [],
+        skipped => [],
+        errors => [],
+        success => 1
+    };
+    
+    # Find the app root directory
+    my $app_root;
+    my $bin_dir = $FindBin::Bin;
+    if ($bin_dir =~ /\/script$/) {
+        $app_root = dirname($bin_dir);
+    } else {
+        if (-f "$bin_dir/Comserv/db_config.json") {
+            $app_root = "$bin_dir/Comserv";
+        } elsif (-f "$bin_dir/db_config.json") {
+            $app_root = $bin_dir;
+        } elsif (-f dirname($bin_dir) . "/Comserv/db_config.json") {
+            $app_root = dirname($bin_dir) . "/Comserv";
+        } else {
+            $app_root = dirname($bin_dir) . "/Comserv";
+        }
+    }
+    
+    # Map of Result file paths for AI Chat tables (with absolute paths)
+    # NOTE: AiConversation must come before AiMessage (parent/child relationship)
+    my @result_files = (
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/DocumentationRoleAccess.pm"
+    );
+    
+    unless ($dbh) {
+        push @{$result->{errors}}, "No database handle provided for table creation";
+        $result->{success} = 0;
+        return $result;
+    }
+    
+    # Check each Result file and create table if missing
+    foreach my $result_file (@result_files) {
+        my $table_name = $self->extract_table_name_from_result_file($result_file);
+        
+        # Check if table exists
+        my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
+        $sth->execute($table_name);
+        my $exists = $sth->fetchrow_arrayref();
+        
+        if ($exists) {
+            push @{$result->{skipped}}, $table_name;
+            next;
+        }
+        
+        # Parse fields from Result file
+        my $fields = $self->parse_result_file_fields($result_file);
+        
+        if (!@$fields) {
+            push @{$result->{errors}}, "No fields found in Result file: $result_file";
+            $result->{success} = 0;
+            next;
+        }
+        
+        # Create the table, passing the existing dbh
+        my $create_result = $self->create_table_from_fields($table_name, $fields, 'DBEncy', $dbh);
+        
+        if ($create_result->{success}) {
+            push @{$result->{created}}, $table_name;
+            if ($c) {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_ai_chat_tables_from_results',
+                    "Created table '$table_name' from Result class");
+            }
+        } else {
+            push @{$result->{errors}}, "Failed to create table '$table_name': $create_result->{error}";
+            $result->{success} = 0;
+        }
+    }
+    
+    return $result;
 }
 
 __PACKAGE__->meta->make_immutable;  # Make the package immutable for performance

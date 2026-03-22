@@ -1,0 +1,103 @@
+[% META
+   title = "Environment Variables Management"
+   description = "Manage system environment variables and configuration"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Administration"
+   page_version = "0.01"
+   last_updated = "Tue Dec 09 18:15:00 UTC 2025"
+%]
+
+[% PageVersion = 'admin/environment_variables/list.tt,v 0.01 2025/12/09 18:15:00 UTC Exp' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    
+    <div class="page-header">
+        <h1>Environment Variables Management</h1>
+        <p class="page-subtitle">Manage system environment variables and configuration settings</p>
+    </div>
+    
+    <div class="content-container">
+        
+        <div class="content-primary">
+            
+            [% IF error_msg %]
+            <div class="alert alert-error" style="background-color: var(--light-color); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--error-color);">Error</h4>
+                <p>[% error_msg | html %]</p>
+            </div>
+            [% END %]
+            
+            [% IF success_msg %]
+            <div class="alert alert-success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h4 style="color: var(--success-color);">Success</h4>
+                <p>[% success_msg | html %]</p>
+            </div>
+            [% END %]
+            
+            <div class="action-bar" style="margin-bottom: var(--spacing-medium);">
+                <a href="[% c.uri_for('/admin/environment_variables/create') %]" class="btn btn-primary">Add New Variable</a>
+                <a href="[% c.uri_for('/admin/environment_variables/audit_log') %]" class="btn btn-secondary">View Audit Log</a>
+            </div>
+            
+            [% IF env_variables.size %]
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Variable Name</th>
+                            <th>Value Preview</th>
+                            <th>Is Secret</th>
+                            <th>Last Modified</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH var IN env_variables %]
+                        <tr>
+                            <td style="color: var(--text-color);">
+                                <code>[% var.key | html %]</code>
+                            </td>
+                            <td style="color: var(--text-color);">
+                                [% IF var.is_secret %]
+                                    <span style="color: var(--text-muted-color);">&lt;secret&gt;</span>
+                                [% ELSE %]
+                                    <code style="word-break: break-all;">[% var.value | truncate(50) | html %]</code>
+                                [% END %]
+                            </td>
+                            <td style="color: var(--text-color);">
+                                [% IF var.is_secret %]
+                                    <span class="badge badge-warning">Yes</span>
+                                [% ELSE %]
+                                    <span class="badge badge-info">No</span>
+                                [% END %]
+                            </td>
+                            <td style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+                                [% var.updated_at %]
+                            </td>
+                            <td class="action-cell">
+                                <a href="[% c.uri_for('/admin/environment_variables/edit', var.id) %]" class="btn btn-sm btn-edit">Edit</a>
+                                <form method="post" action="[% c.uri_for('/admin/environment_variables/delete', var.id) %]" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to delete this variable?')">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+            </div>
+            [% ELSE %]
+            <div class="empty-state" style="text-align: center; padding: var(--spacing-large);">
+                <p style="color: var(--text-muted-color);">No environment variables defined.</p>
+                <a href="[% c.uri_for('/admin/environment_variables/create') %]" class="btn btn-primary">Create First Variable</a>
+            </div>
+            [% END %]
+            
+        </div>
+        
+    </div>
+    
+</div>

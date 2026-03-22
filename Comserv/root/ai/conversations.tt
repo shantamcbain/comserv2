@@ -1,0 +1,788 @@
+[% META
+   title = "Conversations"
+   description = "View and manage your saved AI conversations. Admins can toggle to view all conversations in the system."
+   roles = "user,admin,developer"
+   category = "AI Module"
+   page_version = "0.08"
+   last_updated = "Fri Jan 23 15:00:00 UTC 2026"
+%]
+
+[% PageVersion = 'ai/conversations.tt,v 0.08 2026/01/23 15:00:00 CleanupAgent Exp - Implemented CSS isolation and consolidated message formatting'; %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    
+    <div class="ai-conversations-header-section">
+        <h1>[% IF view_all %]All Conversations (Admin)[% ELSE %]My Conversations[% END %]</h1>
+        <p class="intro">View and manage [% IF view_all %]all[% ELSE %]your[% END %] saved AI conversations</p>
+        
+        [% IF is_admin %]
+        <div class="ai-conversations-admin-controls">
+            [% IF view_all %]
+            <a href="/ai/conversations" class="button button-secondary">View My Conversations Only</a>
+            [% ELSE %]
+            <a href="/ai/conversations?view_all=1" class="button button-secondary">View All Conversations (Admin)</a>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+
+    [% IF total_conversations == 0 %]
+    <div class="ai-conversations-empty-state">
+        <div class="ai-conversations-empty-icon">
+            <i class="empty-icon"></i>
+        </div>
+        <h2>No Conversations Yet</h2>
+        <p>[% IF view_all %]No conversations in the system.[% ELSE %]Start a new conversation to see it appear here.[% END %]</p>
+        <a href="/ai/query_form" class="button button-primary">New Query</a>
+    </div>
+    [% ELSE %]
+    
+    <div class="main-content">
+        <div class="ai-conversations-stats">
+            <strong>[% total_conversations %]</strong> Conversation[% total_conversations == 1 ? '' : 's' %]
+        </div>
+
+        <div class="ai-conversations-list">
+            [% FOREACH conv IN conversations %]
+            <div class="ai-conversations-item" data-conv-id="[% conv.id %]">
+                <div class="ai-conversations-item-row">
+                    <button class="ai-conversations-item-toggle" aria-expanded="false" aria-controls="details-[% conv.id %]">
+                        <i class="toggle-icon"></i>
+                    </button>
+                    
+                    <div class="ai-conversations-item-id">
+                        ID: [% conv.id %]
+                    </div>
+                    
+                    <div class="ai-conversations-item-date">
+                        [% USE date; date.format(conv.created_at, '%Y-%m-%d') || 'Unknown' %]
+                    </div>
+                    
+                    <div class="ai-conversations-item-title">
+                        <a href="/ai/conversation/[% conv.id %]" class="conv-link">[% conv.title || 'Untitled' %]</a>
+                    </div>
+                    
+                    [% IF view_all %]
+                    <div class="ai-conversations-item-user">
+                        [% conv.username || 'Unknown' %]
+                    </div>
+                    [% END %]
+                    
+                    <span class="ai-conversations-status status-[% conv.status %]">[% conv.status || 'active' %]</span>
+                </div>
+                
+                <div class="ai-conversations-item-details" id="details-[% conv.id %]" hidden>
+                    <div class="ai-conversations-details-content">
+                        <div class="ai-conversations-debug-section">
+                            <h4 class="ai-conversations-debug-title">Debug Information</h4>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Conversation ID:</span>
+                                <span class="detail-value">[% conv.id %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">User ID:</span>
+                                <span class="detail-value">[% conv.user_id %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Username:</span>
+                                <span class="detail-value">[% conv.username || 'Unknown' %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Title:</span>
+                                <span class="detail-value">[% conv.title || 'Untitled' %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Status:</span>
+                                <span class="detail-value">[% conv.status || 'active' %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Created:</span>
+                                <span class="detail-value">[% USE date; date.format(conv.created_at, '%Y-%m-%d %H:%M:%S') || 'Unknown' %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Updated:</span>
+                                <span class="detail-value">[% USE date; date.format(conv.updated_at, '%Y-%m-%d %H:%M:%S') || 'Unknown' %]</span>
+                            </div>
+                            
+                            <div class="ai-conversations-detail-row">
+                                <span class="detail-label">Messages:</span>
+                                <span class="detail-value">[% conv.message_count || 0 %]</span>
+                            </div>
+                        </div>
+                        
+                        [% IF conv.messages && conv.messages.size > 0 %]
+                        <div class="ai-conversations-messages-section">
+                            <h3 class="ai-conversations-messages-title">Conversation Messages</h3>
+                            <div class="ai-conversations-messages-container">
+                                [% FOREACH msg IN conv.messages %]
+                                <div class="ai-conversations-message" data-role="[% msg.role %]" data-msg-id="[% msg.id %]">
+                                    <div class="message-header">
+                                        <span class="message-role [% msg.role == 'user' ? 'role-user' : 'role-assistant' %]">
+                                            [% msg.role == 'user' ? 'User Prompt' : 'AI Response' %]
+                                        </span>
+                                        [% IF msg.agent_type %]
+                                        <span class="message-agent">
+                                            ([% msg.agent_type %][% IF msg.model_used %] • [% msg.model_used %][% END %])
+                                        </span>
+                                        [% END %]
+                                        <span class="message-time">
+                                            [% USE date; date.format(msg.created_at, '%H:%M:%S') || 'Unknown' %]
+                                        </span>
+                                        [% IF msg.role == 'assistant' %]
+                                        <button class="copy-message-btn" onclick="copyMessageText(this)" title="Copy message content">📋</button>
+                                        [% END %]
+                                    </div>
+                                    
+                                    <div class="message-debug-toggle">
+                                        <button class="message-debug-btn" onclick="toggleMessageDebug(this)" title="Show message metadata">◆ Debug Info</button>
+                                    </div>
+                                    
+                                    <div class="message-debug-info" style="display: none;">
+                                        <div class="debug-field">
+                                            <span class="debug-label">Message ID:</span>
+                                            <span class="debug-value">[% msg.id %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Conversation ID:</span>
+                                            <span class="debug-value">[% msg.conversation_id %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">User ID:</span>
+                                            <span class="debug-value">[% msg.user_id %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Role:</span>
+                                            <span class="debug-value">[% msg.role %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Agent Type:</span>
+                                            <span class="debug-value">[% msg.agent_type || 'N/A' %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Model Used:</span>
+                                            <span class="debug-value">[% msg.model_used || 'N/A' %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">IP Address:</span>
+                                            <span class="debug-value">[% msg.ip_address || 'N/A' %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">User Role:</span>
+                                            <span class="debug-value">[% msg.user_role || 'N/A' %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Created At:</span>
+                                            <span class="debug-value">[% USE date; date.format(msg.created_at, '%Y-%m-%d %H:%M:%S') || 'Unknown' %]</span>
+                                        </div>
+                                        <div class="debug-field">
+                                            <span class="debug-label">Metadata:</span>
+                                            <span class="debug-value"><pre class="debug-metadata-pre">[% msg.metadata || '{}' %]</pre></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="message-content">
+                                        [% msg.content | html %]
+                                    </div>
+                                </div>
+                                [% END %]
+                            </div>
+                        </div>
+                        [% ELSIF conv.message_count > 0 %]
+                        <div class="ai-conversations-detail-row">
+                            <span class="detail-label">Messages:</span>
+                            <span class="detail-value">Messages exist but could not be loaded</span>
+                        </div>
+                        [% ELSE %]
+                        <div class="ai-conversations-detail-row">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value">No messages in this conversation</span>
+                        </div>
+                        [% END %]
+                        
+                        <div class="ai-conversations-detail-actions">
+                            <a href="/ai/conversation/[% conv.id %]" class="button button-primary">View Conversation</a>
+                            <a href="/ai/conversation/[% conv.id %]/delete" class="button button-warning ai-conversations-delete-btn" data-conv-id="[% conv.id %]">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    [% END %]
+
+    <div class="site-footer">
+        <div class="button-group">
+            <a href="/ai/query_form" class="button button-primary">New Query</a>
+            <a href="/ai" class="button button-secondary">Back to AI Home</a>
+            <a href="/" class="button button-secondary">Return to Menu</a>
+        </div>
+    </div>
+    
+</div>
+
+<style>
+/* AI Conversations page - compact one-line list with expandable details - theme-aware styles */
+
+.ai-conversations-header-section {
+    margin-bottom: var(--spacing-large);
+}
+
+.ai-conversations-header-section h1 {
+    margin-bottom: var(--spacing-small);
+}
+
+.ai-conversations-admin-controls {
+    margin-top: var(--spacing-medium);
+    padding: var(--spacing-small) var(--spacing-medium);
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+    border-left: 3px solid var(--accent-color);
+    display: inline-block;
+}
+
+.ai-conversations-admin-controls .button {
+    margin: 0;
+}
+
+.ai-conversations-empty-state {
+    text-align: center;
+    padding: var(--spacing-large);
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+    border: 2px dashed var(--border-color);
+    margin: var(--spacing-large) 0;
+}
+
+.ai-conversations-empty-icon {
+    margin-bottom: var(--spacing-medium);
+    display: flex;
+    justify-content: center;
+}
+
+.empty-icon::before {
+    content: "[Chat]";
+    font-size: 3em;
+    font-weight: bold;
+    color: var(--accent-color);
+}
+
+.ai-conversations-empty-state h2 {
+    color: var(--text-color);
+    margin: var(--spacing-medium) 0;
+}
+
+.ai-conversations-stats {
+    margin-bottom: var(--spacing-large);
+    padding: var(--spacing-small) var(--spacing-medium);
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+    border-left: 3px solid var(--accent-color);
+    display: inline-block;
+}
+
+/* Compact list layout - single line per conversation */
+.ai-conversations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: var(--spacing-large);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ai-conversations-item {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ai-conversations-item:last-child {
+    border-bottom: none;
+}
+
+.ai-conversations-item-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-medium);
+    padding: var(--spacing-medium);
+    background-color: var(--background-color);
+    transition: background-color 0.2s ease;
+}
+
+.ai-conversations-item-row:hover {
+    background-color: var(--secondary-color);
+}
+
+.ai-conversations-item-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: var(--text-color);
+    font-size: 14px;
+    transition: transform 0.2s ease;
+}
+
+.toggle-icon::before {
+    content: ">";
+    font-size: 1.2em;
+    font-weight: bold;
+    display: inline-block;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.ai-conversations-item-toggle[aria-expanded="true"] .toggle-icon::before {
+    content: "v";
+}
+
+.ai-conversations-item-id {
+    font-size: 0.85em;
+    color: var(--text-color);
+    opacity: 0.8;
+    white-space: nowrap;
+    min-width: 60px;
+    font-family: monospace;
+    background-color: var(--secondary-color);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.ai-conversations-item-date {
+    font-size: 0.9em;
+    color: var(--text-color);
+    white-space: nowrap;
+    min-width: 100px;
+}
+
+.ai-conversations-item-title {
+    flex: 1;
+    min-width: 200px;
+}
+
+.conv-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: text-decoration 0.2s ease;
+}
+
+.conv-link:hover {
+    text-decoration: underline;
+}
+
+.ai-conversations-item-user {
+    font-size: 0.9em;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.ai-conversations-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    text-transform: capitalize;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.status-active {
+    background-color: var(--success-color);
+    color: var(--text-color);
+}
+
+.status-archived {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+}
+
+/* Expandable details section */
+.ai-conversations-item-details {
+    max-height: 0;
+    overflow: hidden;
+    background-color: var(--secondary-color);
+    transition: max-height 0.2s ease;
+}
+
+.ai-conversations-item-details[hidden] {
+    display: none;
+}
+
+.ai-conversations-item-details:not([hidden]) {
+    display: block;
+    max-height: none;
+}
+
+.ai-conversations-details-content {
+    padding: var(--spacing-medium);
+    border-top: 1px solid var(--border-color);
+}
+
+.ai-conversations-debug-section {
+    margin-bottom: var(--spacing-medium);
+    padding: var(--spacing-small);
+    background-color: var(--secondary-color);
+    border-left: 3px solid var(--link-color);
+    border-radius: 4px;
+}
+
+.ai-conversations-debug-title {
+    margin: 0 0 var(--spacing-small) 0;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--link-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ai-conversations-detail-row {
+    display: flex;
+    gap: var(--spacing-medium);
+    margin-bottom: var(--spacing-small);
+    font-size: 0.95em;
+}
+
+.ai-conversations-detail-row:last-of-type {
+    margin-bottom: 0;
+}
+
+.detail-label {
+    font-weight: 500;
+    color: var(--text-color);
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.detail-value {
+    color: var(--text-color);
+    flex: 1;
+    word-break: break-word;
+}
+
+.ai-conversations-messages-section {
+    margin-top: var(--spacing-medium);
+    padding-top: var(--spacing-medium);
+    border-top: 1px solid var(--border-color);
+}
+
+.ai-conversations-messages-title {
+    margin: 0 0 var(--spacing-medium) 0;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.ai-conversations-messages-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+    max-height: 80vh;
+    min-height: 200px;
+    overflow-y: auto;
+    resize: vertical;
+    padding: var(--spacing-small);
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: var(--spacing-medium);
+}
+
+.ai-conversations-message {
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-left: 3px solid var(--border-color);
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+    margin-bottom: var(--spacing-small);
+}
+
+.message-debug-toggle {
+    margin: var(--spacing-small) 0;
+}
+
+.message-debug-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 4px 8px;
+    font-size: 0.8em;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.7;
+}
+
+.message-debug-btn:hover {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border-color: var(--text-color);
+    opacity: 1;
+}
+
+.message-debug-info {
+    margin: var(--spacing-small) 0;
+    padding: var(--spacing-small);
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+.debug-field {
+    display: flex;
+    gap: var(--spacing-small);
+    margin-bottom: var(--spacing-small);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.debug-field:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.debug-label {
+    font-weight: 600;
+    color: var(--link-color);
+    min-width: 120px;
+    flex-shrink: 0;
+}
+
+.debug-value {
+    color: var(--text-color);
+    word-break: break-word;
+    font-family: monospace;
+    flex: 1;
+}
+
+.debug-metadata-pre {
+    margin: 4px 0;
+    padding: 4px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--text-color);
+    overflow-x: auto;
+}
+
+.message-agent {
+    font-size: 0.85em;
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+.ai-conversations-message[data-role="user"] {
+    border-left-color: var(--link-color);
+    background-color: var(--secondary-color);
+}
+
+.ai-conversations-message[data-role="assistant"] {
+    border-left-color: var(--success-color);
+    background-color: var(--secondary-color);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-small);
+    gap: var(--spacing-small);
+}
+
+.message-role {
+    font-weight: 600;
+    font-size: 0.85em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.message-role.role-user {
+    background-color: var(--accent-color);
+    color: var(--text-color);
+}
+
+.message-role.role-assistant {
+    background-color: var(--success-color);
+    color: var(--text-color);
+}
+
+.message-time {
+    font-size: 0.8em;
+    color: var(--text-color);
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.copy-message-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-left: 10px;
+}
+
+.copy-message-btn:hover {
+    opacity: 0.7;
+}
+
+.message-content {
+    font-size: 0.95em;
+    color: var(--text-color);
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.code-block {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 5px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    margin: 10px 0;
+    overflow-x: auto;
+    white-space: pre;
+    display: block;
+}
+
+.ai-conversations-detail-actions {
+    display: flex;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-medium);
+    padding-top: var(--spacing-medium);
+    border-top: 1px solid var(--border-color);
+}
+
+.ai-conversations-detail-actions .button {
+    flex: 1;
+}
+
+.button-group {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.button-group .button {
+    flex: 1;
+    text-align: center;
+}
+
+.site-footer {
+    margin-top: var(--spacing-large);
+    padding-top: var(--spacing-medium);
+    border-top: 1px solid var(--border-color);
+}
+
+.site-footer .button-group {
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .ai-conversations-item-user {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .ai-conversations-item-row {
+        flex-wrap: wrap;
+        gap: var(--spacing-small);
+    }
+    
+    .ai-conversations-item-date {
+        min-width: 80px;
+    }
+    
+    .ai-conversations-item-title {
+        min-width: 150px;
+        order: 2;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .ai-conversations-detail-row {
+        flex-direction: column;
+        gap: var(--spacing-small);
+    }
+    
+    .detail-label {
+        min-width: auto;
+    }
+}
+</style>
+
+<script src="/static/js/ai-common.js"></script>
+<script>
+function toggleMessageDebug(btn) {
+    const messageDiv = btn.closest('.ai-conversations-message');
+    const debugInfo = messageDiv.querySelector('.message-debug-info');
+    const isVisible = debugInfo.style.display !== 'none';
+    debugInfo.style.display = isVisible ? 'none' : 'block';
+    btn.textContent = isVisible ? '◆ Debug Info' : '◇ Hide Debug';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButtons = document.querySelectorAll('.ai-conversations-item-toggle');
+    
+    toggleButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const item = this.closest('.ai-conversations-item');
+            const detailsId = this.getAttribute('aria-controls');
+            const details = document.getElementById(detailsId);
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            
+            this.setAttribute('aria-expanded', !isExpanded);
+            details.hidden = isExpanded;
+
+            // Format message contents when expanded for the first time
+            if (!isExpanded && !details.getAttribute('data-formatted')) {
+                details.querySelectorAll('.message-content').forEach(el => {
+                    // Use a temporary div to get raw text if it was already somewhat processed
+                    const rawContent = el.getAttribute('data-raw-content') || el.textContent.trim();
+                    if (!el.getAttribute('data-raw-content')) {
+                        el.setAttribute('data-raw-content', rawContent);
+                    }
+                    el.innerHTML = AIUtils.formatMessageContent(rawContent);
+                });
+                details.setAttribute('data-formatted', 'true');
+            }
+        });
+    });
+    
+    document.querySelectorAll('.ai-conversations-delete-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const convId = this.getAttribute('data-conv-id');
+            if (confirm('Are you sure you want to delete this conversation?')) {
+                window.location.href = this.href;
+            }
+        });
+    });
+});
+</script>

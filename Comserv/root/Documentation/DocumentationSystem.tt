@@ -1,0 +1,157 @@
+[% META
+    title = "Documentation System"
+    description = "Comprehensive guide to the Comserv Documentation System architecture, organization, and best practices"
+    roles = "normal,editor,admin,developer"
+    TemplateType = "Documentation"
+    category = "documentation"
+    page_version = "2.01"
+    last_updated = "Thu Dec 18 2025"
+    site_specific = "false"
+    author = "Shanta"
+    status = "Active"
+%]
+[% PageVersion = 'Documentation/documentation_system.tt,v 2.01 2025/12/18 shanta Exp shanta - Consolidated: merged documentation_system_overview.tt with Debugging and Future Enhancements sections, updated to Dec 18 2025' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container primary">
+    <h1 style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Documentation System</h1>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-bottom: var(--spacing-medium); line-height: 1.6;">
+        Last Updated: 2025-12-18 | Version: 2.01 | Author: Shanta | Status: Active
+    </div>
+
+    <!-- Table of Contents -->
+    <div id="toc" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0; margin-bottom: var(--spacing-small); line-height: 1.6;">Quick Navigation</h2>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><a href="#overview" style="color: var(--link-color);">Overview</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#documentation-types" style="color: var(--link-color);">Documentation Types</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#visibility-rules" style="color: var(--link-color);">Visibility Rules</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#organization" style="color: var(--link-color);">Organization</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#file-formats" style="color: var(--link-color);">File Formats</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#configuration" style="color: var(--link-color);">Configuration</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#best-practices" style="color: var(--link-color);">Best Practices</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#debugging" style="color: var(--link-color);">Debugging</a></li>
+            <li style="margin-bottom: var(--spacing-small);"><a href="#future-enhancements" style="color: var(--link-color);">Future Enhancements</a></li>
+        </ul>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-color); font-family: var(--body-font); line-height: 1.8;">
+        <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Overview</h2>
+        <p style="margin-bottom: var(--spacing-small); line-height: 1.8;">The Comserv documentation system provides a structured way to organize and access documentation for different sites, roles, and modules. This comprehensive guide explains how the documentation system works, including visibility rules, organization principles, file formats, configuration, and best practices for maintaining documentation.</p>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="documentation-types" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Documentation Types</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">The system supports several types of documentation:</p>
+        <ol style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>General Application Documentation</strong> - Common features like login, profile customization, visible to all sites and users</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Site-Specific Documentation</strong> - Documentation specific to particular sites (MCOOP, CSC), only visible to users of that site</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Role-Specific Documentation</strong> - Targeted at specific user roles (admin, developer), only visible to users with appropriate role</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Module Documentation</strong> - Documentation for specific system modules with visibility dependent on module access permissions</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Controller Documentation</strong> - System controller documentation primarily for developers and administrators</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Changelog Documentation</strong> - System changes and updates to help track system evolution</li>
+        </ol>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="visibility-rules" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Visibility Rules</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">The documentation system applies the following visibility rules:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>CSC Site Administrators</strong> - Can see ALL documentation across all sites and roles (complete access)</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Site-Specific Visibility</strong> - Users can only see documentation for their current site; general documentation (site='all') visible to all sites</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Role-Based Visibility</strong> - Users can only see documentation appropriate for their role; higher roles can see documentation for lower roles</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Module-Specific Visibility</strong> - Module documentation visibility follows site and role rules with additional module-specific permissions</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="organization" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Documentation Organization</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">Documentation is organized into the following categories:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>User Guides</strong> - Basic documentation for end users, getting started guides and FAQs</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Administrator Guides</strong> - Installation and configuration guides for system administrators</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Developer Documentation</strong> - API references and coding standards for developers</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Tutorials</strong> - Step-by-step guides for common tasks</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Controllers & Models Documentation</strong> - Technical documentation for developers and administrators</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Changelog</strong> - System changes visible to developers and administrators</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Proxmox Documentation</strong> - Virtualization environment documentation for administrators</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="file-formats" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">File Formats</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">The documentation system supports multiple file formats:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>Template Toolkit (.tt)</strong> - Primary format for documentation with proper META blocks, supports dynamic content, variables, and conditionals</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Markdown (.md)</strong> - Legacy format for quick drafts (not recommended for published documentation)</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Other Formats</strong> - JSON, HTML, CSS with appropriate content types</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="configuration" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Configuration</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">The documentation system uses a JSON configuration file for centralized management:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>documentation_config.json</strong> - Defines documentation categories, file paths, and metadata settings</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Structure</strong> - Categories section for all documentation types, default paths for documentation keys</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Updates</strong> - When adding new documentation, update configuration file and verify paths point to existing files</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="best-practices" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Best Practices</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">When creating documentation, follow these best practices:</p>
+        <ol style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 2em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>Proper Placement</strong> - Place documentation in appropriate directory based on type</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Clear Metadata</strong> - Include title, author, date, status, and version in META block</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Structured Content</strong> - Use proper headings, table of contents, and code blocks</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Comprehensive Coverage</strong> - Cover all aspects, include examples and address common questions</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Regular Updates</strong> - Keep documentation current with system changes and note update dates</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Management</strong> - Update documentation_config.json when adding or moving documentation</li>
+        </ol>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="debugging" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Debugging</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8;">The documentation system includes debugging features to help troubleshoot issues:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>Debug Mode</strong> - Enable debug mode to see detailed information about documentation loading and categorization</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Logging</strong> - The system logs documentation scanning and categorization; check application logs for errors</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Configuration Validation</strong> - The system validates documentation_config.json file; errors are logged</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-medium); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color);">
+        <h2 id="future-enhancements" style="color: var(--text-color); font-family: var(--header-font); margin-bottom: var(--spacing-medium); line-height: 1.6;">Future Enhancements</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-small); line-height: 1.8;">Planned enhancements for the documentation system include:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font); margin-bottom: var(--spacing-medium); line-height: 1.8; margin-left: 1.5em;">
+            <li style="margin-bottom: var(--spacing-small);"><strong>Improved Search</strong> - Full-text search across all documentation with advanced filtering</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Version Control</strong> - Track documentation changes over time and view previous versions</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>User Feedback</strong> - Allow users to rate documentation and collect improvement suggestions</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Interactive Examples</strong> - Add interactive code examples, demos, and video tutorials</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Documentation Analytics</strong> - Track documentation access patterns and identify coverage gaps</li>
+            <li style="margin-bottom: var(--spacing-small);"><strong>Further Template Improvements</strong> - Additional modularization, dynamic loading, and mobile responsiveness</li>
+        </ul>
+        <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Navigation</a></p>
+    </div>
+
+    <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 2px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small); line-height: 1.8;">
+        <p style="margin-bottom: var(--spacing-small);">This documentation is part of the Comserv system. For technical support or questions, contact the system administrator.</p>
+        <p style="margin-bottom: 0;"><em>Last Updated: December 18, 2025 | Version: 2.01 | Status: Active</em></p>
+    </div>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-color);">
+        <a href="/Documentation/index" style="background-color: var(--primary-color); color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;">← Return to Documentation Menu</a>
+    </div>
+</div>

@@ -1,0 +1,179 @@
+[% META 
+   title = "Starting a Zencoder Chat"
+   description = "Administrative guide for initiating Zencoder chat sessions using the Literal Execution Standard (v3.1) with incremental cleanup workflow enforcement."
+   roles = "admin"
+   TemplateType = "Administration"
+   category = "Zencoder Documentation"
+   page_version = "0.33"
+   last_updated = "Sat Jan 25 00:25:00 UTC 2026"
+%]
+
+[% PageVersion  = 'admin/documentation/ZencoderOpeningPrompt.tt,v 0.33 2026/01/25 Refactored to use centralized AIUtils.copyToClipboard.'; %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1>Starting a Zencoder Chat</h1>
+
+<div class="app-section">
+    <div style="background: var(--schema-alert-success-bg); border: 2px solid var(--success-color); border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; color: var(--success-color);">✅ V3 LITERAL EXECUTION STANDARD (Prevents AI Interpretation Failures)</h3>
+        <ul style="margin-bottom: 0;">
+            <li><strong>Execute First, Understand Second</strong>: AI runs mandatory bash block BEFORE reading anything else.</li>
+            <li><strong>Zero Ambiguity</strong>: Commands in executable format, not instructions AI might interpret/skip.</li>
+            <li><strong>Immediate Audit Trail</strong>: Mandatory Phase 0/1 execution from Prompt 1.</li>
+            <li><strong>Incremental Workflow (Cleanup Agent)</strong>: Mandatory Select ONE change -> Edit -> /updateprompt -> ask_questions loop.</li>
+            <li><strong>Bilateral Logging (Rule 7)</strong>: 100% compliance with <code>USER PROMPT: [verbatim]</code> recording.</li>
+        </ul>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin: 0;">📋 COPY & PASTE: Single-Prompt Initialization</h2>
+    </div>
+    <p><strong>Instructions:</strong> Use the unified prompt below to establish a new Zencoder session. Replace bracketed text with your specific task details. <strong>Cleanup Agents:</strong> You MUST follow the incremental workflow defined in <code>coding-standards.yaml</code>.</p>
+    
+    <div style="background: var(--schema-alert-error-bg); border: 2px solid var(--danger-color); border-radius: 4px; padding: 15px; margin: 15px 0;">
+        <h3 style="margin-top: 0; color: var(--danger-color);">⚠️ CRITICAL COMPLIANCE NOTICE</h3>
+        <p style="color: var(--danger-color);"><strong>PHASE 0 and PHASE 1 are NON-NEGOTIABLE.</strong> Agents MUST execute <code>validation_step0.pl</code> and <code>updateprompt.pl --phase before</code> as their absolute first actions. <strong>Bilateral logging REQUIREMENT:</strong> The <code>--description</code> field MUST contain the <code>USER PROMPT: [verbatim text]</code>. Cleanup Agents MUST execute Phase 2 (After Work) and Phase 3 (After Question) for EVERY incremental change.</p>
+    </div>
+    
+    <div style="background: var(--light-color); border: 2px solid var(--success-color); border-radius: 4px; padding: 15px; margin: 15px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: var(--success-color);">🚀 V3 LITERAL EXECUTION OPENING PROMPT</h3>
+            <button class="copy-btn" data-target="unifiedPromptCodeBlock" style="background: var(--success-color); color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 Copy V3 Prompt</button>
+        </div>
+        <pre style="background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code id="unifiedPromptCodeBlock">AI: Execute this bash block IMMEDIATELY using Bash tool. Do NOT read further until execution completes.
+
+```bash
+cd /home/shanta/PycharmProjects/comserv2
+
+# PHASE 0: Validation
+perl .zencoder/scripts/validation_step0.pl
+
+# PHASE 1: Bilateral Logging (NON-NEGOTIABLE)
+export NEW_CHAT=1  # Change to 0 if continuing existing conversation
+
+# AI: You MUST use the EXACT verbatim prompt provided by the user below.
+# DO NOT paraphrase, summarize, or edit the FULL_PROMPT content.
+export FULL_PROMPT='
+CHAT NAME: [User fills: Brief conversation title]
+
+TASK: [User fills: What needs to be done]
+
+FILES INVOLVED: [User fills: Which files to work with]
+
+SUCCESS CRITERIA: [User fills: What done looks like]
+'
+
+export AGENT_TYPE="cleanup-agent"  # cleanup-agent, planning-agent, documentation-sync, etc
+export PLANNED_ACTION="[AI fills after reading: One-line summary of planned work]"
+
+if [ "$NEW_CHAT" = "1" ]; then
+    perl .zencoder/scripts/updateprompt.pl \
+        --new-chat \
+        --phase before \
+        --action "$PLANNED_ACTION" \
+        --description "USER PROMPT (VERBATIM): $FULL_PROMPT" \
+        --agent-type "$AGENT_TYPE" \
+        --full-prompt "$FULL_PROMPT" \
+        --success 0
+else
+    CONV_ID=$(cat .zencoder/current_conversation_id 2>/dev/null || echo "")
+    perl .zencoder/scripts/updateprompt.pl \
+        --conversation-id "$CONV_ID" \
+        --phase before \
+        --action "$PLANNED_ACTION" \
+        --description "USER PROMPT (VERBATIM): $FULL_PROMPT" \
+        --agent-type "$AGENT_TYPE" \
+        --full-prompt "$FULL_PROMPT" \
+        --success 0
+fi
+
+echo "✅ Execution complete - Phase 0 passed, Phase 1 logged"
+```
+
+NEXT STEP (After bash execution):
+1. AI MUST read /.zencoder/coding-standards.yaml (Single Source of Truth)
+2. AI MUST call ask_questions() to clarify task details BEFORE starting work
+3. Cleanup Agents: Select ONE task/file, apply change, log Phase 2 (After), log Phase 3 (Question), repeat.</code></pre>
+        <p><strong>Key Difference v3:</strong> AI executes commands FIRST (literal bash block), understands task SECOND. Prevents interpretation failures where AI skips mandatory steps.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2>Overview</h2>
+    <p>
+        The <strong>v3 Literal Execution Standard</strong> (Consolidated in <code>coding-standards.yaml</code>) 
+        solves fundamental AI failure patterns by forcing execution BEFORE interpretation. Instead of "instructions" 
+        that AI might skip or misunderstand, the opening prompt contains an executable bash block that runs 
+        immediately. This guarantees Phase 0 validation and Phase 1 bilateral logging happen from the first prompt, 
+        preventing the "helpful but inaccurate" behaviors identified in AI limitation analysis.
+    </p>
+    <p>
+        <strong>Why v3 Works:</strong> AI training optimizes for "helpfulness" (suggesting, explaining, paraphrasing) 
+        over "accuracy" (executing exactly, following literally, recording verbatim). By presenting commands as 
+        executable code blocks rather than prose instructions, we bypass the interpretation layer where failures occur.
+    </p>
+</div>
+    
+<div class="app-section">
+    <h2>Critical Requirements</h2>
+    <div class="content-section">
+        <h3>🔴 Bilateral Audit Trail (MANDATORY)</h3>
+        <p>
+            Establishing a bilateral audit trail means:
+        </p>
+        <ul>
+            <li><strong>Phase 0 execution</strong> must be logged immediately (validation_step0.pl)</li>
+            <li><strong>Phase 1-Before logging</strong> MUST happen before any work begins, using verbatim user input</li>
+            <li><strong>All decisions</strong> must be made via <code>ask_questions()</code></li>
+        </ul>
+    </div>
+    
+    <div class="content-section">
+        <h3>🔴 Consolidated Guidelines</h3>
+        <p>
+            Always refer to <code>/.zencoder/coding-standards.yaml</code> as the single source of truth for:
+        </p>
+        <ul>
+            <li>Global Rules 1-11</li>
+            <li>Agent Role Specifications</li>
+            <li>Documentation Naming Standards (PascalCase)</li>
+            <li>Session Setup Protocol</li>
+        </ul>
+    </div>
+</div>
+
+<script src="/static/js/ai-common.js"></script>
+<script>
+(function() {
+    function init() {
+        if (typeof AIUtils === 'undefined') {
+            setTimeout(init, 100);
+            return;
+        }
+        const buttons = document.querySelectorAll('.copy-btn');
+        buttons.forEach(btn => {
+            if (btn.getAttribute('data-init-done')) return;
+            btn.addEventListener('click', function() {
+                const targetId = btn.getAttribute('data-target');
+                const code = document.getElementById(targetId);
+                if (!code) return;
+                const text = code.textContent || code.innerText;
+                AIUtils.copyToClipboard(btn, text, {
+                    successText: '✅ Copied!',
+                    changeStyle: true,
+                    successBg: '#28a745',
+                    successColor: 'white'
+                });
+            });
+            btn.setAttribute('data-init-done', 'true');
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>

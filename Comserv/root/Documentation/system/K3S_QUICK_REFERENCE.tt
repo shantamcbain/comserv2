@@ -1,0 +1,348 @@
+[% META
+        title = "K3s Production Migration - Quick Reference Card"
+   description = "One-page quick reference for K3s migration: decision matrix, 6-phase roadmap, architecture, critical checkpoints, risks/mitigation, and next steps for infrastructure/dev/ops teams"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,kubernetes,quickstart"
+   page_version = "0.01"
+   last_updated = "Wed Dec 24 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/system/K3S_QUICK_REFERENCE.tt,v 0.01 2025/12/24 zencoder Exp - Quick-reference card for K3s migration: decision matrix, phases, architecture, checkpoints, risks' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">K3s Production Migration - Quick Reference Card</h1>
+    <p style="color: var(--text-color); font-family: var(--body-font); font-size: 1.1em;"><strong>For Infrastructure Team, Development Team, Operations</strong></p>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-24 | 
+        Version: 0.01 | 
+        Status: ✅ APPROVED & READY FOR IMPLEMENTATION | 
+        Timeline: 3-4 months | Priority: CRITICAL - Infrastructure Stability
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#decision-matrix" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Decisions</a>
+                <a href="#roadmap" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">6-Phase Roadmap</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
+                <a href="#checkpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Critical Checkpoints</a>
+                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Enhancements</a>
+                <a href="#risks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Risks & Mitigation</a>
+                <a href="#next-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Next Steps</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPROVAL STATUS BANNER -->
+    <div id="overview" class="row">
+        <div class="col-100">
+            <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <h2 style="color: #1b5e20; font-family: var(--header-font); margin-top: 0;">1. Overview & Approval Status</h2>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>✅ STATUS: APPROVED (2025-12-24)</strong></p>
+                <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>Timeline:</strong> 3-4 months (Phases 1-6) | <strong>Priority:</strong> CRITICAL - Infrastructure Stability</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">Grok's K3s production migration plan has been evaluated and integrated into the Docker/Kubernetes migration strategy. This quick reference card summarizes key decisions, phases, architecture, and next steps.</p>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- QUICK LINKS -->
+    <div class="row">
+        <div class="col-100">
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Quick Links to Implementation Guides</h3>
+            <div style="display: flex; gap: var(--spacing-medium); flex-wrap: wrap;">
+                <a href="/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--primary-color); color: white; border-radius: 4px; text-decoration: none; font-weight: bold;">⭐ START HERE: Implementation Guide</a>
+                <a href="/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--secondary-color); color: white; border-radius: 4px; text-decoration: none;">Main Migration Strategy</a>
+                <a href="/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--secondary-color); color: white; border-radius: 4px; text-decoration: none;">Grok's Original Plan</a>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY DECISION MATRIX -->
+    <div id="decision-matrix" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">2. Key Decision Matrix</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Architecture Decisions</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>✅ K3s</strong> - Lightweight Kubernetes, homelab-friendly</li>
+                <li><strong>✅ Master on proxmox720</strong> - Stable Dell R720 hardware for control-plane</li>
+                <li><strong>✅ Workers distributed</strong> - Across proxmox720/proxmoxws/proxmoxt210</li>
+                <li><strong>✅ Galera 3-replica cluster</strong> - Production database HA</li>
+                <li><strong>✅ Zero-downtime migration</strong> - Via replication cutover</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Database Migration Strategy</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>FROM:</strong> Bare-metal MariaDB (192.168.1.198)</li>
+                <li><strong>TO:</strong> K3s Galera StatefulSet (192.168.1.200 via MetalLB)</li>
+                <li><strong>METHOD:</strong> Master-slave replication cutover</li>
+                <li><strong>ROLLBACK:</strong> 3-day bare-metal retention window</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- 6-PHASE ROADMAP -->
+    <div id="roadmap" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">3. Six-Phase Roadmap (3-4 Months)</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phase 1-2: Docker Compose (Months 1-2)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> Currently Active</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Containerize dev environment</li>
+                <li>Validate environment variables &amp; credentials</li>
+                <li>Test Docker networking for external DB access</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phase 3: K3s Cluster Rebuild (Week 1)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Create K3s master VM 100 on proxmox720 (192.168.1.10)</li>
+                <li>Create 5 worker VMs (101-105) on 3 Proxmox hosts</li>
+                <li>Prepare nodes (swap disable, kernel modules)</li>
+                <li>Install K3s v1.28.4</li>
+                <li>Deploy MetalLB (IP pool: 192.168.1.200-250)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Galera Deployment (Week 2)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Create production-db namespace</li>
+                <li>Create K8s Secrets for DB credentials</li>
+                <li>Deploy PersistentVolumes (100GB x3)</li>
+                <li>Deploy Galera StatefulSet (3 replicas)</li>
+                <li>Verify cluster health</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Zero-Downtime Migration (Week 2-3)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Set bare-metal (192.168.1.198) as master</li>
+                <li>Configure K3s as slave</li>
+                <li>Monitor replication (Seconds_Behind_Master = 0)</li>
+                <li>Verify data integrity (row counts match)</li>
+                <li><strong>CUTOVER:</strong> Stop app → Promote K3s → Update config → Restart</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Phase 6: Stabilization (Week 3-4)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Monitor Galera cluster (7 days minimum)</li>
+                <li>Keep bare-metal online (3-day rollback window)</li>
+                <li>Validate backups &amp; monitoring</li>
+                <li>Document findings</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <div id="architecture" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">4. Architecture at a Glance</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">K3s Master (VM 100)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Location:</strong> proxmox720 (192.168.1.10)</li>
+                <li><strong>Resources:</strong> 8GB RAM, 4 cores, 50GB storage</li>
+                <li><strong>Services:</strong> etcd, apiserver, control-plane</li>
+                <li><strong>Status:</strong> STABLE (Dell R720 hardware)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">K3s Workers (VMs 101-105)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>proxmox720:</strong> VMs 101, 102 (192.168.1.11-12)</li>
+                <li><strong>proxmoxws:</strong> VMs 103, 104 (192.168.1.13-14)</li>
+                <li><strong>proxmoxt210:</strong> VM 105 (192.168.1.15)</li>
+                <li><strong>Capacity:</strong> 5 worker nodes for app scaling</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">MetalLB LoadBalancer</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>IP Pool:</strong> 192.168.1.200-250</li>
+                <li><strong>Galera Service IP:</strong> 192.168.1.200:3306</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Production Database Cluster</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Type:</strong> Galera 3-replica StatefulSet</li>
+                <li><strong>Headless Service:</strong> mariadb-galera (clustering)</li>
+                <li><strong>LoadBalancer Service:</strong> mariadb-lb (external access)</li>
+                <li><strong>Storage:</strong> 100GB per replica (NFS or Longhorn)</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CRITICAL CHECKPOINTS -->
+    <div id="checkpoints" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">5. Critical Checkpoints (DO NOT SKIP)</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Before Phase 3</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ Docker Compose phases (1-2) COMPLETE</li>
+                <li>☐ Environment variables DOCUMENTED</li>
+                <li>☐ DB credentials in .env (NOT in git)</li>
+                <li>☐ Network connectivity VERIFIED (ping test)</li>
+                <li>☐ Proxmox SSH access CONFIGURED</li>
+                <li>☐ 3-day maintenance window SCHEDULED</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">During Phase 5 (Cutover)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ Application replicas SCALED TO ZERO</li>
+                <li>☐ Replication fully synced (monitor Seconds_Behind_Master)</li>
+                <li>☐ Data integrity VERIFIED (row counts match)</li>
+                <li>☐ DNS/config UPDATE atomic</li>
+                <li>☐ Bare-metal ONLINE for rollback (CRITICAL!)</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Post-Cutover (3-Day Window)</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>☐ Galera cluster MONITORED continuously</li>
+                <li>☐ Application features TESTED</li>
+                <li>☐ Backups WORKING</li>
+                <li>☐ Issues DOCUMENTED</li>
+                <li>☐ Rollback decision MADE (keep/retire bare-metal)</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ENHANCEMENTS TO GROK'S PLAN -->
+    <div id="enhancements" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">6. Enhancements to Grok's Original Plan</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">What We Adopted Fully</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>K3s distribution choice (lightweight, homelab-friendly)</li>
+                <li>Master on proxmox720 (stable hardware)</li>
+                <li>Galera 3-replica setup for HA</li>
+                <li>Zero-downtime migration approach</li>
+                <li>3-day rollback window with bare-metal retention</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Recommended Adjustments</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Pre-cluster Docker validation</strong> - Complete Phases 1-2 first to catch config issues early</li>
+                <li><strong>MetalLB IP pool pre-planning</strong> - Define 192.168.1.200-250 before Phase 3 to avoid conflicts</li>
+                <li><strong>Storage strategy decision</strong> - Choose NFS vs Longhorn before Phase 3 to prevent surprises</li>
+                <li><strong>Prometheus + Grafana from day 1</strong> - Visibility is critical for homelab stability</li>
+                <li><strong>Backup automation</strong> - Implement K3s cluster backups before production migration</li>
+                <li><strong>Dual-master option</strong> - Consider second master if proxmox720 capacity permits (improves HA)</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RISKS & MITIGATION -->
+    <div id="risks" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">7. Key Risks &amp; Mitigation</h2>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: K3s Cluster Instability</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Master on stable proxmox720; Prometheus monitoring from day 1</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Data Loss During Migration</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Galera replication + 3-day bare-metal retention</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Application Can't Connect to K3s DB</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Test in staging first; rollback procedure ready</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Network Issues Between Hosts</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> All on same LAN (192.168.1.0/24); no complex routing</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Replication Lag During Cutover</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Monitor Seconds_Behind_Master; wait until 0 before cutover</p>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Missed Rollback Window</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> 3-day minimum retention; 72-hour decision window</p>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- IMMEDIATE NEXT STEPS -->
+    <div id="next-steps" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font);">8. Immediate Next Steps (This Week)</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Infrastructure Team</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Read K3S_PRODUCTION_MIGRATION_GUIDE.tt (Section 1-2: Prerequisites &amp; Architecture)</li>
+                <li>Review Proxmox environment (resource availability, network setup)</li>
+                <li>Prepare SSH keys &amp; credentials</li>
+                <li>Schedule Phase 3 kickoff (target: 1 week from approval)</li>
+                <li>Document actual IPs/credentials (replace examples in guide)</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Development Team</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Complete Docker Compose phases (Phases 1-2)</li>
+                <li>Validate environment variables in .env files</li>
+                <li>Test database connectivity via docker-compose</li>
+                <li>Prepare application deployment manifests for K3s</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Operations Team</h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Plan Prometheus + Grafana stack for K3s cluster</li>
+                <li>Design backup/restore procedure for Galera</li>
+                <li>Document Galera cluster management runbooks</li>
+                <li>Plan on-call coverage for Phase 5 cutover window</li>
+            </ol>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">9. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE" style="color: var(--link-color);"><strong>K3S_PRODUCTION_MIGRATION_GUIDE.tt</strong></a> - Detailed step-by-step implementation with copy/paste commands</li>
+                    <li><a href="/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="color: var(--link-color);"><strong>DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt</strong></a> - Main migration strategy with K3s integration evaluation</li>
+                    <li><a href="/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" style="color: var(--link-color);"><strong>PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt</strong></a> - Grok's original K3s proposal (reference)</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Approval &amp; Sign-off:</strong></p>
+                <ul style="margin: 5px 0;">
+                    <li>Grok (K3s Design): Submitted 2025-12-23 ✅</li>
+                    <li>Zencoder (Integration): Evaluated &amp; Approved 2025-12-24 ✅</li>
+                    <li>Infrastructure Lead: ⏳ Pending Review</li>
+                    <li>Development Team: ⏳ Pending Review</li>
+                </ul>
+                <p><em>This quick reference is part of the Comserv K3s Production Migration initiative. For additional context, see GROK_K3S_INTEGRATION_SUMMARY.md in the .zencoder directory.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

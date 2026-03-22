@@ -1,0 +1,34 @@
+[% IF categories.tutorials %]
+<section class="doc-section">
+    <h2 class="section-toggle">Tutorials</h2>
+    <p>Step-by-step instructions for common tasks.</p>
+    <div class="section-content">
+        [% FOREACH page_name IN categories.tutorials.pages.sort %]
+            [% IF structured_pages.$page_name %]
+                [% page = structured_pages.$page_name %]
+                <a href="[% page.url %]" class="doc-card">
+                    <h3>[% page.title %]</h3>
+                    <p>[% page.description || 'Step-by-step tutorial for Comserv users.' %]</p>
+                    [% IF page.site != 'all' %]<span class="site-badge">[% page.site %]</span>[% END %]
+                    [% IF page.file_type %]<span class="file-type-badge [% page.file_type %]">[% page.file_type %]</span>[% END %]
+                </a>
+            [% END %]
+        [% END %]
+    </div>
+</section>
+[% END %]
+
+<!-- AI Workflows & Team Training -->
+<section class="doc-section">
+    <h2 class="section-toggle">AI Workflows & Team Training</h2>
+    <p>Guides for using AI agents and daily workflows for team coordination and project management.</p>
+    <div class="section-content">
+        <!-- Daily Workflow Tutorial -->
+        <a href="/Documentation/DAILY_WORKFLOW_TUTORIAL" class="doc-card">
+            <h3>Daily Workflow Tutorial: 4-Agent System Guide</h3>
+            <p>Complete step-by-step tutorial for team members on how to execute the daily planning and coordination workflow using the 4-agent system (Daily Audit, DocumentationSync, Master Plan Updater, Daily Plans Generator). Includes agent descriptions, prompt templates, troubleshooting, and team role assignments.</p>
+            <span class="doc-badge">Team Training</span>
+            <span class="doc-badge">Workflows</span>
+        </a>
+    </div>
+</section>

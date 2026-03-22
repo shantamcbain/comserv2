@@ -1,0 +1,499 @@
+[% META
+    title = 'Documentation Model - Content Version Control & Tracking'
+    description = 'Comprehensive documentation for Documentation model covering version control, audit trail, creator/updater tracking, content management, and usage examples for managing in-database documentation records with change history'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,documentation,content-management'
+    page_version = '1.00'
+    last_updated = '2026-01-08 20:35:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/Documentation.tt,v 1.00 2026/01/08 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="documentation-model">Documentation Model - Content Version Control & Tracking</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#relationships">Relationships & Foreign Keys</a></li>
+                    <li><a href="#version-control">Version Control & Audit Trail</a></li>
+                    <li><a href="#api-methods">API Methods</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 8, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Documentation.pm Addition:</strong> New DBIx::Class Result model for in-database content versioning</li>
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for schema, relationships, and audit features</li>
+                    <li><strong>Version Control:</strong> Documented created_by/updated_by tracking with User relationships</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>Documentation</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/Documentation.pm) 
+                    provides a database-backed content storage system for managing documentation records with built-in version control, 
+                    audit trail, and creator/updater tracking. It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Content versioning (title, content, section, version fields)</li>
+                    <li>Creator and updater audit trail (created_by, updated_by user IDs)</li>
+                    <li>Timestamp tracking (created_at, updated_at)</li>
+                    <li>Relationships to User model for author information</li>
+                    <li>Section-based organization (section field for grouping)</li>
+                    <li>Full-text content storage (content field as TEXT type)</li>
+                </ul>
+                <p>
+                    Documentation is used for in-database storage of help articles, changelogs, guides, and other content 
+                    that requires version control and audit tracking. It complements the filesystem-based .tt documentation 
+                    files by providing database-driven documentation management.
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: documentation</h3>
+                <p><strong>Purpose:</strong> Store versioned documentation content with audit trail tracking</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>id</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>Auto-increment</td>
+                        <td>Primary key - unique record identifier</td>
+                    </tr>
+                    <tr>
+                        <td><code>title</code></td>
+                        <td>VARCHAR(255)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Documentation title/heading (human-readable identifier)</td>
+                    </tr>
+                    <tr>
+                        <td><code>content</code></td>
+                        <td>TEXT</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Full documentation content (HTML, Markdown, or plain text)</td>
+                    </tr>
+                    <tr>
+                        <td><code>section</code></td>
+                        <td>VARCHAR(255)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Documentation section/category (e.g., user_guide, api_reference, troubleshooting)</td>
+                    </tr>
+                    <tr>
+                        <td><code>version</code></td>
+                        <td>VARCHAR(50)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Version identifier (e.g., 1.0, 1.1, 2.0-beta; used for tracking documentation revisions)</td>
+                    </tr>
+                    <tr>
+                        <td><code>created_at</code></td>
+                        <td>DATETIME</td>
+                        <td>Yes</td>
+                        <td>Set on create</td>
+                        <td>Record creation timestamp (auto-set by DBIx::Class set_on_create)</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_at</code></td>
+                        <td>DATETIME</td>
+                        <td>Yes</td>
+                        <td>Set on create/update</td>
+                        <td>Last modification timestamp (auto-set on insert and update)</td>
+                    </tr>
+                    <tr>
+                        <td><code>created_by</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>User ID of document creator (foreign key to users.id)</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_by</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>User ID of last updater (foreign key to users.id)</td>
+                    </tr>
+                </table>
+
+                <h3>Field Details</h3>
+                
+                <h4>title</h4>
+                <p>Human-readable title displayed in documentation lists and headers. Examples:</p>
+                <ul>
+                    <li>"Getting Started with Comserv"</li>
+                    <li>"API Reference for Admin Controllers"</li>
+                    <li>"Troubleshooting Database Connection Issues"</li>
+                </ul>
+
+                <h4>section</h4>
+                <p>
+                    Organizes documentation into logical categories. Common section values:
+                </p>
+                <ul>
+                    <li><code>user_guide</code> - End-user documentation</li>
+                    <li><code>api_reference</code> - API documentation</li>
+                    <li><code>troubleshooting</code> - Problem resolution guides</li>
+                    <li><code>changelog</code> - Release notes and version history</li>
+                    <li><code>developer_guide</code> - Developer-focused content</li>
+                    <li><code>deployment</code> - Installation and deployment procedures</li>
+                </ul>
+
+                <h4>version</h4>
+                <p>
+                    Tracks documentation revision. Format examples:
+                </p>
+                <ul>
+                    <li><code>1.0</code> - Initial release</li>
+                    <li><code>1.1</code> - Minor updates</li>
+                    <li><code>2.0</code> - Major revision</li>
+                    <li><code>2.0-beta</code> - Pre-release</li>
+                    <li><code>1.5.1</code> - Patch update</li>
+                </ul>
+                <p><strong>Note:</strong> Increment version when content significantly changes (not for every edit).</p>
+
+                <h4>content</h4>
+                <p>
+                    Full documentation text. Can be:
+                </p>
+                <ul>
+                    <li><strong>HTML:</strong> For formatted content with styling</li>
+                    <li><strong>Markdown:</strong> For portable, human-readable source</li>
+                    <li><strong>Plain text:</strong> For simple documentation</li>
+                </ul>
+                <p><strong>Recommendation:</strong> Store as HTML or Markdown; indicate format in title or separate field if needed.</p>
+
+                <h4>created_at / updated_at</h4>
+                <p>
+                    Automatically managed by DBIx::Class:
+                </p>
+                <ul>
+                    <li><code>created_at</code>: Set once on record creation; never updated</li>
+                    <li><code>updated_at</code>: Set on creation and updated on every modify/update operation</li>
+                </ul>
+                <p><strong>Usage:</strong> Query `updated_at` to find recently changed documentation.</p>
+
+                <h4>created_by / updated_by</h4>
+                <p>
+                    Foreign keys to <code>users.id</code> table. Enables audit trail:
+                </p>
+                <ul>
+                    <li><code>created_by</code>: Original author (unchanged)</li>
+                    <li><code>updated_by</code>: Most recent editor (changes with each update)</li>
+                </ul>
+                <p><strong>Usage:</strong> Link to User model via relationships to get creator/updater names and profiles.</p>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships & Foreign Keys</h2>
+                
+                <h3>belongs_to: creator</h3>
+                <pre><code>$doc->creator();  # Returns User object for created_by user
+my $creator_name = $doc->creator->display_name();</code></pre>
+                <p><strong>Relationship Type:</strong> belongs_to</p>
+                <p><strong>Foreign Key:</strong> created_by → users.id</p>
+                <p><strong>Purpose:</strong> Retrieve User record for document creator</p>
+                <p><strong>Cascade:</strong> No cascade delete (users not deleted with documentation)</p>
+
+                <h3>belongs_to: updater</h3>
+                <pre><code>$doc->updater();  # Returns User object for updated_by user
+my $updater_email = $doc->updater->email;</code></pre>
+                <p><strong>Relationship Type:</strong> belongs_to</p>
+                <p><strong>Foreign Key:</strong> updated_by → users.id</p>
+                <p><strong>Purpose:</strong> Retrieve User record for last editor</p>
+                <p><strong>Note:</strong> Changes on every update; useful for tracking recent activity</p>
+
+                <h3>Recommended Inverse Relationships</h3>
+                <p>The User model should define:</p>
+                <pre><code>$user->created_docs();  # Documents created by this user
+$user->updated_docs();  # Documents updated by this user</code></pre>
+                <p><strong>Purpose:</strong> Enable queries like "all docs edited by user X" or "recent activity by user"</p>
+            </section>
+
+            <section id="version-control">
+                <h2>Version Control & Audit Trail</h2>
+                
+                <h3>Audit Trail Strategy</h3>
+                <p>
+                    Documentation provides a built-in audit trail via user tracking:
+                </p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field</th>
+                        <th>Purpose</th>
+                        <th>Query Example</th>
+                    </tr>
+                    <tr>
+                        <td><code>created_by</code> + <code>created_at</code></td>
+                        <td>Original authorship and creation date</td>
+                        <td>Find docs created by admin since Jan 2026</td>
+                    </tr>
+                    <tr>
+                        <td><code>updated_by</code> + <code>updated_at</code></td>
+                        <td>Last modification and editor</td>
+                        <td>Find recently edited docs or docs edited by specific user</td>
+                    </tr>
+                    <tr>
+                        <td><code>version</code></td>
+                        <td>Documentation release version</td>
+                        <td>Query all docs in v2.0 release</td>
+                    </tr>
+                </table>
+
+                <h3>Version Management Best Practices</h3>
+                <ol>
+                    <li><strong>Semantic Versioning:</strong> Use format MAJOR.MINOR[.PATCH][-suffix]
+                        <ul>
+                            <li>1.0 → 1.1 (minor doc update)</li>
+                            <li>1.0 → 2.0 (major rewrite)</li>
+                            <li>1.0-beta → 1.0 (beta to release)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Keep version stable:</strong> Don't increment version for every edit; use for significant releases</li>
+                    <li><strong>Track in changelog:</strong> Document why version changed (updated APIs, new features, etc.)</li>
+                    <li><strong>Batch updates:</strong> Update multiple docs, then increment version together</li>
+                </ol>
+
+                <h3>Querying Audit Information</h3>
+                <pre><code>
+# Find docs created by specific user
+my $docs = $c->model('Ency::Documentation')->search({
+    created_by => $user_id
+})->all;
+
+# Find recently updated docs
+my $recent = $c->model('Ency::Documentation')->search({
+    updated_at => { '>' => $date }
+}, { order_by => { -desc => 'updated_at' } })->all;
+
+# Find docs by version
+my $v2 = $c->model('Ency::Documentation')->search({
+    version => '2.0'
+})->all;
+
+# Find docs by section with creator info
+my $guides = $c->model('Ency::Documentation')->search({
+    section => 'user_guide'
+}, { 
+    prefetch => 'creator'
+})->all;
+                </code></pre>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods</h2>
+                
+                <h3>Instance Methods (from relationships)</h3>
+                
+                <h4>$doc->creator()</h4>
+                <pre><code>my $creator = $doc->creator();
+print "Created by: " . $creator->display_name() . "\n";</code></pre>
+                <p><strong>Returns:</strong> User Result object for created_by user_id</p>
+                <p><strong>Purpose:</strong> Get creator User record with name, email, etc.</p>
+                <p><strong>Throws:</strong> Exception if created_by user_id doesn't exist</p>
+
+                <h4>$doc->updater()</h4>
+                <pre><code>my $updater = $doc->updater();
+print "Last updated by: " . $updater->username . "\n";</code></pre>
+                <p><strong>Returns:</strong> User Result object for updated_by user_id</p>
+                <p><strong>Purpose:</strong> Get last editor User record</p>
+                <p><strong>Note:</strong> Changes with each update; useful for recent activity tracking</p>
+
+                <h3>Standard DBIx::Class Methods</h3>
+                <pre><code>
+# Create new documentation
+my $doc = $rs->create({
+    title       => 'New Guide',
+    content     => '<h2>Content here</h2>',
+    section     => 'user_guide',
+    version     => '1.0',
+    created_by  => $user_id,
+    updated_by  => $user_id,
+});
+
+# Update documentation
+$doc->content('<h2>Updated content</h2>');
+$doc->version('1.1');
+$doc->updated_by($current_user_id);
+$doc->update();
+
+# Delete documentation
+$doc->delete();
+
+# Search by field
+my $guides = $rs->search({ section => 'user_guide' })->all;
+                </code></pre>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Create New Documentation Record</h3>
+                <pre><code>
+my $schema = $c->model('Ency::Schema');
+my $rs = $schema->resultset('Documentation');
+
+my $new_doc = $rs->create({
+    title       => 'Getting Started with Proxmox Integration',
+    content     => '<h2>Overview</h2><p>This guide explains how to...</p>',
+    section     => 'user_guide',
+    version     => '1.0',
+    created_by  => $c->user->id,
+    updated_by  => $c->user->id,
+});
+
+print "Created documentation ID: " . $new_doc->id . "\n";
+                </code></pre>
+
+                <h3>Example 2: Update Documentation with New Version</h3>
+                <pre><code>
+my $doc = $rs->find($doc_id);
+
+$doc->content($new_html_content);
+$doc->version('1.1');
+$doc->updated_by($c->user->id);
+$doc->update();
+
+print "Updated to version " . $doc->version . "\n";
+                </code></pre>
+
+                <h3>Example 3: Query by Section with Creator Info</h3>
+                <pre><code>
+my @api_docs = $rs->search(
+    { section => 'api_reference' },
+    { prefetch => 'creator', order_by => { -desc => 'updated_at' } }
+)->all;
+
+foreach my $doc (@api_docs) {
+    print "Title: " . $doc->title . "\n";
+    print "Created by: " . $doc->creator->display_name() . "\n";
+    print "Updated: " . $doc->updated_at . "\n";
+    print "---\n";
+}
+                </code></pre>
+
+                <h3>Example 4: Find Recently Updated Docs</h3>
+                <pre><code>
+use DateTime;
+
+my $one_week_ago = DateTime->now->subtract(days => 7);
+
+my @recent = $rs->search({
+    updated_at => { '>=' => $one_week_ago->datetime }
+}, {
+    prefetch => 'updater',
+    order_by => { -desc => 'updated_at' }
+})->all;
+
+foreach my $doc (@recent) {
+    print $doc->title . " - Updated by " 
+        . $doc->updater->username . " on " 
+        . $doc->updated_at . "\n";
+}
+                </code></pre>
+
+                <h3>Example 5: Batch Version Upgrade</h3>
+                <pre><code>
+# Upgrade all v1.0 docs to v1.1
+my @v1_docs = $rs->search({ version => '1.0' })->all;
+
+foreach my $doc (@v1_docs) {
+    $doc->version('1.1');
+    $doc->updated_by($c->user->id);
+    $doc->update();
+}
+
+print "Upgraded " . scalar(@v1_docs) . " documents to v1.1\n";
+                </code></pre>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <h3>Issue: "Relationship 'creator' doesn't exist"</h3>
+                <p><strong>Cause:</strong> Trying to call ->creator() on Documentation object, but relationship not loaded.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Ensure prefetch is used in search: `search({...}, { prefetch => 'creator' })`</li>
+                    <li>Or call creator() directly: it will lazy-load if relationship exists</li>
+                    <li>Check Documentation.pm has `belongs_to('creator' => ...)`</li>
+                </ul>
+
+                <h3>Issue: "Can't find User with id X" on created_by lookup</h3>
+                <p><strong>Cause:</strong> created_by references a user_id that no longer exists in users table.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check database: `SELECT created_by FROM documentation WHERE created_by NOT IN (SELECT id FROM users)`</li>
+                    <li>Handle gracefully in code: wrap ->creator() in try/catch</li>
+                    <li>Data cleanup: update orphaned documentation to reference valid user or NULL (requires schema change)</li>
+                </ul>
+
+                <h3>Issue: "updated_at not changing on update()"</h3>
+                <p><strong>Cause:</strong> set_on_update not configured properly in schema.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Verify updated_at column definition: `set_on_update => 1`</li>
+                    <li>Check DBIx::Class version supports set_on_update (v0.08+)</li>
+                    <li>Manually update if needed: `$doc->updated_at(DateTime->now)->update()`</li>
+                </ul>
+
+                <h3>Issue: "Version field too small for my version string"</h3>
+                <p><strong>Cause:</strong> version VARCHAR(50) is insufficient for long version strings.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Use semantic versioning (keep versions short): v1.2.3, not "Release 1.2.3 bugfix build"</li>
+                    <li>For long descriptions, use content field instead</li>
+                    <li>Expand column if absolutely necessary: `ALTER TABLE documentation MODIFY COLUMN version VARCHAR(100)`</li>
+                </ul>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <strong>Related Documentation:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/User">User Model</a> - Creator/updater relationship</li>
+                        <li><a href="/Documentation/Documentation/index">/Documentation/index</a> - Filesystem-based documentation (complementary)</li>
+                    </ul>
+                </div>
+            </section>
+
+            <hr style="margin: 40px 0;">
+            <footer style="color: #666; font-size: 12px;">
+                <p>
+                    <strong>File:</strong> Comserv/lib/Comserv/Model/Schema/Ency/Result/Documentation.pm<br>
+                    <strong>Documentation Version:</strong> 1.00 (2026-01-08)<br>
+                    <strong>Last Updated:</strong> 2026-01-08 20:35:00 UTC<br>
+                    <strong>Maintained By:</strong> Zencoder (MainAgent)
+                </p>
+            </footer>
+        </div>
+    </div>
+</div>

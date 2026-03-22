@@ -2,10 +2,25 @@ package Comserv::Controller::Admin::NetworkDiagnostics;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-use IPC::Run3;
 use Try::Tiny;
 use JSON;
 use File::Slurp qw(read_file);
+
+# Try to load IPC::Run3, but make it optional
+BEGIN {
+    eval {
+        require IPC::Run3;
+        IPC::Run3->import();
+    };
+    if ($@) {
+        warn "Warning: IPC::Run3 module not available. Some network diagnostics features may be limited.\n";
+        # Create a dummy run3 function as fallback
+        *run3 = sub {
+            warn "IPC::Run3 not available - run3 call cannot be executed\n";
+            return 0;
+        };
+    }
+}
 
 BEGIN { extends 'Catalyst::Controller'; }
 

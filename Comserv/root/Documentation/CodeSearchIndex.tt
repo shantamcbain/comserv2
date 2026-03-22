@@ -1,0 +1,362 @@
+[% META
+        title = "CodeSearchIndex Result Class"
+   description = "DBIx::Class Result class for managing searchable code index with role-based access control and code element extraction"
+   roles = "admin,developer"
+   TemplateType = "model"
+   category = "models"
+   page_version = "0.01"
+   last_updated = "2026-01-11 16:03:00 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/CodeSearchIndex.tt,v 0.01 2026/01/11 DocumentationSyncAgent Exp - New Result class documentation from CodeSearchIndex.pm' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">CodeSearchIndex Result Class Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 16:03:00 UTC |
+        Version: 0.01 |
+        Author: Zencoder / DocumentationSyncAgent |
+        Status: New Result class documentation created from CodeSearchIndex.pm code audit
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#schema" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Schema</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
+                <a href="#code-elements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Code Elements</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>CodeSearchIndex Result Class</strong> (Comserv::Model::Schema::Ency::Result::CodeSearchIndex) is a DBIx::Class Result class that manages a searchable index of code files with extracted code elements and role-based access control. It stores file paths, file types, searchable code content, extracted code elements (functions, classes, variables), and controls access based on user roles.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This class enables efficient code searching and discovery with proper access restrictions, maintaining a content hash for change detection and automatic indexing timestamps. It supports multiple file types (Perl modules, Template Toolkit, SQL) and provides helper methods for accessing and filtering code elements.</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of CodeSearchIndex Result class including schema definition, field descriptions, helper methods, and code element extraction patterns.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Perl 5.20 or later</li>
+                <li>DBIx::Class ORM (v0.08194 or later)</li>
+                <li>Comserv application instance with ENCY database</li>
+                <li>JSON support for code_elements storage</li>
+                <li>MariaDB/MySQL with codesearchindex table</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Multi-File Type Support</strong>: Index Perl modules (.pm), Template Toolkit (.tt), and SQL files</li>
+                <li><strong>Code Element Extraction</strong>: Extract and store functions, classes, and variables in JSON format</li>
+                <li><strong>Searchable Content</strong>: Store full searchable code content with longtext field</li>
+                <li><strong>Change Detection</strong>: Content hash tracks file modifications for incremental indexing</li>
+                <li><strong>Role-Based Access</strong>: Control visibility based on user roles (developer, admin)</li>
+                <li><strong>Unique File Paths</strong>: Prevent duplicate entries for the same code file</li>
+                <li><strong>File Metadata</strong>: Track file size and automatic indexing timestamps</li>
+                <li><strong>Helper Methods</strong>: Convenient accessors for code elements, functions, classes, and variables</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SCHEMA SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="schema" style="color: var(--text-color); font-family: var(--header-font);">4. Schema Definition</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Table: codesearchindex</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Primary table: <code>codesearchindex</code></p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Column Definitions</h3>
+            <table border="1" style="width: 100%; border-collapse: collapse;">
+                <tr style="background-color: var(--light-color);">
+                    <th style="padding: 8px; text-align: left;">Column</th>
+                    <th style="padding: 8px; text-align: left;">Type</th>
+                    <th style="padding: 8px; text-align: left;">Nullable</th>
+                    <th style="padding: 8px; text-align: left;">Default</th>
+                    <th style="padding: 8px; text-align: left;">Description</th>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>id</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">Auto-increment</td>
+                    <td style="padding: 8px;">Primary key - unique index entry identifier</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>file_path</code></td>
+                    <td style="padding: 8px;">VARCHAR(512)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Full path to the indexed code file (unique)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>file_type</code></td>
+                    <td style="padding: 8px;">ENUM('pm', 'tt', 'sql')</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Type of file being indexed (pm=Perl, tt=Template Toolkit, sql=SQL)</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>code_elements</code></td>
+                    <td style="padding: 8px;">JSON</td>
+                    <td style="padding: 8px;">YES</td>
+                    <td style="padding: 8px;">NULL</td>
+                    <td style="padding: 8px;">Extracted code elements (functions, classes, variables) in JSON format</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>searchable_code</code></td>
+                    <td style="padding: 8px;">LONGTEXT</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Full searchable code content for full-text search</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>content_hash</code></td>
+                    <td style="padding: 8px;">VARCHAR(64)</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">SHA-256 hash of file content for change detection</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>indexed_at</code></td>
+                    <td style="padding: 8px;">TIMESTAMP</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;">CURRENT_TIMESTAMP</td>
+                    <td style="padding: 8px;">When the file was indexed</td>
+                </tr>
+                <tr style="background-color: var(--light-color);">
+                    <td style="padding: 8px;"><code>min_role</code></td>
+                    <td style="padding: 8px;">ENUM('developer', 'admin')</td>
+                    <td style="padding: 8px;">NO</td>
+                    <td style="padding: 8px;"></td>
+                    <td style="padding: 8px;">Minimum role required to access this indexed code (developer=visible to all, admin=admins only)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px;"><code>file_size</code></td>
+                    <td style="padding: 8px;">INTEGER</td>
+                    <td style="padding: 8px;">YES</td>
+                    <td style="padding: 8px;">NULL</td>
+                    <td style="padding: 8px;">Size of the file in bytes for indexing statistics</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Result Class Methods</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.1 get_code_elements</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Retrieve all extracted code elements as a hash.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$elements = $index->get_code_elements();
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Hash reference containing code elements, or empty hash if none exist.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.2 get_functions</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Extract list of functions defined in the indexed code.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$functions = $index->get_functions();
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of function names/definitions, or empty array if none.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.3 get_classes</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Extract list of classes defined in the indexed code.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$classes = $index->get_classes();
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of class names/definitions, or empty array if none.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.4 get_variables</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Extract list of variables defined in the indexed code.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$variables = $index->get_variables();
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of variable names/definitions, or empty array if none.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.5 is_accessible_by_role</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Check if a user with a specific role can access this indexed code.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$accessible = $index->is_accessible_by_role($user_role);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$user_role: User's role string ('developer', 'admin', etc.)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Boolean (1 if accessible, 0 if not). Admins always have access.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE EXAMPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">6. Usage Examples</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.1 Search Code Index by File Path</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">use Comserv::Model::Schema::Ency::Result::CodeSearchIndex;
+
+my $schema = $c->model('DBEncy')->schema;
+
+# Find index entry for a specific file
+my $index = $schema->resultset('CodeSearchIndex')->search({
+    file_path => 'lib/Comserv/Controller/Admin.pm'
+})->first;
+
+if ($index) {
+    print "File indexed at: " . $index->indexed_at . "\n";
+    print "File size: " . $index->file_size . " bytes\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.2 Search for Specific Function</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema = $c->model('DBEncy')->schema;
+
+# Search for files containing a specific function
+my @results = $schema->resultset('CodeSearchIndex')->search({
+    searchable_code => { -like => '%sub my_function%' }
+}, { rows => 10 })->all;
+
+foreach my $result (@results) {
+    print "Found in: " . $result->file_path . "\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.3 Get Code Elements for a File</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $index = $schema->resultset('CodeSearchIndex')->find($id);
+
+# Get all extracted code elements
+my $elements = $index->get_code_elements();
+
+# Get specific element types
+my $functions = $index->get_functions();
+my $classes = $index->get_classes();
+my $variables = $index->get_variables();
+
+print "Functions: " . join(", ", @$functions) . "\n";
+print "Classes: " . join(", ", @$classes) . "\n";
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.4 Check Access by User Role</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $index = $schema->resultset('CodeSearchIndex')->find($id);
+my $user_role = $c->user->get('role');
+
+if ($index->is_accessible_by_role($user_role)) {
+    # Display the indexed code to user
+    print $index->searchable_code;
+} else {
+    print "You do not have permission to view this code.\n";
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.5 Find All Recently Indexed Files</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $schema = $c->model('DBEncy')->schema;
+
+# Find files indexed in the last hour
+my $one_hour_ago = DateTime->now->subtract(hours => 1)->iso8601;
+
+my @recent = $schema->resultset('CodeSearchIndex')->search({
+    indexed_at => { '>' => $one_hour_ago }
+}, { order_by => 'indexed_at DESC' })->all;
+
+foreach my $index (@recent) {
+    print "File: " . $index->file_path . "\n";
+    print "Indexed: " . $index->indexed_at . "\n";
+}
+</pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CODE ELEMENTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="code-elements" style="color: var(--text-color); font-family: var(--header-font);">7. Code Elements Structure</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.1 JSON Structure</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <code>code_elements</code> field stores extracted code elements in JSON format with the following structure:</p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">{
+    "functions": [
+        "function_name_1",
+        "function_name_2"
+    ],
+    "classes": [
+        "ClassName1",
+        "ClassName2"
+    ],
+    "variables": [
+        "$var_name_1",
+        "$var_name_2"
+    ]
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.2 File Types and Supported Elements</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>pm (Perl Module)</strong>: Extracts subroutines, packages, and variables</li>
+                <li><strong>tt (Template Toolkit)</strong>: Extracts blocks, filters, and template functions</li>
+                <li><strong>sql (SQL Files)</strong>: Extracts table names, procedures, and functions</li>
+            </ul>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">8. See Also</h2>
+            <div style="background-color: var(--success-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/models/DBEncy" style="color: var(--link-color);">DBEncy Model</a> - ENCY database schema and operations</li>
+                    <li><a href="/Documentation/system/CodeSearching" style="color: var(--link-color);">Code Searching</a> - Code search and discovery features</li>
+                    <li><a href="/Documentation/system/AccessControl" style="color: var(--link-color);">Access Control</a> - Role-based access control system</li>
+                    <li>DBIx::Class Documentation - ORM framework reference</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row" style="margin-top: var(--spacing-xlarge); padding-top: var(--spacing-large); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+                Documentation for Comserv::Model::Schema::Ency::Result::CodeSearchIndex | Version 0.01 | Last Updated: 2026-01-11 16:03:00 UTC | Maintained by DocumentationSyncAgent
+            </p>
+        </div>
+    </div>
+</div>

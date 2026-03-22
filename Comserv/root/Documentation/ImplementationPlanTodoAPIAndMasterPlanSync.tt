@@ -1,0 +1,484 @@
+[% META 
+   title = "Implementation Plan: Todo API & Master Plan DB Sync"
+   description = "Comprehensive plan for migrating text-based DailyPlan/PriorityTodo to application-driven todo system with REST API, database-driven Master Plan, and IDE integration"
+   roles = "admin,developer,devops"
+   TemplateType = "Implementation"
+   category = "planning,todo-system,api,automation"
+   page_version = "0.01"
+   last_updated = "2026-01-14"
+%]
+[% PageVersion = 'root/Documentation/IMPLEMENTATION_PLAN_TodoAPIAndMasterPlanSync.tt,v 0.01 2026/01/14 10:36:00 MainAgent Exp - Initial plan: REST API for todo creation, database-driven Master Plan, DailyPlan flagging, IDE integration.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Implementation Plan: Todo API & Master Plan DB Sync</h1>
+    
+    <div class="alert alert-info">
+        <h3>📋 Strategic Context</h3>
+        <p><strong>Problem</strong>: Text-based DailyPlan.tt and PriorityTodo.md require manual updates and AI assistance to stay current.</p>
+        <p><strong>Solution</strong>: Migrate to application-driven workflow with REST API and database-driven Master Plan that auto-syncs.</p>
+        <p><strong>Benefit</strong>: Reduces overhead, keeps Master Plan in sync automatically, enables IDE agents to create tasks directly without manual intervention.</p>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>⚡ Current Status (Jan 14, 2026)</h2>
+    
+    <div class="alert alert-success">
+        <h3>✅ PHASE 1A: Database & Schema (COMPLETE)</h3>
+        <ul>
+            <li><strong>ApiToken Table Created</strong>:
+                <ul>
+                    <li>✅ <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm</code> – Result class with:
+                        <ul>
+                            <li>Hashed token storage (never plaintext in database)</li>
+                            <li>Token expiration support (expires_at field)</li>
+                            <li>Revocation tracking (revoked_at field)</li>
+                            <li>Last used timestamp for auditing</li>
+                            <li>Relationship to User table (user_id foreign key)</li>
+                            <li>Optional token naming for user reference</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="alert alert-info" id="phase-1b-tokens">
+        <h3>🟡 PHASE 1B: Token Usage Implementation (IN PROGRESS)</h3>
+        <ul>
+            <li><strong>Files Created</strong>:
+                <ul>
+                    <li>✅ <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm</code> – <a href="/Documentation/models/ApiToken.tt">Token schema</a> with hashed storage, expiration, revocation</li>
+                    <li>✅ <code>Comserv/lib/Comserv/Controller/Api.pm</code> – <a href="/Documentation/controllers/Api.tt">Token management endpoints</a> (generate, list, revoke)</li>
+                </ul>
+            </li>
+            <li><strong>Files Modified</strong>:
+                <ul>
+                    <li>✅ <code>Comserv/lib/Comserv/Controller/Todo.pm</code> – <a href="/Documentation/controllers/Todo.tt#api-endpoints">Added REST API endpoints</a> + token validation (~380 lines)</li>
+                </ul>
+            </li>
+            <li><strong>API Endpoints Implemented</strong>:
+                <ul>
+                    <li>✅ <code>POST /api/todo/create</code> – <a href="/api/doc/todo-create">Documentation</a> (Token auth required, dev-only)</li>
+                    <li>✅ <code>GET /api/todo/{id}</code> – <a href="/api/doc/todo-get">Documentation</a> (Token auth required)</li>
+                    <li>✅ <code>PUT /api/todo/{id}</code> – <a href="/api/doc/todo-update">Documentation</a> (Token auth required, partial update)</li>
+                    <li>✅ <code>GET /api/project/{id}</code> – <a href="/api/doc/project-get">Documentation</a> (Token auth required)</li>
+                    <li>✅ <code>POST /api/generate-token</code> – <a href="/api/doc/token-generate">Documentation</a> (Admin generates tokens)</li>
+                    <li>✅ <code>GET /api/tokens</code> – <a href="/api/doc/tokens-list">Documentation</a> (List user tokens)</li>
+                    <li>✅ <code>DELETE /api/tokens/{id}</code> – <a href="/api/doc/token-revoke">Documentation</a> (Revoke tokens)</li>
+                </ul>
+            </li>
+            <li><strong>Token Validation Implementation (IN PROGRESS)</strong>:
+                <ul>
+                    <li>✅ Created <code>ApiTokenValidator.pm</code> utility for consistent token validation – <a href="/Documentation/utils/ApiTokenValidator.tt">View Utility Docs</a></li>
+                    <li>✅ Validate Bearer token in Authorization header</li>
+                    <li>✅ Check token_hash against database (SHA-256 comparison)</li>
+                    <li>✅ Verify token is active (is_active = 1)</li>
+                    <li>✅ Check expiration (expires_at > NOW or NULL)</li>
+                    <li>✅ Reject revoked tokens (revoked_at IS NULL check)</li>
+                    <li>✅ Return clear error codes: 401 (invalid), 403 (revoked/expired), 400 (malformed)</li>
+                    <li>✅ Update last_used_at timestamp on successful validation</li>
+                    <li>✅ Applied validator to all /api/todo/* endpoints in <code>Todo.pm</code></li>
+                    <li>📖 <strong>Documentation</strong>: Created <a href="/Documentation/ApiTokenReferenceGuide" target="_blank">ApiTokenReferenceGuide.tt</a> with usage instructions.</li>
+                </ul>
+            </li>
+            <li><strong>Schema Requirement (IMPORTANT)</strong>:
+                <ul>
+                    <li>Table <code>api_tokens</code> must exist in database before API endpoints can be used</li>
+                    <li>Required columns: <code>id, user_id, token_hash, token_name, is_active, created_at, expires_at, last_used_at, revoked_at</code></li>
+                    <li><strong>Admin Action</strong>: Create table via DBIx::Class migration or SQL directly</li>
+                    <li>If table is missing: API requests will return 500 error + database error logged</li>
+                    <li>Table schema defined in: <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ApiToken.pm</code></li>
+                </ul>
+            </li>
+            <li><strong>Testing (READY)</strong>:
+                <ol>
+                    <li><strong>Prerequisite</strong>: Ensure <code>api_tokens</code> table exists in database</li>
+                    <li>Generate token via <code>POST /api/generate-token</code> (admin user, session auth)</li>
+                    <li>Test token with endpoints:
+                        <ul>
+                            <li>POST /api/todo/create</li>
+                            <li>GET /api/todo/:id</li>
+                            <li>PUT /api/todo/:id</li>
+                            <li>GET /api/project/:id</li>
+                        </ul>
+                    </li>
+                    <li>Verify Bearer token header: <code>Authorization: Bearer &lt;token&gt;</code></li>
+                    <li>Check logs for token validation results</li>
+                </ol>
+            </li>
+        </ul>
+    </div>
+
+    <div class="alert alert-warning" id="phase-2-schema-blocker">
+        <h3>⚠️ BLOCKER: Phase 2 Schema Migration (Schema Comparison Bug)</h3>
+        <p><strong>Issue</strong>: Schema comparison system fails to create <code>project_documentation_mapping</code> table from DBIx::Class Result definition.</p>
+        <p><strong>Root Cause</strong>: Unknown – need to debug how the schema migration pipeline processes Result classes and generates DDL.</p>
+        <p><strong>Blocking</strong>: Phase 2 (Master Plan refactoring) cannot proceed until this is resolved.</p>
+        <p><strong>Task</strong>: Debug <code>deploy_schema.pl</code> and schema comparison logic to understand why new Result classes aren't recognized as "missing tables".</p>
+    </div>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>Overview</h2>
+    
+    <p>Replace text-based task management with application-driven workflow using:</p>
+    <ul>
+        <li>Todo/Project database tables as single source of truth</li>
+        <li>REST API for programmatic todo creation from IDE/Zencoder agents</li>
+        <li>Master Plan as database-driven query view (reads Projects/Todos, auto-syncs)</li>
+        <li>Flagging mechanism in DailyPlan to bulk-create todos into application</li>
+    </ul>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>Phase 1: REST API Endpoints (Dev-Only, comserv_server.pl) — ✅ COMPLETE</h2>
+    
+    <h3>How REST APIs Work</h3>
+    
+    <p><strong>Key Principle</strong>: REST APIs are <strong>endpoint-based</strong>. Each endpoint = one action. Add new endpoints as features are needed.</p>
+    <p><strong>Example Growth Path</strong>:</p>
+    <ul>
+        <li><strong>Week 1</strong>: POST /api/todo/create, GET /api/todo/{id}, PUT /api/todo/{id}</li>
+        <li><strong>Week 2</strong>: Need to delete todos? Add DELETE /api/todo/{id}</li>
+        <li><strong>Week 3</strong>: Need project CRUD? Add POST /api/project/create, GET /api/project/{id}</li>
+    </ul>
+    <p><strong>No "master configuration"</strong>—just add controller methods with routes when needed. Simple and scalable.</p>
+
+    <h3>1.1 Endpoint: POST /api/todo/create</h3>
+    
+    <p><strong>Purpose</strong>: Create todo from IDE/Zencoder agent without UI form</p>
+    <p><strong>Authentication</strong>: Session-based (role check: admin/developer only)</p>
+    <p><strong>Dev-Only Enforcement</strong>: Only accessible via comserv_server.pl (development). Blocked in Starman production environment.</p>
+    
+    <h4>Request Body (JSON)</h4>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+  "subject": "string (required)",
+  "description": "string (optional)",
+  "project_id": "integer (optional, defaults to project 1)",
+  "start_date": "YYYY-MM-DD (required)",
+  "due_date": "YYYY-MM-DD (required)",
+  "priority": "integer 1-10 (required, 1=Critical, 10=Optional)",
+  "status": "integer 1-3 (required, 1=NEW, 2=IN_PROGRESS, 3=DONE)",
+  "assigned_to": "string (optional, username)"
+}</code></pre>
+    
+    <h4>Response (Success)</h4>
+    <pre style="background: #e8f5e9; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+  "success": true,
+  "todo_id": 42,
+  "message": "Todo created successfully",
+  "todo": { ... full todo record ... }
+}</code></pre>
+    
+    <h4>Response (Error)</h4>
+    <pre style="background: #ffebee; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+  "success": false,
+  "error": "Missing required fields: subject, start_date",
+  "code": "validation_error"
+}</code></pre>
+
+    <h3>1.2 Endpoint: GET /api/todo/{id}</h3>
+    <p><strong>Purpose</strong>: Retrieve single todo for Master Plan or verification</p>
+    <p><strong>Response</strong>: Full todo record (JSON)</p>
+
+    <h3>1.3 Endpoint: PUT /api/todo/{id}</h3>
+    <p><strong>Purpose</strong>: Update todo status/priority from IDE agent</p>
+    <p><strong>Request Body</strong> (partial update allowed):</p>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+  "status": "integer 1-3",
+  "priority": "integer 1-10",
+  "description": "string",
+  "assigned_to": "string"
+}</code></pre>
+
+    <h3>1.4 Endpoint: GET /api/project/{id}</h3>
+    <p><strong>Purpose</strong>: Retrieve project details for Master Plan query</p>
+    <p><strong>Response</strong>: Project record with all fields</p>
+
+    <h3>1.5 Token Management Endpoints</h3>
+    <p><strong>POST /api/generate-token</strong> – Admin generates a token</p>
+    <ul>
+        <li>Request: <code>{ "token_name": "string (optional)", "expires_in_days": integer }</code></li>
+        <li>Response: <code>{ "success": true, "token": "...", "warning": "Store securely" }</code></li>
+        <li>Note: Token only returned once at creation</li>
+    </ul>
+    <p><strong>GET /api/tokens</strong> – List all user's tokens with metadata</p>
+    <p><strong>DELETE /api/tokens/{id}</strong> – Revoke a token anytime</p>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2 id="phase-2-master-plan">Phase 2: Master Plan as Database Query View + Documentation Mapping — 🔴 BLOCKED</h2>
+
+    <h3>⚠️ DEBUGGING REQUIRED: Schema Comparison System</h3>
+    
+    <p><strong>Problem Statement</strong>:</p>
+    <ul>
+        <li>Created <code>Comserv/lib/Comserv/Model/Schema/Ency/Result/ProjectDocumentationMapping.pm</code> – Result class is complete and valid</li>
+        <li>Ran <code>perl deploy_schema.pl</code> to deploy schema changes</li>
+        <li>Result: Table NOT created in database. Schema comparison system doesn't recognize the new Result class.</li>
+    </ul>
+
+    <p><strong>Debug Tasks</strong>:</p>
+    <ol>
+        <li>Examine <code>deploy_schema.pl</code> – How does it discover Result classes?</li>
+        <li>Check schema comparison logic – Why doesn't it detect missing <code>project_documentation_mapping</code> table?</li>
+        <li>Verify DBIx::Class::Migration configuration – Is Result class properly registered?</li>
+        <li>Test manual table creation – Confirm schema structure is correct once table exists</li>
+        <li>Validate API integration – Ensure ProjectDocumentationMapping Result can be queried once table is created</li>
+    </ol>
+
+    <p><strong>Files to Investigate</strong>:</p>
+    <ul>
+        <li><code>Comserv/deploy_schema.pl</code> – Schema deployment entry point</li>
+        <li><code>Comserv/lib/Comserv/Model/Schema/Ency.pm</code> – Schema definition and Result loading</li>
+        <li><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/</code> – All Result classes (check how new one fits pattern)</li>
+        <li><code>.db/migrations/</code> – Check if migration files are being generated</li>
+    </ul>
+    
+    <h3>2.1 Master Plan Structure (Query-Based)</h3>
+    
+    <p>Instead of hardcoded task lists, Master Plan will query database:</p>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>[% projects = schema.resultset('Project').search({ status => { '!=' => 3 } } ) %]
+[% FOREACH project IN projects %]
+   &lt;h3&gt;[% project.name %] ([% project.project_code %])&lt;/h3&gt;
+   
+   [% doc_mappings = schema.resultset('ProjectDocumentationMapping').search({ project_id => project.id }) %]
+   [% IF doc_mappings.count %]
+      &lt;p&gt;Documentation:
+      [% FOREACH mapping IN doc_mappings %]
+         &lt;a href="/[% mapping.documentation_path %]"&gt;[% mapping.documentation_path %]&lt;/a&gt;
+      [% END %]
+      &lt;/p&gt;
+   [% END %]
+   
+   [% todos = schema.resultset('Todo').search({ project_id => project.id, status => { '!=' => 3 } }) %]
+   &lt;ul&gt;
+   [% FOREACH todo IN todos %]
+      &lt;li&gt;[% todo.subject %] (Priority: [% todo.priority %], Due: [% todo.due_date %])&lt;/li&gt;
+   [% END %]
+   &lt;/ul&gt;
+[% END %]</code></pre>
+    
+    <p><strong>Benefit</strong>: Master Plan auto-updates as todos/projects change. No manual editing needed.</p>
+
+    <h3>2.2 Create Linked Table: ProjectDocumentationMapping</h3>
+    
+    <p><strong>Design Rationale</strong>: Normalized table for flexibility (one project → multiple docs, one doc → multiple projects)</p>
+    <p><strong>Table Structure</strong>:</p>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>CREATE TABLE project_documentation_mapping (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT NOT NULL,
+    documentation_path VARCHAR(500) NOT NULL,  -- e.g., /Documentation/ConfigurationInfrastructure.tt#section-id
+    is_primary TINYINT DEFAULT 0,              -- Flag primary doc for the project
+    display_order INT,                         -- Order to display docs
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+</code></pre>
+    <p><strong>Example Data</strong>:</p>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>project_id=5, documentation_path=/Documentation/ConfigurationInfrastructure.tt#section-auth, is_primary=1
+project_id=5, documentation_path=/Documentation/Troubleshooting.tt#section-config, is_primary=0
+project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
+</code></pre>
+    <p><strong>Benefit</strong>: One project can reference multiple docs. Master Plan knows exactly which docs describe each project.</p>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2 id="phase-3-dailyplan-flagging">Phase 3: DailyPlan Flagging Mechanism</h2>
+    
+    <h3>3.1 Flag Format in DailyPlan.tt</h3>
+    
+    <p>Add <code>add_to_todo</code> attribute to tasks:</p>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>&lt;div class="task-item" data-task-id="task-001" data-add_to_todo="true"&gt;
+  &lt;h4&gt;Fix Todo Display Bug&lt;/h4&gt;
+  &lt;p&gt;Critical blocker for Daily Plans UI&lt;/p&gt;
+  &lt;button onclick="addTodoFromDailyPlan(this)" class="add-todo-btn"&gt;+ Add to Todo&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+    <h3>3.2 JavaScript Handler (New)</h3>
+    
+    <p>When user clicks "Add to Todo":</p>
+    <ol>
+        <li>Extract task details from DailyPlan DOM</li>
+        <li>POST to <code>/api/todo/create</code> with mapped fields (requires Bearer token)</li>
+        <li>On success: Mark task as "✅ Added to Todo", disable button</li>
+        <li>Display todo_id in UI for tracking</li>
+    </ol>
+
+    <h3>3.3 PriorityTodo Integration</h3>
+    
+    <p>Similar mechanism for PriorityTodo.md:</p>
+    <ul>
+        <li>"Create Todo" button on each priority item</li>
+        <li>Bulk action: "Create All Priority Todos at Once"</li>
+        <li>Automatic mapping: PriorityTodo order → todo priority (1-10 scale)</li>
+    </ul>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2 id="phase-4-ide-agent">Phase 4: IDE Agent Integration — 🔵 PENDING (Phase 2)</h2>
+    
+    <h3>4.1 Zencoder Agent Workflow</h3>
+    
+    <p><strong>Old Workflow</strong>:</p>
+    <pre>Agent → Manual text edit to DailyPlan.tt → Wait for review</pre>
+    
+    <p><strong>New Workflow</strong>:</p>
+    <pre>Agent → POST /api/todo/create → Todo auto-added → Master Plan updates automatically</pre>
+
+    <h3>4.2 API Call Example (Perl)</h3>
+    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>use LWP::UserAgent;
+use JSON::MaybeXS;
+
+my $ua = LWP::UserAgent->new;
+my $url = 'http://localhost:3000/api/todo/create';
+
+my $data = {
+  subject => 'Implement user authentication',
+  description => 'Add login/logout via Catalyst::Plugin::Authentication',
+  project_id => 5,
+  start_date => '2026-01-15',
+  due_date => '2026-01-20',
+  priority => 3,
+  status => 1
+};
+
+my $response = $ua->post(
+  $url,
+  'Content-Type' => 'application/json',
+  Content => encode_json($data)
+);
+
+if ($response->is_success) {
+  my $result = decode_json($response->content);
+  print "Todo created: " . $result->{todo_id} . "\n";
+} else {
+  warn "Error: " . $response->status_line;
+}</code></pre>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2 id="phase-5-timeline">Phase 5: Implementation Timeline</h2>
+    
+    <h3>Week 1 (Jan 14-20)</h3>
+    <ul>
+        <li>[✅] Build /api/todo/create endpoint (role-gated, dev-only)</li>
+        <li>[✅] Build /api/todo/{id}, /api/project/{id} endpoints</li>
+        <li>[✅] Create ApiToken.pm schema (hashed storage, expiration, revocation)</li>
+        <li>[🟡] Build ApiTokenValidator.pm utility for consistent validation</li>
+        <li>[🟡] Test token generation, validation, expiration, revocation with curl/Postman</li>
+        <li>[ ] Deploy schema changes to database</li>
+    </ul>
+
+    <h3>Week 2 (Jan 21-27)</h3>
+    <ul>
+        <li>[ ] Refactor Master Plan to query database instead of static text</li>
+        <li>[ ] Add JS handler for DailyPlan "Add to Todo" buttons</li>
+        <li id="priority-format-update">[🟡] <strong>NEW</strong>: Update Priority Todo format and content (See Todo #3 in PriorityTodos.tt):
+            <ul>
+                <li>✅ Define new HTML/TT structure with grid layout.</li>
+                <li>[ ] Update all 15 priority items to the new format.</li>
+                <li>[ ] Integrate Project (from database/plan), Plan Name, and Plan Link fields</li>
+                <li>[ ] Map keyfields from <code>Todo.pm</code> (record_id, status, priority, dates) for consistency</li>
+            </ul>
+        </li>
+        <li>[ ] Test Master Plan auto-sync as todos are created</li>
+    </ul>
+
+    <h3>Week 3 (Jan 28-Feb 3)</h3>
+    <ul>
+        <li>[ ] Integrate PriorityTodo with todo system</li>
+        <li>[ ] Build Zencoder agent example (Perl script calling API)</li>
+        <li>[ ] Document API for developers</li>
+    </ul>
+
+    <h3>Week 4+ (Ongoing)</h3>
+    <ul>
+        <li>[ ] Iterate on filtering (project-specific Master Plan views)</li>
+        <li>[ ] Archive old text-based DailyPlan/PriorityTodo docs</li>
+        <li>[ ] Train agents on new workflow</li>
+    </ul>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2 id="validation-checklist">Implementation Validation Checklist</h2>
+    
+    <ul>
+        <li>[✅] <code>/api/todo/create</code> responds with JSON</li>
+        <li>[✅] Token validation: Missing/invalid tokens get 401</li>
+        <li>[✅] Dev-only check: Starman production blocks API endpoints</li>
+        <li>[✅] Token generation: Admin can create tokens with TTL</li>
+        <li>[✅] Token revocation: Admins can revoke tokens anytime</li>
+        <li>[ ] <strong>PENDING</strong>: Schema comparison system creates project_documentation_mapping table</li>
+        <li>[ ] Master Plan TT queries execute without errors (once schema fixed)</li>
+        <li>[ ] DailyPlan buttons trigger API calls successfully</li>
+        <li>[ ] Todos created via API appear in Master Plan within 1 request cycle</li>
+    </ul>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>Rollback Plan</h2>
+    
+    <p>If issues arise:</p>
+    <ol>
+        <li>Revert to text-based Master Plan (keep old .tt version)</li>
+        <li>Disable API endpoints (comment out routes in Api.pm and Todo.pm)</li>
+        <li>Continue using UI form for manual todo creation</li>
+        <li>No data loss (todos already in database; ApiToken records can be archived)</li>
+    </ol>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>Known Issues & Debugging Tasks</h2>
+    
+    <ul>
+        <li><strong>🔴 CRITICAL</strong>: Schema comparison system not detecting ProjectDocumentationMapping as missing table
+            <ul>
+                <li>Status: Under investigation</li>
+                <li>Impact: Blocks Phase 2 implementation</li>
+                <li>Next Step: Debug deploy_schema.pl and schema migration pipeline</li>
+            </ul>
+        </li>
+    </ul>
+
+    <hr style="margin: 30px 0;" />
+
+    <h2>Open Questions / Notes</h2>
+    
+    <ul>
+        <li>Should API also support updating Projects from IDE agents?</li>
+        <li>Auto-link todo ↔ Documentation when project has documentation_mapping?</li>
+        <li>Real-time Master Plan updates or scheduled refresh?</li>
+        <li>Archive strategy for completed todos (keep or delete)?</li>
+        <li>How does DBIx::Class::Migration discover and register new Result classes?</li>
+    </ul>
+
+    <div class="alert alert-success">
+        <h3>📌 Immediate Next Steps (Phase 1B: Token Usage)</h3>
+        <ol>
+            <li><strong>BUILD</strong>: Create <code>ApiTokenValidator.pm</code> utility module
+                <ul>
+                    <li>Extract Bearer token from Authorization header</li>
+                    <li>Hash incoming token (SHA-256) and compare to token_hash in database</li>
+                    <li>Check is_active, expires_at, and revoked_at fields</li>
+                    <li>Return structured result: { valid => 1, user_id => X, api_token_id => Y } OR { valid => 0, error => '...' }</li>
+                </ul>
+            </li>
+            <li><strong>TEST</strong>: Validate token flow end-to-end
+                <ul>
+                    <li>Admin generates token via /api/generate-token</li>
+                    <li>Test valid token passes validation</li>
+                    <li>Test expired/revoked tokens are rejected</li>
+                    <li>Test malformed Authorization headers return 401</li>
+                </ul>
+            </li>
+            <li><strong>DEPLOY</strong>: Run schema migration to ensure api_tokens table is created in database</li>
+            <li><strong>ONCE COMPLETE</strong>: Debug schema comparison system for Phase 2 (project_documentation_mapping)</li>
+        </ol>
+    </div>
+
+</div>

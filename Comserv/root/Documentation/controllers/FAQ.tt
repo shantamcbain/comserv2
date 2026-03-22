@@ -1,75 +1,202 @@
-# FAQ Controller
+[% META
+        title = "FAQ Controller"
+   description = "Frequently Asked Questions system with categorized interface and HelpDesk integration"
+   roles = "developer,admin"
+   TemplateType = "Documentation"
+   category = "controllers"
+   page_version = "0.01"
+   last_updated = "Tue Jan 06 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/FAQ.tt,v 0.01 2026/01/06 shanta Exp shanta - Initial refactor to DocumentationTtTemplate standards' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 
-**Last Updated:** April 24, 2024  
-**Author:** Shanta  
-**Status:** Active
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">FAQ Controller</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-06 | 
+        Version: 0.01 |
+        Author: Shanta | 
+        Status: Active
+    </div>
 
-## Overview
-The FAQ controller manages the Frequently Asked Questions system for Computer System Consulting. It provides a categorized interface for users to find answers to common questions without needing to submit a support ticket.
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#urls" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">URL Structure</a>
+                <a href="#access" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access Control</a>
+                <a href="#navigation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Navigation</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
+                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Enhancements</a>
+            </div>
+        </div>
+    </div>
 
-## Key Features
-- Categorized FAQ organization
-- Interactive question and answer display
-- Integration with the HelpDesk system
-- Debug message handling for troubleshooting
-- Responsive design for all devices
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ controller manages the Frequently Asked Questions system for Computer System Consulting. It provides a categorized interface for users to find answers to common questions without needing to submit a support ticket.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-## Methods
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">2. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Categorized FAQ Organization</strong>: Questions organized by topic for easy navigation</li>
+                <li><strong>Interactive Display</strong>: Question and answer display with interactive elements</li>
+                <li><strong>HelpDesk Integration</strong>: Seamless integration with the HelpDesk system</li>
+                <li><strong>Debug Message Handling</strong>: Comprehensive debugging capabilities for troubleshooting</li>
+                <li><strong>Responsive Design</strong>: Works on all devices including mobile platforms</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-### Base Methods
-- `auto`: Common setup for all FAQ actions, initializes debug messages
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">3. Methods</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.1 Base Methods</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">auto</code>: Common setup for all FAQ actions, initializes debug messages</li>
+            </ul>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3.2 Page Methods</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">index</code>: Main FAQ page with category listings and popular questions</li>
+                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">category</code>: Category-specific FAQ pages with relevant questions and answers</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-### Page Methods
-- `index`: Main FAQ page with category listings and popular questions
-- `category`: Category-specific FAQ pages with relevant questions and answers
+    <!-- URL STRUCTURE SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="urls" style="color: var(--text-color); font-family: var(--header-font);">4. URL Structure</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Endpoint</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/faq</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Main FAQ page with all categories and popular questions</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code style="background-color: var(--light-color); padding: 2px 4px;">/faq/category/{id}</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Category-specific FAQ pages with relevant questions and answers</td>
+                </tr>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-## URL Structure
-- `/faq` - Main FAQ page with all categories and popular questions
-- `/faq/category/{id}` - Category-specific FAQ pages
+    <!-- ACCESS CONTROL SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="access" style="color: var(--text-color); font-family: var(--header-font);">5. Access Control</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ controller is accessible to all users:</p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Anonymous users can view all FAQ content</li>
+                <li>No special permissions are required to access FAQ pages</li>
+                <li>Content is read-only for all user types</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-## Access Control
-This controller is accessible to all users:
-- Anonymous users can view all FAQ content
-- No special permissions are required
+    <!-- NAVIGATION INTEGRATION SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="navigation" style="color: var(--text-color); font-family: var(--header-font);">6. Navigation Integration</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ system is integrated into the HelpDesk dropdown menu in the main navigation through the <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">TopDropListHelpDesk.tt</code> template, providing easy access to the FAQ system.</p>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.1 Related Template Files</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Main FAQ Template</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/FAQ/index.tt</code> - Main FAQ template with categories and popular questions</li>
+                <li><strong>Category Template</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/CSC/FAQ/category.tt</code> - Category-specific FAQ template</li>
+                <li><strong>Navigation Menu</strong>: <code style="background-color: var(--light-color); padding: 2px 4px;">/root/Navigation/TopDropListHelpDesk.tt</code> - HelpDesk dropdown menu with FAQ link</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-## Navigation Integration
-The FAQ system is integrated into the HelpDesk dropdown menu in the main navigation through the `TopDropListHelpDesk.tt` template, providing easy access to the FAQ system.
+    <!-- LOGGING AND DEBUGGING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="logging" style="color: var(--text-color); font-family: var(--header-font);">7. Logging and Debugging</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The FAQ controller uses comprehensive logging with <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">log_with_details</code>:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
+    "Detailed message with relevant information");</code></pre>
+            </div>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-medium);">Debug messages are stored in the stash for display in templates when debug mode is enabled:</p>
+            
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>push @{$c->stash->{debug_msg}}, "Debug message";</code></pre>
+            </div>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.1 Implementation Notes</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Uses JavaScript for interactive question and answer display</li>
+                <li>Implements responsive design for all devices</li>
+                <li>Maintains debug messages in an array for troubleshooting</li>
+                <li>Designed to work without explicit loading in Comserv.pm</li>
+                <li>Integrates seamlessly with the HelpDesk system for comprehensive support</li>
+            </ul>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-## Related Files
-- Template files:
-  - `/root/CSC/FAQ/index.tt` - Main FAQ template with categories and popular questions
-  - `/root/CSC/FAQ/category.tt` - Category-specific FAQ template
-- Navigation:
-  - `/root/Navigation/TopDropListHelpDesk.tt` - HelpDesk dropdown menu with FAQ link
+    <!-- FUTURE ENHANCEMENTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="enhancements" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. Future Enhancements</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><strong>Search Functionality</strong>: Add search capability for finding specific questions quickly</li>
+                    <li><strong>User Feedback System</strong>: Implement feedback mechanism to track FAQ usefulness</li>
+                    <li><strong>Admin Interface</strong>: Create admin interface for managing FAQ content</li>
+                    <li><strong>Knowledge Base Integration</strong>: Integrate with Knowledge Base for more detailed answers</li>
+                </ul>
+            </div>
 
-## Logging and Debugging
-The FAQ controller uses comprehensive logging with `log_with_details`:
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
 
-```perl
-$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
-    "Detailed message with relevant information");
-```
-
-Debug messages are stored in the stash for display in templates when debug mode is enabled:
-
-```perl
-push @{$c->stash->{debug_msg}}, "Debug message";
-```
-
-## Implementation Notes
-- Uses JavaScript for interactive question and answer display
-- Implements responsive design for all devices
-- Maintains debug messages in an array for troubleshooting
-- Designed to work without explicit loading in Comserv.pm
-- Integrates with the HelpDesk system for comprehensive support
-
-## Future Enhancements
-- Search functionality for finding specific questions
-- User feedback system for FAQ usefulness
-- Admin interface for managing FAQ content
-- Integration with the Knowledge Base for more detailed answers
-
-## Related Documentation
-- [HelpDesk System Documentation](/Documentation/HelpDeskSystem)
-- [HelpDesk Controller Documentation](/Documentation/controllers/HelpDesk)
-- [Documentation System Guide](/Documentation/documentation_config_guide)
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Related Documentation</strong>:</p>
+                <ul style="color: var(--text-muted-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/HelpDeskSystem" style="color: var(--link-color);">HelpDesk System Documentation</a></li>
+                    <li><a href="/Documentation/controllers/HelpDesk" style="color: var(--link-color);">HelpDesk Controller Documentation</a></li>
+                    <li><a href="/Documentation/documentation_config_guide" style="color: var(--link-color);">Documentation System Guide</a></li>
+                </ul>
+                <p><em>This documentation is part of the Comserv system.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

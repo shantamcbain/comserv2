@@ -1,0 +1,110 @@
+[% META 
+   title = "Daily Plan - January 7, 2026"
+   description = "Wednesday: C.1 Documentation Audit Phase 2, B.3 theme refactor completion, C.2 Model Audit planning"
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "daily-plans,documentation,audits"
+   page_version = "0.04"
+   last_updated = "Mon Jan 05 16:56:18 UTC 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/DailyPlans/Daily_Plans-2026-01-07.tt,v 0.04 2026/01/05 16:56:18 zencoder Exp - Jan 5 Audit Sync: A.3 Credentials Audit Execution Phase 1 priority; B.3 theme refactoring' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color);">Daily Plan: Wednesday, January 7, 2026 (Documentation Audits & Theme Completion)</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Context:</strong> End of week push | 
+        <strong>Status:</strong> 3 Tasks (1 finish, 2 progress) | 
+        <strong>Last Updated:</strong> 2026-01-07
+    </div>
+
+    <h2>🔴 Priority 1: C.1 Documentation Audit - Phase 2 (3 hours)</h2>
+    
+    <ol>
+        <li><strong>Gap remediation:</strong>
+            <ul>
+                <li>Create: stub documentation files for missing controller docs</li>
+                <li>Fix: broken links identified on Jan 6</li>
+                <li>Update: outdated references (pointing to old plans/features)</li>
+            </ul>
+        </li>
+        <li><strong>Create remediation report:</strong>
+            <ul>
+                <li>File: /Documentation/C1_Documentation_Audit_Report.tt</li>
+                <li>Include: Gaps found, remediation completed, remaining work</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>🟠 Priority 2: B.3 Theme Refactoring - COMPLETION (2-3 hours)</h2>
+    
+    <ol>
+        <li><strong>Final refactoring push:</strong>
+            <ul>
+                <li>Complete: Remaining files (target: all identified files done)</li>
+                <li>Test: Full theme consistency across application</li>
+                <li>Verify: No visual regressions or broken styles</li>
+            </ul>
+        </li>
+        <li><strong>Create final B.3 report:</strong>
+            <ul>
+                <li>File: /Documentation/B3_Theme_Refactoring_Complete.tt</li>
+                <li>Include: Files refactored, lines changed, testing results</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h2>🟡 Priority 3: C.2 Model Audit - Scope Planning (1-2 hours)</h2>
+    
+    <ol>
+        <li><strong>Assess model documentation:</strong>
+            <ul>
+                <li>Count: Total DBIx::Class Result models</li>
+                <li>Check: Documentation coverage per model</li>
+                <li>Identify: Most critical models lacking docs (AiMessage, Conversation, etc.)</li>
+            </ul>
+        </li>
+        <li><strong>Create C.2 scope document:</strong>
+            <ul>
+                <li>File: /Documentation/C2_Model_Audit_Plan.tt</li>
+                <li>Include: Model inventory + documentation gaps + priority</li>
+            </ul>
+        </li>
+    </ol>
+
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="padding: 10px;">Task</th>
+            <th style="padding: 10px;">Duration</th>
+            <th style="padding: 10px;">Status</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">C.1 Phase 2 Remediation</td>
+            <td style="padding: 10px;">3 hours</td>
+            <td style="padding: 10px;">Fix gaps</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">B.3 Theme Completion</td>
+            <td style="padding: 10px;">2-3 hours</td>
+            <td style="padding: 10px;">✅ Final</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">C.2 Model Audit Planning</td>
+            <td style="padding: 10px;">1-2 hours</td>
+            <td style="padding: 10px;">Scope</td>
+        </tr>
+    </table>
+
+    <div style="background-color: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0;">
+        <h3>Tomorrow's Plan (Jan 8 - Thursday)</h3>
+        <p><strong>Week Review + Buffer:</strong> Week 1 summary, begin C.2 Model Audit, buffer for unexpected work or testing</p>
+    </div>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px;">
+        <p><strong>Daily Plan v0.01 | Wednesday January 7, 2026 | End of Week 1 Implementation</strong></p>
+    </div>
+</div>

@@ -1,32 +1,45 @@
 [% META
-        title = "OPNsense VM on R710 with Proxmox, Kubernetes & Docker Failover Setup"
-   description = "Complete guide for deploying OPNsense VM on Dell R710 with Proxmox, Docker-enabled Kubernetes cluster, and automatic failover to physical Dell 210"
+        title = "OPNsense VM on Proxmox with Kubernetes Setup (Multi-Host Cluster)"
+   description = "Complete guide for deploying OPNsense firewall VM in Proxmox infrastructure. Current deployment: VM 103 on proxmoxt210 (PVE 7.4), supporting 3-host K8s cluster (proxmoxws, proxmox720)"
    roles = "admin,developer"
    TemplateType = "Documentation"
-   category = "infrastructure"
-   page_version = "1.0"
-   last_updated = "Thu Oct 17 09:09:29 AM PST 2024"
+   category = "infrastructure,kubernetes,networking"
+   page_version = "1.01"
+   last_updated = "Tue Dec 23 17:30:00 UTC 2025"
    site_specific = "false"
 %]
-[% PageVersion = 'Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt,v 1.0 09:09:29 2024/10/17 shanta Exp shanta - OPNsense VM Infrastructure Setup with Failover' %]
+[% PageVersion = 'Documentation/developer/opnsense_vm_proxmox_k8s_setup.tt,v 1.01 2025/12/23 zencoder Exp - Updated for current infrastructure: OPNsense as VM 103 on proxmoxt210 (PVE 7.4) providing gateway for 3-host K8s cluster (proxmoxws PVE 8.3.0, proxmox720 PVE 8.4.14) with bare-metal DB at 192.168.1.198' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
 <div class="container">
-    <h1 style="color: var(--text-color); font-family: var(--header-font);">OPNsense VM on Dell R710 with Proxmox, Kubernetes & Docker Failover Setup</h1>
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">OPNsense VM on Proxmox with Kubernetes - Current Infrastructure</h1>
     
     <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-        Last Updated: October 17, 2024 | 
-        Version: 1.0 | 
+        Last Updated: Dec 23, 2025 | 
+        Version: 1.01 | 
         Author: Infrastructure Team | 
         Status: Active
+    </div>
+
+    <div style="background-color: #fff3e0; border: 1px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
+        <h3 style="color: #d84315; margin-top: 0;">⚠️ Note: Document Updated for Current Infrastructure</h3>
+        <p style="color: var(--text-color); margin: 10px 0;"><strong>This document was originally written for Dell R710 hardware.</strong> It has been updated to reflect the <strong>current production infrastructure</strong> (Dec 23, 2025):</p>
+        <ul style="color: var(--text-color); margin: 10px 0; padding-left: 20px;">
+            <li><strong>OPNsense Location</strong>: VM 103 on proxmoxt210 (PVE 7.4)</li>
+            <li><strong>K8s Cluster</strong>: Distributed across proxmoxws (PVE 8.3.0) and proxmox720 (PVE 8.4.14)</li>
+            <li><strong>Master Node</strong>: VM 100 on proxmoxws</li>
+            <li><strong>Worker Nodes</strong>: VM 201 (proxmox720), VM 103 (proxmoxws)</li>
+            <li><strong>Production DB</strong>: Bare-metal at 192.168.1.198 (outside Proxmox)</li>
+        </ul>
+        <p style="color: var(--text-color); margin-top: 10px;"><strong>References to "Dell R710" in original doc are historical.</strong> The principles and setup steps remain valid, adapted to current multi-host Proxmox topology.</p>
     </div>
 
     <div class="row">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
-            <p style="color: var(--text-color); font-family: var(--body-font);">This guide provides a comprehensive, step-by-step deployment of an OPNsense virtual machine on a Dell PowerEdge R710 server using Proxmox VE as the hypervisor. The setup includes a Kubernetes cluster with Docker runtime in a separate VM for containerized services, and implements automatic failover to a physical Dell 210 using CARP (Common Address Redundancy Protocol) for high availability.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This guide provides comprehensive deployment guidance for OPNsense firewall VM in Proxmox infrastructure. The setup includes a distributed Kubernetes cluster (Master on proxmoxws VM 100, Workers on proxmox720 VM 201 and proxmoxws VM 103) with containerized services, integrated with OPNsense network routing (VM 103 on proxmoxt210) for secure multi-node infrastructure.</p>
         </div>
     </div>
 

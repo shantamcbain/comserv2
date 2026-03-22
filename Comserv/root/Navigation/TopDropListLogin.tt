@@ -1,7 +1,7 @@
 
 [% PageVersion = 'Navigation/TopDropListLogin.tt,v 0.06 2025/09/03 shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
-    [% PageVersion %]
+    [%# PageVersion %]
 [% END %]
 
 [%# Determine user role for display %]

@@ -1,0 +1,412 @@
+[% META
+        title = "Chat Controller"
+   description = "Comserv chat system for real-time messaging and conversation management with admin response capability"
+   roles = "admin,developer,user"
+   TemplateType = "controller"
+   category = "controllers"
+   page_version = "0.02"
+   last_updated = "2026-01-11 15:02:47 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/Chat.tt,v 0.02 2026/01/11 DocumentationSyncAgent Exp - Version consolidation and recent code updates' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Chat Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 15:02:47 UTC | 
+        Version: 0.02 |
+        Author: DocumentationSyncAgent | 
+        Status: Version consolidation and recent code updates integrated
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#routes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API Routes</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>Chat Controller</strong> (Comserv::Controller::Chat) manages real-time chat messaging and conversation persistence in Comserv. It provides user-facing chat interfaces and admin management capabilities with integrated structured logging for all chat operations.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The controller handles multi-user conversations, message storage, admin responses, and message retrieval with role-based access control. All operations are logged via Comserv::Util::Logging for audit trails and debugging.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- RECENT CHANGES SECTION -->
+    <div class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
+        <div class="col-100">
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Recent Changes (v0.02 - Jan 11, 2026)</h3>
+            <ul style="margin: 5px 0 0 20px; font-size: 0.9em; color: var(--text-color);">
+                <li><strong>v0.02 (2026-01-11):</strong> Version consolidation from v1.00 to v0.02 (corrected starting version). Code changes integrated per git HEAD~1..HEAD audit. All messaging, conversation management, and admin response features documented.</li>
+                <li><strong>v1.00 (2025-01-09):</strong> Initial comprehensive documentation of Chat controller with logging integration.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES & KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-50">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Catalyst framework 5.90130+</li>
+                <li>DBIx::Class ORM with ENCY schema</li>
+                <li>Comserv::Util::Logging module</li>
+                <li>AiConversation and AiMessage database tables</li>
+                <li>User session management (user_id, username, roles)</li>
+                <li>Admin role for chat management</li>
+            </ul>
+        </div>
+        <div class="col-50">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>User Chat Interface</strong>: Main chat page (index action)</li>
+                <li><strong>Message Management</strong>: Send and retrieve messages via API</li>
+                <li><strong>Conversation Persistence</strong>: Auto-create conversations, store metadata</li>
+                <li><strong>Admin Dashboard</strong>: View all conversations and responses</li>
+                <li><strong>Role-Based Access</strong>: Admin-only management, user visibility controls</li>
+                <li><strong>Structured Logging</strong>: All operations logged with context</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-100">
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- API ROUTES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="routes" style="color: var(--text-color); font-family: var(--header-font);">4. API Routes</h2>
+            
+            <h3 id="route-index" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 GET /chat/ (index)</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Display main chat interface and load user context</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong> None (uses session data)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response:</strong> Renders chat/index.tt template with user_id and username</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example Request:</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>GET http://localhost:3000/chat/</code></pre>
+            </div>
+
+            <h3 id="route-send" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 POST /chat/send_message</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Send a user message to chat (creates conversation if needed)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>message</code> (string, required): Message content</li>
+                <li><code>conversation_id</code> (integer, optional): Existing conversation; auto-created if omitted</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  "success": 1,
+  "message_id": 42,
+  "conversation_id": 15,
+  "timestamp": "2025-01-09T12:34:56Z"
+}</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error Response (400 - empty message):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  "success": 0,
+  "error": "Message cannot be empty"
+}</code></pre>
+            </div>
+
+            <h3 id="route-get" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.3 GET /chat/get_messages</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Retrieve chat messages (paginated, role-based)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>conversation_id</code> (integer, optional): Filter by conversation</li>
+                <li><code>last_id</code> (integer, default=0): Return messages with id > last_id (pagination)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control:</strong> Admins see all messages; users see only their own</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  "success": 1,
+  "messages": [
+    {
+      "id": 42,
+      "conversation_id": 15,
+      "user_id": 199,
+      "role": "user",
+      "content": "Hello, how can I help?",
+      "timestamp": "2025-01-09T12:34:56Z",
+      "agent_type": "chat",
+      "metadata": {"username": "Guest", "user_role": "user"}
+    }
+  ],
+  "count": 1
+}</code></pre>
+            </div>
+
+            <h3 id="route-admin" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.4 GET /chat/admin</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Admin dashboard for chat conversation management</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong> None</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control:</strong> Admin role required; redirects to home if not admin</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response:</strong> Renders chat/admin.tt template with all conversations (agent_type='chat')</p>
+
+            <h3 id="route-respond" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.5 POST /chat/respond</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Admin sends response to user in conversation</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><code>message</code> (string, required): Admin response content</li>
+                <li><code>conversation_id</code> (integer, required): Target conversation</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control:</strong> Admin role required (403 if not admin)</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  "success": 1,
+  "message_id": 43,
+  "conversation_id": 15,
+  "timestamp": "2025-01-09T12:35:00Z"
+}</code></pre>
+            </div>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error: Missing parameters (400):</strong></p>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
+  "success": 0,
+  "error": "Message and conversation_id are required"
+}</code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Methods Reference</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Method</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Route</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Purpose</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Access</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>index</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GET /chat/</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Display chat home page</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Public</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>send_message</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">POST /chat/send_message</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Store user message</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Public</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>get_messages</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GET /chat/get_messages</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Retrieve messages (paginated)</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Public/Role-Based</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>admin</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GET /chat/admin</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin chat dashboard</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin Only</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>respond</code></td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">POST /chat/respond</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Send admin response</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin Only</td>
+                </tr>
+            </table>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- LOGGING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="logging" style="color: var(--text-color); font-family: var(--header-font);">6. Logging & Debugging</h2>
+            
+            <p style="color: var(--text-color); font-family: var(--body-font);">All Chat controller operations use <strong>Comserv::Util::Logging</strong> with structured log_with_details() calls including file, line number, method name, and contextual details.</p>
+            
+            <h3 id="logging-operations" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.1 Logged Operations</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
+                <tr>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Operation</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Level</th>
+                    <th style="background-color: var(--table-header-bg); color: var(--text-color); font-family: var(--header-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Details Captured</th>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">User accesses chat/index</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, username</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Message sent</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG / INFO / WARN</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, domain, conversation_id (if created)</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Empty message rejected</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">WARN</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, reason</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation created</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">conversation_id, user_id, domain, site_name</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Messages retrieved</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG / INFO</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, is_admin, count, conversation_id</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin access attempt</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO / WARN</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, is_admin flag</td>
+                </tr>
+                <tr>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin responds</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">message_id, conversation_id, admin_id</td>
+                </tr>
+                <tr style="background-color: var(--secondary-color);">
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Any error</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ERROR</td>
+                    <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Exception message, context</td>
+                </tr>
+            </table>
+
+            <h3 id="logging-example" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.2 Example Log Entry</h3>
+            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>[INFO] Chat.pm:104 send_message - Created new conversation_id=15 for user_id=199</code></pre>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
+            
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-empty-message" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Message Cannot Be Empty Error (400)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> send_message returns HTTP 400 with "Message cannot be empty" error</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> User submitted empty or whitespace-only message</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify message parameter is not empty in POST body</li>
+                    <li>Trim whitespace from user input client-side</li>
+                    <li>Check chat/index.tt form validation</li>
+                </ol>
+            </div>
+
+            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-conv-not-found" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Conversation Not Found (404)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Admin respond endpoint returns "Conversation not found"</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Invalid conversation_id or conversation was deleted</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify conversation_id exists: <code>SELECT * FROM ai_conversation WHERE id = ?</code></li>
+                    <li>Reload admin dashboard to get current conversation IDs</li>
+                    <li>Check database permissions</li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-auth-fail" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Unauthorized / Access Denied (403)</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Admin endpoints (admin, respond) return 403 Unauthorized</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> User lacks 'admin' role or session not authenticated</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check user roles: <code>$c->check_user_roles('admin')</code></li>
+                    <li>Verify session has user_id and roles set</li>
+                    <li>Review Comserv authentication and authorization flow</li>
+                    <li>Check database user_role column for AiMessage entries</li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-db-error" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Database Errors / 500 Server Error</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Any endpoint returns 500 with "Failed to..." error</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Database connectivity, schema issues, or missing tables</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Check error logs: tail -f Comserv/root/log/comserv.log</li>
+                    <li>Verify AiConversation and AiMessage tables exist</li>
+                    <li>Test database connection: <code>perl -e 'use Comserv::Model::DBEncy; ...'</code></li>
+                    <li>Check schema definitions in Comserv/lib/Comserv/Model/Schema/</li>
+                    <li>Enable debug mode to see full exception: <code>$c->session->{debug_mode} = 1</code></li>
+                </ol>
+            </div>
+
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <h3 id="ts-logging-missing" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: No Log Entries / Logging Not Working</h3>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Expected log entries do not appear in comserv.log</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Logging not initialized, file permissions, or log level too high</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+                <ol style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>Verify Comserv::Util::Logging is loaded: check Chat.pm line 7</li>
+                    <li>Check log file permissions: <code>ls -la Comserv/root/log/</code></li>
+                    <li>Verify log level in config: check comserv.conf</li>
+                    <li>Test logging manually: <code>$self->logging->log_with_details(...)</code></li>
+                </ol>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/controllers/AI" style="color: var(--link-color);">AI Controller</a> - AI conversation and integration</li>
+                    <li><a href="/Documentation/controllers/Admin" style="color: var(--link-color);">Admin Controller</a> - System administration</li>
+                    <li><a href="/Documentation/models/RemoteDB" style="color: var(--link-color);">RemoteDB Model</a> - Database integration patterns</li>
+                    <li><a href="/Documentation/system/database_configuration" style="color: var(--link-color);">Database Configuration</a> - Connection setup</li>
+                    <li><a href="/chat" style="color: var(--link-color);">Chat Interface</a> - User chat application</li>
+                    <li><a href="/chat/admin" style="color: var(--link-color);">Chat Admin Dashboard</a> - Administrative view</li>
+                </ul>
+            </div>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p>For technical support or questions about this documentation, contact the system administrator.</p>
+                <p><em>This documentation is part of the Comserv system. Last sync: 2025-01-09.</em></p>
+            </div>
+        </div>
+    </div>
+</div>

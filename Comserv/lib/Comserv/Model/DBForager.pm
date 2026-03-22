@@ -41,11 +41,32 @@ sub COMPONENT {
         $connection_info = $remote_db->get_connection_info('shanta_forager');
     };
 
+    # Fallback to SQLite if primary connections fail
     if ($@ || !$connection_info) {
         my $error = $@ || "No connection info returned from RemoteDB";
+        
+        # Write error to STDERR for debugging  (bypasses logging system if broken)
+        warn "\n=== DBForager CRITICAL ERROR ===\n";
+        warn "Failed to get connection from RemoteDB\n";
+        warn "Error: $error\n";
+        warn "===============================\n\n";
+        
         $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
-            "DBForager: Failed to get connection from RemoteDB: $error");
-        die "DBForager: Failed to establish database connection: $error";
+            "DBForager CRITICAL: Failed to get connection from RemoteDB: $error");
+        $logger->log_with_details(undef, 'error', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager CRITICAL: Falling back to SQLite offline mode - APPLICATION WILL HAVE LIMITED FUNCTIONALITY");
+        
+        # Create a fallback SQLite connection
+        $connection_info = {
+            connection_name => 'sqlite_forager_fallback',
+            config => {
+                db_type => 'sqlite',
+                database_path => 'data/forager_offline.db',
+                description => 'SQLite Fallback - Forager Database (offline mode)',
+                priority => 999
+            },
+            database_name => 'shanta_forager'
+        };
     }
 
     # Extract connection details from RemoteDB
@@ -105,13 +126,58 @@ sub COMPONENT {
             quote_char => '`',
         };
     } else {
+        # CRITICAL FIX (November 2025): Select available database driver
+        # Try MariaDB first (preferred), fall back to mysql if not installed
+        my $driver = $db_type eq 'mariadb' ? 'MariaDB' : 'mysql';
+        my $driver_available = 0;
+        
+        # Check if preferred driver is available
+        if ($driver eq 'MariaDB') {
+            eval {
+                require DBD::MariaDB;
+                $driver_available = 1;
+            };
+            # Fall back to mysql if MariaDB not available
+            if (!$driver_available) {
+                eval {
+                    require DBD::mysql;
+                    $driver = 'mysql';
+                    $driver_available = 1;
+                };
+            }
+        } else {
+            # If already set to mysql, check it's available
+            eval {
+                require DBD::mysql;
+                $driver_available = 1;
+            };
+        }
+        
+        $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+            "DBForager: Using database driver: $driver (available: $driver_available)");
+        
         $connect_info = {
-            dsn => "dbi:mysql:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
             user => $conn->{username},
             password => $conn->{password},
             mysql_enable_utf8 => 1,
-            on_connect_do => ["SET NAMES 'utf8'", "SET CHARACTER SET 'utf8'"],
+            mysql_connect_timeout => 10,
+            mysql_read_timeout => 30,
+            mysql_write_timeout => 30,
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+            quote_names => 1,
             quote_char => '`',
+            name_sep => '.',
+            limit_dialect => 'LimitXY',
+            on_connect_do => [
+                "SET NAMES 'utf8'",
+                "SET CHARACTER SET 'utf8'",
+                "SET SESSION max_execution_time=60000",
+                "SET SESSION net_read_timeout=30",
+                "SET SESSION net_write_timeout=30",
+            ],
         };
     }
     
@@ -127,10 +193,29 @@ sub get_connection_info {
     my $storage = $self->schema->storage;
     my $connect_info = $storage->connect_info;
     
+    # Handle both hash ref and string formats for connect_info
+    # DBIx::Class may store as [ { dsn => "...", user => "...", password => "..." } ]
+    # OR as [ "dbi:mysql:...", "user", "password" ]
+    my $current_dsn = 'Unknown';
+    my $current_username = 'Unknown';
+    
+    if ($connect_info && ref($connect_info) eq 'ARRAY' && @$connect_info) {
+        # First element is a hash ref with keys (dsn, user, password)
+        if (ref($connect_info->[0]) eq 'HASH') {
+            $current_dsn = $connect_info->[0]{dsn} if $connect_info->[0]{dsn};
+            $current_username = $connect_info->[0]{user} if $connect_info->[0]{user};
+        }
+        # First element is the DSN string, second is username
+        elsif (defined $connect_info->[0] && $connect_info->[0] ne '') {
+            $current_dsn = $connect_info->[0];
+            $current_username = $connect_info->[1] if defined $connect_info->[1] && $connect_info->[1] ne '';
+        }
+    }
+    
     my $info = {
         # Current runtime connection info
-        current_dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
-        current_username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
+        current_dsn => $current_dsn,
+        current_username => $current_username,
         connection_type => ref($storage) || 'Unknown',
         
         # Startup connection selection info
@@ -159,8 +244,7 @@ sub get_herbal_data {
         { 'botanical_name' => { '!=' => '' } },
         { order_by => 'botanical_name' }
     );
-    return [$dbforager->all]
-
+    return [$dbforager->all];
 }
 # Get herbs with bee forage information
 sub get_bee_forage_plants {
@@ -284,23 +368,6 @@ sub trim {
     my $s = shift;
     $s =~ s/^\s+|\s+$//g;
     return $s;
-}
-
-# Method to get current connection info for debugging (similar to DBEncy)
-sub get_connection_info {
-    my ($self) = @_;
-    
-    my $storage = $self->schema->storage;
-    my $connect_info = $storage->connect_info;
-    
-    my $info = {
-        dsn => $connect_info->[0]{dsn} || $connect_info->[0] || 'Unknown',
-        username => $connect_info->[0]{user} || $connect_info->[1] || 'Unknown',
-        # Don't expose password for security
-        connection_type => ref($storage) || 'Unknown'
-    };
-    
-    return $info;
 }
 
 1;

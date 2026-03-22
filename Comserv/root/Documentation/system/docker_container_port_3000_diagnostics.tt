@@ -1,0 +1,337 @@
+[% PageVersion = 'Documentation/docker_container_port_3000_diagnostics.tt,v 1.0 2025/12/19 Zencoder Exp Shanta ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<h1 id="container_diagnostics_top"><a href="#container_diagnostics_top">Docker Container Port 3000 Diagnostic Report</a></h1>
+
+<div class="toc" id="toc">
+<h3>Quick Navigation</h3>
+<ul>
+    <li><a href="#problem_statement">Problem Statement</a></li>
+    <li><a href="#root_cause">Root Cause Analysis</a></li>
+    <li><a href="#investigation_plan">Investigation Plan</a></li>
+    <li><a href="#findings">Findings Summary</a></li>
+    <li><a href="#solution">Solution & Fix</a></li>
+    <li><a href="#verification">Verification Steps</a></li>
+</ul>
+</div>
+
+<div class="container warning" id="problem_statement">
+    <div class="container-header">Problem Statement</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Issue Description</h3>
+            <ul>
+                <li><strong>Symptom</strong>: Docker container accepts connections on port 3000 but returns empty response/timeout</li>
+                <li><strong>Container Status</strong>: Running but marked as "unhealthy"</li>
+                <li><strong>Application Status</strong>: Runs normally from command line (perl script/comserv_server.pl)</li>
+                <li><strong>Environment</strong>: docker-compose up (development setup)</li>
+                <li><strong>Port Mapping</strong>: 3000:3000 (host:container)</li>
+            </ul>
+            
+            <h3>Expected Behavior</h3>
+            <p>When accessing http://localhost:3000, the Comserv Perl/Catalyst application should serve the web interface with full HTML content and functionality.</p>
+            
+            <h3>Actual Behavior</h3>
+            <p>Connection attempt results in timeout or connection refused error. No application content is served.</p>
+        </div>
+    </div>
+</div>
+
+<div class="container info" id="root_cause">
+    <div class="container-header">Root Cause Analysis - PERMISSION DENIED ERROR</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Primary Issue: EACCES (Permission Denied)</h3>
+            
+            <p><strong>Error Found in Container Logs:</strong></p>
+            <pre><code>2025-12-17 04:25:08,076 INFO spawnerr: unknown error making dispatchers for 'comserv-server': EACCES
+2025-12-17 04:25:09,078 INFO spawnerr: unknown error making dispatchers for 'comserv-server': EACCES
+2025-12-17 04:25:11,083 INFO spawnerr: unknown error making dispatchers for 'comserv-server': EACCES
+2025-12-17 04:25:14,125 INFO gave up: comserv-server entered FATAL state, too many start retries too quickly</code></pre>
+            
+            <h3>What's Happening</h3>
+            <ol>
+                <li><strong>Supervisord starts successfully</strong> - The supervisor process manager launches as PID 1 (running as root)</li>
+                <li><strong>Supervisor tries to launch comserv-server</strong> - It attempts to fork a new process for the Perl application</li>
+                <li><strong>Permission denied on log files</strong> - The comserv user cannot write to /opt/comserv/root/log/catalyst.log and catalyst_error.log</li>
+                <li><strong>Process fails to start</strong> - Without writable log destinations, supervisor abandons the process</li>
+                <li><strong>Port 3000 remains unbound</strong> - No application listens on port 3000, connection times out</li>
+            </ol>
+            
+            <h3>Root Cause: Insufficient Directory Permissions</h3>
+            
+            <p>In <code>docker-entrypoint.sh</code> (lines 91-93):</p>
+            <pre><code>mkdir -p ${CATALYST_HOME}/root/log /var/log/supervisor
+chmod 755 ${CATALYST_HOME}/root/log /var/log/supervisor</code></pre>
+            
+            <p><strong>Problem</strong>: The log directory is created with <code>chmod 755</code>, which means:</p>
+            <ul>
+                <li><strong>Owner (root)</strong>: read, write, execute (7)</li>
+                <li><strong>Group</strong>: read, execute only (5) - <strong>NO WRITE</strong></li>
+                <li><strong>Others</strong>: read, execute only (5) - <strong>NO WRITE</strong></li>
+            </ul>
+            
+            <p>When supervisor tries to write log files as the <code>comserv</code> user, the user lacks write permissions on the directory.</p>
+            
+            <h3>Why This Happens</h3>
+            <p>Even though the Dockerfile correctly does <code>chown -R comserv:comserv /opt/comserv</code> during build, the entrypoint script runs AFTER container startup and recreates the directories with root ownership and restrictive permissions (755).</p>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="investigation_plan">
+    <div class="container-header">Investigation Plan (In Progress)</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <table class="diagnostic-table">
+                <thead>
+                    <tr>
+                        <th>Step</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                        <th>Finding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Check docker ps for running containers</td>
+                        <td>✅ Complete</td>
+                        <td>Container <code>comserv-web-dev</code> (ID: e76bd136da89) is up 16 hours, marked unhealthy</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Review docker logs for errors</td>
+                        <td>✅ Complete</td>
+                        <td>Found repeated EACCES error in supervisor spawning process</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Check process list inside container</td>
+                        <td>✅ Complete</td>
+                        <td>Only supervisord (PID 1) and ps command running - no Perl application process</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td>Test port connectivity inside container</td>
+                        <td>✅ Complete</td>
+                        <td>curl to localhost:3000 returns "Connection refused" - nothing listening on port</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td>Analyze docker-entrypoint.sh permissions logic</td>
+                        <td>✅ Complete</td>
+                        <td>Found chmod 755 on log directory - insufficient for comserv user write access</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td>Review create-supervisor-config.sh user configuration</td>
+                        <td>✅ Complete</td>
+                        <td>Supervisor configured to run as <code>user=comserv</code>, but directory lacks write permissions</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td>Verify Dockerfile user setup</td>
+                        <td>✅ Complete</td>
+                        <td>Dockerfile correctly creates comserv user and chowns /opt/comserv, but entrypoint undoes this</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="container success" id="findings">
+    <div class="container-header">Key Findings Summary</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Finding 1: Permission Mismatch</h3>
+            <p><strong>Log Directory Permissions Issue</strong>: Directory created as <code>755</code> (root-owned) prevents comserv user from writing to catalyst.log</p>
+            
+            <h3>Finding 2: Supervisor Process Failure</h3>
+            <p><strong>No Application Process Running</strong>: Supervisor fails to spawn comserv-server due to permission error. Only supervisord daemon is running.</p>
+            
+            <h3>Finding 3: Port Unbound</h3>
+            <p><strong>Port 3000 Not Listening</strong>: Since Starman/Perl application never starts, port 3000 has no service listening. Connection attempts time out.</p>
+            
+            <h3>Finding 4: Health Check Fails</h3>
+            <p><strong>Unhealthy Container Status</strong>: Health check in docker-compose tries to curl http://localhost:3000/health but gets connection refused, marking container unhealthy</p>
+            
+            <h3>Finding 5: Application Runs Fine Locally</h3>
+            <p><strong>No Code Issues</strong>: Application works perfectly when run from command line (perl script/comserv_server.pl) - confirms this is purely a containerization/permission issue, not application logic</p>
+        </div>
+    </div>
+</div>
+
+<div class="container info" id="solution">
+    <div class="container-header">Solution & Fix</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Fix: Update docker-entrypoint.sh Permissions</h3>
+            
+            <p><strong>Change this (lines 91-93):</strong></p>
+            <pre><code>mkdir -p ${CATALYST_HOME}/root/log /var/log/supervisor
+chmod 755 ${CATALYST_HOME}/root/log /var/log/supervisor</code></pre>
+            
+            <p><strong>To this:</strong></p>
+            <pre><code>mkdir -p ${CATALYST_HOME}/root/log /var/log/supervisor
+chmod 755 ${CATALYST_HOME}/root/log /var/log/supervisor
+chown -R comserv:comserv ${CATALYST_HOME}/root/log</code></pre>
+            
+            <h3>Alternative Solution (More Permissive)</h3>
+            <p>If the above doesn't work, use:</p>
+            <pre><code>mkdir -p ${CATALYST_HOME}/root/log /var/log/supervisor
+chmod 777 ${CATALYST_HOME}/root/log /var/log/supervisor
+chown -R comserv:comserv ${CATALYST_HOME}/root/log</code></pre>
+            
+            <h3>Why This Works</h3>
+            <ol>
+                <li><code>mkdir -p</code> - Ensures directories exist</li>
+                <li><code>chmod 755</code> - Ensures proper read/execute for others</li>
+                <li><code>chown -R comserv:comserv</code> - <strong>KEY FIX</strong> - Makes comserv the owner, ensuring write permissions</li>
+            </ol>
+            
+            <h3>Implementation Steps</h3>
+            <ol>
+                <li>Edit <code>Comserv/docker-entrypoint.sh</code></li>
+                <li>Locate lines 91-93 (after the comment about supervisor socket)</li>
+                <li>Add the <code>chown</code> command</li>
+                <li>Rebuild Docker image: <code>docker-compose build</code></li>
+                <li>Restart container: <code>docker-compose down && docker-compose up</code></li>
+                <li>Verify port 3000 responds</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<div class="container warning" id="verification">
+    <div class="container-header">Verification & Testing</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Before Fix (Current State)</h3>
+            <pre><code>$ curl http://localhost:3000/
+curl: (7) Failed to connect to localhost port 3000 after 2 ms: Couldn't connect to server
+
+$ docker ps
+CONTAINER ID   STATUS           NAMES
+e76bd136da89   Up 16h (unhealthy)   comserv-web-dev
+
+$ docker logs comserv-web-dev | grep EACCES
+INFO spawnerr: unknown error making dispatchers for 'comserv-server': EACCES</code></pre>
+            
+            <h3>After Fix (Expected)</h3>
+            <pre><code>$ curl http://localhost:3000/
+HTTP/1.1 200 OK
+[HTML content of Comserv application page]
+
+$ docker ps
+CONTAINER ID   STATUS           NAMES
+e76bd136da89   Up 16h (healthy)    comserv-web-dev
+
+$ docker logs comserv-web-dev | grep FATAL
+[No FATAL errors]</code></pre>
+            
+            <h3>Testing Checklist</h3>
+            <table class="diagnostic-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Command/Action</th>
+                        <th>Expected Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Port Connection</td>
+                        <td><code>curl http://localhost:3000/</code></td>
+                        <td>HTTP 200 with HTML content</td>
+                    </tr>
+                    <tr>
+                        <td>Container Health</td>
+                        <td><code>docker ps --format "table {{.Names}}\t{{.Status}}"</code></td>
+                        <td>Status shows "(healthy)" not "(unhealthy)"</td>
+                    </tr>
+                    <tr>
+                        <td>Process Running</td>
+                        <td><code>docker exec [container] ps aux | grep starman</code></td>
+                        <td>Starman process with PID and workers visible</td>
+                    </tr>
+                    <tr>
+                        <td>Log Files</td>
+                        <td><code>docker exec [container] ls -la /opt/comserv/root/log/</code></td>
+                        <td>catalyst.log and catalyst_error.log exist and are writable</td>
+                    </tr>
+                    <tr>
+                        <td>No EACCES Errors</td>
+                        <td><code>docker logs [container] | grep EACCES</code></td>
+                        <td>No output (no errors found)</td>
+                    </tr>
+                    <tr>
+                        <td>Health Endpoint</td>
+                        <td><code>curl http://localhost:3000/health</code></td>
+                        <td>JSON response: {"status":"ok"} or similar</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="additional_notes">
+    <div class="container-header">Additional Notes & Recommendations</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <h3>Resource Conservation</h3>
+            <p>This investigation was optimized for low-resource environments by:</p>
+            <ul>
+                <li>✅ Documenting findings in real-time (.tt file created during investigation)</li>
+                <li>✅ Running parallel diagnostic commands to reduce total time</li>
+                <li>✅ Focusing on the most likely cause (permission errors) first</li>
+                <li>✅ Using existing container logs rather than creating new test containers</li>
+            </ul>
+            
+            <h3>Future Prevention</h3>
+            <ul>
+                <li>Consider using <code>chown</code> in Dockerfile instead of relying on entrypoint</li>
+                <li>Add explicit permission checks in docker-entrypoint.sh diagnostic output</li>
+                <li>Update health check to include permission verification as part of startup</li>
+                <li>Document permission requirements in docker-compose comments</li>
+            </ul>
+            
+            <h3>Related Docker/Kubernetes Files</h3>
+            <ul>
+                <li><code>docker-entrypoint.sh</code> - Fix location</li>
+                <li><code>create-supervisor-config.sh</code> - Supervisor process configuration</li>
+                <li><code>supervisord.conf</code> - Supervisor base configuration</li>
+                <li><code>Dockerfile</code> - Image build configuration</li>
+                <li><code>docker-compose.yml</code> - Container orchestration (root level)</li>
+                <li><code>docker-compose.dev.yml</code> - Development-specific overrides</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="container success" id="see_also">
+    <div class="container-header">See Also</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <ul>
+                <li><a href="/Documentation/system/DOCKER_KUBERNETES_MIGRATION_STRATEGY">Docker/Kubernetes Migration Strategy</a> - Comprehensive container strategy</li>
+                <li><a href="/Documentation/system/docker_pycharm_setup_guide">Docker PyCharm Setup Guide</a> - Development environment configuration</li>
+                <li><a href="/Documentation/system/starman_diagnostics">Starman Diagnostics</a> - Application server troubleshooting</li>
+                <li><a href="/Documentation/system/network_diagnostics">Network Diagnostics</a> - Network connectivity issues</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top: 40px; padding: 20px; background-color: #f5f5f5; border-radius: 4px;">
+    <p style="font-size: 12px; color: #666;">
+        <strong>Document Version:</strong> 1.0<br>
+        <strong>Created:</strong> 2025-12-19<br>
+        <strong>Diagnosis Status:</strong> Complete - Ready for implementation<br>
+        <strong>Confidence Level:</strong> High (Permission error verified in logs)
+    </p>
+</div>

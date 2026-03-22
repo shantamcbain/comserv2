@@ -1,0 +1,49 @@
+[% META title = 'Ve7tit Theme Fix - September 9, 2025' %]
+
+<h1>Ve7tit Theme Fix - September 9, 2025</h1>
+
+<h2>Issue</h2>
+<p>The Ve7tit site was not displaying with the correct theme because it was not mapped in the theme configuration system.</p>
+
+<h2>Root Cause</h2>
+<p>The <code>theme_definitions.json</code> file did not include a mapping for the "ve7tit" site name to any theme, causing it to fall back to the default theme instead of the intended APIS (beekeeping) theme.</p>
+
+<h2>Solution</h2>
+<p>Added the ve7tit site mapping to the <code>site_themes</code> section in <code>theme_definitions.json</code>:</p>
+
+<pre><code>"site_themes": {
+  "ve7tit": "apis",
+  // ... other mappings
+}</code></pre>
+
+<h2>Files Modified</h2>
+<ul>
+<li><code>Comserv/root/static/config/theme_definitions.json</code> - Added ve7tit → apis mapping</li>
+</ul>
+
+<h2>Testing</h2>
+<ul>
+<li>Verified that Ve7tit site now correctly loads with the APIS theme</li>
+<li>Confirmed honeycomb background and yellow/orange color scheme are applied</li>
+<li>All existing site themes remain functional</li>
+</ul>
+
+<h2>Todo System Integration</h2>
+<ul>
+<li>Created todo item (ID: 181) to track this fix</li>
+<li>Marked as completed after successful implementation</li>
+<li>Added to development workflow for future theme mapping issues</li>
+</ul>
+
+<h2>Impact</h2>
+<ul>
+<li>Ve7tit site now displays with proper beekeeping-themed styling</li>
+<li>Consistent user experience across all beekeeping-related sites</li>
+<li>Improved theme system reliability</li>
+</ul>
+
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../features/theme_system.tt">Theme System Documentation</a></li>
+<li><a href="../features/todo_system.tt">Todo System Documentation</a></li>
+</ul>

@@ -1,0 +1,201 @@
+[% META title = 'Add Device' %]
+[% PageVersion = 'NetworkMap/add_device.tt,v 0.01 2025/04/20 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+ [% IF debug_msg.size %]
+   <div class="debug-message">
+     <ul>
+     [% FOREACH msg IN debug_msg %]
+       <li>[% msg %]</li>
+     [% END %]
+     </ul>
+   </div>
+ [% END %]
+[% END %]
+
+<div class="network-map-container">
+    <h1>Add Device</h1>
+    
+    <div class="network-map-actions">
+        <div class="action-buttons">
+            <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Back to Network Map</a>
+        </div>
+    </div>
+    
+    [% IF status_msg %]
+        <div class="alert alert-success">[% status_msg %]</div>
+    [% END %]
+    
+    [% IF error_msg %]
+        <div class="alert alert-danger">[% error_msg %]</div>
+    [% END %]
+    
+    <div class="form-container">
+        <form action="[% c.uri_for('/NetworkMap/add_device') %]" method="post" class="device-form">
+            <div class="form-group">
+                <label for="device_name">Device Name:</label>
+                <input type="text" id="device_name" name="device_name" class="form-control" required>
+                <small class="form-text text-muted">A unique name for this device (e.g., web-server-01, router-main)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="ip">IP Address:</label>
+                <input type="text" id="ip" name="ip" class="form-control" required placeholder="192.168.1.100">
+                <small class="form-text text-muted">The IP address of this device</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="network">Network:</label>
+                <select id="network" name="network" class="form-control" required>
+                    <option value="">Select a network</option>
+                    [% FOREACH network_id IN networks.keys.sort %]
+                        <option value="[% network_id %]">[% networks.$network_id.name %] ([% networks.$network_id.cidr %])</option>
+                    [% END %]
+                </select>
+                <small class="form-text text-muted">The network this device belongs to</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="type">Device Type:</label>
+                <select id="type" name="type" class="form-control" required>
+                    <option value="">Select a type</option>
+                    <option value="server">Server</option>
+                    <option value="workstation">Workstation</option>
+                    <option value="router">Router</option>
+                    <option value="switch">Switch</option>
+                    <option value="firewall">Firewall</option>
+                    <option value="printer">Printer</option>
+                    <option value="iot">IoT Device</option>
+                    <option value="mobile">Mobile Device</option>
+                    <option value="other">Other</option>
+                </select>
+                <small class="form-text text-muted">The type of device</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" class="form-control" rows="3"></textarea>
+                <small class="form-text text-muted">A detailed description of this device's purpose and usage</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="services">Services:</label>
+                <input type="text" id="services" name="services" class="form-control" placeholder="http, ssh, dns">
+                <small class="form-text text-muted">Comma-separated list of services provided by this device</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add Device</button>
+                <a href="[% c.uri_for('/NetworkMap') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .network-map-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .network-map-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .alert {
+        padding: 12px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .form-container {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .device-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .form-control {
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 16px;
+    }
+    
+    textarea.form-control {
+        resize: vertical;
+    }
+    
+    .form-text {
+        font-size: 14px;
+        color: #6c757d;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .debug-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+</style>

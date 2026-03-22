@@ -1,0 +1,462 @@
+[% META 
+   title = "Daily Plan Automator System Design"
+   description = "System design for the Daily Plan Automator - the orchestrator that manages the 4-agent daily planning pipeline (Daily Audit → DocumentationSync → MasterPlanUpdater → DailyPlansGenerator). Includes architecture, data flows, automation triggers, integration points, and implementation roadmap."
+   roles = "admin,developer,devops"
+   TemplateType = "Documentation"
+   category = "system-design,workflow,automation,agents,planning"
+   page_version = "0.01"
+   last_updated = "Tue Jan 06 17:42:00 UTC 2026"
+%]
+[% PageVersion = 'root/Documentation/ai_workflows/DailyPlanAutomatorDesign.tt,v 0.01 2026/01/06 17:42:00 zencoder Exp - Initial system design for Daily Plan Automator' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Daily Plan Automator: System Architecture & Design</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        <strong>Created:</strong> 2026-01-06 | 
+        <strong>Version:</strong> 0.01 | 
+        <strong>Status:</strong> Design Phase - Ready for Implementation
+    </div>
+
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #4caf50;">
+        <h2 style="margin-top: 0;">✅ Executive Summary</h2>
+        <p><strong>Purpose:</strong> The Daily Plan Automator is the orchestration system that manages a 4-agent pipeline to automatically update project state, documentation, and generate daily plans from MasterPlanCoordination.tt priorities.</p>
+        <p><strong>Scope:</strong> System design for the automator that coordinates Agent 1-4 (Daily Audit → DocumentationSync → MasterPlanUpdater → DailyPlansGenerator).</p>
+        <p><strong>Success Criteria:</strong> Workflow design documented with automation triggers, data flows, integration points, and implementation roadmap complete.</p>
+    </div>
+
+    <h2 id="system-overview">1. System Overview: The 4-Agent Pipeline Architecture</h2>
+    
+    <div style="background: #f0f7ff; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">Pipeline Structure</h3>
+        <pre style="background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 3px; overflow-x: auto;">
+┌─────────────────────────────────────────────────────────────────┐
+│        DAILY PLAN AUTOMATOR (Orchestrator)                      │
+│     Triggers Pipeline on Daily Schedule (Morning UTC)           │
+└────────────┬────────────────────────────────────────────────────┘
+             │
+             ├─→ [Chat 1] Daily Audit Agent (15-20 min)
+             │   ├─ Input: prompts_log.yaml (previous chat history)
+             │   ├─ Process: Analyze yesterday's work, extract changes
+             │   ├─ Output: audit_YYYY-MM-DD.md, audit_YYYY-MM-DD.json
+             │   └─ Exit: /chathandoff to Chat 2
+             │
+             ├─→ [Chat 2] DocumentationSync Agent (10-15 min)
+             │   ├─ Input: audit_YYYY-MM-DD.md (from Agent 1)
+             │   ├─ Process: Map code changes to documentation files
+             │   ├─ Output: Updated /Documentation/*.tt files
+             │   └─ Exit: /chathandoff to Chat 3
+             │
+             ├─→ [Chat 3] Master Plan Updater Agent (10-15 min)
+             │   ├─ Input: Updated documentation + audit (Agents 1-2)
+             │   ├─ Process: Update MasterPlanCoordination.tt
+             │   ├─ Output: MasterPlanCoordination.tt vX.XX
+             │   └─ Exit: /chathandoff to Chat 4
+             │
+             └─→ [Chat 4] Daily Plans Generator Agent (15-20 min)
+                 ├─ Input: MasterPlanCoordination.tt vX.XX
+                 ├─ Process: Generate 7-day daily plans from master plan
+                 ├─ Output: 7× Daily_Plans-YYYY-MM-DD.tt files
+                 └─ Exit: Session complete, /sessionhandoff to new session
+        </pre>
+    </div>
+
+    <h2 id="data-flow">2. Data Flow & Integration Points</h2>
+    
+    <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Stage</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Input Source</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Process</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Output Artifacts</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Next Agent</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background: #fef5e7;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔴 Agent 1: Audit</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">prompts_log.yaml<br/>Chat history logs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Parse yesterday's work<br/>Extract code diffs<br/>Summarize changes</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">audit_YYYY-MM-DD.md<br/>audit_YYYY-MM-DD.json<br/>code diffs</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">→ Agent 2</td>
+            </tr>
+            <tr style="background: #fff3cd;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>🟠 Agent 2: DocSync</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">audit_YYYY-MM-DD.md<br/>(from Agent 1)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Map code files → docs<br/>Update .tt files<br/>Verify syntax</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Updated /Documentation/*.tt<br/>Change log (file list)<br/>Version bumps</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">→ Agent 3</td>
+            </tr>
+            <tr style="background: #e8f5e9;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>🟢 Agent 3: MasterPlan</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Audit summary</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Update status sections<br/>Increment version<br/>Update timestamps</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>vX.XX (bumped)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">→ Agent 4</td>
+            </tr>
+            <tr style="background: #e3f2fd;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>🔵 Agent 4: Daily Plans</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt vX.XX<br/>Current date</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Extract priorities<br/>Sequence tasks<br/>Generate 7 plans</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">7× Daily_Plans-YYYY-MM-DD.tt<br/>Format: .tt files</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">✅ Complete</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="automation-triggers">3. Automation Triggers & Scheduling</h2>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">🔔 When Does the Automator Run?</h3>
+        <ul>
+            <li><strong>Daily Schedule:</strong> 06:00-08:00 UTC (morning, before team starts work)</li>
+            <li><strong>Manual Trigger:</strong> Execute prompt in Zencoder: "Run Daily Plan Automator for [DATE]"</li>
+            <li><strong>Dependency Trigger:</strong> When master plan changes, re-run Agent 4 only (Daily Plans Generator)</li>
+            <li><strong>Emergency Trigger:</strong> Manual /chathandoff between agents if one fails</li>
+        </ul>
+    </div>
+
+    <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">📋 Automation Checkpoints</h3>
+        <table style="width: 100%; margin: 15px 0;">
+            <thead style="background: #f5f5f5;">
+                <tr>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Checkpoint</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Condition</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Before Agent 1</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: prompts_log.yaml exists?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">If NO → Create template; If YES → Proceed</td>
+                </tr>
+                <tr style="background: #fafafa;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>After Agent 1</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: audit_YYYY-MM-DD.md created?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">If NO → Log error, halt pipeline; If YES → Start Agent 2</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>After Agent 2</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: Docs updated, no syntax errors?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">If errors → Rollback, retry; If OK → Start Agent 3</td>
+                </tr>
+                <tr style="background: #fafafa;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>After Agent 3</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: Master plan version bumped?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">If NO → Log warning; If YES → Start Agent 4</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>After Agent 4</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Check: 7 daily plans created?</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">If NO → Retry Agent 4; If YES → Mark complete ✅</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 id="workflow-phases">4. Workflow Phases: How Automator Coordinates Agents</h2>
+    
+    <h3 id="phase0-setup">Phase 0: Setup & Validation (Automator Prepares)</h3>
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <ol>
+            <li>Execute <code>validation_step0.pl</code> - Verify previous chat compliance</li>
+            <li>Check <code>prompts_log.yaml</code> - Confirm audit trail accessible</li>
+            <li>Determine today's date and create audit file path (audit_YYYY-MM-DD.tt)</li>
+            <li>Log startup: <code>/updateprompt --phase before --action "Daily Plan Automator: Start pipeline for [DATE]"</code></li>
+            <li>Ready for Phase 1</li>
+        </ol>
+    </div>
+
+    <h3 id="phase1-agents">Phase 1-4: Agent Execution Pipeline</h3>
+    <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <p><strong>For each Agent (1-4):</strong></p>
+        <ol>
+            <li><strong>Pre-Execution:</strong> Verify input artifacts exist</li>
+            <li><strong>Execution:</strong> Trigger agent prompt in new chat</li>
+            <li><strong>Monitoring:</strong> Track /chathandoff execution (signals agent completion)</li>
+            <li><strong>Validation:</strong> Verify output artifacts created (diffs, files updated, version bumped)</li>
+            <li><strong>Logging:</strong> Record agent completion in prompts_log.yaml</li>
+            <li><strong>Next Step:</strong> If successful → Proceed to next agent; If failure → Log and halt</li>
+        </ol>
+    </div>
+
+    <h3 id="phase5-completion">Phase 5: Completion & Reporting</h3>
+    <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <ol>
+            <li>Verify all 4 agents completed successfully</li>
+            <li>Update Audit_2026-01-06.tt with final status (✅ Complete)</li>
+            <li>Update master_plan.md with daily plan links for today</li>
+            <li>Execute <code>/updateprompt --phase after --success 1</code> - Log pipeline completion</li>
+            <li>Execute <code>/sessionhandoff</code> - Archive session, ready for next day</li>
+        </ol>
+    </div>
+
+    <h2 id="integration-points">5. Integration Points with Zencoder Framework</h2>
+    
+    <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+        <thead style="background: #f5f5f5;">
+            <tr>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Component</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Integration Point</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Requirement</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background: #fafafa;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>validation_step0.pl</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Phase 0 compliance gate</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Must PASS before pipeline starts</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>/updateprompt.pl</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Bilateral logging at Phase 1, 5</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Log startup, completion, any errors</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>/chathandoff</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Between agents (after each)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Agents execute; automator detects signal</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>/sessionhandoff</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">End of pipeline (Phase 5)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Archives session, starts fresh next day</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>ask_questions()</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">User decisions (error recovery)</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">When agent fails, ask user to continue or skip</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>prompts_log.yaml</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Chat history source for Agent 1</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Must exist; tracks all chats in session</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 10px; border: 1px solid #ddd;"><strong>prompts_log.yaml</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Audit trail for compliance</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">Automator logs all phase transitions</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="error-handling">6. Error Handling & Recovery Strategy</h2>
+    
+    <div style="background: #ffebee; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">🔴 Error Scenarios & Responses</h3>
+        
+        <h4>Scenario 1: Agent Fails to Produce Output</h4>
+        <div style="background: #fff; padding: 10px; border-left: 4px solid #f44336; margin: 10px 0;">
+            <p><strong>Example:</strong> Agent 1 (Daily Audit) completes but audit_YYYY-MM-DD.md not created</p>
+            <p><strong>Detection:</strong> Automator checks for file after /chathandoff signal</p>
+            <p><strong>Response:</strong> Log error → Ask user "Retry Agent 1 or Skip to Agent 2?" → Act on response</p>
+            <p><strong>Recovery:</strong> If Retry → Re-trigger Agent 1 prompt; If Skip → Proceed with empty audit (warn Agent 2)</p>
+        </div>
+        
+        <h4>Scenario 2: Agent Syntax Error in Output File</h4>
+        <div style="background: #fff; padding: 10px; border-left: 4px solid #ff9800; margin: 10px 0;">
+            <p><strong>Example:</strong> Agent 2 updates Documentation files but introduces TT syntax error</p>
+            <p><strong>Detection:</strong> Agent 2 validates syntax before completion</p>
+            <p><strong>Response:</strong> Agent fixes error, re-saves file, confirms valid syntax</p>
+            <p><strong>Recovery:</strong> If unfixable → Manual rollback + ask user intervention</p>
+        </div>
+        
+        <h4>Scenario 3: Agent Timeout or Crash</h4>
+        <div style="background: #fff; padding: 10px; border-left: 4px solid #d32f2f; margin: 10px 0;">
+            <p><strong>Example:</strong> Agent 3 (Master Plan Updater) exceeds token limit mid-execution</p>
+            <p><strong>Detection:</strong> Timeout after 30 minutes, no /chathandoff signal</p>
+            <p><strong>Response:</strong> Log failure → Notify user → Offer "Restart Agent 3" or "Skip to Agent 4"</p>
+            <p><strong>Recovery:</strong> Depends on how much Agent 3 completed (may need manual master plan update)</p>
+        </div>
+    </div>
+
+    <h2 id="task-selection">7. Task Selection Logic: How Plans are Generated</h2>
+    
+    <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">🎯 Daily Plan Generation Algorithm (Agent 4)</h3>
+        <ol style="line-height: 2;">
+            <li><strong>Input:</strong> MasterPlanCoordination.tt vX.XX (updated by Agent 3)</li>
+            <li><strong>Extract:</strong> Priority matrix from master plan (Top 10 Priorities table)</li>
+            <li><strong>Filter:</strong> Tasks marked "In Progress" or "Ready" (skip "Planned" or "Completed")</li>
+            <li><strong>Sequence:</strong> Sort by (Severity DESC, Priority ASC, Timeline ASC)</li>
+            <li><strong>Distribute:</strong> Spread 7 days of work across next 7 calendar days</li>
+            <li><strong>Parallel Detection:</strong> Identify tasks that can run simultaneously (same Severity, no dependencies)</li>
+            <li><strong>Assign Parallel Work:</strong> Group parallel tasks to same day</li>
+            <li><strong>Generate Daily Plan Template:</strong> For each day:
+                <ul>
+                    <li>Create Daily_Plans-YYYY-MM-DD.tt file</li>
+                    <li>List priority 1-3 tasks for day</li>
+                    <li>Note task durations (hours)</li>
+                    <li>Include dependencies (blocking tasks)</li>
+                    <li>Add "Tomorrow's Plan" section (lookahead)</li>
+                </ul>
+            </li>
+            <li><strong>Validate:</strong> Check all plans follow template format</li>
+            <li><strong>Output:</strong> 7 files created, ready for team execution</li>
+        </ol>
+    </div>
+
+    <h2 id="daily-sync">8. Daily Synchronization: Master Plan ↔ Daily Plans</h2>
+    
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">🔄 Bidirectional Sync Pattern</h3>
+        <table style="width: 100%; margin: 15px 0;">
+            <thead style="background: #f5f5f5;">
+                <tr>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Direction</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Source</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Target</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">When</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background: #fafafa;">
+                    <td style="padding: 10px; border: 1px solid #ddd;">
+                        <strong>Master Plan → Daily Plans</strong>
+                        <br/><span style="font-size: 0.9em;">(Downstream)</span>
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Priority Matrix + Status</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Daily_Plans-YYYY-MM-DD.tt<br/>(7 files, next 7 days)</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Every morning (Agent 4 phase)</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;">
+                        <strong>Daily Plans → Master Plan</strong>
+                        <br/><span style="font-size: 0.9em;">(Upstream, next cycle)</span>
+                    </td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Completed daily plans<br/>from yesterday's work</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">MasterPlanCoordination.tt<br/>Status updates</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">Next morning (Agent 3 phase)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2 id="success-criteria">9. Success Criteria & Implementation Roadmap</h2>
+    
+    <div style="background: #fff9c4; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">✅ Design Success Criteria (This Phase)</h3>
+        <ul>
+            <li>✅ <strong>Criterion 1:</strong> Daily Plan Automator design document complete (this file)</li>
+            <li>✅ <strong>Criterion 2:</strong> 4-agent pipeline architecture documented with data flows</li>
+            <li>✅ <strong>Criterion 3:</strong> Automation triggers and scheduling logic defined</li>
+            <li>✅ <strong>Criterion 4:</strong> Error handling and recovery strategy documented</li>
+            <li>✅ <strong>Criterion 5:</strong> Integration with Zencoder framework (validation, logging, handoffs) defined</li>
+            <li>✅ <strong>Criterion 6:</strong> Task selection logic for daily plan generation specified</li>
+            <li>✅ <strong>Criterion 7:</strong> Master Plan ↔ Daily Plans synchronization pattern documented</li>
+        </ul>
+    </div>
+
+    <div style="background: #e3f2fd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">🚀 Implementation Roadmap (Next Phase)</h3>
+        <ol>
+            <li><strong>Phase A (Verification):</strong> Validate 4-agent workflow by executing 1 full pipeline cycle manually
+                <ul>
+                    <li>Trigger each agent sequentially (Chats 1-4)</li>
+                    <li>Verify /chathandoff signals between agents</li>
+                    <li>Confirm output artifacts created (audit, updated docs, master plan, daily plans)</li>
+                </ul>
+            </li>
+            <li><strong>Phase B (Documentation):</strong> Create agent role specifications for Chat 36-39
+                <ul>
+                    <li>Daily Audit Agent role (Chat 36)</li>
+                    <li>DocumentationSync Agent role (Chat 37)</li>
+                    <li>Master Plan Updater Agent role (Chat 38)</li>
+                    <li>Daily Plans Generator Agent role (Chat 39)</li>
+                </ul>
+            </li>
+            <li><strong>Phase C (Automation):</strong> Build orchestrator script to trigger agents automatically
+                <ul>
+                    <li>Create automation_pipeline.pl Perl script</li>
+                    <li>Implement agent status monitoring</li>
+                    <li>Add error recovery and fallback procedures</li>
+                    <li>Schedule with cron for daily 06:00 UTC execution</li>
+                </ul>
+            </li>
+            <li><strong>Phase D (Testing):</strong> Full integration testing with all components
+                <ul>
+                    <li>Test 4-agent pipeline end-to-end</li>
+                    <li>Test error scenarios (agent failures, timeouts)</li>
+                    <li>Test rollback procedures</li>
+                    <li>Verify daily plans generated correctly from master plan</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <h2 id="dependencies">10. Dependencies & Constraints</h2>
+    
+    <div style="background: #ffebee; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">⚠️ Critical Dependencies</h3>
+        <ul>
+            <li><strong>Zencoder Scripts:</strong> validation_step0.pl, /updateprompt.pl (must be functional)</li>
+            <li><strong>Agent Roles:</strong> Daily Audit, DocumentationSync, Master Plan Updater, Daily Plans Generator (must be defined)</li>
+            <li><strong>Documentation System:</strong> MasterPlanCoordination.tt, Daily_Plans template structure (must be stable)</li>
+            <li><strong>Chat Infrastructure:</strong> /chathandoff, /sessionhandoff keywords (must be implemented)</li>
+            <li><strong>File System:</strong> All documentation paths must be stable (no moves/deletions during pipeline)</li>
+        </ul>
+    </div>
+
+    <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 15px 0;">
+        <h3 style="margin-top: 0;">📋 Constraints</h3>
+        <ul>
+            <li><strong>Daily Only:</strong> Pipeline designed to run once per day (morning UTC)</li>
+            <li><strong>Sequential Execution:</strong> Agents must run in order (1→2→3→4); no parallelization</li>
+            <li><strong>Single Session Assumption:</strong> All 4 agents in same Zencoder session (use /chathandoff, not /sessionhandoff between agents)</li>
+            <li><strong>File Locks:</strong> No concurrent edits to MasterPlanCoordination.tt during pipeline</li>
+            <li><strong>Audit Trail Required:</strong> All changes logged via /updateprompt and prompts_log.yaml</li>
+        </ul>
+    </div>
+
+    <h2 id="glossary">11. Glossary & Key Concepts</h2>
+    
+    <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+        <tr style="background: #f5f5f5;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Term</th>
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Definition</th>
+        </tr>
+        <tr style="background: #fafafa;">
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>Daily Plan Automator</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">The orchestrator system that manages the 4-agent pipeline; responsible for triggering, monitoring, and coordinating agents</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>4-Agent Pipeline</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Sequence of 4 specialized agents (Daily Audit → DocumentationSync → MasterPlanUpdater → DailyPlansGenerator) that execute daily</td>
+        </tr>
+        <tr style="background: #fafafa;">
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>/chathandoff</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Keyword that agents execute to move to next chat within same session; signals agent completion to automator</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>/sessionhandoff</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Keyword that archives entire session and starts fresh; executed after Agent 4 completes (end of day)</td>
+        </tr>
+        <tr style="background: #fafafa;">
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>Bilateral Logging</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Pattern of logging in /updateprompt.pl at Phase 1 (before work) and Phase 5 (after work); tracks start/end for compliance</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>Checkpoint</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Validation point where automator verifies agent output before proceeding to next agent</td>
+        </tr>
+        <tr style="background: #fafafa;">
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>Audit Trail</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Complete record of pipeline execution logged in prompts_log.yaml; includes phase transitions, errors, user responses</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;"><strong>Task Selection</strong></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">Algorithm in Agent 4 that extracts priorities from master plan and converts to daily task breakdown (7 days)</td>
+        </tr>
+    </table>
+
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <p><strong>Design Document v0.01 | January 6, 2026 | Status: Complete - Ready for Implementation Phase A</strong></p>
+        <p>This design specifies the Daily Plan Automator system architecture, 4-agent pipeline orchestration, automation triggers, data flows, error handling, and implementation roadmap. Next step: Validation Phase A (execute 1 full pipeline cycle manually).</p>
+    </div>
+</div>

@@ -1,0 +1,354 @@
+[% META
+        title = "RemoteDB Utility"
+   description = "Utility module for executing queries and managing remote database connections with comprehensive error handling"
+   roles = "admin,developer"
+   TemplateType = "utility"
+   category = "utilities"
+   page_version = "0.01"
+   last_updated = "2026-01-11 15:59:00 UTC"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/utilities/RemoteDB.tt,v 0.01 2026/01/11 DocumentationSyncAgent Exp - New utility documentation from RemoteDB.pm code' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">RemoteDB Utility Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 15:59:00 UTC |
+        Version: 0.01 |
+        Author: Zencoder / DocumentationSyncAgent |
+        Status: New utility documentation created from RemoteDB.pm code audit
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
+                <a href="#getting-started" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Getting Started</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Usage Examples</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">1. Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">The <strong>RemoteDB Utility</strong> (Comserv::Util::RemoteDB) provides a Perl interface for executing queries and managing rows on remote database connections. It abstracts the complexity of remote database operations and provides helper methods for common CRUD (Create, Read, Update, Delete) operations with comprehensive error handling and logging.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">This utility is built on Moose for object-oriented design and integrates with Comserv's logging system for detailed operation tracking and debugging.</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <strong>Initial Release (v0.01 - 2026-01-11)</strong>: Complete documentation of RemoteDB utility module with all CRUD methods, connection management, and query execution utilities.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES & KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">2. Prerequisites</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Perl 5.20 or later</li>
+                <li>Moose object system installed</li>
+                <li>Try::Tiny exception handling module</li>
+                <li>Comserv application instance (for $c context)</li>
+                <li>RemoteDB model configured with active connections</li>
+                <li>Logging module available (Comserv::Util::Logging)</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">3. Key Features</h2>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>CRUD Operations</strong>: Full support for Create, Read, Update, and Delete operations on remote databases</li>
+                <li><strong>Query Execution</strong>: Direct SQL query execution with parameterized queries to prevent SQL injection</li>
+                <li><strong>Row Retrieval</strong>: Dedicated methods for fetching single rows or multiple rows with filtering</li>
+                <li><strong>Connection Management</strong>: Check connection existence, list available connections, and obtain database handles</li>
+                <li><strong>Error Handling</strong>: Comprehensive error handling with detailed logging of connection and query issues</li>
+                <li><strong>Flexible Querying</strong>: Support for WHERE clauses, ORDER BY, LIMIT, and OFFSET parameters</li>
+                <li><strong>Moose Integration</strong>: Object-oriented design with lazy loading of logging singleton</li>
+            </ul>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- GETTING STARTED SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="getting-started" style="color: var(--text-color); font-family: var(--header-font);">4. Getting Started</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.1 Basic Usage in Controllers</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">To use RemoteDB in a controller or other Comserv component:</p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">use Comserv::Util::RemoteDB;
+
+# Create an instance
+my $remote_db = Comserv::Util::RemoteDB->new();
+
+# Check if connection exists
+if ($remote_db->connection_exists($c, 'production_db')) {
+    # Execute operations
+}
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">4.2 Accessing Connected Databases</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">Ensure your remote database connections are configured in the application before attempting operations. Use the RemoteDB model to manage connection definitions.</p>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="methods" style="color: var(--text-color); font-family: var(--header-font);">5. Methods Reference</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.1 execute_query</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Execute a raw SQL query on a remote database connection.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $remote_db->execute_query($c, $conn_name, $query, $params);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection (string)</li>
+                <li>$query: SQL query string with ? placeholders for parameterized queries</li>
+                <li>$params: Array reference of parameter values for the placeholders</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Query result or error hash with 'error' key if connection not found.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.2 get_row</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Fetch a single row from a remote database table with optional WHERE conditions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$row = $remote_db->get_row($c, $conn_name, $table, $where, $params);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection</li>
+                <li>$table: Table name (string)</li>
+                <li>$where: Hash reference with column => value pairs for WHERE clause</li>
+                <li>$params: Optional hash reference (reserved for future use)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> First matching row as a hash reference, or undef if no rows found.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.3 get_rows</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Fetch multiple rows from a remote database with optional filtering, ordering, and pagination.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$rows = $remote_db->get_rows($c, $conn_name, $table, $where, $params);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection</li>
+                <li>$table: Table name (string)</li>
+                <li>$where: Hash reference for WHERE conditions (optional)</li>
+                <li>$params: Hash reference with optional keys: order_by, limit, offset</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of matching rows.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.4 insert_row</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Insert a new row into a remote database table.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $remote_db->insert_row($c, $conn_name, $table, $data);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection</li>
+                <li>$table: Table name (string)</li>
+                <li>$data: Hash reference with column => value pairs to insert</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Query execution result (typically status or affected row count).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.5 update_row</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Update existing rows in a remote database table with WHERE conditions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $remote_db->update_row($c, $conn_name, $table, $data, $where);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection</li>
+                <li>$table: Table name (string)</li>
+                <li>$data: Hash reference with column => value pairs to update</li>
+                <li>$where: Hash reference with WHERE condition column => value pairs</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Query execution result (status or affected row count).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.6 delete_row</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Delete rows from a remote database table with WHERE conditions.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$result = $remote_db->delete_row($c, $conn_name, $table, $where);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the remote connection</li>
+                <li>$table: Table name (string)</li>
+                <li>$where: Hash reference with WHERE condition column => value pairs</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Query execution result (status or affected row count).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.7 get_connections</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> List all available remote database connections.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$conn_list = $remote_db->get_connections($c);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Array reference of connection names, sorted alphabetically.</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.8 connection_exists</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Check if a specific remote database connection is configured.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$exists = $remote_db->connection_exists($c, $conn_name);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the connection to check (string)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> Boolean (1 if exists, 0 if not).</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">5.9 get_dbh</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose:</strong> Obtain a raw database handle for a remote connection for advanced operations.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Signature:</strong></p>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$dbh = $remote_db->get_dbh($c, $conn_name);
+</pre>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>$c: Catalyst context object</li>
+                <li>$conn_name: Name of the connection (string)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns:</strong> DBI database handle object for the specified connection.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE EXAMPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">6. Usage Examples</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.1 Fetching Data from Remote Database</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $remote_db = Comserv::Util::RemoteDB->new();
+
+# Get single user by ID
+my $user = $remote_db->get_row($c, 'production_db', 'users', { id => 123 });
+
+# Get multiple rows with filtering
+my $active_users = $remote_db->get_rows($c, 'production_db', 'users', 
+    { status => 'active' }, 
+    { order_by => 'created_date DESC', limit => 10 });
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.2 Inserting Data</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $new_data = {
+    username => 'john_doe',
+    email => 'john@example.com',
+    status => 'active'
+};
+
+$remote_db->insert_row($c, 'production_db', 'users', $new_data);
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.3 Updating Data</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $update_data = {
+    email => 'newemail@example.com',
+    status => 'inactive'
+};
+
+my $where = { id => 123 };
+
+$remote_db->update_row($c, 'production_db', 'users', $update_data, $where);
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.4 Deleting Data</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">$remote_db->delete_row($c, 'production_db', 'users', { id => 123 });
+</pre>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">6.5 Listing Available Connections</h3>
+            <pre style="background-color: var(--code-bg); color: var(--code-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;">my $connections = $remote_db->get_connections($c);
+foreach my $conn_name (@$connections) {
+    print "Available connection: $conn_name\n";
+}
+</pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- TROUBLESHOOTING SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.1 Connection Not Found Error</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> "Remote connection 'X' does not exist" error when executing queries.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Check that the connection name is correct (case-sensitive)</li>
+                <li>Verify the connection is configured in the RemoteDB model</li>
+                <li>Use get_connections() to list available connections and verify the correct name</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.2 No Results Returned</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> get_row() or get_rows() returns empty results when data should exist.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li>Verify the table name is correct and exists in the remote database</li>
+                <li>Check WHERE conditions match actual data (values are case-sensitive)</li>
+                <li>Confirm the connection is active and the remote database is accessible</li>
+                <li>Test with execute_query() to run a raw SELECT to verify data exists</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">7.3 Logging Query Issues</h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> Need to debug query execution errors.</p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> The RemoteDB utility logs errors through Comserv::Util::Logging. Check application logs for details. Use debug_mode in Catalyst for additional query information.</p>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">8. See Also</h2>
+            <div style="background-color: var(--success-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <ul style="color: var(--text-color); font-family: var(--body-font); margin: 0; padding-left: 20px;">
+                    <li><a href="/Documentation/models/RemoteDB" style="color: var(--link-color);">RemoteDB Model</a> - Configuration and management of remote database connections</li>
+                    <li><a href="/Documentation/system/DatabaseConfiguration" style="color: var(--link-color);">Database Configuration</a> - Setting up remote database connections</li>
+                    <li><a href="/Documentation/system/Logging" style="color: var(--link-color);">Logging Utility</a> - Comserv logging system for debugging</li>
+                    <li>DBI Documentation - Perl database interface reference</li>
+                </ul>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER SECTION -->
+    <div class="row" style="margin-top: var(--spacing-xlarge); padding-top: var(--spacing-large); border-top: 1px solid var(--border-color);">
+        <div class="col-100">
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small); text-align: center;">
+                Documentation for Comserv::Util::RemoteDB | Version 0.01 | Last Updated: 2026-01-11 15:59:00 UTC | Maintained by DocumentationSyncAgent
+            </p>
+        </div>
+    </div>
+</div>

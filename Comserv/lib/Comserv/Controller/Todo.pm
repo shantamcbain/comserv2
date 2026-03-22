@@ -1,9 +1,12 @@
 package Comserv::Controller::Todo;
 use Moose;
 use namespace::autoclean;
+use DateTime;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
+use JSON::MaybeXS;
 use Comserv::Util::Logging; # Import the logging utility
+use Comserv::Util::ApiTokenValidator;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -71,6 +74,12 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
         
+        # Include todos without any dates if they're not completed (for day view of today only)
+        my $today = DateTime->now->ymd;
+        if (!$todo->start_date && !$todo->due_date && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
+            $include_todo = 1;
+        }
+        
         $include_todo;
     } @$todos;
     
@@ -123,31 +132,6 @@ sub begin :Private {
 
     # If we get here, the user is authorized
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'begin', "User authorized to access Todo: " . ($c->session->{username} || 'Guest'));
-}
-
-sub index :Path(/todo) :Args(0) {
-    my ( $self, $c ) = @_;
-
-    # Retrieve all of the todo records as todo model objects and store in the stash
-    $c->stash(todos => [$c->model('DB::Todo')->all]);
-
-    # Set the TT template to use.
-    $c->stash(template => 'todo/todo.tt');
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 'Fetched todos for the, todo page');
-    $c->forward($c->view('TT'));
-}
-sub auto :Private {
-    my ($self, $c) = @_;
-
-    # Check if the user is logged in and has admin or developer role
-    unless (defined $c->session->{username} && grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles}}) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto', "Unauthorized access attempt to Todo controller");
-        $c->response->redirect($c->uri_for('/'));
-        return 0;
-    }
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto', "User authorized to access Todo controller");
-    return 1;
 }
 
 # Main todo action with filtering capabilities
@@ -378,7 +362,8 @@ sub details :Path('/todo/details') :Args {
         $c->stash(
             record => $todo, 
             accumulative_time => $accumulative_time,
-            projects => $projects
+            projects => $projects,
+            return_to => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
         # Set the template to 'todo/details.tt'
@@ -412,6 +397,9 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
+    
     # Fetch the project_id from query parameters (if any)
     my $project_id = $c->request->query_parameters->{project_id};
     my $current_project;
@@ -470,6 +458,9 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         users           => \@users,          # List of users to populate dropdown
         build_priority  => \%priority_options, # Priority options for dropdown
         build_status    => \%status_options,   # Status options for dropdown
+        return_to       => $return_to,       # URL to return to after action
+        start_date      => $c->request->params->{start_date},
+        time_of_day     => $c->request->params->{time_of_day},
         template        => 'todo/addtodo.tt' # Template for rendering
     );
 
@@ -539,6 +530,9 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $project_controller = $c->controller('Project');
     my $projects = $project_controller->fetch_projects_with_subprojects($c);
 
+    # Capture return URL from referer or parameter
+    my $return_to = $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo'));
+
     # Fetch all users to populate the user drop-down
     my @users = $schema->resultset('User')->search({}, { order_by => 'id' });
 
@@ -581,6 +575,7 @@ sub edit :Path('/todo/edit') :Args(1) {
         accumulative_time => $accumulative_time,
         build_priority   => \%priority_options, # Priority options for dropdown
         build_status     => \%status_options,   # Status options for dropdown
+        return_to        => $return_to,         # URL to return to after action
         template         => 'todo/edit.tt'
     );
 
@@ -708,6 +703,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             username_of_poster   => $c->session->{username},
             status               => $form_data->{status},
             priority             => $form_data->{priority},
+            time_of_day          => $form_data->{time_of_day},
             share                => $form_data->{share} || 0,
             last_mod_by          => $c->session->{username} || 'system',
             last_mod_date        => DateTime->now->ymd,
@@ -745,8 +741,14 @@ sub modify :Path('/todo/modify') :Args(1) {
     );
 
     # Handle successful update
+    $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
+    
+    if ($form_data->{return_to}) {
+        $c->response->redirect($form_data->{return_to});
+        $c->detach();
+    }
+    
     $c->stash(
-        success_msg => "Todo item with ID $record_id has been successfully updated.",
         record      => $todo,             # Provide updated data
         template    => 'todo/details.tt',  # Redirect back to the form for review
     );
@@ -886,6 +888,7 @@ sub create :Local {
         username_of_poster => $current_user,
         status => $self->convert_status_to_string($params->{status}) || 'NEW',
         priority => $params->{priority} || 3, # Medium priority by default
+        time_of_day => $params->{time_of_day},
         share => $params->{share} ? 1 : 0,
         last_mod_by => $current_user,
         last_mod_date => $current_date,
@@ -918,9 +921,257 @@ sub create :Local {
         $c->detach();
     }
 
-    # Redirect to the todo list with success message
+    # Redirect to the todo list or return_to URL with success message
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
-    $c->response->redirect($c->uri_for($self->action_for('todo')));
+    my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
+    
+    # Handle the case where the return_to URL might already have a fragment
+    # or ensure it's properly handled if coming from internal referer
+    $c->response->redirect($redirect_url);
+}
+
+=head2 update_time
+
+POST /todo/update_time - Update the time_of_day for a todo item (AJAX endpoint for drag-and-drop)
+
+=cut
+
+sub update_time :Path('/todo/update_time') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and time_of_day'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update the time_of_day
+    eval {
+        $todo->update({ time_of_day => $time_of_day });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
+            "Updated time_of_day for todo $record_id to $time_of_day");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time',
+            "Failed to update time_of_day for todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day
+        }
+    );
+    $c->forward('View::JSON');
+}
+
+=head2 update_time_and_date
+
+POST /todo/update_time_and_date - Update both time_of_day and start_date for a todo item (AJAX endpoint for week view drag-and-drop)
+
+=cut
+
+sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $start_date = $c->request->params->{start_date};
+    
+    # Validate parameters
+    unless ($record_id && $time_of_day && $start_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id, time_of_day, and start_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Update both time_of_day and start_date
+    eval {
+        $todo->update({ 
+            time_of_day => $time_of_day,
+            start_date => $start_date
+        });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
+            "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_time_and_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo time and date updated successfully',
+            todo_id => $record_id,
+            new_time => $time_of_day,
+            new_date => $start_date
+        }
+    );
+    $c->forward('View::JSON');
+}
+
+=head2 update_display_date
+
+POST /todo/update_display_date - Update the display date for a todo (for month view drag-and-drop)
+Month view displays by due_date if present, otherwise start_date.
+This endpoint updates the appropriate field to move the todo to a new date.
+
+=cut
+
+sub update_display_date :Path('/todo/update_display_date') :Args(0) {
+    my ($self, $c) = @_;
+    
+    # Get parameters
+    my $record_id = $c->request->params->{record_id};
+    my $time_of_day = $c->request->params->{time_of_day};
+    my $display_date = $c->request->params->{display_date};
+    
+    # Validate parameters
+    unless ($record_id && $display_date) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => 'Missing required parameters: record_id and display_date'
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Get the todo item
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    
+    unless ($todo) {
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Todo not found: $record_id"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Month view displays by due_date if present, otherwise start_date
+    # Update the field that's being displayed
+    my $update_fields = {};
+    
+    if ($todo->due_date) {
+        # Todo has a due_date, so it's displayed by due_date - update due_date
+        $update_fields->{due_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating due_date to $display_date for todo $record_id (displayed by due_date)");
+    } else {
+        # Todo doesn't have due_date, so it's displayed by start_date - update start_date
+        $update_fields->{start_date} = $display_date;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_display_date',
+            "Updating start_date to $display_date for todo $record_id (displayed by start_date)");
+    }
+    
+    # Also update time_of_day if provided
+    if ($time_of_day) {
+        $update_fields->{time_of_day} = $time_of_day;
+    }
+    
+    # Update the todo record
+    eval {
+        $todo->update($update_fields);
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_display_date',
+            "Failed to update todo $record_id: $@");
+        $c->stash(
+            json => {
+                success => 0,
+                error => "Failed to update todo: $@"
+            }
+        );
+        $c->forward('View::JSON');
+        return;
+    }
+    
+    # Return success
+    $c->stash(
+        json => {
+            success => 1,
+            message => 'Todo display date updated successfully',
+            todo_id => $record_id,
+            display_date => $display_date,
+            updated_field => $todo->due_date ? 'due_date' : 'start_date'
+        }
+    );
+    $c->forward('View::JSON');
 }
 
 sub day :Path('/todo/day') :Args {
@@ -947,24 +1198,41 @@ sub day :Path('/todo/day') :Args {
     # Fetch ALL todos for the site for calendar view
     my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
 
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Fetched " . scalar(@$todos) . " total todos for site " . $c->session->{SiteName});
+
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
     
-    # Debug logging
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-        "Filtering for date: $date, Total todos: " . scalar(@$todos) . ", Filtered todos: " . scalar(@$filtered_todos));
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "After date filtering: " . scalar(@$filtered_todos) . " todos remain for date $date");
+
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
+    # Separate overdue and today's todos
+    my @overdue_todos;
+    my @today_todos;
     
-    if ($c->session->{debug_mode}) {
-        foreach my $todo (@$todos) {
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day', 
-                "Todo: " . $todo->subject . ", Start: " . ($todo->start_date || 'NULL') . 
-                ", Due: " . ($todo->due_date || 'NULL') . ", Status: " . $todo->status);
+    foreach my $todo (@sorted_todos) {
+        if ($todo->due_date && $todo->due_date lt $date && $todo->status != 3) {
+            push @overdue_todos, $todo;
+        } else {
+            push @today_todos, $todo;
         }
     }
 
+    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
+        "Separated into " . scalar(@overdue_todos) . " overdue and " . scalar(@today_todos) . " today todos");
+
     # Add the todos to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@today_todos,
+        overdue_todos => \@overdue_todos,
         sitename => $c->session->{SiteName},
         date => $date,
         previous_date => $previous_date,
@@ -1017,9 +1285,16 @@ sub week :Path('/todo/week') :Args {
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
 
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
     # Add the todos to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@sorted_todos,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
@@ -1060,9 +1335,16 @@ sub month :Path('/todo/month') :Args {
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
 
+    # Sort todos by time_of_day, then priority, then start_date
+    my @sorted_todos = sort { 
+        ($a->time_of_day // '00:00:00') cmp ($b->time_of_day // '00:00:00') ||
+        ($a->priority // 10) <=> ($b->priority // 10) ||
+        ($a->start_date // '') cmp ($b->start_date // '')
+    } @$filtered_todos;
+
     # Organize todos by day of month (use due_date if available, otherwise start_date)
     my %todos_by_day;
-    foreach my $todo (@$filtered_todos) {
+    foreach my $todo (@sorted_todos) {
         my $display_date = $todo->due_date || $todo->start_date;
         if ($display_date) {
             my $todo_date = DateTime::Format::ISO8601->parse_datetime($display_date);
@@ -1098,7 +1380,7 @@ sub month :Path('/todo/month') :Args {
 
     # Add the todos and calendar to the stash
     $c->stash(
-        todos => $filtered_todos,
+        todos => \@sorted_todos,
         calendar => \@calendar,
         sitename => $c->session->{SiteName},
         month_name => $dt->month_name,
@@ -1113,4 +1395,283 @@ sub month :Path('/todo/month') :Args {
 
     $c->forward($c->view('TT'));
 }
+
+# REST API Endpoints (Dev-only: comserv_server.pl, NOT Starman production)
+# All API methods return JSON and require admin/developer roles
+
+sub _api_dev_only_check {
+    my ($self, $c) = @_;
+    
+    unless ($ENV{CATALYST_ENV} && $ENV{CATALYST_ENV} eq 'development') {
+        $c->res->status(403);
+        $c->res->content_type('application/json');
+        $c->res->body(encode_json({
+            success => 0,
+            error => 'API endpoints are development-only (comserv_server.pl). Not available in production.',
+            code => 'api_dev_only'
+        }));
+        $c->detach();
+    }
+}
+
+sub _api_validate_token {
+    my ($self, $c) = @_;
+    
+    my $result = Comserv::Util::ApiTokenValidator->validate_from_request($c);
+    
+    unless ($result->{valid}) {
+        $self->_api_error($c, $result->{error}, 'invalid_token', $result->{code});
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $api_token = $schema->resultset('ApiToken')->find($result->{api_token_id});
+    my $user = $api_token->user if $api_token;
+    
+    $c->stash->{api_user} = $user;
+    $c->stash->{api_user_id} = $result->{user_id};
+    $c->stash->{api_token} = $api_token;
+    
+    return 1;
+}
+
+sub _api_error {
+    my ($self, $c, $error, $code, $status) = @_;
+    $status //= 400;
+    
+    $c->res->status($status);
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        success => 0,
+        error => $error,
+        code => $code
+    }));
+    $c->detach();
+}
+
+sub _api_success {
+    my ($self, $c, $message, $data) = @_;
+    
+    $c->res->status(200);
+    $c->res->content_type('application/json');
+    my $response = {
+        success => 1,
+        message => $message,
+    };
+    $response = { %$response, %$data } if $data;
+    $c->res->body(encode_json($response));
+    $c->detach();
+}
+
+=head2 api_todo_create
+
+POST /api/todo/create - Create a new todo via API
+
+Required JSON fields: subject, start_date, due_date, priority, status
+Optional JSON fields: description, project_id, assigned_to
+
+Dev-only: comserv_server.pl only, requires admin/developer role
+=cut
+
+sub api_todo_create :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $current_user = $c->stash->{api_user}->username || 'system';
+    
+    my @required = qw(subject start_date due_date priority status);
+    my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
+    if (@missing) {
+        $self->_api_error($c, "Missing required fields: " . join(', ', @missing), 'validation_error');
+    }
+    
+    my $start_date = $params->{start_date};
+    my $due_date = $params->{due_date};
+    if ($start_date gt $due_date) {
+        $self->_api_error($c, "Start date cannot be after due date", 'date_validation_error');
+    }
+    
+    my $project_id = $params->{project_id} || 1;
+    eval {
+        my $project = $schema->resultset('Project')->find($project_id);
+        unless ($project) {
+            die "Project $project_id not found";
+        }
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid project_id: $@", 'invalid_project');
+    }
+    
+    my $sitename = $c->session->{SiteName} || 'default';
+    
+    my $todo = $schema->resultset('Todo')->create({
+        subject => $params->{subject},
+        description => $params->{description} || '',
+        project_id => $project_id,
+        start_date => $start_date,
+        due_date => $due_date,
+        priority => $params->{priority},
+        status => $params->{status},
+        assigned_to => $params->{assigned_to} || $current_user,
+        sitename => $sitename,
+        date_time_posted => DateTime->now,
+        posted_by => $current_user,
+    });
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_create',
+        "Todo created via API: ID=$todo->id, Subject=$params->{subject}, Project=$project_id");
+    
+    $self->_api_success($c, 'Todo created successfully', {
+        todo_id => $todo->id,
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_read
+
+GET /api/todo/:id - Retrieve a single todo by ID
+=cut
+
+sub api_todo_read :Local :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
+    }
+    
+    $self->_api_success($c, 'Todo retrieved', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_todo_update
+
+PUT /api/todo/:id - Update a todo (partial update allowed)
+=cut
+
+sub api_todo_update :Path('/api/todo/update') :Args(1) {
+    my ($self, $c, $todo_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $params;
+    eval {
+        my $body = $c->request->body;
+        $params = decode_json($body) if $body;
+    };
+    if ($@) {
+        $self->_api_error($c, "Invalid JSON: $@", 'json_parse_error', 400);
+    }
+    
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($todo_id);
+    
+    unless ($todo) {
+        $self->_api_error($c, "Todo not found: $todo_id", 'not_found', 404);
+    }
+    
+    my $update_data = {};
+    my %allowed_fields = map { $_ => 1 } qw(status priority description assigned_to);
+    
+    foreach my $field (keys %$params) {
+        if ($allowed_fields{$field}) {
+            $update_data->{$field} = $params->{$field};
+        }
+    }
+    
+    if (keys %$update_data) {
+        $todo->update($update_data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_todo_update',
+            "Todo updated via API: ID=$todo_id, Fields=" . join(',', keys %$update_data));
+    }
+    
+    $self->_api_success($c, 'Todo updated successfully', {
+        todo => $self->_todo_to_hash($todo)
+    });
+}
+
+=head2 api_project_read
+
+GET /api/project/:id - Retrieve a project by ID
+=cut
+
+sub api_project_read :Path('/api/project') :Args(1) {
+    my ($self, $c, $project_id) = @_;
+    
+    $self->_api_dev_only_check($c);
+    $self->_api_validate_token($c);
+    
+    my $schema = $c->model('DBEncy');
+    my $project = $schema->resultset('Project')->find($project_id);
+    
+    unless ($project) {
+        $self->_api_error($c, "Project not found: $project_id", 'not_found', 404);
+    }
+    
+    $self->_api_success($c, 'Project retrieved', {
+        project => $self->_project_to_hash($project)
+    });
+}
+
+=head2 Helper: _todo_to_hash
+
+Convert Todo DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _todo_to_hash {
+    my ($self, $todo) = @_;
+    
+    return {
+        id => $todo->id,
+        subject => $todo->subject,
+        description => $todo->description,
+        project_id => $todo->project_id,
+        start_date => $todo->start_date,
+        due_date => $todo->due_date,
+        priority => $todo->priority,
+        status => $todo->status,
+        assigned_to => $todo->assigned_to,
+        sitename => $todo->sitename,
+        date_time_posted => $todo->date_time_posted ? $todo->date_time_posted->iso8601 : undef,
+        posted_by => $todo->posted_by,
+        accumulative_time => $todo->accumulative_time || 0,
+    };
+}
+
+=head2 Helper: _project_to_hash
+
+Convert Project DBIx::Class object to hashref for JSON serialization
+=cut
+
+sub _project_to_hash {
+    my ($self, $project) = @_;
+    
+    return {
+        id => $project->id,
+        name => $project->name,
+        project_code => $project->project_code,
+        description => $project->description,
+        sitename => $project->sitename,
+        status => $project->status,
+    };
+}
+
 1;

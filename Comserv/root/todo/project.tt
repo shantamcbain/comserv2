@@ -1,6 +1,6 @@
 
 [% META title = 'Project Management' %]
-[% PageVersion = 'todo/project.tt,v 0.10 2025/10/10 shanta Exp shanta - Compact project summary with time data in headers, collapsed containers by default ' %]
+[% PageVersion = 'todo/project.tt,v 0.12 2026/02/09 shanta Exp shanta - Card header shows name/code/status/description preview. Fixed status display (handles string/int). Added todos table. Matches subproject format.' %]
 [% # Note: additional_css is now set in the controller with a timestamp to force reload %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
@@ -179,12 +179,43 @@
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-chevron-down collapse-icon mr-2"></i>
-                            <span class="card-title mb-0 mr-3">[% project.name %]</span>
+                        <div style="flex: 1;">
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="fas fa-chevron-down collapse-icon mr-2"></i>
+                                <span class="card-title mb-0 mr-3"><strong>[% project.name %]</strong></span>
+                                [% IF project.project_code %]
+                                    <span class="badge badge-secondary mr-2">[% project.project_code %]</span>
+                                [% END %]
+                                [% 
+                                    # Determine status display (handle both string and integer status)
+                                    status_display = 'Unknown';
+                                    status_badge = 'badge-secondary';
+                                    status_icon = 'question-circle';
+                                    
+                                    IF project.status == 1 || project.status == 'new' || project.status == 'New';
+                                        status_display = 'New';
+                                        status_badge = 'badge-info';
+                                        status_icon = 'plus-circle';
+                                    ELSIF project.status == 2 || project.status == 'in progress' || project.status == 'In Progress';
+                                        status_display = 'In Progress';
+                                        status_badge = 'badge-primary';
+                                        status_icon = 'spinner';
+                                    ELSIF project.status == 3 || project.status == 'completed' || project.status == 'Completed';
+                                        status_display = 'Completed';
+                                        status_badge = 'badge-success';
+                                        status_icon = 'check-circle';
+                                    END;
+                                %]
+                                <span class="badge [% status_badge %]"><i class="fas fa-[% status_icon %]"></i> [% status_display %]</span>
+                            </div>
+                            [% IF project.description %]
+                                <div class="text-muted" style="font-size: 0.9em; margin-left: 25px;">
+                                    [% project.description.substr(0, 100) %][% IF project.description.length > 100 %]...[% END %]
+                                </div>
+                            [% END %]
                             
                             <!-- Compact Project Summary -->
-                            <div class="d-flex align-items-center text-muted">
+                            <div class="d-flex align-items-center text-muted mt-2" style="margin-left: 25px;">
                                 [% 
                                     # Calculate project summary data
                                     total_todos = 0;
@@ -255,41 +286,166 @@
                 
                 <!-- Card body with project details (collapsed by default) -->
                 <div class="card-body" id="project-body-[% project.id %]">
-                    <!-- Description -->
-                    [% IF project.description %]
-                        <p class="card-text">[% project.description.substr(0, 100) %][% IF project.description.length > 100 %]...[% END %]</p>
-                    [% ELSE %]
-                        <p class="card-text text-muted">No description available</p>
-                    [% END %]
-                    
-                    <!-- Status badge -->
-                    <div class="mb-2">
-                        [% SWITCH project.status %]
-                            [% CASE 1 %]<span class="badge badge-info">New</span>
-                            [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
-                            [% CASE 3 %]<span class="badge badge-success">Completed</span>
-                            [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
+
+                    <!-- Project ID and Record Information -->
+                    <div class="mb-3 p-2 bg-light border-left border-primary">
+                        <strong><i class="fas fa-hashtag"></i> Project ID:</strong> [% project.id %]
+                        [% IF project.record_id %]
+                            | <strong>Record #:</strong> [% project.record_id %]
+                        [% END %]
+                        [% IF project.project_code %]
+                            | <strong>Code:</strong> <span class="badge badge-secondary">[% project.project_code %]</span>
                         [% END %]
                     </div>
                     
+                    <!-- Description -->
+                    [% IF project.description %]
+                        <div class="mb-3">
+                            <strong><i class="fas fa-align-left"></i> Description:</strong>
+                            <p class="card-text mt-2">[% project.description %]</p>
+                        </div>
+                    [% ELSE %]
+                        <p class="card-text text-muted"><i class="fas fa-align-left"></i> No description available</p>
+                    [% END %]
+                    
+                    <!-- Status Information -->
+                    <div class="mb-3">
+                        <h6><i class="fas fa-info-circle"></i> Status</h6>
+                        [% 
+                            # Reuse status logic from header
+                            IF project.status == 1 || project.status == 'new' || project.status == 'New';
+                                status_display = 'New';
+                                status_badge = 'badge-info';
+                                status_icon = 'plus-circle';
+                            ELSIF project.status == 2 || project.status == 'in progress' || project.status == 'In Progress';
+                                status_display = 'In Progress';
+                                status_badge = 'badge-primary';
+                                status_icon = 'spinner';
+                            ELSIF project.status == 3 || project.status == 'completed' || project.status == 'Completed';
+                                status_display = 'Completed';
+                                status_badge = 'badge-success';
+                                status_icon = 'check-circle';
+                            ELSE;
+                                status_display = 'Unknown';
+                                status_badge = 'badge-secondary';
+                                status_icon = 'question-circle';
+                            END;
+                        %]
+                        <span class="badge [% status_badge %]"><i class="fas fa-[% status_icon %]"></i> [% status_display %]</span>
+                    </div>
+                    
+                    <!-- Project Sizing and Estimates -->
+                    <div class="mb-3">
+                        <strong><i class="fas fa-chart-bar"></i> Project Metrics:</strong>
+                        <ul class="list-unstyled ml-3 mt-2">
+                            [% IF project.project_size %]
+                                <li>
+                                    <i class="fas fa-ruler-combined"></i> <strong>Size:</strong>
+                                    [% SWITCH project.project_size %]
+                                        [% CASE 1 %]<span class="badge badge-success">Small (< 40 hours)</span>
+                                        [% CASE 2 %]<span class="badge badge-info">Medium (40-160 hours)</span>
+                                        [% CASE 3 %]<span class="badge badge-warning">Large (160-400 hours)</span>
+                                        [% CASE 4 %]<span class="badge badge-danger">Extra Large (> 400 hours)</span>
+                                        [% CASE DEFAULT %]<span class="badge badge-secondary">[% project.project_size %]</span>
+                                    [% END %]
+                                </li>
+                            [% END %]
+                            [% IF project.estimated_man_hours %]
+                                <li><i class="fas fa-hourglass-half"></i> <strong>Estimated Hours:</strong> [% project.estimated_man_hours %]h</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                    
                     <!-- Project details -->
-                    <ul class="list-unstyled">
-                        [% IF project.start_date %]
-                            <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% project.start_date %]</li>
-                        [% END %]
-                        
-                        [% IF project.end_date %]
-                            <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% project.end_date %]</li>
-                        [% END %]
-                        
-                        [% IF project.developer_name %]
-                            <li><i class="fas fa-user-cog"></i> <strong>Dev:</strong> [% project.developer_name %]</li>
-                        [% END %]
-                        
-                        [% IF project.client_name %]
-                            <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
-                        [% END %]
-                    </ul>
+                    <div class="mb-3">
+                        <strong><i class="fas fa-calendar-alt"></i> Timeline & Team:</strong>
+                        <ul class="list-unstyled ml-3 mt-2">
+                            [% IF project.start_date %]
+                                <li><i class="far fa-calendar-alt"></i> <strong>Start:</strong> [% project.start_date %]</li>
+                            [% END %]
+                            
+                            [% IF project.end_date %]
+                                <li><i class="far fa-calendar-check"></i> <strong>Due:</strong> [% project.end_date %]</li>
+                            [% END %]
+                            
+                            [% IF project.developer_name %]
+                                <li><i class="fas fa-user-cog"></i> <strong>Developer:</strong> [% project.developer_name %]</li>
+                            [% END %]
+                            
+                            [% IF project.client_name %]
+                                <li><i class="fas fa-user-tie"></i> <strong>Client:</strong> [% project.client_name %]</li>
+                            [% END %]
+                        </ul>
+                    </div>
+                    
+                    <!-- Comments -->
+                    [% IF project.comments %]
+                        <div class="mb-3">
+                            <h6><i class="fas fa-comments"></i> Comments</h6>
+                            <div class="bg-light p-3 border-left border-primary">
+                                [% project.comments %]
+                            </div>
+                        </div>
+                    [% END %]
+                    
+                    <!-- Associated Todos Section -->
+                    [% IF project.todos && project.todos.size > 0 %]
+                    <div class="mb-3">
+                        <h6><i class="fas fa-tasks"></i> Associated Todos ([% project.todos.size %])</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Todo</th>
+                                        <th>Status</th>
+                                        <th>Priority</th>
+                                        <th>Start Date</th>
+                                        <th>Due Date</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH todo IN project.todos %]
+                                    <tr>
+                                        <td>
+                                            <form action="/todo/details" method="POST" style="display: inline;">
+                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
+                                                <button type="submit" class="btn btn-link p-0" style="text-decoration: none;">
+                                                    [% todo.subject %]
+                                                </button>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            [% SWITCH todo.status %]
+                                                [% CASE 1 %]<span class="badge badge-info">New</span>
+                                                [% CASE 2 %]<span class="badge badge-primary">In Progress</span>
+                                                [% CASE 3 %]<span class="badge badge-success">Completed</span>
+                                                [% CASE DEFAULT %]<span class="badge badge-secondary">Unknown</span>
+                                            [% END %]
+                                        </td>
+                                        <td>
+                                            [% SWITCH todo.priority %]
+                                                [% CASE 1 %]<span class="badge badge-danger">High</span>
+                                                [% CASE 2 %]<span class="badge badge-warning">Medium</span>
+                                                [% CASE 3 %]<span class="badge badge-info">Low</span>
+                                                [% CASE DEFAULT %]<span class="badge badge-secondary">-</span>
+                                            [% END %]
+                                        </td>
+                                        <td>[% todo.start_date || '-' %]</td>
+                                        <td>[% todo.due_date || '-' %]</td>
+                                        <td>[% todo.accumulated_time || '0' %]h</td>
+                                    </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    [% ELSE %]
+                    <div class="mb-3">
+                        <h6><i class="fas fa-tasks"></i> Associated Todos</h6>
+                        <p class="text-muted">No todos assigned to this project yet.</p>
+                    </div>
+                    [% END %]
                     
                     <!-- Action buttons -->
                     <div class="d-flex justify-content-between mt-3">

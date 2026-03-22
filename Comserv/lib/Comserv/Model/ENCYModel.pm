@@ -2,7 +2,8 @@ package Comserv::Model::ENCYModel;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
-     use Try::Tiny;
+use Try::Tiny;
+use Data::Dumper;
 extends 'Catalyst::Model';
 
 has 'ency_schema' => (
@@ -34,13 +35,6 @@ sub add_herb {
 
     # Log the herb data being added
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Adding new herb: " . join(", ", map { "$_: $herb_data->{$_}" } keys %$herb_data));
-# Method to add a new herb to the forager database
-sub add_herb {
-    my ($self, $herb_data) = @_;
-    # Logic to save the herb data to the database
-    $self->forager_schema->resultset('Herb')->create($herb_data);
-}
-
 
     # Logic to save the herb data to the database
     eval {
@@ -95,12 +89,11 @@ sub update_herb {
 }
 sub get_herb_by_id {
     my ($self, $c, $id) = @_;
-    print "Fetching herb with ID: $id\n";  # Add logging
     my $herb = $self->forager_schema->resultset('Herb')->find($id);
     if ($herb) {
-        print "Fetched herb: ", $herb->botanical_name, "\n";  $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_herb_by_id', "Herb with ID $id fetched successfully.");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_herb_by_id', "Herb with ID $id fetched successfully.");
     } else {
-        print "No herb found with ID: $id\n";  # Add logging
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_herb_by_id', "No herb found with ID: $id");
     }
     return $herb;
 }
@@ -138,12 +131,12 @@ sub create_reference {
 }
 
 sub get_category_by_id {
-    my ($self, $c,  $id) = @_;
+    my ($self, $c, $id) = @_;
 
     # Log the retrieval attempt
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_category_by_id', "Fetching category with ID $id");
 
-    my $category = $self->ency_schema->resultset($c, 'Category')->find($id);
+    my $category = $self->ency_schema->resultset('Category')->find($id);
     if ($category) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_category_by_id', "Category with ID $id fetched successfully.");
     } else {
@@ -156,7 +149,6 @@ sub create_category {
     my ($self, $c, $data) = @_;
 
     # Log the creation attempt
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_category', "Creating category: " . join(", ", map { "$_: $data->{$_}" } keys %$data));
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_category', "Creating category: " . join(", ", map { "$_: $data->{$_}" } keys %$data));
 
     my $category;

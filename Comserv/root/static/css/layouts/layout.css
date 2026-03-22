@@ -4,10 +4,6 @@
   max-width: var(--container-width);
   margin: 0 auto;
   padding: 0 var(--spacing-medium);
-  /* Global container scrolling support */
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  overflow-x: hidden;
   /* Ensure smooth scrolling */
   scroll-behavior: smooth;
   /* Firefox scrollbar styling */

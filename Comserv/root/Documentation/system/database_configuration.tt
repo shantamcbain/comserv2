@@ -1,5 +1,5 @@
-[% META title = 'Database Configuration Guide' %]
-[% PageVersion = 'Documentation/system/database_configuration.tt,v 1.0 2025/01/27 shanta Exp' %]
+[% META title = 'Database Configuration Guide' description = 'Database configuration guide for Comserv. Updated Jan 2 with ai_conversations schema changes.' page_version = '1.01' last_updated = 'Thu Jan 02 15:45:00 UTC 2026' %]
+[% PageVersion = 'Documentation/system/database_configuration.tt,v 1.01 2026/01/02 15:45:00 zencoder Exp - Jan 2 Update: ai_conversations table metadata column addition documented' %]
 [% debug %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -8,6 +8,12 @@
 [% END %]
 
 <h1>Database Configuration Guide</h1>
+
+<div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+    <h3 style="margin-top: 0; color: #155724;">📋 Schema Update: Jan 2, 2026</h3>
+    <p style="margin: 5px 0; color: #155724;"><strong>ai_conversations Table Change:</strong> Added metadata column (longtext, nullable) to support AI conversation metadata storage. This fix resolves a schema mismatch that prevented message creation from Dec 27-30.</p>
+    <p style="margin: 5px 0; color: #155724;"><strong>Migration Required:</strong> If upgrading from versions before Jan 2, execute: <code>ALTER TABLE ai_conversations ADD COLUMN metadata longtext NULL AFTER status;</code></p>
+</div>
 
 <h2>Overview</h2>
 <p>This document explains the new standardized database configuration system for the Comserv application. The system supports multiple connection types with automatic failover and priority-based connection attempts.</p>

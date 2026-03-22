@@ -1,0 +1,612 @@
+[% META
+   title = "Daily Plan - December 27, 2025 - AI Chat Search Features & Integration Testing"
+   description = "Daily workflow for testing AI Chat search capabilities (documentation search, code search, web search), integration with the application, and performance validation. Builds on successful message persistence from Dec 26 testing."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "daily-planning,ai-systems,search-features,integration-testing"
+   page_version = "0.01"
+   last_updated = "Fri Dec 26 17:50:00 UTC 2025"
+%]
+[% PageVersion = 'root/Documentation/Daily_Plans_2025-12-27.tt,v 0.01 2025/12/26 17:50:00 zencoder Exp - Created: AI Chat search features testing, integration validation, performance baseline (Phase 5 AI Chat System)' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+    <h1>Daily Plan - December 27, 2025</h1>
+    <h2>AI Chat Search Features & Integration Testing</h2>
+
+    <div class="last-updated">
+        <strong>Date:</strong> Saturday, December 27, 2025 |
+        <strong>Focus:</strong> Test AI Chat search capabilities and system integration |
+        <strong>Status:</strong> 📋 Planning Phase - Dependent on Dec 26 Results
+    </div>
+
+    <div class="alert alert-warning">
+        <h3>⚠️ CONDITIONAL PLAN - Requires Dec 26 Success</h3>
+        <p><strong>This plan executes ONLY IF December 26 testing passes (Phase 3-4).</strong></p>
+        <p>If Dec 26 identifies critical issues (tables missing, messages not saving, queries failing), then this plan will be adjusted to focus on debugging and fixing those issues instead.</p>
+        <p><strong>Check:</strong> <a href="/Documentation/Daily_Plans-2025-12-26#success-criteria" style="color: #007bff;">December 26 Success Criteria</a> before starting this plan.</p>
+    </div>
+
+    <div class="toc" id="toc">
+        <h3>Table of Contents</h3>
+        <ul>
+            <li><a href="#phase-1-doc-search">Phase 1: Documentation Search Testing</a></li>
+            <li><a href="#phase-2-code-search">Phase 2: Code Search Testing</a></li>
+            <li><a href="#phase-3-integration">Phase 3: System Integration Testing</a></li>
+            <li><a href="#phase-4-performance">Phase 4: Performance & Load Testing</a></li>
+            <li><a href="#task-checklist">Daily Task Checklist</a></li>
+            <li><a href="#success-criteria">Success Criteria</a></li>
+        </ul>
+    </div>
+
+    <!-- Prerequisites -->
+    <div class="content-section">
+        <h2 id="prerequisites">✅ Prerequisites (From December 26)</h2>
+
+        <div class="alert alert-success">
+            <p><strong>This plan assumes Dec 26 results:</strong></p>
+            <ul>
+                <li>✅ All 6-7 AI Chat tables exist and verified</li>
+                <li>✅ Table schemas match Result class definitions</li>
+                <li>✅ Test chat messages successfully saved to database</li>
+                <li>✅ Messages persist across page reloads</li>
+                <li>✅ Basic query and retrieval tests pass</li>
+            </ul>
+        </div>
+
+        <p><strong>If any prerequisite failed on Dec 26:</strong> Work through the <a href="/Documentation/Daily_Plans-2025-12-26#next-steps">Dec 26 Next Steps (Debug Path)</a> first, then return to this plan when ready.</p>
+    </div>
+
+    <!-- Phase 1: Documentation Search -->
+    <div class="content-section">
+        <h2 id="phase-1-doc-search">🔍 Phase 1: Documentation Search Testing (FULLTEXT Search Index)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY</span>
+            <p><strong>Execution:</strong> Test documentation metadata indexing and FULLTEXT search</p>
+            <p><strong>Duration Est.:</strong> 45 minutes</p>
+        </div>
+
+        <h3>Purpose</h3>
+        <p>The <code>documentation_metadata_index</code> table enables AI to search through the application's .tt documentation files. This phase verifies the search index is populated and working correctly.</p>
+
+        <div class="task-card">
+            <h4>Task 1.1: Verify Index Is Populated</h4>
+            <p><strong>Check how many documentation files are indexed:</strong></p>
+            <pre><code>SELECT COUNT(*) as total_docs, 
+       COUNT(DISTINCT file_path) as unique_files,
+       MIN(indexed_at) as oldest_index,
+       MAX(indexed_at) as newest_index
+FROM documentation_metadata_index;</code></pre>
+
+            <p><strong>Expected Result:</strong></p>
+            <ul>
+                <li>✓ Should find 50+ documentation files indexed (Comserv has 314+ .tt files)</li>
+                <li>✓ Indexed timestamps should be recent (from Dec 26 or later, depending on when indexing ran)</li>
+                <li>✓ Various file paths from different documentation sections</li>
+            </ul>
+
+            <p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 3px; margin-top: 10px;">
+                <strong>⚠️ If Index Empty:</strong> Documentation indexing hasn't run yet. This is okay; can proceed with manual trigger in Task 1.3.
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.2: Inspect Sample Documentation Entry</h4>
+            <p><strong>Look at one indexed documentation file:</strong></p>
+            <pre><code>SELECT id, file_path, title, excerpt, role_access, file_size, indexed_at
+FROM documentation_metadata_index 
+LIMIT 1\G</code></pre>
+
+            <p><strong>Verify Fields Are Populated:</strong></p>
+            <ul>
+                <li>✓ file_path: Full path like "Documentation/AI_Chat_Schema_Documentation"</li>
+                <li>✓ title: Human-readable title from META block</li>
+                <li>✓ excerpt: First 200 chars of content</li>
+                <li>✓ role_access: Roles that can see this doc (admin, developer, user)</li>
+                <li>✓ file_size: Bytes in the original file</li>
+                <li>✓ searchable_text: FULLTEXT indexed content (check below in Task 1.4)</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.3: Test FULLTEXT Search</h4>
+            <p><strong>Search for documentation containing specific keywords:</strong></p>
+            <pre><code>SELECT id, file_path, title, MATCH(searchable_text) AGAINST('database' IN BOOLEAN MODE) as relevance_score
+FROM documentation_metadata_index 
+WHERE MATCH(searchable_text) AGAINST('database' IN BOOLEAN MODE)
+ORDER BY relevance_score DESC
+LIMIT 10;</code></pre>
+
+            <p><strong>Test Multiple Searches (Run 3-4 different searches):</strong></p>
+            <ul>
+                <li>Search "database" - Should find schema, ENCY, BMaster docs</li>
+                <li>Search "authentication" - Should find auth, user management, login docs</li>
+                <li>Search "todo" - Should find todo system, project management docs</li>
+                <li>Search "theme" - Should find theme system documentation</li>
+            </ul>
+
+            <p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 3px; margin-top: 10px;">
+                <strong>✅ Success:</strong> FULLTEXT search returns relevant documentation with scores (higher = more relevant).
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.4: Test Role-Based Access Filtering</h4>
+            <p><strong>Verify documentation access control works:</strong></p>
+            <pre><code>-- Find docs accessible to 'developer' role
+SELECT file_path, title, role_access
+FROM documentation_metadata_index 
+WHERE role_access LIKE '%developer%'
+LIMIT 5;
+
+-- Find docs accessible to 'user' role only (most restricted)
+SELECT file_path, title, role_access
+FROM documentation_metadata_index 
+WHERE role_access = 'user'
+LIMIT 5;</code></pre>
+
+            <p><strong>Verify:</strong> Different documentation has appropriate role restrictions (admin docs not visible to users, technical docs visible to developers, etc.)</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 1.5: Test Documentation Index from UI</h4>
+            <p><strong>If AI Chat has a search interface:</strong></p>
+            <ol>
+                <li>Navigate to /ai or /Documentation/AI in Comserv</li>
+                <li>Try searching for "database" in the documentation search</li>
+                <li>Verify search results show relevant documentation</li>
+                <li>Click on a result and verify correct document opens</li>
+                <li>Try several different search terms</li>
+            </ol>
+
+            <p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 3px;">
+                <strong>Record Results:</strong> How many results per search? Are results relevant? Does clicking results work?
+            </p>
+        </div>
+    </div>
+
+    <!-- Phase 2: Code Search -->
+    <div class="content-section">
+        <h2 id="phase-2-code-search">💻 Phase 2: Code Search Testing (Developer Code Index)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY</span>
+            <p><strong>Execution:</strong> Test code search index for developers</p>
+            <p><strong>Duration Est.:</strong> 30 minutes</p>
+        </div>
+
+        <h3>Purpose</h3>
+        <p>The <code>code_search_index</code> table helps developers find functions, classes, and methods. This phase tests that code is properly indexed and searchable.</p>
+
+        <div class="task-card">
+            <h4>Task 2.1: Check Code Index Population</h4>
+            <p><strong>Verify code files are indexed:</strong></p>
+            <pre><code>SELECT COUNT(*) as total_files,
+       COUNT(DISTINCT file_path) as unique_files,
+       GROUP_CONCAT(DISTINCT file_type) as file_types,
+       MIN(indexed_at) as oldest_index,
+       MAX(indexed_at) as newest_index
+FROM code_search_index;</code></pre>
+
+            <p><strong>Expected Result:</strong></p>
+            <ul>
+                <li>✓ 50+ Perl files (.pm) indexed</li>
+                <li>✓ 50+ Template files (.tt) indexed</li>
+                <li>✓ 10+ SQL files (.sql) indexed</li>
+                <li>✓ Timestamps recent</li>
+            </ul>
+
+            <p><strong>If Empty:</strong> Code indexing hasn't run. This is normal; can proceed with manual indexing trigger.</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 2.2: Inspect Code Index Entry</h4>
+            <p><strong>Look at a Perl controller file entry:</strong></p>
+            <pre><code>SELECT id, file_path, file_type, code_elements, searchable_code, indexed_at
+FROM code_search_index 
+WHERE file_type = 'pm' 
+LIMIT 1\G</code></pre>
+
+            <p><strong>Verify:</strong></p>
+            <ul>
+                <li>✓ code_elements is valid JSON with function/method names</li>
+                <li>✓ searchable_code contains function definitions</li>
+                <li>✓ file_path shows actual controller path (e.g., lib/Comserv/Controller/Admin.pm)</li>
+                <li>✓ min_role indicates who can see this code (admin/developer)</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 2.3: Test Code Search</h4>
+            <p><strong>Search for specific methods or functions:</strong></p>
+            <pre><code>-- Search for "create_conversation" function
+SELECT id, file_path, file_type, MATCH(searchable_code) AGAINST('create_conversation' IN BOOLEAN MODE) as score
+FROM code_search_index 
+WHERE MATCH(searchable_code) AGAINST('create_conversation' IN BOOLEAN MODE)
+LIMIT 5;
+
+-- Search for "BelongsTo" relationship declaration
+SELECT id, file_path, file_type
+FROM code_search_index 
+WHERE MATCH(searchable_code) AGAINST('BelongsTo' IN BOOLEAN MODE)
+LIMIT 10;</code></pre>
+
+            <p><strong>Test Multiple Code Searches:</strong></p>
+            <ul>
+                <li>Search "sub list" - Find list methods in controllers</li>
+                <li>Search "my $self" - Find method definitions</li>
+                <li>Search "DBIx::Class" - Find model definitions</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 2.4: Test Code Metadata Extraction</h4>
+            <p><strong>Verify code_elements JSON is properly formatted:</strong></p>
+            <pre><code>SELECT file_path, code_elements
+FROM code_search_index 
+WHERE code_elements IS NOT NULL 
+  AND JSON_LENGTH(code_elements) > 0
+LIMIT 3\G</code></pre>
+
+            <p><strong>Verify JSON Structure:</strong> Should contain objects with: function_name, line_number, type (sub, method, class, etc.)</p>
+        </div>
+    </div>
+
+    <!-- Phase 3: Integration Testing -->
+    <div class="content-section">
+        <h2 id="phase-3-integration">🔗 Phase 3: System Integration Testing (Chat + Search + Context)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY - IMPORTANT</span>
+            <p><strong>Execution:</strong> Test AI Chat system works with all search indexes</p>
+            <p><strong>Duration Est.:</strong> 60 minutes</p>
+        </div>
+
+        <h3>Purpose</h3>
+        <p>Verify the AI Chat system can use documentation search, code search, and web search together. This is the core value of the AI Chat feature.</p>
+
+        <div class="task-card">
+            <h4>Task 3.1: Test AI Request with Documentation Search</h4>
+            <p><strong>Send a chat request that requires documentation search:</strong></p>
+            <ol>
+                <li>Open AI Chat interface (http://localhost:5000/ai)</li>
+                <li>Ask a question like: "How does the Todo system work?"</li>
+                <li>Note the request in the chat</li>
+                <li>Let AI respond</li>
+            </ol>
+
+            <p><strong>Verify in Database:</strong></p>
+            <pre><code>-- Find the chat message with search context
+SELECT id, user_id, content, search_context, sources_cited, created_at
+FROM ai_messages 
+WHERE role = 'user' 
+  AND content LIKE '%Todo%'
+ORDER BY created_at DESC 
+LIMIT 1\G</code></pre>
+
+            <p><strong>Check:</strong></p>
+            <ul>
+                <li>✓ Message was saved</li>
+                <li>✓ Assistant response also saved (should be next message)</li>
+                <li>✓ search_context shows which docs were searched</li>
+                <li>✓ sources_cited lists documentation sources found</li>
+            </ul>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.2: Test AI Request with Code Search</h4>
+            <p><strong>Ask about code implementation:</strong></p>
+            <ol>
+                <li>Send: "Show me how the Todo controller creates a new todo"</li>
+                <li>Note if AI can find and reference code</li>
+                <li>Verify search_context includes code_search_index references</li>
+            </ol>
+
+            <p><strong>Database Verification:</strong></p>
+            <pre><code>-- Check if code search results were cited
+SELECT search_context, sources_cited
+FROM ai_messages 
+WHERE role = 'assistant' 
+  AND sources_cited LIKE '%code_search%'
+ORDER BY created_at DESC 
+LIMIT 1\G</code></pre>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.3: Test Conversation Thread Continuity</h4>
+            <p><strong>Have a multi-message conversation:</strong></p>
+            <ol>
+                <li>Ask: "What is the ENCY system?"</li>
+                <li>Follow-up: "How many tables does it have?"</li>
+                <li>Follow-up: "Can you show me the Herb model?"</li>
+                <li>Verify AI can maintain context across messages</li>
+            </ol>
+
+            <p><strong>Database Check:</strong></p>
+            <pre><code>-- See the whole conversation
+SELECT id, role, LEFT(content, 100) as content_preview, created_at
+FROM ai_messages 
+WHERE conversation_id = [YOUR_CONVERSATION_ID]
+ORDER BY created_at ASC;</code></pre>
+
+            <p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 3px;">
+                <strong>✅ Success:</strong> All 3+ messages should be linked under same conversation_id, maintaining order and context.
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 3.4: Test Web Search Integration (If Enabled)</h4>
+            <p><strong>Ask a question requiring external information:</strong></p>
+            <ol>
+                <li>Send: "What's the latest Node.js LTS version?"</li>
+                <li>Check if AI performs web search</li>
+                <li>Verify web_search_results table has entries</li>
+            </ol>
+
+            <p><strong>Database Check:</strong></p>
+            <pre><code>SELECT id, query, result_title, result_url, found_by_user_id, created_at
+FROM web_search_results 
+ORDER BY created_at DESC 
+LIMIT 5;</code></pre>
+
+            <p><strong>Record:</strong> How many web search results? Are they relevant?</p>
+        </div>
+    </div>
+
+    <!-- Phase 4: Performance Testing -->
+    <div class="content-section">
+        <h2 id="phase-4-performance">⚡ Phase 4: Performance & Load Testing (Scaling Verification)</h2>
+
+        <div class="phase-status">
+            <span class="status-badge pending">EXECUTE TODAY</span>
+            <p><strong>Execution:</strong> Test system performance with realistic loads</p>
+            <p><strong>Duration Est.:</strong> 45 minutes</p>
+        </div>
+
+        <h3>Purpose</h3>
+        <p>Verify the system can handle realistic usage: multiple messages, large conversations, heavy search activity.</p>
+
+        <div class="task-card">
+            <h4>Task 4.1: Query Performance Baseline</h4>
+            <p><strong>Measure query response times:</strong></p>
+            <pre><code>-- Check query response time for conversation history (100 messages)
+SELECT SQL_CALC_FOUND_ROWS id, role, LEFT(content, 50) as preview, created_at
+FROM ai_messages 
+WHERE conversation_id = [ID]
+ORDER BY created_at DESC
+LIMIT 100;
+
+-- Check query time (should be < 100ms):
+SHOW PROFILES;</code></pre>
+
+            <p><strong>Verify:</strong> Query returns in under 100ms with proper indexes</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.2: FULLTEXT Search Performance</h4>
+            <p><strong>Benchmark documentation search:</strong></p>
+            <pre><code>SELECT COUNT(*) as results
+FROM documentation_metadata_index 
+WHERE MATCH(searchable_text) AGAINST('database' IN BOOLEAN MODE);
+
+-- Check execution time (should be < 50ms):</code></pre>
+
+            <p><strong>Expected:</strong> Should return 50+ results in under 50ms with FULLTEXT index</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.3: Stress Test - Multiple Rapid Messages</h4>
+            <p><strong>Send 10 rapid messages in same conversation:</strong></p>
+            <ol>
+                <li>Create a new conversation</li>
+                <li>Send 10 messages rapidly (one every 3-5 seconds)</li>
+                <li>Measure time to save and retrieve each</li>
+                <li>Check database for all messages</li>
+            </ol>
+
+            <p><strong>Verify:</strong></p>
+            <pre><code>-- All 10 messages saved?
+SELECT COUNT(*) FROM ai_messages 
+WHERE conversation_id = [ID];</code></pre>
+
+            <p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 3px;">
+                <strong>✅ Success:</strong> All 10+ messages saved with correct timestamps and order preserved.
+            </p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.4: Large Message Handling</h4>
+            <p><strong>Test with large message content:</strong></p>
+            <ol>
+                <li>Send a message with 5,000+ characters of content</li>
+                <li>Verify it saves correctly to ai_messages (LONGTEXT column)</li>
+                <li>Verify retrieval doesn't truncate or corrupt the content</li>
+            </ol>
+
+            <p><strong>Database Check:</strong></p>
+            <pre><code>SELECT id, LENGTH(content) as content_length, 
+       CHAR_LENGTH(content) as char_count
+FROM ai_messages 
+WHERE LENGTH(content) > 5000
+ORDER BY created_at DESC 
+LIMIT 1;</code></pre>
+
+            <p><strong>Verify:</strong> Length matches what you sent, no truncation</p>
+        </div>
+
+        <div class="task-card">
+            <h4>Task 4.5: Index Effectiveness Check</h4>
+            <p><strong>Verify indexes are being used efficiently:</strong></p>
+            <pre><code>-- Check if queries use indexes
+EXPLAIN SELECT * FROM ai_messages WHERE conversation_id = 1;
+EXPLAIN SELECT * FROM documentation_metadata_index 
+         WHERE MATCH(searchable_text) AGAINST('test' IN BOOLEAN MODE);</code></pre>
+
+            <p><strong>Verify:</strong> EXPLAIN output shows "Using index" or reasonable key usage, not full table scans</p>
+        </div>
+    </div>
+
+    <!-- Task Checklist -->
+    <div class="content-section">
+        <h2 id="task-checklist">✅ Daily Task Checklist</h2>
+
+        <table class="checklist-table">
+            <tbody>
+                <tr>
+                    <td style="width: 40px;"><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.1:</strong> Verify documentation index is populated (50+ docs)</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.2:</strong> Inspect sample documentation entry</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.3:</strong> Test FULLTEXT search with 3-4 different keywords</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.4:</strong> Verify role-based access filtering works</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 1.5:</strong> Test documentation search from UI</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 2.1:</strong> Check code index population (50+ files)</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 2.2:</strong> Inspect code index entry and JSON structure</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 2.3:</strong> Test code search (3-4 searches)</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 2.4:</strong> Verify code_elements JSON structure</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.1:</strong> Test documentation search integration</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.2:</strong> Test code search integration</td>
+                </tr>
+                <tr style="background-color: #fff3cd;">
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.3:</strong> Test conversation thread continuity</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 3.4:</strong> Test web search integration (if enabled)</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.1:</strong> Query performance baseline measurement</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.2:</strong> FULLTEXT search performance benchmark</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.3:</strong> Stress test with 10 rapid messages</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.4:</strong> Large message handling (5000+ chars)</td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox" disabled></td>
+                    <td><strong>Phase 4.5:</strong> Index effectiveness verification</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; font-size: 13px; color: #666;">
+            Highlighted items are critical for search functionality. Regular items are performance/integration validation.
+        </p>
+    </div>
+
+    <!-- Success Criteria -->
+    <div class="content-section">
+        <h2 id="success-criteria">🎯 Success Criteria</h2>
+
+        <div class="success-card">
+            <h3>✅ FULL SUCCESS (All Phases Pass)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>Documentation search returns 50+ indexed files, FULLTEXT works</li>
+                <li>Code search returns relevant results for function/method names</li>
+                <li>AI Chat can reference documentation and code in responses</li>
+                <li>Conversation threads maintain context across 5+ messages</li>
+                <li>Performance: Queries < 100ms, FULLTEXT < 50ms, no index issues</li>
+                <li>Stress test: 10 rapid messages all save and retrieve correctly</li>
+                <li>Large messages (5000+ chars) save without truncation</li>
+            </ul>
+            <p><strong>Next Step:</strong> Phase 5 cleanup, final testing, and production readiness review</p>
+        </div>
+
+        <div class="warning-card" style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <h3>⚠️ PARTIAL SUCCESS (Some Features Missing)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>Search indexes exist but empty or incomplete</li>
+                <li>Search works but performance slow (> 200ms)</li>
+                <li>Integration works but with missing features (no web search, etc.)</li>
+            </ul>
+            <p><strong>Next Step:</strong> Schedule Phase 5b (Optimization & Completion)</p>
+        </div>
+
+        <div class="alert alert-danger">
+            <h3>❌ FAILURE (Critical Issues)</h3>
+            <p><strong>Conditions:</strong></p>
+            <ul>
+                <li>Search indexes don't exist or are completely empty</li>
+                <li>FULLTEXT queries fail or return no results</li>
+                <li>AI Chat can't access search results</li>
+                <li>Performance: Queries take > 1 second</li>
+                <li>Stress test: Messages lost or corrupted</li>
+            </ul>
+            <p><strong>Next Step:</strong> Debug search implementation and return to Phase 1</p>
+        </div>
+    </div>
+
+    <!-- Next Steps -->
+    <div class="content-section">
+        <h2 id="next-steps">🔄 Next Steps (December 28 & Beyond)</h2>
+
+        <h3>If All Tests Pass ✅</h3>
+        <ul>
+            <li><strong>Phase 5:</strong> Documentation, cleanup, and production readiness</li>
+            <li><strong>Phase 6:</strong> Monitor performance in production</li>
+            <li><strong>Enhancement:</strong> Add web search integration (if not yet enabled)</li>
+            <li><strong>Optimization:</strong> Fine-tune search relevance and performance</li>
+        </ul>
+
+        <h3>If Issues Found ⚠️</h3>
+        <ul>
+            <li><strong>Priority 1:</strong> Fix failing search features</li>
+            <li><strong>Priority 2:</strong> Optimize performance (if > 200ms queries)</li>
+            <li><strong>Priority 3:</strong> Complete missing features (web search, etc.)</li>
+        </ul>
+
+        <div class="nav-links" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 4px;">
+            <p><strong>📅 Depends On:</strong> <a href="/Documentation/Daily_Plans-2025-12-26" style="color: #007bff; text-decoration: none; font-weight: bold;">December 26 Daily Plan Results</a></p>
+            <p><strong>📋 Reference:</strong> <a href="/Documentation/MASTER_PLAN_COORDINATION" style="color: #007bff; text-decoration: none; font-weight: bold;">Master Plan Coordination</a></p>
+            <p><strong>📚 Feature Spec:</strong> <a href="/Documentation/AI_CHAT_DOCUMENTATION_FEATURE_SPEC" style="color: #007bff; text-decoration: none; font-weight: bold;">AI Chat Feature Specification</a></p>
+        </div>
+    </div>
+
+    <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
+        <p>Daily Plan for December 27, 2025 | Version 0.01 | AI Chat Search Features & Integration (Phase 5)</p>
+        <p>⚠️ CONDITIONAL: Executes only if December 26 testing passes | Part of MASTER_PLAN_COORDINATION</p>
+    </div>
+</div>

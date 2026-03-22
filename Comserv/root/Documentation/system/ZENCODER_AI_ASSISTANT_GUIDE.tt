@@ -1,0 +1,433 @@
+[% META
+        title = "Zencoder AI Assistant Guide"
+   description = "Comprehensive guide on using Zencoder AI agents, enforcement rules, blocking gates, workflows, and switching agents effectively in PyCharm for Comserv development. Updated Jan 23: All references synchronized with central coding-standards.yaml (v1.3-STABLE). Lists all 11 active agents."
+   roles = "admin,developer"
+   TemplateType = "Documentation"
+   category = "documentation,ai"
+   page_version = "0.05"
+   last_updated = "Fri Jan 23 15:55:00 UTC 2026"
+%]
+[% PageVersion = 'root/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE.tt,v 0.05 2026/01/23 15:55:00 zencoder Exp - Jan 23 Update: Synchronized with coding-standards.yaml v1.3-STABLE and 11-agent consolidation' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">Zencoder AI Assistant Guide</h1>
+
+<!-- Local navigation for quick access -->
+<nav id="toc" style="margin: 10px 0; padding: 10px; background: var(--light-color); border: 1px solid var(--border-color);">
+    <strong>On this page:</strong>
+    <ul style="list-style: none; padding-left: 0; margin: 8px 0; column-count: 2; column-gap: 24px;">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#critical-ask-questions">🔴 ask_questions() Enforcement</a></li>
+        <li><a href="#agents">Agents</a></li>
+        <li><a href="#startup-protocol">Startup Protocol</a></li>
+        <li><a href="#blocking-gate">Blocking Gate</a></li>
+        <li><a href="#rules">Rules</a></li>
+        <li><a href="#dual-logging">Dual Logging System</a></li>
+        <li><a href="#workflows">Workflows &amp; Mandatory Paths</a></li>
+        <li><a href="#switching-agents">Switching Agents</a></li>
+        <li><a href="#self-detection">Self-Detection Recovery</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#recent-changes">Recent Changes</a></li>
+        <li><a href="#see-also">See Also</a></li>
+    </ul>
+</nav>
+
+<div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+    Last Updated: Fri Jan 23 2026 15:55:00 UTC |
+    Status: Stable Release v1.3-STABLE (Jan 23 Consolidation) - Unified 11-agent architecture, Rule 6 Tool Boundaries, and Bilateral Audit Trail logging requirements |
+    Maintained By: Development Team |
+    <a href="#" style="color: var(--text-muted-color);">Report Issue</a> | <a href="#" style="color: var(--text-muted-color);">Edit This Page</a>
+</div>
+
+<div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+    <h3 style="margin-top: 0; color: #155724;">✅ Jan 23, 2026 - Configuration Cleanup & Consolidation</h3>
+    <p style="margin: 5px 0; color: #155724;"><strong>11-Agent Consolidation:</strong> All 11 agents are now fully consolidated into <code>coding-standards.yaml</code> (v1.3-STABLE). Individual .md files are archived.</p>
+    <p style="margin: 5px 0; color: #155724;"><strong>Rule 6 Tool Boundaries:</strong> Strict enforcement of tool boundaries. Zencoder agents MUST NOT read or modify <code>.continue/</code> or <code>.cursor/</code> configurations.</p>
+    <p style="margin: 5px 0; color: #155724;"><strong>Bilateral Audit Trail:</strong> Every action is now logged in <code>prompts_log.yaml</code> with dual verification (Zencoder platform + project YAML).</p>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);">Zencoder is PyCharm's integrated AI assistant that uses agents, rules, workflows, and agent switching in chat-based interactions. This guide explains how to use these features effectively for Comserv development, based on the rules in the .zencoder directory. Zencoder helps with code generation, debugging, and project management while adhering to Comserv standards and strict enforcement requirements.</p>
+        <div style="background: var(--warning-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--danger-color);">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">⚠️ CRITICAL:</strong> This guide covers mandatory enforcement rules. The most important: <a href="#critical-ask-questions" style="color: var(--link-color); font-weight: bold;">ask_questions() ONLY for user input</a> (never text questions). Violations cause chat stalls and lost history.</p>
+        </div>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="critical-ask-questions" style="color: var(--text-color); font-family: var(--header-font);">🔴 ask_questions() Enforcement (CRITICAL)</h2>
+        <div class="alert alert-danger">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>THE RULE</strong>: When asking users for input/decisions, <strong>ONLY use the ask_questions() function</strong>. Never ask text questions like "Would you like me to..." or "Should I..."</p>
+        </div>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Why This Rule Exists</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Text questions cause chat stalls:</strong></p>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Agent asks text question (e.g., "Would you like me to apply the fix?")</li>
+            <li>User expects natural conversation</li>
+            <li>Chat enters "finishing up loop" (waits for response that won't come)</li>
+            <li>User must manually terminate chat</li>
+            <li><strong>/updateprompt is never executed → Chat history is lost</strong></li>
+        </ol>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>ask_questions() function solves this:</strong></p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Function pauses agent execution and waits for structured response</li>
+            <li>User selects from predefined options</li>
+            <li>Agent receives structured answer and continues properly</li>
+            <li>Chat stays alive, history preserved</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Reference Documentation</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>For complete details, read:</strong> <a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (Rule 1: ask_questions())</a> (authoritative source for all Zencoder standards)</p>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="agents" style="color: var(--text-color); font-family: var(--header-font);">Agents: Architecture &amp; Roles</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Important distinction:</strong> Zencoder uses TWO separate concepts that are often confused:</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">1. Registered Zencoder Agents (Live on Server)</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Created via</strong>: PyCharm IDE interface (Ctrl + . → Agents → Add custom agent)</li>
+            <li><strong>Location</strong>: Zencoder server (NOT stored locally in git)</li>
+            <li><strong>Usage</strong>: Invoked with slash commands (e.g., /cleanup, /docker)</li>
+            <li><strong>Scope</strong>: Shareable across team; persistent</li>
+            <li><strong>Examples</strong>: Cleanup Agent, Docker Agent, MainAgent, BugBuster</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">2. Role Specifications (Reference Blueprints in .zencoder/)</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Stored in</strong>: /.zencoder/rules/ (git-tracked markdown files)</li>
+            <li><strong>Purpose</strong>: Provide instructions/specifications for creating agents</li>
+            <li><strong>Files</strong>: cleanup-agent-role.md, docker-agent-role.md, documentation-synchronization-agent.md, etc.</li>
+            <li><strong>Usage</strong>: Source material when creating actual agents via IDE</li>
+            <li><strong>Scope</strong>: Project-specific configuration</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>In Practice:</strong> Comserv uses 11 specialized agents coordinated through central coding-standards.yaml. Each agent has specific responsibilities in the daily workflow chain.</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Active Comserv Agents (11 Total)</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Cleanup Agent</strong>: Remove inconsistencies, consolidate configuration files, enforce coding standards, maintain central YAML</li>
+            <li><strong>Docker Agent</strong>: Manage containers, handle deployment, troubleshoot container/K8s issues</li>
+            <li><strong>DocumentationAgent ✍️ WRITER</strong>: Author new documentation, plan architecture, coordinate with SYNCER</li>
+            <li><strong>Master Plan Updater Agent</strong>: Update MasterPlanCoordination.tt with audit results, versioning, and status updates</li>
+            <li><strong>Daily Audit Agent</strong>: Create daily audit entries documenting code changes and identifying documentation needs</li>
+            <li><strong>Daily Plan Automator Agent</strong>: Automate daily workflow by maintaining project state and generating audit data</li>
+            <li><strong>Master Plan Manager Agent</strong>: View and manage MasterPlanCoordination.tt (single source of truth)</li>
+            <li><strong>Daily Plans Generator Agent</strong>: Generate 7-day daily plans based on master plan priorities</li>
+            <li><strong>DocumentationSyncAgent 🔄 SYNCER</strong>: Implement documentation changes, enforce format standards, and synchronize with code changes</li>
+            <li><strong>Main Agent</strong>: General-purpose application development agent for Catalyst/Comserv framework</li>
+            <li><strong>PlanningAgent</strong>: Consolidate project planning with a hybrid application-first + document-backup model</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="startup-protocol" style="color: var(--text-color); font-family: var(--header-font);">Startup Protocol: Central Configuration (UPDATED)</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>EVERY agent MUST read the central configuration file FIRST:</strong></p>
+        <div style="background: var(--warning-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--danger-color);">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">✅ UPDATED Jan 23:</strong> All deprecated .md files have been removed. Configuration is now 100% centralized in <code>coding-standards.yaml</code> (v1.3-STABLE).</p>
+        </div>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>PRIMARY (ONLY SOURCE)</strong>: <code>/.zencoder/coding-standards.yaml</code> - <em>v1.3-STABLE - All rules, agents, keywords, workflows, standards in ONE file</em>
+                <ul style="margin-top: 8px; margin-bottom: 8px;">
+                    <li><strong>Rule 1:</strong> ask_questions() - ONLY method for user input</li>
+                    <li><strong>Rule 2:</strong> /updateprompt workflow and blocking gate system</li>
+                    <li><strong>Rule 3:</strong> /chathandoff and /sessionhandoff keywords</li>
+                    <li><strong>Rule 4:</strong> ask_questions() function syntax and execution</li>
+                    <li><strong>Rule 5:</strong> /validatett Template Toolkit validation</li>
+                    <li><strong>Rule 6:</strong> Tool Boundaries (Zencoder vs Continue)</li>
+                    <li><strong>Rule 7:</strong> Bilateral Audit Trail logging requirements</li>
+                    <li><strong>Rule 8:</strong> PascalCase Filename Convention</li>
+                    <li><strong>Rule 9:</strong> RoleSpec Initialization Integrity Protocol</li>
+                    <li><strong>Rule 10:</strong> Documentation Standards</li>
+                    <li><strong>Rule 11:</strong> Agents 1-11 - Complete specifications for all 11 consolidated agents</li>
+                </ul>
+            </li>
+        </ol>
+        <div style="background: var(--info-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--link-color);">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>💡 Best Practice:</strong> Read coding-standards.yaml FIRST to get all configuration. It replaces reading multiple .md files and is the authoritative source for all rules.</p>
+        </div>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="blocking-gate" style="color: var(--text-color); font-family: var(--header-font);">🔴 Blocking Gate: /updateprompt (UNIVERSAL)</h2>
+        <div class="alert alert-danger">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CRITICAL RULE</strong>: <strong>Every prompt MUST execute /updateprompt FIRST</strong>, before reading files, analyzing, or generating output.</p>
+        </div>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">The Four Steps (DO THESE FIRST)</h3>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Get timestamp</strong>: <code>date -u '+%Y-%m-%dT%H:%M:%SZ'</code></li>
+            <li><strong>Read session state</strong>: Check <code>prompts_log.yaml</code> (latest entries) for chat/prompt number</li>
+            <li><strong>Append YAML entry to prompts_log.yaml</strong> with: timestamp, chat, prompt, action, description, files_involved, tools_used, success (null initially)</li>
+            <li><strong>THEN (only after step 3 complete)</strong> - Read configuration files and proceed with work</li>
+        </ol>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Three-Layer Enforcement System</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>LAYER 1: Role Tag Pre-Check (alwaysApply: true)</strong></p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Role specifications include <code>alwaysApply: true</code></li>
+            <li>Signals to IDE: "Execute /updateprompt gate FIRST before any agent output"</li>
+            <li>If /updateprompt NOT logged within 30 seconds → IDE timeout (15-minute ban)</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>LAYER 2: Automated Pre-Check (Blocks Read/Edit/Bash)</strong></p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Before agent can call Read, Edit, or Bash → system verifies /updateprompt entry exists in prompts_log.yaml</li>
+            <li>If NOT found → tool call is BLOCKED with error message</li>
+            <li>Agent must RESTART prompt with /updateprompt execution first</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>LAYER 3: Mandatory Acknowledgment</strong></p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Every prompt output MUST start with: <code>[/updateprompt executed]</code> or <code>[/updateprompt BLOCKED]</code> or <code>[/updateprompt FAILED]</code></li>
+            <li>If any text/analysis appears BEFORE these statements → response flagged as FAILED</li>
+            <li>CONSEQUENCE: IDE locks agent for 15 minutes</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="rules" style="color: var(--text-color); font-family: var(--header-font);">Rules &amp; Boundaries</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);">Rules govern agent behavior, defined in <strong>/.zencoder/coding-standards.yaml (v1.3-STABLE)</strong>. Key rules for effective use:</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Tool Management Boundaries</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Zencoder manages</strong>: /.zencoder/rules/*, /.zencoder/docs/, prompts_log.yaml</li>
+            <li><strong>Zencoder does NOT manage</strong>: Cursor tool files (.cursor/), application code</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Key Behavioral Rules</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>/updateprompt Protocol</strong>: Execute /updateprompt FIRST in every prompt; update prompts_log.yaml</li>
+            <li><strong>ask_questions() ONLY</strong>: For user input decisions, ONLY use ask_questions() function (NEVER text questions)</li>
+            <li><strong>Audit Trail</strong>: Log all actions to prompts_log.yaml to maintain bilateral audit trail</li>
+            <li><strong>Editing Rules</strong>: Use Edit tool for changes; no Bash partial edits (sed/awk)</li>
+            <li><strong>Comserv Integration</strong>: Reference consolidated YAML for project standards; update files per documentation standards</li>
+            <li><strong>Keywords</strong>: Understand and follow global keywords from coding-standards.yaml and execution protocol</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="dual-logging" style="color: var(--text-color); font-family: var(--header-font);">Audit Trail System (YAML-Only)</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Consolidation Complete:</strong> The transition period is over. <code>prompts_log.yaml</code> is now the sole authoritative source of truth for session history and prompt tracking.</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">prompts_log.yaml (Primary System)</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Location</strong>: /Comserv/root/Documentation/session_history/prompts_log.yaml</li>
+            <li><strong>Format</strong>: YAML blocks appended chronologically (newest at bottom)</li>
+            <li><strong>Purpose</strong>: Structured audit trail of ALL agent activity</li>
+            <li><strong>Fields</strong>: timestamp, ai_assistant, agent_name, session_id, chat, prompt, action, description, files_involved, code_changed, tools_used, success, hostname, diagnostics, problems, notes</li>
+            <li><strong>Automatic Detection</strong>: Scripts automatically detect chat/prompt numbers from handoff entries.</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="workflows" style="color: var(--text-color); font-family: var(--header-font);">Workflows &amp; Mandatory Paths</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>After /updateprompt completes, one of three mandatory paths MUST be followed:</strong></p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">PATH A: User Input Needed</h3>
+        <pre style="background: var(--code-bg); padding: 10px; border-left: 4px solid var(--link-color); color: var(--text-color); font-family: monospace;">/updateprompt → ask_questions() function → WAIT for user</pre>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Use this when you need user input or approval to proceed</li>
+            <li>MUST use ask_questions() function (NEVER text questions)</li>
+            <li>Chat pauses and waits for user's structured response</li>
+            <li>Next prompt continues from user's answer</li>
+            <li>✅ Prevents stalls, preserves history</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">PATH B: Work Complete (No Further Input)</h3>
+        <pre style="background: var(--code-bg); padding: 10px; border-left: 4px solid var(--link-color); color: var(--text-color); font-family: monospace;">/updateprompt → Do work → Log success: true → "Prompt complete"</pre>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Use this when prompt's work is fully done</li>
+            <li>No user input needed</li>
+            <li>Work proceeds independently (read files, edit, analyze, etc.)</li>
+            <li>Update prompts_log.yaml: success: true</li>
+            <li>State "Prompt complete" in your response</li>
+            <li>✅ No stalls, work finishes cleanly</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">PATH C: Loop Back (Multi-Prompt Work)</h3>
+        <pre style="background: var(--code-bg); padding: 10px; border-left: 4px solid var(--link-color); color: var(--text-color); font-family: monospace;">/updateprompt → Do work → ask_questions() (PATH A) OR complete (PATH B)</pre>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Use this for complex tasks requiring multiple prompts in same chat</li>
+            <li>Each prompt gets its own /updateprompt entry in prompts_log.yaml</li>
+            <li>Within a prompt: do work, then decide PATH A (ask user) or PATH B (complete)</li>
+            <li>Next prompt starts with new /updateprompt entry</li>
+            <li>✅ Full history preserved across multiple prompts</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Example Workflow</h3>
+        <pre style="background: var(--code-bg); padding: 10px; margin: 10px 0; color: var(--text-color); font-family: monospace; overflow-x: auto;">Prompt 1: /updateprompt → Read config files → Analyze issues → ask_questions() [PATH A]
+User responds: "Fix issue #1"
+
+Prompt 2: /updateprompt → Make changes → ask_questions() [PATH A] 
+User responds: "Looks good, proceed"
+
+Prompt 3: /updateprompt → Complete remaining work → "Prompt complete" [PATH B]</pre>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="switching-agents" style="color: var(--text-color); font-family: var(--header-font);">Switching Agents</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);">Switch agents mid-chat for specialization. Use agent switching when task scope changes or you need different expertise.</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">How to Switch</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>Via Command</strong>: /chathandoff (end chat with handoff notes) or /sessionhandoff (archive session)</li>
+            <li><strong>Via UI</strong>: Click agent selector in IDE sidebar</li>
+            <li><strong>Context</strong>: Provide full chat history to new agent; don't assume context carries over</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Best Practices</h3>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>After /updateprompt</strong>: Switch after current /updateprompt entry is logged</li>
+            <li><strong>Provide Context</strong>: Copy relevant chat excerpts and file paths for new agent</li>
+            <li><strong>Log in Handoff</strong>: Document why you're switching (e.g., "Need Docker expertise")</li>
+            <li><strong>Comserv Example</strong>: MainAgent (general) → Docker Agent (containers) → Cleanup Agent (consolidation)</li>
+        </ul>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="self-detection" style="color: var(--text-color); font-family: var(--header-font);">Self-Detection &amp; Recovery Workflow</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>If you (the agent) realize you just violated a rule</strong>, follow this immediate recovery:</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Violation Types &amp; Recovery</h3>
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">Violation: Asked Text Question Instead of ask_questions()</h4>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>RECOGNIZE</strong>: Your output contained "Would you like me to..." or "Should I..." or similar</li>
+            <li><strong>EXECUTE /updateprompt IMMEDIATELY</strong>: Log to prompts_log.yaml with:
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li>problems: "SELF-DETECTED VIOLATION: Agent asked text question instead of using ask_questions() function"</li>
+                    <li>success: false</li>
+                </ul>
+            </li>
+            <li><strong>CALL ask_questions() NOW</strong>: Use the function with your original question</li>
+            <li><strong>WAIT FOR USER RESPONSE</strong>: Do NOT continue work</li>
+            <li><strong>EXECUTE /updateprompt AGAIN</strong> (next prompt): Log recovery with success: true</li>
+        </ol>
+        <h4 style="color: var(--text-color); font-family: var(--header-font);">Violation: Output Before /updateprompt Logged</h4>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>RECOGNIZE</strong>: You generated analysis/code/output without calling /updateprompt first</li>
+            <li><strong>EXECUTE /updateprompt IMMEDIATELY</strong>: Create entry documenting the violation</li>
+            <li><strong>CALL ask_questions()</strong>: Confirm user wants to proceed with output</li>
+            <li><strong>RESTART</strong>: Begin prompt correctly with /updateprompt FIRST</li>
+        </ol>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>WHY SELF-DETECT?</strong> Self-detection shows compliance and prevents chat stalls. Better to catch and fix immediately than wait for user to notice.</p>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting Enforcement Gaps</h2>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Known Issues (as of Chat 36):</strong> Enforcement rules are deployed but some agents still violate ask_questions() workflow. This section documents known gaps and recovery steps.</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Issue: Chat Still Stalling (Agent Asking Text Questions)</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptom</strong>: Chat enters "finishing up loop" where agent asks text questions and chat waits indefinitely</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause</strong>: Agent read enforcement rules but chose to ignore ask_questions() requirement during token generation</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>What You Can Do (User)</strong>:</p>
+        <ol style="color: var(--text-color); font-family: var(--body-font);">
+            <li>If you see agent asking text question, immediately respond with: "Use ask_questions() function instead"</li>
+            <li>Agent should self-detect and call ask_questions() in recovery attempt</li>
+            <li>If chat still hangs, manually end chat with /chathandoff and document the failure</li>
+        </ol>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Tracking</strong>: These violations are logged to prompts_log.yaml with action: "self-detect-and-recover-from-text-question-violation"</p>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Issue: /updateprompt Pre-Check Not Blocking</h3>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptom</strong>: Agent generates output/analysis before /updateprompt entry exists in prompts_log.yaml</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Root Cause</strong>: IDE pre-check layer (LAYER 2 of blocking gate) may not be enforcing correctly</p>
+        <p style="color: var(--text-color); font-family: var(--body-font);"><strong>What to Check</strong>:</p>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li>Is prompts_log.yaml being created with entries?</li>
+            <li>When blocking should occur (LAYER 2), are tool calls actually blocked with error message?</li>
+        </ul>
+        <h3 style="color: var(--text-color); font-family: var(--header-font);">Reference: Enforcement Status from Chat 36</h3>
+        <div style="background: var(--warning-color); padding: 10px; margin: 10px 0; border-left: 4px solid var(--danger-color);">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>Status</strong>: Enforcement deployed in Chat 35 BUT still allowing violations in Chat 36. This indicates gaps in IDE pre-check layer or agent non-compliance that requires investigation.</p>
+        </div>
+        <p style="color: var(--text-color); font-family: var(--body-font);">See prompts_log.yaml entries from Chat 36 for detailed violation documentation.</p>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="recent-changes" style="color: var(--text-color); font-family: var(--header-font);">Recent Changes</h2>
+        <div class="alert alert-warning">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>v0.05 (Jan 23, 2026):</strong> Major configuration cleanup and agent consolidation synchronization</p>
+        </div>
+        <ul style="color: var(--text-color); font-family: var(--body-font);">
+            <li><strong>✅ All references updated to coding-standards.yaml v1.3-STABLE</strong> - Confirmed single source of truth for rules 1-11</li>
+            <li><strong>✅ 11-Agent Consolidation Finalized</strong> - Expanded agent list from 8 to 11 to match current configuration standards</li>
+            <li><strong>✅ Rule 6 Enforcement</strong> - Strictly defined tool boundaries to prevent Zencoder from accessing external AI tool configs</li>
+            <li><strong>✅ Bilateral Audit Trail</strong> - Synchronized logging requirements for <code>prompts_log.yaml</code> to ensure transparent audit trails</li>
+        </ul>
+        <div class="alert alert-warning">
+            <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>v0.03 (Dec 31, 2025):</strong> Major documentation update for consolidation Phase 3 completion</p>
+        </div>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-100">
+        <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">See Also &amp; References</h2>
+        <div class="alert alert-success">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>🔴 CRITICAL (Read First):</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (Rule 1)</a> - <strong>THE most important rule</strong>; authoritative source for ask_questions() ONLY requirement</li>
+                <li><a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (GLOBAL RULES)</a> - Core Zencoder configuration; /updateprompt gate, startup protocol, tool boundaries</li>
+                <li><a href="/Documentation/system/ZENCODER_AI_ASSISTANT_GUIDE">This File</a> - You're already reading the authoritative Comserv guide!</li>
+            </ul>
+        </div>
+        <div class="alert alert-info">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>✅ Consolidated Central Configuration:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>PRIMARY SOURCE:</strong> <a href="#" style="color: var(--link-color);">/.zencoder/coding-standards.yaml (v1.3-STABLE)</a> - All 11 agents, all rules, all keywords in ONE file (UPDATED Jan 23)</li>
+                <li><strong>IDE ECOSYSTEM SEPARATION:</strong> Rule 6 in coding-standards.yaml explaining Zencoder vs Continue tool boundaries</li>
+            </ul>
+        </div>
+        <div class="alert alert-info">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Session Tracking &amp; Logging:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/prompts_log.yaml</a> - YAML audit trail of all agent activity</li>
+                <li><a href="#" style="color: var(--link-color);">/Comserv/root/Documentation/session_history/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md</a> - Configuration audit documentation</li>
+            </ul>
+        </div>
+        <div class="alert alert-info">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Project Documentation:</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><a href="/Documentation/general/documentation_editor_guide">Documentation Editor Guide</a> - Standards for editing .tt documentation files</li>
+                <li><a href="/Documentation/">Documentation Index</a> - Access all Comserv documentation</li>
+            </ul>
+        </div>
+        <div class="alert alert-info">
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ DEPRECATED FILES (Removed Dec 31 - For Reference Only):</strong></p>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>ask_questions_enforcement.md</strong> - REMOVED (content in coding-standards.yaml Rule 1)</li>
+                <li><strong>cleanup-agent-role.md</strong> - REMOVED (content in coding-standards.yaml agents section)</li>
+                <li><strong>docker-agent-role.md</strong> - REMOVED (content in coding-standards.yaml agents section)</li>
+                <li><strong>updateprompt-workflow.md</strong> - REMOVED (content in coding-standards.yaml Rule 2)</li>
+                <li><strong>zencoder-role-specification.md</strong> - REMOVED (content consolidated to coding-standards.yaml)</li>
+                <li><strong>comserv-ai-guidelines-consolidated.yaml</strong> - REMOVED (project standards integrated into coding-standards.yaml)</li>
+            </ul>
+            <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><em>These files were consolidated into /.zencoder/coding-standards.yaml v1.0-STABLE as part of Phase 3 cleanup (Dec 31).</em></p>
+        </div>
+        <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><a href="#toc" style="color: var(--link-color);">↑ Back to Navigation</a></p>
+    </div>
+</div>
+
+<!-- Footer -->
+<div class="footer" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background: var(--light-color); border: 1px solid var(--border-color);">
+    <p style="color: var(--text-muted-color); font-family: var(--body-font); text-align: center;">Comserv Documentation - Maintained by Development Team</p>
+</div>
+
+</div>

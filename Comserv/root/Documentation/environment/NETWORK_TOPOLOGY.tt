@@ -1,0 +1,20 @@
+[% META title = 'Network Topology' %]
+[% PageVersion = 'Documentation/environment/NETWORK_TOPOLOGY.tt,v 0.01 2025/11/14 Codebuddy Exp Codebuddy ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="network-topology">
+    <h1>Global Network Topology</h1>
+    <p>High-level topology diagram reference. Link to SVG/Mermaid diagrams and source data (IP ranges, VLANs, core paths).</p>
+    <p>Diagram references should be kept external when possible to avoid embedding sensitive data in docs.</p>
+    <ul>
+        <li>Physical racks and core network devices</li>
+        <li>Proxmox cluster nodes connected to gateway paths</li>
+        <li>Primary data paths between VMs/Databases and storage</li>
+    </ul>
+</div>
+
+...rest of the code...

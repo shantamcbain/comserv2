@@ -1,0 +1,571 @@
+[% META 
+   title = "Daily Audit Guide - Documentation Sync & Zencoder Workflow"
+   description = "Step-by-step guide for executing daily audit pipeline: validation, documentation sync via agents, master plan updates, and daily plans generation. Includes DocumentationSyncAgent configuration settings and enforcement rules for routine documentation updates."
+   roles = "admin,developer,editor"
+   TemplateType = "Application"
+   category = "Documentation,AI,Zencoder,Admin"
+   page_version = "1.21"
+   last_updated = "2026-01-16 19:50"
+   editable = "true"
+%]
+
+[% PageVersion = 'admin/documentation/DailyAuditGuide.tt,v 1.21 2026/01/16 19:50:00 UTC Zencoder Exp - Comprehensive DocumentationAgent Performance Analysis Added: Analyzed prompts_log.yaml Chats 1-65 to consolidate successes (Chat 63 log link management 100% success), critical failures (template validation missing, batch edits, missing file reads, chat compaction context loss, file verification gaps), and testing findings (CSS theme variable compliance, collapsible container patterns, link validation). Renamed Architecture Simplification section to include performance analysis. Added 5 critical failure patterns with root causes and required fixes. Added warning section for edge cases (template conformance, link validation). Total section +175 lines with actionable improvement items for DocumentationAgent WRITER specification.' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<!-- AI EDITABLE SECTION: This file can be edited via Documentation/run_audit agent workflow. Update section metadata and plan counts when daily plans are regenerated. -->
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Daily Audit Guide</h1>
+        <p>Complete guide for executing the daily audit pipeline: validation, documentation synchronization, master plan updates, and daily plans generation.</p>
+    </div>
+
+    <nav id="toc" style="background: var(--secondary-color); padding: 15px; border-radius: 4px; margin: 20px 0; border: 1px solid var(--border-color);">
+        <h3 style="margin-top: 0; margin-bottom: 12px;">📑 Quick Navigation</h3>
+        <ul style="margin: 0; padding-left: 20px; columns: 2; column-gap: 30px;">
+            <li style="margin-bottom: 8px;"><a href="#status-metadata" style="color: var(--primary-color);">Master Status Metadata</a></li>
+            <li style="margin-bottom: 8px;"><a href="#quick-reference" style="color: var(--primary-color);">Quick Reference</a></li>
+            <li style="margin-bottom: 8px;"><a href="#audit-agents" style="color: var(--primary-color);">Daily Audit Agents Pipeline</a></li>
+            <li style="margin-bottom: 8px;"><a href="#pipeline-menu" style="color: var(--primary-color);">Pipeline Documentation Menu</a></li>
+            <li style="margin-bottom: 8px;"><a href="#zencoder-tips" style="color: var(--primary-color);">Zencoder Workflow Tips</a></li>
+            <li style="margin-bottom: 8px;"><a href="#ai-guide" style="color: var(--primary-color);">AI Assistants Master Guide</a></li>
+            <li style="margin-bottom: 8px;"><a href="#workflow-checklist" style="color: var(--primary-color);">Workflow Checklist</a></li>
+            <li style="margin-bottom: 8px;"><a href="#architecture-simplification" style="color: var(--primary-color); font-weight: bold;">🏗️ Agent Architecture & Documentation System Redesign (NEW)</a></li>
+        </ul>
+    </nav>
+
+    <div class="content-container">
+        
+        <!-- Master Status Metadata - Collapsible Container -->
+        <details id="status-metadata" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
+                📊 Master Status Metadata (Session Info) - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>Created:</strong> 2025-12-24 | <strong>Version:</strong> 1.08 (Jan 13 17:50) | <strong>Status:</strong> 📋 Active</p>
+                <p><strong>Last Updated:</strong> 2026-01-13 17:50:00 UTC | <strong>Daily Plans:</strong> 26 total plans in system (source of truth: /Documentation/DailyPlans/ directory)</p>
+                <p><strong>Session Context:</strong> Chat 64 - Documentation Agent workflow testing. 4-agent Daily Plan Automator pipeline production-ready, all systems operational.</p>
+            </div>
+        </details>
+        
+        <!-- Quick Reference Collapsible Container -->
+        <details id="quick-reference" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
+                🔧 Quick Reference - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>AI Controller:</strong> Ollama integration with multi-turn conversations</li>
+                    <li><strong>Model Management:</strong> Pull, test, and manage LLM models</li>
+                    <li><strong>Documentation Sync:</strong> Automated audit workflow (v1.11, Jan 8, 2026)</li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- Daily Audit Agents Guide Collapsible Container -->
+        <details id="audit-agents" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: var(--secondary-color); border-bottom: 1px solid var(--border-color);">
+                🤖 Daily Audit Agents Pipeline - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <h5 style="margin-top: 0;">How to Use the Agent Pipeline That Populates Daily Audit</h5>
+                <div style="background: var(--schema-alert-success-bg); padding: 12px; border-left: 4px solid var(--success-color); border-radius: 3px; margin: 15px 0;">
+                    <p style="margin: 0 0 10px 0;"><strong>📝 Start: Open New Log (Record 320)</strong></p>
+                    <p style="margin: 0;">Create a timestamped log entry before starting the audit pipeline:</p>
+                    <p style="margin: 8px 0 0 0;">
+                        <a href="[% c.uri_for('/log/log_form', { todo_record_id = 320 }) %]" class="btn btn-sm btn-success">📋 Open New Audit Log</a>
+                    </p>
+                </div>
+                <div style="background: var(--secondary-color); padding: 10px; border-radius: 3px; margin: 15px 0;">
+                    <p><strong>Step 1: Execute Documentation Sync Audit</strong></p>
+                    <p>Run the documentation sync audit to validate system compliance and identify documentation update needs:</p>
+                    <p><strong>Purpose:</strong> Audits documentation against code changes, identifies gaps, generates audit findings for documentation sync workflow</p>
+                    
+                    <p style="margin-top: 10px; padding: 8px; background: var(--schema-alert-info-bg); border-left: 3px solid var(--info-color); border-radius: 3px;">
+                        <a href="[% c.uri_for('/Documentation/run_audit') %]" class="btn btn-sm btn-primary" style="margin-right: 10px;">🔍 Run Audit Now</a>
+                        <em style="font-size: 0.9em; color: var(--text-color);">Execute documentation_sync_audit.pl and view results inline</em>
+                    </p>
+                    
+                    <p><strong style="margin-top: 10px; color: var(--text-color);">Alternative - Run from Terminal/Container:</strong></p>
+                    <p style="margin-top: 5px; padding: 8px; background: var(--schema-alert-warning-bg); border-left: 3px solid var(--warning-color); border-radius: 3px; font-family: monospace; font-size: 0.9em;">
+                        cd /home/shanta/PycharmProjects/comserv2<br/>
+                        perl .zencoder/scripts/documentation_sync_audit.pl --verbose
+                    </p>
+                    
+
+                </div>
+                <div style="background: var(--secondary-color); padding: 10px; border-radius: 3px; margin: 15px 0;">
+                    <p><strong>Step 2: Documentation Synchronization (DocumentationSyncAgent)</strong></p>
+                    <p style="color: var(--text-muted-color); font-size: 0.95em; margin: 5px 0;">The DocumentationSyncAgent implements documentation changes by scanning directory structure, validating template conformance, and updating files with code changes from the audit. It receives the audit from Step 1 and passes results to Step 3 (Master Plan Updater).</p>
+                    
+                    <p style="margin-top: 10px;"><strong style="color: var(--text-color);">Agent Workflow (from <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents:documentation-sync section):</strong></p>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 1-BASE:</strong> Scan Documentation Directory</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">Find all .tt files in /Comserv/root/Documentation/. Detect format violations (.md files, orphaned files, missing .tt equivalents)</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 2-BASE:</strong> Validate Template Conformance</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">For each .tt file: Check META block (required fields), PageVersion line, debug mode guard, CSS variables (no inline colors), layout classes, last_updated format</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 3-BASE:</strong> Detect Content Inconsistencies</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">Scan for: Outdated references to deleted features, broken links, mismatched documentation vs code, stale examples</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 4-EXTENSION:</strong> Receive Update Request (Daily Audit)</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">Extract from /daily-audit: file list to update, reasons for each, code changes summary, audit reference date</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 5-EXTENSION:</strong> Update Each Documentation File</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">For each file: (1) Read .tt file and META block, (2) Add/update Recent Changes section, (3) Update last_updated with system date (format: 'Day Mon DD HH:MM:SS UTC YYYY'), (4) Increment page_version (minor bump), (5) Update PageVersion line with new version + timestamp</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 6-EXTENSION:</strong> Validate After Updates</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">After each update: Check META syntax valid, PageVersion line valid, HTML/TT syntax correct, no broken links. Read file back to confirm</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 7-EXTENSION:</strong> Summarize Updates</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">Create summary: date, source (daily audit chat number), files updated (with version transitions), total files count. Track version increments</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>Step 8-EXTENSION:</strong> Call Master Plan Updater</p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);">Pass to /update-master-plan: Audit date, chats, code files modified count, docs updated list, issues/successes, next steps. Do NOT wait for response</p>
+                    </div>
+                    
+                    <p style="margin-top: 15px; padding: 10px; background: var(--schema-alert-warning-bg); border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <strong>Workflow Source:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards.yaml</a> - agents:documentation-sync-agent section (lines 1812-1910)
+                    </p>
+                    
+                    <h5 style="margin-top: 20px; margin-bottom: 10px; color: var(--text-color);">📋 Configuration Settings & Enforcement Rules</h5>
+                    <p style="color: var(--text-muted-color); font-size: 0.95em; margin: 10px 0;">To tune the agent for routine documentation updates, configure these key enforcement rules and validation settings:</p>
+                    
+                    <div style="background: #fff; padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>🔴 PRIORITY 1: File Format Enforcement</strong></p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> All files in /Comserv/root/Documentation/ MUST be .tt format (Template Toolkit). <strong>Detect:</strong> .md files in documentation directory (violations). <strong>Action:</strong> When violations found, verify .tt equivalents exist, check content parity, confirm .tt is current, then delete .md with confirmation. Configure agent to scan on daily audit trigger.</p>
+                    </div>
+                    
+                    <div style="background: #fff; padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>🔴 PRIORITY 2: Template Conformance Validation</strong></p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> Every .tt file MUST conform to DocumentationTtTemplate.tt. <strong>Mandatory elements:</strong> (1) META block with title, description, page_version, last_updated; (2) PageVersion line with version+timestamp; (3) Debug mode guard; (4) CSS variables only (no inline colors like #123456 - use var(--text-color) instead); (5) Layout classes (.container, .row, .col-*). <strong>Validation:</strong> Agent scans each .tt for these elements before accepting changes. If FAIL: Report specific violations + line numbers, refuse to process file. If PASS: Proceed with updates.</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>🟠 PRIORITY 3: Documentation-to-Code Sync Monitor</strong></p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> When code changes, documentation must stay in sync. <strong>Trigger checks:</strong> When controller modified → check controller docs exist; Model added → check model docs; Feature added → check feature docs; API endpoint changed → check API docs; Configuration added → check config docs. <strong>Validation:</strong> (1) Find corresponding documentation file; (2) Check file exists; (3) Check last_updated is current; (4) Verify new features/changes are documented with setup/config/troubleshooting sections. Configure agent to flag missing/stale documentation for user review.</p>
+                    </div>
+                    
+                    <div style="background: var(--background-color); padding: 10px; margin: 8px 0; border-left: 3px solid var(--warning-color); border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>🟠 PRIORITY 4: Duplicate & Redundant Detection</strong></p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> Each topic has exactly ONE authoritative documentation file. <strong>Detect:</strong> Multiple .tt files with identical content (same title/topic). <strong>Identify authority:</strong> Check version numbers and last_updated timestamps; newer version = current/authoritative. <strong>Action:</strong> Mark obsolete versions as archived, consolidate cross-references to canonical version. Configure weekly or on-demand duplicate scans.</p>
+                    </div>
+                    
+                    <div style="background: var(--bg-secondary); padding: 10px; margin: 8px 0; border-left: 3px solid #fbc02d; border-radius: 3px;">
+                        <p style="margin: 5px 0;"><strong>🟡 PRIORITY 5: Version Management & Last Updated Tracking</strong></p>
+                        <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> Track documentation currency. <strong>Settings:</strong> (1) Update page_version with minor bumps (1.00 → 1.01) on each edit; (2) Update last_updated in META block with system date (format: 'Day Mon DD HH:MM:SS UTC YYYY'); (3) Update PageVersion line with new version + timestamp; (4) Add "Recent Changes" section to document what changed in each update. <strong>Monitoring:</strong> Flag files not updated in >30 days for review. Configure notifications when version increments are missing.</p>
+                    </div>
+                    
+                    <p style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-left: 3px solid #9e9e9e; border-radius: 3px;">
+                        <strong>Configuration Sources:</strong><br/>
+                        • <strong>Workflow & Responsibilities:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards.yaml</a> - agents:documentation-sync-agent (lines 1812-1910)<br/>
+                        • <strong>Enforcement Rules & Validation:</strong> Archived agent spec - documentation-synchronization-agent.md (sections on File Format Enforcement, Template Conformance, Sync Monitoring, Duplicate Detection, Cleanup Scheduler)<br/>
+                        • <strong>Template Reference:</strong> DocumentationTtTemplate.tt (master template all docs must conform to)<br/>
+                        • <strong>Link Standards:</strong> <a href="/Documentation/DOCUMENTATION_LINK_STANDARDS" style="color: var(--primary-color);">DOCUMENTATION_LINK_STANDARDS.md</a> (authoritative reference for /Documentation/FileName link format rules)
+                    </p>
+                </div>
+                <div style="background: var(--secondary-color); padding: 10px; border-radius: 3px; margin: 15px 0;">
+                    <p><strong>Step 3: Update the Master Plan</strong></p>
+                    <p>Run the Master Plan Coordination update to consolidate all system status based on documentation updates from Step 2 and audit findings from Step 1:</p>
+                    <p><code style="background: #fff; padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Update MASTER_PLAN"</code></p>
+                </div>
+                <div style="background: var(--secondary-color); padding: 10px; border-radius: 3px; margin: 15px 0;">
+                    <p><strong>Step 4: Update the Daily Plans</strong></p>
+                    <p>Generate or update daily plans for the week with latest priorities:</p>
+                    <p><code style="background: #fff; padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Generate Daily Plans"</code></p>
+                </div>
+                <div style="background: #fff3e0; padding: 12px; border-left: 4px solid #ff9800; border-radius: 3px; margin: 15px 0;">
+                    <p style="margin: 0 0 10px 0;"><strong>📝 Finish: Close Log (Record 320)</strong></p>
+                    <p style="margin: 0;">After completing the audit pipeline, close the log to record completion time and status:</p>
+                    <p style="margin: 8px 0 0 0;">
+                        <a href="[% c.uri_for('/log/log_form', { todo_record_id = 320 }) %]" class="btn btn-sm btn-warning">📋 Close Daily Audit Log</a>
+                    </p>
+                </div>
+            </div>
+        </details>
+
+        <!-- Daily Audit Pipeline Documentation Menu - Collapsible Container -->
+        <details id="pipeline-menu" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color);">
+                📚 Daily Audit Pipeline Documentation Menu - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <p style="margin-top: 0; color: var(--text-muted-color);"><em>Complete navigation guide for all Daily Audit Pipeline documentation files. Use these links to find relevant information during each step.</em></p>
+                
+                <div style="background: #fef5e7; padding: 12px; border-left: 4px solid #f39c12; border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">📋 Step 1: Documentation Sync Audit</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>File:</strong> <a href="/Documentation/DailyAuditGuide" style="color: var(--primary-color);">DailyAuditGuide</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Section:</strong> Step 1 | <strong>Purpose:</strong> How to execute documentation sync audit</li>
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents:daily-audit section | <strong>Purpose:</strong> Complete Daily Audit Agent workflow, responsibilities, and inputs/outputs</li>
+                        <li><strong>File:</strong> <code>Comserv/root/Documentation/AuditReports/DocumentationSyncAudit.json</code> | <strong>Format:</strong> JSON (auto-generated) | <strong>Path:</strong> AuditReports/ | <strong>Purpose:</strong> Most recent audit findings with code-to-doc mapping</li>
+                    </ul>
+                </div>
+
+                <div style="background: #fff3e0; padding: 12px; border-left: 4px solid #ff9800; border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">✏️ Step 2: Documentation Update Manager (DocumentationSyncAgent)</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>File:</strong> <a href="/Documentation/DailyAuditGuide" style="color: var(--primary-color);">DailyAuditGuide</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Section:</strong> Step 2 | <strong>Purpose:</strong> DocumentationSyncAgent workflow, expectations, and 8-step process</li>
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents:documentation-sync section (lines 1812-1910) | <strong>Purpose:</strong> Complete DocumentationSyncAgent specification, responsibilities, workflow, and template conformance requirements</li>
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - CRITICAL SETTINGS: DOCUMENTATION PATHS (lines 308-330) | <strong>Purpose:</strong> File format standards (.tt only), naming conventions (PascalCase), and template requirements</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--schema-alert-success-bg); padding: 12px; border-left: 4px solid var(--success-color); border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">📊 Step 3: Update Master Plan (Master Plan Updater Agent)</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>File:</strong> <a href="/Documentation/DailyAuditGuide" style="color: var(--primary-color);">DailyAuditGuide</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Section:</strong> Step 3 | <strong>Purpose:</strong> How to execute master plan update</li>
+                        <li><strong>File:</strong> <a href="/Documentation/MasterPlanCoordination" style="color: var(--primary-color);">MasterPlanCoordination</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Purpose:</strong> AUTHORITATIVE SOURCE - System priorities, status, roadmap, and version control</li>
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents:master-plan-updater section | <strong>Purpose:</strong> Master Plan Updater Agent specification, inputs from DocumentationSyncAgent, workflow, and responsibilities</li>
+                        <li><strong>File:</strong> <a href="/Documentation/ComservSystems" style="color: var(--primary-color);">ComservSystems</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Purpose:</strong> Complete system inventory, dependencies, architecture, and technical components</li>
+                    </ul>
+                </div>
+
+                <div style="background: var(--schema-alert-info-bg); padding: 12px; border-left: 4px solid var(--info-color); border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">📅 Step 4: Generate Daily Plans (Daily Plan Automator Agent)</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>File:</strong> <a href="/Documentation/DailyAuditGuide" style="color: var(--primary-color);">DailyAuditGuide</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Section:</strong> Step 4 | <strong>Purpose:</strong> How to execute daily plans generation from master plan</li>
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents:daily-plans-automator section | <strong>Purpose:</strong> Daily Plan Automator Agent specification, inputs from Master Plan Updater Agent, workflow, and daily plan generation process</li>
+                        <li><strong>Directory:</strong> <code>Comserv/root/Documentation/DailyPlans/</code> | <strong>Format:</strong> Template Toolkit (.tt) files | <strong>Files:</strong> DailyPlans-YYYY-MM-DD.tt | <strong>Purpose:</strong> Generated 7-day daily plans (updated automatically by Daily Plan Automator Agent)</li>
+                    </ul>
+                </div>
+
+                <div style="background: #f3e5f5; padding: 12px; border-left: 4px solid #9c27b0; border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">🔗 Supporting & Reference Documentation</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>Reference:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards</a> - agents section (lines 1044-1910) | <strong>Purpose:</strong> Complete 4-agent pipeline architecture, system overview, data flows, agent integrations, upstream/downstream dependencies</li>
+                        <li><strong>File:</strong> <a href="/Documentation/AI" style="color: var(--primary-color);">AI</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Purpose:</strong> All available AI assistants (Daily Audit Agent, DocumentationSyncAgent, Master Plan Updater Agent, Daily Plan Automator Agent) and their responsibilities</li>
+                        <li><strong>File:</strong> <code>Comserv/root/Documentation/config/RepositoryCodeAudit.json</code> | <strong>Format:</strong> JSON (auto-generated) | <strong>Path:</strong> config/ | <strong>Purpose:</strong> Code-to-documentation mapping reference for all controllers, models, utilities</li>
+                        <li><strong>File:</strong> <a href="/Documentation/DocumentationSystemAuditPlan" style="color: var(--primary-color);">DocumentationSystemAuditPlan</a> | <strong>Format:</strong> Template Toolkit (.tt) | <strong>Purpose:</strong> Overall documentation audit strategy, scope, standards, and compliance framework</li>
+                    </ul>
+                </div>
+
+                <div style="background: #fce4ec; padding: 12px; border-left: 4px solid #e91e63; border-radius: 3px; margin: 15px 0;">
+                    <h5 style="margin: 0 0 10px 0;">⚙️ Zencoder & Automation</h5>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>.zencoder/coding-standards.yaml</strong> → Lines 145-170: ask_questions() NO TIMEOUT rule (critical for workflow)</li>
+                        <li><strong>.zencoder/coding-standards.yaml</strong> → Lines 81-145: Rule 1 ask_questions() enforcement</li>
+                        <li><strong>.zencoder/rules/repo.md</strong> → Repository standards and Zencoder enforcement</li>
+                        <li><strong>.zencoder/scripts/</strong> → documentation_sync_audit.pl, updateprompt.pl, validation_step0.pl</li>
+                    </ul>
+                </div>
+
+                <p style="margin: 15px 0 0 0; padding: 10px; background: var(--schema-alert-warning-bg); border-radius: 3px; font-size: 0.9em; border-left: 3px solid var(--warning-color);">
+                    <strong>💡 Pro Tip:</strong> Bookmark this menu for quick access during daily audits. All links include specific anchors to relevant sections when available.
+                </p>
+            </div>
+        </details>
+
+        <!-- Zencoder Workflow Tips Collapsible Container -->
+        <details id="zencoder-tips" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color);">
+                ⚙️ Zencoder Workflow Tips - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>ask_questions():</strong> Use for user input (never text questions)</li>
+                    <li><strong>/updateprompt.pl:</strong> Execute before AND after work to log actions</li>
+                    <li><strong>Phase Protocol:</strong> Phase 0 (validate) → Phase 1 (log) → Phase 2 (work) → Phase 3 (ask)</li>
+                    <li><strong>WAIT INDEFINITELY:</strong> After calling ask_questions(), wait for user response</li>
+                    <li><strong>Coding Standards:</strong> Check .zencoder/coding-standards.yaml for compliance rules</li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- Full AI Documentation Collapsible Container -->
+        <details id="ai-guide" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; margin: 20px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color);">
+                📖 AI Assistants Master Guide (AI.tt) - Click to Expand
+            </summary>
+            <div style="padding: 15px;">
+                <p><strong>AI Assistants Available:</strong></p>
+                <ul>
+                    <li><strong>Documentation Agent:</strong> Manages documentation updates, audit coordination, daily plan synchronization</li>
+                    <li><strong>Cleanup Agent:</strong> Maintains code standards, enforces documentation compliance</li>
+                    <li><strong>Daily Plan Automator:</strong> 4-agent pipeline for automated daily plan generation and master plan synchronization</li>
+                    <li><strong>Zencoder Integration:</strong> Multi-turn conversation support, structured task execution, audit workflow coordination</li>
+                </ul>
+                <p><a href="/Documentation/AI" style="color: var(--primary-color);">View Full AI Assistants Master Guide →</a></p>
+            </div>
+        </details>
+
+        <h4 id="workflow-checklist">Daily Audit Workflow Checklist:</h4>
+        <div class="task-list">
+            <div class="task-list-items">
+                <div class="task-item">
+                    <input type="checkbox" id="daily-task-1">
+                    <label for="daily-task-1" class="task-label">Step 1: Execute documentation_sync_audit.pl to identify documentation gaps</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" id="daily-task-2">
+                    <label for="daily-task-2" class="task-label">Step 2: Prompt Documentation Agent to update files based on audit findings</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" id="daily-task-3">
+                    <label for="daily-task-3" class="task-label">Step 3: Update SystemsMaster & MasterPlanCoordination with latest system status</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" id="daily-task-4">
+                    <label for="daily-task-4" class="task-label">Step 4: Generate or update daily plans for the week with latest priorities</label>
+                </div>
+                <div class="task-item">
+                    <input type="checkbox" id="daily-task-5">
+                    <label for="daily-task-5" class="task-label">Bonus: Review Zencoder Workflow Tips for protocol compliance</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Simplification Proposal - NEW SECTION -->
+        <h3 id="architecture-simplification" style="margin-top: 30px; padding-bottom: 10px; border-bottom: 2px solid var(--warning-color);"></h3>
+        <details style="background: #fff3e0; border: 2px solid #ff9800; border-radius: 4px; margin: 30px 0; padding: 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #ffe0b2; border-bottom: 2px solid var(--warning-color);">
+                🏗️ AGENT ARCHITECTURE & DOCUMENTATION SYSTEM REDESIGN - Simplification Proposal with Performance Analysis
+            </summary>
+            <div style="padding: 20px;">
+                <div style="background: #fff9e6; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: var(--text-color);">⚠️ Current Issue Identified</h4>
+                    <p style="margin: 5px 0;"><strong>Problem:</strong> Agent naming confusion between DocumentationSyncAgent and Daily Audit Agent creates workflow ambiguity. The Daily Plan Automator and Daily Audit Agent are resource-intensive and can conflict with manual documentation tasks.</p>
+                    <p style="margin: 5px 0;"><strong>Proposal Status:</strong> <em>Under Review</em> - This section proposes a simplified 3-agent architecture.</p>
+                </div>
+
+                <h5 style="margin-top: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--warning-color);">Current (Complex) Architecture - 6 Agents</h5>
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0; background: var(--bg-secondary);">
+                    <thead style="background: #fff3e0;">
+                        <tr>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Agent</th>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Role</th>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Daily Audit Agent</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Generate audit files from session history</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">❌ <em>REMOVE</em></td>
+                        </tr>
+                        <tr style="background: var(--secondary-color);">
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>DocumentationSyncAgent</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Implement doc updates based on code changes</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">✅ <em>KEEP</em> (rename clarity)</td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>DocumentationAgent</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Plan documentation updates</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">✅ <em>KEEP</em></td>
+                        </tr>
+                        <tr style="background: var(--secondary-color);">
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Daily Plan Automator</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Orchestrate 4-agent daily pipeline</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">❌ <em>REMOVE</em></td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Master Plan Updater</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Update master plan from audit results</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">⚠️ <em>FOLD into PlanningAgent</em></td>
+                        </tr>
+                        <tr style="background: var(--secondary-color);">
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Daily Plans Generator</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Generate daily plans from master plan</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">⚠️ <em>FOLD into PlanningAgent</em></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--success-color);">Proposed (Simplified) Architecture - 3 Agents</h5>
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0; background: var(--bg-secondary);">
+                    <thead style="background: var(--schema-alert-success-bg);">
+                        <tr>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Agent</th>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Core Responsibility</th>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Inputs</th>
+                            <th style="border: 1px solid var(--border-color); padding: 8px; text-align: left;">Outputs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>PlanningAgent</strong> ✨ NEW</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Manage overall project planning, set priorities, generate daily/weekly plans, update master plan</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">MasterPlanCoordination.tt, current session history, user priorities</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Daily plans, master plan updates, priority lists</td>
+                        </tr>
+                        <tr style="background: var(--secondary-color);">
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>DocumentationAgent</strong> ✍️ <strong>WRITER</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Author/Write</strong> documentation from user perspective. Create new documentation content, structure, and organization based on user needs and project requirements.</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">User requirements, project context, current documentation structure, style guides</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">New documentation content, documentation plans, authorship decisions</td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>DocumentationSyncAgent</strong> 🔄 <strong>SYNCER</strong></td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;"><strong>Sync/Maintain</strong> documentation to keep it current with code changes. Update existing documentation files to reflect new code, deleted features, API changes, and system updates.</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Git diffs, code changes, current documentation files, version updates</td>
+                            <td style="border: 1px solid var(--border-color); padding: 8px;">Updated documentation files, sync reports, validation confirmations</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--info-color);">Proposed Workflow (Simplified)</h5>
+                <div style="background: var(--schema-alert-info-bg); padding: 15px; border-left: 4px solid var(--info-color); border-radius: 3px; margin: 15px 0;">
+                    <p style="margin: 5px 0;"><strong>Step 1: User initiates PlanningAgent</strong></p>
+                    <p style="margin: 5px 20px; font-size: 0.9em;">Execute <code>/planning</code> command to set project priorities, generate daily/weekly plans, update master plan based on current project status</p>
+                    
+                    <p style="margin: 15px 0 5px 0;"><strong>Step 2a: User initiates DocumentationAgent (WRITER)</strong> when authoring new documentation</p>
+                    <p style="margin: 5px 20px; font-size: 0.9em;">Execute <code>/documentation-write</code> command to create new documentation content from user perspective, structure documentation, author new guides/references</p>
+                    
+                    <p style="margin: 15px 0 5px 0;"><strong>Step 2b: User initiates DocumentationSyncAgent (SYNCER)</strong> when code changes need documentation updates</p>
+                    <p style="margin: 5px 20px; font-size: 0.9em;">Execute <code>/documentation-sync</code> command to keep documentation current with code changes, update affected documentation files, sync API/feature changes</p>
+                    
+                    <p style="margin: 15px 0 0 0; color: var(--text-muted-color); font-size: 0.95em;"><em>Result:</em> Simplified, user-driven workflow with clear separation between documentation authoring (writing new docs) and documentation maintenance (syncing with code). No automated orchestration conflicts.</p>
+                </div>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--success-color);">Benefits of Simplified Architecture</h5>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Clear Agent Naming:</strong> Each agent has a single, obvious responsibility (no "automator" confusion)</li>
+                    <li><strong>User Control:</strong> Manual workflow initiation prevents conflicts between agents</li>
+                    <li><strong>Easier Debugging:</strong> 3 agents instead of 6 means fewer interaction points to troubleshoot</li>
+                    <li><strong>Reduced Token Usage:</strong> No automatic daily audits consuming resources continuously</li>
+                    <li><strong>Flexible Scheduling:</strong> Users run agents on-demand rather than fixed times</li>
+                </ul>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--error-color);">Migration Plan (Next Steps)</h5>
+                <div style="background: var(--schema-alert-error-bg); padding: 15px; border-left: 4px solid var(--error-color); border-radius: 3px; margin: 15px 0;">
+                    <ol style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>Phase 1:</strong> Create PlanningAgent specification in coding-standards.yaml (new agent_id: "planning", command: /planning)</li>
+                        <li><strong>Phase 2:</strong> Clarify DocumentationAgent role: ✍️ WRITER role - author new documentation. Update command to /documentation-write and specs in coding-standards.yaml</li>
+                        <li><strong>Phase 3:</strong> Clarify DocumentationSyncAgent role: 🔄 SYNCER role - sync/maintain documentation with code changes. Update command to /documentation-sync and specs in coding-standards.yaml</li>
+                        <li><strong>Phase 4:</strong> Archive Daily Plan Automator agent spec (move to .zencoder/rules/archive/)</li>
+                        <li><strong>Phase 5:</strong> Archive Daily Audit Agent spec (move to .zencoder/rules/archive/)</li>
+                        <li><strong>Phase 6:</strong> Update all documentation links and references to new agent command aliases (/planning, /documentation-write, /documentation-sync)</li>
+                        <li><strong>Phase 7:</strong> Test simplified workflow: PlanningAgent → DocumentationAgent (WRITER) or DocumentationSyncAgent (SYNCER)</li>
+                        <li><strong>Phase 8:</strong> Update this guide and all related documentation with final architecture and new agent workflows</li>
+                    </ol>
+                </div>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color);">Technical Details to Finalize</h5>
+                <ul style="margin: 10px 0; padding-left: 20px; color: var(--text-muted-color);">
+                    <li><strong>PlanningAgent responsibilities:</strong> Should it handle both project-level planning AND daily audit tracking? Or just planning?</li>
+                    <li><strong>DocumentationAgent output format:</strong> Structured list of files needing updates with reasons?</li>
+                    <li><strong>Cascade vs. manual:</strong> Should DocumentationAgent automatically invoke DocumentationSyncAgent, or require user approval between steps?</li>
+                    <li><strong>Backward compatibility:</strong> What happens to existing master plan, daily plans, and session history files?</li>
+                </ul>
+
+                <h5 style="margin-top: 25px; padding-bottom: 10px; border-bottom: 2px solid var(--warning-color);">DocumentationAgent Performance Analysis & Testing Findings</h5>
+                
+                <div style="background: var(--secondary-color); padding: 15px; border-left: 4px solid #666; border-radius: 3px; margin: 15px 0;">
+                    <p style="margin: 5px 0;"><strong>📊 Comprehensive Review of DocumentationAgent Sessions</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">Analysis of prompts_log.yaml from Chats 1-65 reveals both successes and critical gaps in DocumentationAgent role specification. This section consolidates findings to improve agent settings and workflow design.</p>
+                </div>
+
+                <h6 style="margin-top: 20px; color: var(--success-color);">✅ SUCCESSES - What Works Well</h6>
+                <div style="background: var(--schema-alert-success-bg); padding: 12px; border-left: 4px solid var(--success-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>1. Log Link Management (Chat 63 - 8 Prompts, 100% Success)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">DocumentationAgent successfully added dual log links to DailyAuditGuide.tt with proper Catalyst routing, semantic styling, and container positioning. All phase gates executed correctly (/updateprompt before/after, ask_questions for decisions). Zero failures across 8 prompts.</p>
+                </div>
+
+                <div style="background: var(--schema-alert-success-bg); padding: 12px; border-left: 4px solid var(--success-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>2. File Reading & Analysis Pattern</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">When DocumentationAgent reads target files before editing, modifications are accurate and contextually appropriate. Pattern: Read source → Analyze structure → Apply targeted edits → Verify links work.</p>
+                </div>
+
+                <h6 style="margin-top: 20px; color: var(--error-color);">❌ CRITICAL FAILURES - Patterns to Prevent</h6>
+                
+                <div style="background: var(--schema-alert-error-bg); padding: 12px; border-left: 4px solid var(--error-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>1. Template Conformance Validation Missing (Chats 25-28)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Issue:</strong> Created documentation files without comparing to documentation_tt_template.tt standard. Files (Admin.tt, AI.tt) created with incomplete sections, missing metadata blocks, non-standard styling.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Root Cause:</strong> Agent instruction missing mandatory step: "Compare all new files to documentation_tt_template.tt BEFORE final submission."</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Impact:</strong> Templates not found in documentation system, affecting discoverability and consistency.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Fix Required:</strong> Add mandatory verification step to DocumentationAgent WRITER specification.</p>
+                </div>
+
+                <div style="background: var(--schema-alert-error-bg); padding: 12px; border-left: 4px solid var(--error-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>2. Batch Edit Failures (Chats 25-28)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Issue:</strong> Agent attempted to apply multiple file changes in single edit operation. Result: Files created with mixed old/new formatting, incomplete transitions.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Root Cause:</strong> Agent chose batch strategy instead of atomic edits (one change per prompt).</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Impact:</strong> Documentation system unstable; users see mixed formats and outdated content side-by-side.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Fix Required:</strong> Update DocumentationAgent specification: "ALWAYS apply one file change per prompt. NEVER batch multiple files. Pattern: /updateprompt→Edit ONE file→/updateprompt→Ask next step."</p>
+                </div>
+
+                <div style="background: var(--schema-alert-error-bg); padding: 12px; border-left: 4px solid var(--error-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>3. Missing File Read Before Edit (Chats 11-15)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Issue:</strong> Agent edited files without reading them first. Violated auto-applied rule: "ALWAYS read file before edit."</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Root Cause:</strong> Agent instructions did not emphasize mandatory read step.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Impact:</strong> Edits overwrote unplanned content; users lost work; audit trail incomplete.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Fix Required:</strong> Make mandatory in WRITER instructions: "Step 0: ALWAYS read target file. Step 1: Analyze structure. Step 2: Plan changes. Step 3: Apply changes via Edit tool."</p>
+                </div>
+
+                <div style="background: var(--schema-alert-error-bg); padding: 12px; border-left: 4px solid var(--error-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>4. Chat Compaction & Role Context Loss (Chats 11, 21)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Issue:</strong> Long chats caused compaction of role specification and agent instructions. Agent lost context mid-session and violated protocol (made changes without ask_questions approval, skipped /updateprompt gates).</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Root Cause:</strong> Role context deleted during chat compaction; agent continued with partial instructions.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Impact:</strong> Workflow failures; audit trail broken; user trust affected.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Fix Required:</strong> Prevent long chats > 15 prompts without /chathandoff. Keep role specification external (coding-standards.yaml) as permanent reference, not chat-dependent.</p>
+                </div>
+
+                <div style="background: var(--schema-alert-warning-bg); padding: 12px; border-left: 4px solid var(--warning-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>5. File Verification Gaps (Chats 25-28)</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Issue:</strong> Agent claimed files written successfully (logged success:true) but files were not actually created. Prompts 79-82 marked as successful with missing Admin.tt, AI.tt documentation.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Root Cause:</strong> No Read verification step after Write operation. Rule 3 violation: "ALWAYS verify files exist after Write."</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Impact:</strong> False audit trail; silent failures; documentation gap undetected.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Fix Required:</strong> Add post-Write verification step: "After Write, immediately Read target file to verify content. If file missing or incomplete, log failure and ask user for correction."</p>
+                </div>
+
+                <h6 style="margin-top: 20px; color: var(--info-color);">⚠️ WARNINGS - Edge Cases to Handle</h6>
+                
+                <div style="background: var(--schema-alert-info-bg); padding: 12px; border-left: 4px solid var(--info-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>Template Conformance Checks Before Submission</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">Agent must verify: (1) All required META block fields present (title, description, roles, category, page_version, last_updated), (2) PageVersion RCS line in correct format, (3) Debug IF block present, (4) Sections match template: Overview, Prerequisites, Getting Started, Advanced, Troubleshooting, Config Table, See Also, (5) Inline CSS uses theme variables, not hardcoded colors.</p>
+                </div>
+
+                <div style="background: var(--schema-alert-info-bg); padding: 12px; border-left: 4px solid var(--info-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>Link Validation Requirements</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">Before final submission: (1) All internal anchors (#section-id) point to existing IDs in document, (2) External links use /Documentation/FileName format (no .tt extension), (3) All links tested for 404 errors, (4) Title attributes added for accessibility, (5) Markdown links converted to HTML <a> tags with proper Catalyst uri_for() helpers.</p>
+                </div>
+
+                <h6 style="margin-top: 20px; color: var(--warning-color);">🧪 Real-World Testing Findings (Chat 65 - PriorityTodos.tt)</h6>
+                <p style="color: var(--text-muted-color); font-size: 0.95em; margin: 10px 0;">During real-world testing of DocumentationAgent WRITER with PriorityTodos.tt menu modifications, the following improvements were identified:</p>
+                
+                <div style="background: var(--schema-alert-warning-bg); padding: 12px; border-left: 4px solid var(--warning-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>🟡 Issue: CSS Theme Variable Compliance Gap</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">DocumentationAgent initially used hardcoded colors (#667eea, #764ba2) instead of theme variables (var(--primary-color), var(--secondary-color), var(--text-color)). This violated documentation CSS compliance standards and would prevent proper theme switching.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Resolution:</strong> All color styles updated to use theme variables. Agent should validate CSS compliance before final submission.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Improvement Action:</strong> Add pre-submission CSS validation checklist requiring agent to verify all inline styles use theme variables, not hardcoded colors.</p>
+                </div>
+                
+                <div style="background: var(--schema-alert-success-bg); padding: 12px; border-left: 4px solid var(--success-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>✅ Discovery: Collapsible Container Pattern Preferred</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">User feedback showed that compact navigation menus should use <code>&lt;details&gt;</code> collapsible containers (closed by default) rather than always-visible bars. This matches existing documentation component patterns (used in DailyAuditGuide.tt).</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Improvement Action:</strong> Update documentation component guidelines to specify collapsible containers for auxiliary navigation/menus. Include styling pattern example: gray background (#f9f9f9), light header (#f5f5f5), border, and padding standards.</p>
+                </div>
+                
+                <div style="background: var(--schema-alert-info-bg); padding: 12px; border-left: 4px solid var(--info-color); border-radius: 3px; margin: 10px 0;">
+                    <p style="margin: 5px 0;"><strong>ℹ️ Observation: Link Testing Critical</strong></p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);">DocumentationAgent must verify all internal anchor links (#priority-1, #priority-2, etc.) point to existing IDs in the document. External links (/Documentation/FileName routes) should be tested for 404 errors before final submission.</p>
+                    <p style="margin: 8px 0 0 0; font-size: 0.9em; color: var(--text-color);"><strong>Improvement Action:</strong> Add link validation step to agent workflow: (1) Verify internal anchors exist in document, (2) Test external routes match actual documentation pages, (3) Use title attributes with descriptive text for accessibility.</p>
+                </div>
+
+                <div style="background: var(--secondary-color); padding: 15px; border-radius: 3px; margin: 20px 0; text-align: center;">
+                    <p style="margin: 5px 0;"><strong>Next Action:</strong> Review this proposal and confirm implementation approach.</p>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-muted-color);">This proposal was added on 2026-01-16 as part of IDE consolidation cleanup and agent architecture redesign.</p>
+                    <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>DocumentationAgent Testing Findings added on 2026-01-16 Chat 65.</strong></p>
+                </div>
+            </div>
+        </details>
+
+    </div>
+</div>

@@ -1,0 +1,418 @@
+[% META
+    title = 'Media Model - File & Asset Management'
+    description = 'Comprehensive documentation for Media model covering media file storage, type management, content association, file operations, and usage examples for managing images, documents, and other media assets with content relationship tracking'
+    roles = 'admin,developer,editor'
+    TemplateType = 'model'
+    category = 'models,media,file-management'
+    page_version = '1.00'
+    last_updated = '2026-01-08 20:40:00 UTC'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/models/Media.tt,v 1.00 2026/01/08 zencoder-docsync Exp ' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="media-model">Media Model - File & Asset Management</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Database Schema & Fields</a></li>
+                    <li><a href="#relationships">Relationships</a></li>
+                    <li><a href="#supported-types">Supported Media Types</a></li>
+                    <li><a href="#api-methods">API Methods</a></li>
+                    <li><a href="#examples">Usage Examples</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#see-also">See Also</a></li>
+                </ul>
+            </div>
+
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.00 - Jan 8, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>Media.pm Addition:</strong> New DBIx::Class Result model for managing media files and assets</li>
+                    <li><strong>Initial Documentation:</strong> Created comprehensive documentation for schema, types, and file management</li>
+                    <li><strong>Content Association:</strong> Documented optional relationship to Content model for media grouping</li>
+                </ul>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <strong>Media</strong> model (Comserv/lib/Comserv/Model/Schema/Ency/Result/Media.pm) 
+                    provides a database abstraction layer for managing media files, assets, and attachments across the Comserv application. 
+                    It is a DBIx::Class Result class that supports:
+                </p>
+                <ul>
+                    <li>Media file metadata storage (filename, type, references)</li>
+                    <li>File type classification and filtering</li>
+                    <li>Optional content association (grouping media by content)</li>
+                    <li>Media lifecycle management (creation, deletion, reference counting)</li>
+                    <li>Support for images, documents, videos, audio, and custom media types</li>
+                    <li>Flexible filtering by file type or content relationship</li>
+                </ul>
+                <p>
+                    Media acts as a registry for files in the application, storing metadata that allows 
+                    controllers and utilities to manage files, enforce access control, track file usage, and 
+                    maintain relationships between media and content (articles, documentation, projects, etc.).
+                </p>
+            </section>
+
+            <section id="schema">
+                <h2>Database Schema & Fields</h2>
+                
+                <h3>Table: media</h3>
+                <p><strong>Purpose:</strong> Store metadata and references for media files and assets</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Data Type</th>
+                        <th>Nullable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td><code>id</code></td>
+                        <td>INTEGER</td>
+                        <td>No</td>
+                        <td>Auto-increment</td>
+                        <td>Primary key - unique media record identifier</td>
+                    </tr>
+                    <tr>
+                        <td><code>filename</code></td>
+                        <td>VARCHAR(255)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>Original filename (e.g., document.pdf, photo.jpg, slide_deck.pptx)</td>
+                    </tr>
+                    <tr>
+                        <td><code>type</code></td>
+                        <td>VARCHAR(50)</td>
+                        <td>No</td>
+                        <td>—</td>
+                        <td>File type/MIME classification (e.g., image, document, video, audio, application)</td>
+                    </tr>
+                    <tr>
+                        <td><code>content_id</code></td>
+                        <td>INTEGER</td>
+                        <td>Yes</td>
+                        <td>NULL</td>
+                        <td>Foreign key to content.id (optional; allows grouping media by content)</td>
+                    </tr>
+                </table>
+
+                <h3>Field Details</h3>
+                
+                <h4>filename</h4>
+                <p>
+                    The original filename as uploaded or created. Examples:
+                </p>
+                <ul>
+                    <li><code>comserv_logo.png</code></li>
+                    <li><code>deployment_guide_v2.1.pdf</code></li>
+                    <li><code>product_demo_20260108.mp4</code></li>
+                    <li><code>infrastructure_diagram.svg</code></li>
+                </ul>
+                <p><strong>Note:</strong> Filesystem path not stored here (handled by file management utility); only filename for display.</p>
+
+                <h4>type</h4>
+                <p>
+                    Categorizes the media file for filtering and validation. Recommended values:
+                </p>
+                <ul>
+                    <li><code>image</code> - JPEG, PNG, GIF, SVG, WebP</li>
+                    <li><code>document</code> - PDF, Word, Excel, PowerPoint</li>
+                    <li><code>video</code> - MP4, WebM, MOV, AVI</li>
+                    <li><code>audio</code> - MP3, WAV, OGG, AAC</li>
+                    <li><code>application</code> - ZIP, EXE, JAR, Executable archives</li>
+                    <li><code>text</code> - TXT, CSV, Log files</li>
+                    <li><code>source</code> - Code files (Perl, Python, JS, etc.)</li>
+                </ul>
+                <p><strong>Best Practice:</strong> Use consistent type values for queries and filtering.</p>
+
+                <h4>content_id</h4>
+                <p>
+                    Optional foreign key linking media to Content records. Enables:
+                </p>
+                <ul>
+                    <li><strong>Media Grouping:</strong> Associate multiple images/files with a single content item</li>
+                    <li><strong>Cascade Operations:</strong> Delete all media when associated content is removed</li>
+                    <li><strong>Usage Tracking:</strong> Know which content uses which media</li>
+                    <li><strong>NULL for Orphaned Media:</strong> Media not yet associated with any content</li>
+                </ul>
+                <p><strong>LEFT JOIN Logic:</strong> Relationship uses LEFT JOIN, allowing orphaned media records.</p>
+            </section>
+
+            <section id="relationships">
+                <h2>Relationships</h2>
+                
+                <h3>belongs_to: content</h3>
+                <pre><code>$media->content();  # Returns Content object if content_id is set
+my $parent_content = $media->content();
+if ($parent_content) {
+    print "Media belongs to: " . $parent_content->title . "\n";
+}</code></pre>
+                <p><strong>Relationship Type:</strong> belongs_to (LEFT JOIN)</p>
+                <p><strong>Foreign Key:</strong> content_id → content.id</p>
+                <p><strong>Nullable:</strong> YES (NULL if media not associated with content)</p>
+                <p><strong>Purpose:</strong> Link media files to their parent content item</p>
+                <p><strong>Join Type:</strong> LEFT (allows orphaned media without parent content)</p>
+
+                <h3>Recommended Inverse Relationship</h3>
+                <p>The Content model should define:</p>
+                <pre><code>$content->media();  # Get all media associated with this content
+my @files = $content->media()->all;
+print "Content has " . scalar(@files) . " files\n";</code></pre>
+                <p><strong>Purpose:</strong> Enable queries like "all images for article X" or "media by content type"</p>
+            </section>
+
+            <section id="supported-types">
+                <h2>Supported Media Types</h2>
+                
+                <h3>Type Classification</h3>
+                <p>
+                    The <code>type</code> field categorizes files for application-level filtering and validation:
+                </p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Type Value</th>
+                        <th>File Extensions</th>
+                        <th>MIME Types</th>
+                        <th>Use Cases</th>
+                    </tr>
+                    <tr>
+                        <td><code>image</code></td>
+                        <td>.jpg, .png, .gif, .svg, .webp</td>
+                        <td>image/jpeg, image/png, image/svg+xml</td>
+                        <td>UI graphics, photos, diagrams, logos</td>
+                    </tr>
+                    <tr>
+                        <td><code>document</code></td>
+                        <td>.pdf, .docx, .xlsx, .pptx</td>
+                        <td>application/pdf, application/msword</td>
+                        <td>Guides, reports, proposals, templates</td>
+                    </tr>
+                    <tr>
+                        <td><code>video</code></td>
+                        <td>.mp4, .webm, .mov, .avi</td>
+                        <td>video/mp4, video/webm</td>
+                        <td>Demos, tutorials, presentations</td>
+                    </tr>
+                    <tr>
+                        <td><code>audio</code></td>
+                        <td>.mp3, .wav, .ogg, .aac</td>
+                        <td>audio/mpeg, audio/wav</td>
+                        <td>Podcasts, narration, sound effects</td>
+                    </tr>
+                    <tr>
+                        <td><code>application</code></td>
+                        <td>.zip, .tar, .exe, .jar</td>
+                        <td>application/zip, application/x-executable</td>
+                        <td>Releases, installers, archives</td>
+                    </tr>
+                    <tr>
+                        <td><code>text</code></td>
+                        <td>.txt, .csv, .log</td>
+                        <td>text/plain, text/csv</td>
+                        <td>Data exports, logs, raw text</td>
+                    </tr>
+                </table>
+
+                <h3>Custom Type Registration</h3>
+                <p>
+                    Applications can define additional type values in configuration:
+                </p>
+                <pre><code>
+# Custom type example
+my $media = $rs->create({
+    filename   => 'backup_20260108.sql',
+    type       => 'database',  # Custom type
+    content_id => undef,
+});
+                </code></pre>
+                <p><strong>Note:</strong> Use consistent type values across application; consider documenting in app configuration.</p>
+            </section>
+
+            <section id="api-methods">
+                <h2>API Methods</h2>
+                
+                <h3>Instance Methods</h3>
+                
+                <h4>$media->content()</h4>
+                <pre><code>my $parent = $media->content();
+if ($parent) {
+    print "Associated with: " . $parent->id . "\n";
+} else {
+    print "Media is orphaned (no parent content)\n";
+}</code></pre>
+                <p><strong>Returns:</strong> Content Result object, or undef if content_id is NULL</p>
+                <p><strong>Purpose:</strong> Get parent content for this media file</p>
+
+                <h3>Standard DBIx::Class Methods</h3>
+                <pre><code>
+# Create media record
+my $media = $rs->create({
+    filename   => 'photo.jpg',
+    type       => 'image',
+    content_id => $content_id,  # Optional
+});
+
+# Update media type
+$media->type('document');
+$media->update();
+
+# Delete media
+$media->delete();
+
+# Search by type
+my @images = $rs->search({ type => 'image' })->all;
+
+# Search by content
+my @content_media = $rs->search({ content_id => $id })->all;
+
+# Search with content prefetch
+my @with_parent = $rs->search(
+    { type => 'image' },
+    { prefetch => 'content' }
+)->all;
+                </code></pre>
+            </section>
+
+            <section id="examples">
+                <h2>Usage Examples</h2>
+                
+                <h3>Example 1: Register Uploaded Image</h3>
+                <pre><code>
+my $schema = $c->model('Ency::Schema');
+my $rs = $schema->resultset('Media');
+
+my $media = $rs->create({
+    filename   => 'documentation_screenshot.png',
+    type       => 'image',
+    content_id => $article_id,
+});
+
+print "Registered media ID: " . $media->id . "\n";
+                </code></pre>
+
+                <h3>Example 2: List All Images for Content</h3>
+                <pre><code>
+my @images = $rs->search({
+    type       => 'image',
+    content_id => $article_id,
+})->all;
+
+foreach my $img (@images) {
+    print $img->filename . " (ID: " . $img->id . ")\n";
+}
+                </code></pre>
+
+                <h3>Example 3: Find Orphaned Media</h3>
+                <pre><code>
+my @orphaned = $rs->search({
+    content_id => undef
+})->all;
+
+print "Found " . scalar(@orphaned) . " orphaned media files\n";
+                </code></pre>
+
+                <h3>Example 4: Bulk Type Update</h3>
+                <pre><code>
+my @old_videos = $rs->search({ type => 'video' })->all;
+
+foreach my $v (@old_videos) {
+    $v->type('multimedia');
+    $v->update();
+}
+
+print "Updated " . scalar(@old_videos) . " videos to 'multimedia'\n";
+                </code></pre>
+
+                <h3>Example 5: Media with Parent Content Info</h3>
+                <pre><code>
+my @docs = $rs->search(
+    { type => 'document' },
+    { prefetch => 'content' }
+)->all;
+
+foreach my $doc (@docs) {
+    print $doc->filename . " → ";
+    if ($doc->content) {
+        print "Used in content ID " . $doc->content->id . "\n";
+    } else {
+        print "Unassociated\n";
+    }
+}
+                </code></pre>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                
+                <h3>Issue: "Can't find Content with id X" on content lookup</h3>
+                <p><strong>Cause:</strong> content_id references a Content record that no longer exists.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Set content_id to NULL (orphan the media): `$media->content_id(undef)->update()`</li>
+                    <li>Or delete the media: `$media->delete()`</li>
+                    <li>Check database for orphaned records: `SELECT id FROM media WHERE content_id NOT IN (SELECT id FROM content)`</li>
+                </ul>
+
+                <h3>Issue: "Type field too restrictive"</h3>
+                <p><strong>Cause:</strong> VARCHAR(50) insufficient for long type values or custom naming.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Use standardized short type values (image, document, etc.)</li>
+                    <li>Store detailed description elsewhere (in filename, notes, separate field)</li>
+                    <li>Expand column if needed: `ALTER TABLE media MODIFY COLUMN type VARCHAR(100)`</li>
+                </ul>
+
+                <h3>Issue: "Duplicate filename references"</h3>
+                <p><strong>Cause:</strong> No unique constraint on filename (same file registered multiple times).</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check for duplicates: `SELECT filename, COUNT(*) FROM media GROUP BY filename HAVING COUNT(*) > 1`</li>
+                    <li>Consolidate if possible (merge duplicate references)</li>
+                    <li>Add unique constraint if needed: `ALTER TABLE media ADD UNIQUE INDEX idx_filename (filename)`</li>
+                </ul>
+
+                <h3>Issue: "Media not showing up in content queries"</h3>
+                <p><strong>Cause:</strong> Forgot to prefetch 'content' relationship in search.</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Use prefetch in query: `search({...}, { prefetch => 'content' })`</li>
+                    <li>Or call ->content() explicitly (lazy-loads relationship)</li>
+                    <li>Check content_id is not NULL and points to valid Content record</li>
+                </ul>
+            </section>
+
+            <section id="see-also">
+                <h2>See Also</h2>
+                <div class="alert alert-success">
+                    <strong>Related Documentation:</strong>
+                    <ul style="margin: 5px 0 0 20px;">
+                        <li><a href="/Documentation/models/Content">Content Model</a> - Parent content relationship</li>
+                        <li><a href="/Documentation/system/FileManagement">File Management Guide</a> - Filesystem storage coordination</li>
+                    </ul>
+                </div>
+            </section>
+
+            <hr style="margin: 40px 0;">
+            <footer style="color: #666; font-size: 12px;">
+                <p>
+                    <strong>File:</strong> Comserv/lib/Comserv/Model/Schema/Ency/Result/Media.pm<br>
+                    <strong>Documentation Version:</strong> 1.00 (2026-01-08)<br>
+                    <strong>Last Updated:</strong> 2026-01-08 20:40:00 UTC<br>
+                    <strong>Maintained By:</strong> Zencoder (MainAgent)
+                </p>
+            </footer>
+        </div>
+    </div>
+</div>

@@ -1,5 +1,23 @@
 #!/usr/bin/env perl
 
+BEGIN {
+    # CRITICAL FIX (November 2025): Ensure main lib/ takes ABSOLUTE PRIORITY over blib/lib/
+    # Same fix as comserv_server.pl to prevent test framework from loading stale code
+    use FindBin;
+    
+    # STEP 1: Remove any blib/lib entries from @INC (Module::Install artifact)
+    @INC = grep { 
+        $_ !~ /blib[\/\\]lib/ && 
+        $_ !~ /\Qblib\E/ 
+    } @INC;
+    
+    # STEP 2: Add main lib path to VERY BEGINNING of @INC via unshift (takes absolute priority)
+    unshift @INC, "$FindBin::Bin/../lib";
+    
+    # STEP 3: Also add project root for relative module loading
+    unshift @INC, "$FindBin::Bin/..";
+}
+
 use Catalyst::ScriptRunner;
 Catalyst::ScriptRunner->run('Comserv', 'Test');
 

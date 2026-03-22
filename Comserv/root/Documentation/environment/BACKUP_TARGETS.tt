@@ -1,0 +1,19 @@
+[% META title = 'Backup Targets' %]
+[% PageVersion = 'Documentation/environment/BACKUP_TARGETS.tt,v 0.01 2025/11/14 Codebuddy Exp Codebuddy ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="backup-targets">
+    <h1>Backup targets and retention</h1>
+    <p>Reference for backup destinations, retention windows, and restore SLAs. Do not include credentials.</p>
+    <ul>
+        <li>Backup locations (local, NFS, object store)</li>
+        <li>Retention policies</li>
+        <li>Contacts for restore verification</li>
+    </ul>
+</div>
+
+...rest of the code...

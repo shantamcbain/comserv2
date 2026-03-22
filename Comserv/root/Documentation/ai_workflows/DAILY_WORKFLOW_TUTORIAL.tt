@@ -1,0 +1,624 @@
+[% META 
+   title = 'Daily Workflow Tutorial - 4-Agent System Guide'
+   description = 'Complete step-by-step tutorial for team members on how to execute the daily planning and coordination workflow using the 4-agent system (Daily Audit, DocumentationSync, Master Plan Updater, Daily Plans Generator). Includes agent descriptions, prompt templates, troubleshooting, and team role assignments. Updated Jan 2 with agent lockup prevention fixes.'
+   roles = 'admin,developer,devops'
+   TemplateType = 'Documentation'
+   category = 'workflow,tutorial,agents,planning,team-processes'
+   page_version = '0.02'
+   last_updated = 'Thu Jan 02 15:46:00 UTC 2026'
+%]
+[% PageVersion = 'root/Documentation/ai_workflows/DAILY_WORKFLOW_TUTORIAL.tt,v 0.02 2026/01/02 15:46:00 zencoder Exp - Jan 2 Update: Agent lockup prevention protocol documented; multi-file safety constraints added' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [% "Debugging HostName: " _ HostName %]
+[% END %]
+
+<div class="app-container">
+    <h1>Daily Workflow Tutorial: 4-Agent System Guide</h1>
+    
+    <div class="alert alert-warning">
+        <h3>📋 Purpose of This Guide</h3>
+        <p>This tutorial teaches all team members (technical and non-technical) how to execute the daily planning and coordination workflow. The workflow uses 4 specialized AI agents that work together in sequence to maintain project state, update documentation, and generate daily plans for the entire team.</p>
+        <p><strong>⏱️ Typical Duration</strong>: 45-90 minutes per day (depending on chat complexity)</p>
+        <p><strong>🎯 Best Time</strong>: First thing in the morning, after checking for overnight updates</p>
+    </div>
+
+    <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+        <h3 style="margin-top: 0; color: #155724;">✅ Update: Jan 2, 2026 - Agent Lockup Prevention</h3>
+        <p style="margin: 5px 0; color: #155724;"><strong>Multi-File Operations Safety:</strong> Cleanup Agent and other agents now have lockup prevention protocols when updating multiple files. Pattern: /updateprompt BEFORE each file edit (not before all files). This prevents token exhaustion during infrastructure updates.</p>
+        <p style="margin: 5px 0; color: #155724;"><strong>Agent Compliance Improvements:</strong> Main Agent spec updated with mandatory /updateprompt enforcement and PATH A/B/C workflow pattern. Ensures consistent behavior across all prompts.</p>
+        <p style="margin: 5px 0; color: #155724;"><strong>Impact on Tutorial:</strong> When agents report multi-file operations (like updating 3+ documentation files), they now follow safe checkpoint pattern automatically.</p>
+    </div>
+
+    <h2 id="overview">1. The 4-Agent Workflow Overview</h2>
+    
+    <div style="background: #f0f7ff; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h3>How It Works (In Order)</h3>
+        <ol style="font-size: 1.1em; line-height: 1.8;">
+            <li><strong style="color: #d9534f;">🔴 Daily Audit Agent</strong> - Reads yesterday's work and creates an audit report</li>
+            <li><strong style="color: #f0ad4e;">🟠 DocumentationSync Agent</strong> - Updates documentation based on code changes</li>
+            <li><strong style="color: #5cb85c;">🟢 Master Plan Updater Agent</strong> - Updates the master coordination document</li>
+            <li><strong style="color: #0275d8;">🔵 Daily Plans Generator Agent</strong> - Creates 7-day plans for team execution</li>
+        </ol>
+        <p style="margin-top: 20px;"><strong>⏱️ Why Multiple Chats?</strong> Zencoder performance degrades with each prompt, so agents run in separate chats with /chathandoff checkpoints between them. This prevents token exhaustion and maintains accuracy.</p>
+    </div>
+
+    <h2 id="quick-start">2. Quick Start: First Run of the Day</h2>
+    
+    <div class="alert alert-info">
+        <h4>✅ Morning Checklist (5 minutes)</h4>
+        <ol>
+            <li>Open Zencoder IDE integration</li>
+            <li>Navigate to <strong>Chat with AI</strong></li>
+            <li>Check today's daily plan: <a href="/Documentation/Daily_Plans-CURRENT-DATE">/Documentation/Daily_Plans-CURRENT-DATE</a></li>
+            <li>Run Agent 1 (Daily Audit) - see "Chat 1" section below</li>
+            <li>After Agent 1 completes, proceed to Agent 2 in new chat</li>
+        </ol>
+    </div>
+
+    <h2 id="detailed-workflow">3. Detailed Workflow: Step-by-Step for Each Agent</h2>
+
+    <h3 id="agent1">Agent 1: Daily Audit Agent (15-20 minutes)</h3>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+        <h4>🔴 What This Agent Does</h4>
+        <p>Reads the chat history from yesterday and creates a summary of what was accomplished, what code was changed, and what still needs work.</p>
+        <p><strong>Output</strong>: audit_YYYY-MM-DD.md (human-readable) and audit_YYYY-MM-DD.json (computer-readable)</p>
+    </div>
+
+    <h4>How to Run Agent 1</h4>
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="width: 30%; padding: 10px;">Step</th>
+            <th style="width: 70%; padding: 10px;">What to Do</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Open New Chat</strong></td>
+            <td style="padding: 10px;">Start a fresh chat conversation (don't use old chats)</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
+            <td style="padding: 10px;">Use the prompt template (customize placeholders in [BRACKETS])</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Paste & Send</strong></td>
+            <td style="padding: 10px;">Send to Zencoder - agent will respond with work summary</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Review Output</strong></td>
+            <td style="padding: 10px;">Check the audit files created in Documentation/session_history/audit_logs/</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Wait for /chathandoff</strong></td>
+            <td style="padding: 10px;">Agent will execute /chathandoff automatically when done</td>
+        </tr>
+    </table>
+
+    <h4>Agent 1 Prompt Template (COPY & PASTE)</h4>
+    <pre style="background: #f5f5f5; padding: 15px; border-left: 4px solid #d9534f; overflow-x: auto;"><code>I need you to run the Daily Audit Agent to document yesterday's work.
+
+Here are the details:
+- Yesterday's date: [YESTERDAY-DATE, e.g., 2026-01-02]
+- Today's date: [TODAY-DATE, e.g., 2026-01-03]
+- Work session: [DESCRIBE YESTERDAY'S FOCUS, e.g., "A.2 K8s Readiness - Phase 2 (Architecture Design)"]
+- Chats worked: [CHAT NUMBERS, e.g., "Chats 5-7"]
+- Key accomplishments: [2-3 ITEMS, e.g., "Completed K8s architecture design, created migration strategy, tested tooling"]
+
+Run the Daily Audit Agent workflow:
+1. Read prompts_log.yaml latest chat entries
+2. Extract: files modified, code changes, issues
+3. Create: audit_[YESTERDAY-DATE].md (append mode) + audit_[YESTERDAY-DATE].json (merge mode)
+4. Generate code diffs for modified files
+5. Execute /chathandoff when complete
+
+Note: Output goes to /Comserv/root/Documentation/session_history/audit_logs/</code></pre>
+
+    <h4>What Success Looks Like</h4>
+    <ul>
+        <li>✅ Agent reads session history and extracts work summary</li>
+        <li>✅ Agent creates audit_YYYY-MM-DD.md file (human-readable)</li>
+        <li>✅ Agent creates audit_YYYY-MM-DD.json file (structured)</li>
+        <li>✅ Agent executes /chathandoff (note in console)</li>
+        <li>✅ Agent responds: "Audit complete. Ready for next agent."</li>
+    </ul>
+
+    <hr style="margin: 30px 0;">
+
+    <h3 id="agent2">Agent 2: DocumentationSync Agent (10-15 minutes)</h3>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+        <h4>🟠 What This Agent Does</h4>
+        <p>Takes the audit from Agent 1 and updates all relevant documentation files. When code changes, this agent finds the corresponding .tt documentation and updates it.</p>
+        <p><strong>Input</strong>: audit_YYYY-MM-DD.md (from Agent 1)</p>
+        <p><strong>Output</strong>: Updated documentation files in /Comserv/root/Documentation/</p>
+    </div>
+
+    <h4>How to Run Agent 2</h4>
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="width: 30%; padding: 10px;">Step</th>
+            <th style="width: 70%; padding: 10px;">What to Do</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Open New Chat</strong></td>
+            <td style="padding: 10px;">Start a fresh chat (previous chat with Agent 1 is done)</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
+            <td style="padding: 10px;">Use the template with yesterday's date</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Paste & Send</strong></td>
+            <td style="padding: 10px;">Agent will sync documentation to code changes</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Review Changes</strong></td>
+            <td style="padding: 10px;">Agent will list which .tt files were updated</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Wait for /chathandoff</strong></td>
+            <td style="padding: 10px;">Agent executes /chathandoff when done</td>
+        </tr>
+    </table>
+
+    <h4>Agent 2 Prompt Template (COPY & PASTE)</h4>
+    <pre style="background: #f5f5f5; padding: 15px; border-left: 4px solid #f0ad4e; overflow-x: auto;"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
+
+Details:
+- Audit date: [YESTERDAY-DATE, e.g., 2026-01-02]
+- Changed files: [LIST OF CODE FILES MODIFIED, e.g., "Comserv/lib/AI.pm, Comserv/root/static/js/widget.js"]
+- Documentation focus: [WHAT TO UPDATE, e.g., "AI Chat System docs, Widget UI/UX docs"]
+
+Run the DocumentationSync Agent workflow:
+1. Read audit_[YESTERDAY-DATE].md from session history
+2. Map code files to documentation files (e.g., AI.pm → Documentation/controllers/AI.tt)
+3. Update relevant .tt documentation files with latest changes
+4. Add Recent Changes section noting what was updated
+5. Update version numbers and timestamps in META sections
+6. Validate all files for HTML/TT syntax
+7. Execute /chathandoff when complete
+
+Do NOT create new files; update ONLY existing documentation files.</code></pre>
+
+    <h4>What Success Looks Like</h4>
+    <ul>
+        <li>✅ Agent reads audit file from Agent 1</li>
+        <li>✅ Agent identifies which docs need updating</li>
+        <li>✅ Agent updates documentation files (.tt files)</li>
+        <li>✅ Agent lists updated files and line counts</li>
+        <li>✅ Agent executes /chathandoff</li>
+        <li>✅ Agent responds: "Documentation sync complete. Ready for next agent."</li>
+    </ul>
+
+    <hr style="margin: 30px 0;">
+
+    <h3 id="agent3">Agent 3: Master Plan Updater Agent (10-15 minutes)</h3>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+        <h4>🟢 What This Agent Does</h4>
+        <p>Takes the audit from Agent 2 and updates the MasterPlanCoordination.tt file (the single source of truth for all 15 plans). Updates version numbers, timestamps, status, and next steps.</p>
+        <p><strong>Input</strong>: Audit from Agent 1-2</p>
+        <p><strong>Output</strong>: Updated MasterPlanCoordination.tt with version bump</p>
+    </div>
+
+    <h4>How to Run Agent 3</h4>
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="width: 30%; padding: 10px;">Step</th>
+            <th style="width: 70%; padding: 10px;">What to Do</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Open New Chat</strong></td>
+            <td style="padding: 10px;">Fresh chat (independent from previous agents)</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
+            <td style="padding: 10px;">Update plan status and next steps</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Paste & Send</strong></td>
+            <td style="padding: 10px;">Agent updates master plan file</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Verify Update</strong></td>
+            <td style="padding: 10px;">Check <a href="/Documentation/MASTER_PLAN_COORDINATION">/Documentation/MasterPlanCoordination.tt</a></td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Wait for /chathandoff</strong></td>
+            <td style="padding: 10px;">Agent executes checkpoint</td>
+        </tr>
+    </table>
+
+    <h4>Agent 3 Prompt Template (COPY & PASTE)</h4>
+    <pre style="background: #f5f5f5; padding: 15px; border-left: 4px solid #5cb85c; overflow-x: auto;"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
+
+Details:
+- Audit date: [YESTERDAY-DATE, e.g., 2026-01-02]
+- Plans worked on: [LIST OF PLANS, e.g., "A.2 Kubernetes Readiness, E.1 AI Chat System"]
+- Status updates: [WHAT CHANGED, e.g., "A.2: Phase 2 Architecture Complete, E.1: Widget Validation In Progress"]
+- Blockers: [ANY BLOCKERS, or "None"]
+- Next priorities: [TOP 3 ITEMS FOR TODAY, e.g., "Continue A.2 Phase 3, Validate E.1 widget"]
+
+Run the Master Plan Updater Agent workflow:
+1. Read MasterPlanCoordination.tt current state
+2. Extract current version number
+3. Increment version (e.g., 0.12 → 0.13)
+4. Update: page_version, last_updated timestamp, Status line
+5. Update: Recent Activity section with yesterday's work
+6. Update: Next Steps section with today's priorities
+7. Validate: HTML/TT syntax correct, dates formatted consistently
+8. Execute /chathandoff when complete
+
+File location: /Comserv/root/Documentation/MasterPlanCoordination.tt</code></pre>
+
+    <h4>What Success Looks Like</h4>
+    <ul>
+        <li>✅ Agent reads current master plan state</li>
+        <li>✅ Agent increments version number</li>
+        <li>✅ Agent updates timestamp to current date/time</li>
+        <li>✅ Agent updates Status section with plan progress</li>
+        <li>✅ Agent updates Recent Activity and Next Steps</li>
+        <li>✅ Agent executes /chathandoff</li>
+        <li>✅ Agent responds: "Master plan updated to vX.XX. Ready for final agent."</li>
+    </ul>
+
+    <hr style="margin: 30px 0;">
+
+    <h3 id="agent4">Agent 4: Daily Plans Generator Agent (15-20 minutes)</h3>
+    
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0;">
+        <h4>🔵 What This Agent Does</h4>
+        <p>Takes the updated master plan and creates 7-day daily plans. These plans break down the master plan priorities into actionable daily tasks for the entire team.</p>
+        <p><strong>Input</strong>: Updated MasterPlanCoordination.tt from Agent 3</p>
+        <p><strong>Output</strong>: 7 new Daily_Plans-YYYY-MM-DD.tt files (one for each day of the week)</p>
+    </div>
+
+    <h4>How to Run Agent 4</h4>
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="width: 30%; padding: 10px;">Step</th>
+            <th style="width: 70%; padding: 10px;">What to Do</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Open New Chat</strong></td>
+            <td style="padding: 10px;">Final chat for daily planning</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Copy Prompt Below</strong></td>
+            <td style="padding: 10px;">Specify date range for next 7 days</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Paste & Send</strong></td>
+            <td style="padding: 10px;">Agent creates 7 daily plan files</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>Review Daily Plans</strong></td>
+            <td style="padding: 10px;">Check daily plans directory (each plan has navigation)</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>Wait for /chathandoff</strong></td>
+            <td style="padding: 10px;">Agent completes workflow</td>
+        </tr>
+    </table>
+
+    <h4>Agent 4 Prompt Template (COPY & PASTE)</h4>
+    <pre style="background: #f5f5f5; padding: 15px; border-left: 4px solid #0275d8; overflow-x: auto;"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
+
+Details:
+- Today's date: [TODAY-DATE, e.g., 2026-01-03]
+- Date range for plans: [START-DATE to END-DATE, e.g., 2026-01-03 to 2026-01-09]
+- Team focus areas: [TOP PRIORITIES FROM MASTER PLAN, e.g., "A.2 K8s Readiness (main), A.3 Credentials (parallel), B.1/B.2 reviews"]
+- Special notes: [ANY CONSTRAINTS, e.g., "Weekend work on Jan 5-6, Holiday on Jan 1"]
+
+Run the Daily Plans Generator Agent workflow:
+1. Read MasterPlanCoordination.tt to extract priorities
+2. Review previous 7 days of Daily_Plans-YYYY-MM-DD.tt files
+3. Calculate next 7-day date range (starting today)
+4. Break down master plan priorities into daily actionable tasks
+5. Create Daily_Plans-YYYY-MM-DD.tt for each of the 7 days
+6. Include: Overview, Priority 1-3 tasks with time estimates, Success criteria
+7. Validate all files for HTML/TT syntax
+8. Execute /chathandoff when complete
+
+Output: 7 new files in /Comserv/root/Documentation/DailyPlans/</code></pre>
+
+    <h4>What Success Looks Like</h4>
+    <ul>
+        <li>✅ Agent reads updated master plan</li>
+        <li>✅ Agent creates 7 daily plan files (one for each day)</li>
+        <li>✅ Agent validates all files are formatted correctly</li>
+        <li>✅ Agent updates master plan navigation link to today's plan</li>
+        <li>✅ Agent executes /chathandoff</li>
+        <li>✅ Agent responds: "Generated 7-day plans. Daily workflow complete."</li>
+    </ul>
+
+    <h2 id="team-roles">4. Team Roles & Responsibilities</h2>
+    
+    <div style="background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h3>Who Runs What?</h3>
+        <table border="1" style="width: 100%;">
+            <tr style="background: #5cb85c; color: white;">
+                <th style="padding: 10px;">Role</th>
+                <th style="padding: 10px;">Responsibility</th>
+                <th style="padding: 10px;">Which Agents?</th>
+            </tr>
+            <tr>
+                <td style="padding: 10px;"><strong>Daily Workflow Lead</strong></td>
+                <td style="padding: 10px;">Initiates all 4 agents in sequence each morning</td>
+                <td style="padding: 10px;">Agents 1, 2, 3, 4 (all)</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px;"><strong>Team Members</strong></td>
+                <td style="padding: 10px;">Read generated daily plans; execute tasks for their day</td>
+                <td style="padding: 10px;">Daily plans (output from Agent 4)</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px;"><strong>Tech Lead / Admin</strong></td>
+                <td style="padding: 10px;">Monitor agent execution; troubleshoot issues; update master plan manually if needed</td>
+                <td style="padding: 10px;">Can run any agent independently</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 10px;"><strong>DevOps / Infrastructure</strong></td>
+                <td style="padding: 10px;">Execute infrastructure tasks from daily plans (K8s, deployments, etc.)</td>
+                <td style="padding: 10px;">Reads daily plans for assigned tasks</td>
+            </tr>
+        </table>
+    </div>
+
+    <h2 id="timing">5. Typical Timing & Workflow Schedule</h2>
+    
+    <table border="1" style="width: 100%; margin: 20px 0;">
+        <tr style="background: #f5f5f5;">
+            <th style="width: 15%; padding: 10px;">Time</th>
+            <th style="width: 25%; padding: 10px;">Activity</th>
+            <th style="width: 60%; padding: 10px;">Details</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>8:00 AM</strong></td>
+            <td style="padding: 10px;">Start Daily Workflow</td>
+            <td style="padding: 10px;">Team lead opens Zencoder, reads today's daily plan</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>8:05 AM</strong></td>
+            <td style="padding: 10px;">Agent 1 Chat</td>
+            <td style="padding: 10px;">Send Daily Audit prompt (15-20 min), wait for /chathandoff</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>8:25 AM</strong></td>
+            <td style="padding: 10px;">Agent 2 Chat</td>
+            <td style="padding: 10px;">Send DocumentationSync prompt (10-15 min), wait for /chathandoff</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>8:40 AM</strong></td>
+            <td style="padding: 10px;">Agent 3 Chat</td>
+            <td style="padding: 10px;">Send Master Plan Update prompt (10-15 min), wait for /chathandoff</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>8:55 AM</strong></td>
+            <td style="padding: 10px;">Agent 4 Chat</td>
+            <td style="padding: 10px;">Send Daily Plans Generator prompt (15-20 min), wait for /chathandoff</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+            <td style="padding: 10px;"><strong>9:15 AM</strong></td>
+            <td style="padding: 10px;">Workflow Complete</td>
+            <td style="padding: 10px;">Review generated daily plans; distribute to team</td>
+        </tr>
+        <tr>
+            <td style="padding: 10px;"><strong>9:30 AM - 5:00 PM</strong></td>
+            <td style="padding: 10px;">Team Execution</td>
+            <td style="padding: 10px;">Team members work on tasks from daily plans</td>
+        </tr>
+    </table>
+
+    <h2 id="troubleshooting">6. Troubleshooting Guide</h2>
+    
+    <h3>Common Issues & Solutions</h3>
+
+    <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #f0ad4e;">
+        <h4>❌ Agent Doesn't Respond or Takes Too Long</h4>
+        <p><strong>Cause:</strong> Zencoder experiencing lag or overload</p>
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Wait 2-3 minutes; agent may still be processing</li>
+            <li>Check network connection</li>
+            <li>If >5 minutes, refresh browser (don't close chat)</li>
+            <li>If still stuck, close chat and try prompt again in new chat</li>
+            <li>If problem persists: Skip that agent, continue with next (not ideal but workflow continues)</li>
+        </ol>
+    </div>
+
+    <div style="background: #f8d7da; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #dc3545;">
+        <h4>❌ Agent Says "Cannot Find File"</h4>
+        <p><strong>Cause:</strong> File path is incorrect or file doesn't exist yet</p>
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Check file location: <strong>/Comserv/root/Documentation/session_history/</strong> for audit files</li>
+            <li>Verify date format in filename: YYYY-MM-DD (e.g., 2026-01-02.md)</li>
+            <li>If Agent 1 hasn't run yet, audit file won't exist—run Agent 1 first</li>
+            <li>Manually create audit file with placeholder content (ask tech lead)</li>
+        </ol>
+    </div>
+
+    <div style="background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #17a2b8;">
+        <h4>❌ /chathandoff Didn't Execute (Agent Didn't Move to Next Step)</h4>
+        <p><strong>Cause:</strong> Agent completed work but forgot final checkpoint</p>
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Type in chat: <strong>/chathandoff</strong> (manually execute checkpoint)</li>
+            <li>Copy agent's output to session history manually (ask tech lead)</li>
+            <li>Proceed to next agent in new chat</li>
+            <li>Report to tech lead: "Agent 2 skipped /chathandoff"</li>
+        </ol>
+    </div>
+
+    <div style="background: #d4edda; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #28a745;">
+        <h4>⚠️ Agent Made Unexpected Changes to Files</h4>
+        <p><strong>Cause:</strong> Agent interpreted prompt incorrectly or had stale data</p>
+        <p><strong>Solution:</strong></p>
+        <ol>
+            <li>Review changes in Git: <strong>git diff</strong> to see what changed</li>
+            <li>If changes are correct: commit them with message "Auto-update from [Agent Name]"</li>
+            <li>If changes are wrong: <strong>git checkout [filename]</strong> to revert</li>
+            <li>Report issue to tech lead with details of what went wrong</li>
+        </ol>
+    </div>
+
+    <h2 id="best-practices">7. Best Practices & Tips</h2>
+    
+    <div style="background: #e8f4f8; padding: 20px; border-radius: 5px;">
+        <h4>✅ Do This</h4>
+        <ul style="line-height: 1.8;">
+            <li><strong>Run workflow consistently:</strong> Same time each morning ensures predictable behavior</li>
+            <li><strong>Keep prompts clear:</strong> Provide specific dates, file names, and context</li>
+            <li><strong>Review outputs:</strong> Check generated files for accuracy before team uses them</li>
+            <li><strong>Wait for /chathandoff:</strong> Don't start next chat until agent signals completion</li>
+            <li><strong>Document issues:</strong> Log problems with agents for pattern analysis</li>
+            <li><strong>Backup daily plans:</strong> If generating fails, use previous day as template</li>
+            <li><strong>Communicate with team:</strong> Share daily plans as soon as Agent 4 completes</li>
+        </ul>
+    </div>
+
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin-top: 20px;">
+        <h4>❌ Don't Do This</h4>
+        <ul style="line-height: 1.8;">
+            <li><strong>Skip agents:</strong> All 4 agents must run in sequence for workflow integrity</li>
+            <li><strong>Reuse old chats:</strong> Always start fresh chats (old chats have stale context)</li>
+            <li><strong>Edit agent prompts:</strong> Use templates as-is; only change [PLACEHOLDERS]</li>
+            <li><strong>Run agents out of order:</strong> Agent 1 → 2 → 3 → 4 (no jumping)</li>
+            <li><strong>Manually edit master plan:</strong> Let Agent 3 update it; manual edits cause version conflicts</li>
+            <li><strong>Ignore errors:</strong> Report all issues to tech lead for troubleshooting</li>
+            <li><strong>Keep old daily plans:</strong> Delete plans older than 14 days to save space</li>
+        </ul>
+    </div>
+
+    <h2 id="examples">8. Complete Example: Morning Workflow (Jan 3, 2026)</h2>
+    
+    <div style="background: #f0f7ff; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h3>Scenario: Team Lead Running Daily Workflow</h3>
+        
+        <h4>8:05 AM - Agent 1 Chat</h4>
+        <pre style="background: #fff; padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Daily Audit Agent to document yesterday's work.
+
+Here are the details:
+- Yesterday's date: 2026-01-02
+- Today's date: 2026-01-03
+- Work session: A.2 K8s Readiness - Phase 2 (Architecture Design)
+- Chats worked: Chats 5-7
+- Key accomplishments: Completed K8s architecture design, created migration strategy, tested tooling
+
+Run the Daily Audit Agent workflow...
+[rest of template...]</code></pre>
+
+        <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Audit complete. audit_2026-01-02.md and audit_2026-01-02.json created. Executing /chathandoff..."</p>
+
+        <h4>8:25 AM - Agent 2 Chat (New Chat Window)</h4>
+        <pre style="background: #fff; padding: 10px; border: 1px solid #ccc;"><code>I need you to run the DocumentationSync Agent to update documentation based on yesterday's code changes.
+
+Details:
+- Audit date: 2026-01-02
+- Changed files: Comserv/lib/Comserv/Model/KubernetesConfig.pm, Comserv/root/Documentation/MasterPlanCoordination.tt
+- Documentation focus: K8s readiness docs, master plan updates
+
+Run the DocumentationSync Agent workflow...
+[rest of template...]</code></pre>
+
+        <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Documentation sync complete. Updated 2 .tt files (230 lines). Executing /chathandoff..."</p>
+
+        <h4>8:40 AM - Agent 3 Chat (New Chat Window)</h4>
+        <pre style="background: #fff; padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Master Plan Updater Agent to update the master plan with yesterday's progress.
+
+Details:
+- Audit date: 2026-01-02
+- Plans worked on: A.2 Kubernetes Readiness
+- Status updates: A.2: Phase 2 Architecture Complete
+- Blockers: None
+- Next priorities: Begin Phase 3 (Tooling Setup), Continue E.1 validation
+
+Run the Master Plan Updater Agent workflow...
+[rest of template...]</code></pre>
+
+        <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Master plan updated to v0.14. Version incremented, timestamp refreshed, status updated. Executing /chathandoff..."</p>
+
+        <h4>8:55 AM - Agent 4 Chat (New Chat Window)</h4>
+        <pre style="background: #fff; padding: 10px; border: 1px solid #ccc;"><code>I need you to run the Daily Plans Generator Agent to create 7-day plans for the team.
+
+Details:
+- Today's date: 2026-01-03
+- Date range for plans: 2026-01-03 to 2026-01-09
+- Team focus areas: A.2 K8s Readiness (main), A.3 Credentials (parallel), B.1/B.2 reviews
+- Special notes: Weekend work on Jan 5-6
+
+Run the Daily Plans Generator Agent workflow...
+[rest of template...]</code></pre>
+
+        <p style="margin-top: 15px;"><strong>Agent Response:</strong> "Generated 7-day plans (Jan 3-9). All files validated. Master plan navigation updated. Executing /chathandoff. Daily workflow complete."</p>
+
+        <h4>9:15 AM - Results</h4>
+        <ul>
+            <li>✅ Audit files created (audit_2026-01-02.md and .json)</li>
+            <li>✅ Documentation updated (2 files, 230 lines)</li>
+            <li>✅ Master plan updated to v0.14</li>
+            <li>✅ 7 daily plans generated (DailyPlans-2026-01-03.tt through DailyPlans-2026-01-09.tt)</li>
+            <li>✅ Team ready with fresh daily plans</li>
+        </ul>
+
+        <p style="margin-top: 20px;"><strong>Team Lead Next Step:</strong> Share link to today's plan: <strong>/Documentation/Daily_Plans-2026-01-03</strong></p>
+    </div>
+
+    <h2 id="resources">9. Quick Reference & Resources</h2>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+        <div style="background: #e8f4f8; padding: 15px; border-radius: 5px;">
+            <h4>📍 Important File Locations</h4>
+            <ul style="font-size: 0.95em;">
+                <li><strong>Audit logs:</strong> /Documentation/session_history/audit_logs/</li>
+                <li><strong>Master plan:</strong> /Documentation/MasterPlanCoordination.tt</li>
+                <li><strong>Daily plans:</strong> /Documentation/DailyPlans/</li>
+                <li><strong>Session history:</strong> /Documentation/session_history/</li>
+                <li><strong>Agent specs:</strong> /.zencoder/coding-standards.yaml</li>
+            </ul>
+        </div>
+
+        <div style="background: #f0f7ff; padding: 15px; border-radius: 5px;">
+            <h4>⏱️ Time Estimates</h4>
+            <ul style="font-size: 0.95em;">
+                <li>Agent 1 (Audit): 15-20 min</li>
+                <li>Agent 2 (Docs): 10-15 min</li>
+                <li>Agent 3 (Master Plan): 10-15 min</li>
+                <li>Agent 4 (Daily Plans): 15-20 min</li>
+                <li><strong>Total:</strong> 45-90 minutes</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2 id="support">10. Getting Help</h2>
+    
+    <div class="alert alert-info">
+        <h4>🆘 Who to Contact</h4>
+        <ul>
+            <li><strong>Technical issues (agent errors):</strong> Tech Lead / Shanta</li>
+            <li><strong>Understanding prompts:</strong> Team lead or this tutorial</li>
+            <li><strong>Workflow problems:</strong> Daily workflow lead or admin</li>
+            <li><strong>Daily plan questions:</strong> Your task's assignee or team lead</li>
+        </ul>
+    </div>
+
+    <div class="alert alert-warning">
+        <h4>📞 Escalation Path</h4>
+        <ol>
+            <li>Try troubleshooting steps above</li>
+            <li>If issue persists: Document the problem with screenshots</li>
+            <li>Contact tech lead with: what you tried, what happened, current state</li>
+            <li>Tech lead can run agents independently for testing/recovery</li>
+            <li>Escalate to project lead if workflow completely broken</li>
+        </ol>
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <h2 id="footer">About This Document</h2>
+    
+    <p><strong>Version:</strong> 0.01 | <strong>Last Updated:</strong> Jan 1, 2026 | <strong>Author:</strong> Daily Plans Generator Agent</p>
+    <p><strong>Purpose:</strong> Guide all team members (technical and non-technical) through the daily planning workflow using the 4-agent system.</p>
+    <p><strong>Next Update:</strong> After 2 weeks of team usage; gather feedback and refine instructions.</p>
+</div>

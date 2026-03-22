@@ -1,25 +1,791 @@
-[% PageVersion = 'Documentation/AI.tt,v 0.01 2024/11/28 Shanta Exp shanta ' %]
+[% META
+    title = 'AI Controller - Ollama Integration & Multi-Turn Conversations'
+    description = 'Comprehensive documentation for AI controller covering all 16+ methods, guest session support, JSON API endpoints, multi-turn conversations, model management, server configuration, and conversation persistence'
+    roles = 'admin,developer,editor,user'
+    TemplateType = 'controller'
+    category = 'controllers,ai,ollama'
+    page_version = '1.11'
+    last_updated = '2026-01-08'
+    site_specific = ''
+%]
+
+[% PageVersion = 'Documentation/AI.tt,v 1.11 2026/01/08 zencoder-docsync Exp ' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1>AI Integration Plan</h1>
-<p>This document outlines the integration of AI features into the Comserv application, focusing on enhancing user interactions and data management.</p>
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 id="ai-controller">AI Controller - Ollama Integration & Multi-Turn Conversations</h1>
+            
+            <div id="toc" class="alert alert-info">
+                <strong>Contents:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#authentication">Authentication & Guest Sessions</a></li>
+                    <li><a href="#main-interface">Main Interface & Configuration</a></li>
+                    <li><a href="#api-endpoints">JSON API Endpoints</a></li>
+                    <li><a href="#form-endpoints">Web Form Endpoints</a></li>
+                    <li><a href="#conversations">Conversation Management</a></li>
+                    <li><a href="#model-management">Model Management</a></li>
+                    <li><a href="#server-management">Server Management</a></li>
+                    <li><a href="#implementation-details">Implementation Details</a></li>
+                    <li><a href="#methods-reference">Complete Methods Reference</a></li>
+                </ul>
+            </div>
 
-<h2>Objectives</h2>
-<ul>
-    <li>Implement AI-driven recommendations for content management.</li>
-    <li>Utilize natural language processing for user queries and interactions.</li>
-    <li>Enhance data analysis capabilities for better decision-making.</li>
-</ul>
+            <div class="alert alert-success" id="recent-changes">
+                <h3 style="margin-top: 0;">📝 Recent Changes (v1.11 - Jan 8, 2026)</h3>
+                <ul style="margin: 5px 0 0 20px;">
+                    <li><strong>AI.pm Code Updates:</strong> 3 commits with controller enhancements and bug fixes</li>
+                    <li><strong>Documentation Sync:</strong> Updated version to 1.11 to reflect latest code state</li>
+                    <li><strong>Audit Trail:</strong> Documentation now synced via automated audit workflow</li>
+                </ul>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">For complete change history, see git commit history of <code>lib/Comserv/Controller/AI.pm</code></p>
+            </div>
+            
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    The <code>AI</code> controller (Comserv/lib/Comserv/Controller/AI.pm) provides comprehensive 
+                    AI/Ollama integration for the Comserv application. It supports:
+                </p>
+                <ul>
+                    <li>Interactive AI chat interface with guest user support</li>
+                    <li>JSON API endpoints for programmatic access</li>
+                    <li>Multi-turn conversation persistence with conversation history</li>
+                    <li>Ollama model management (pull, test, remove)</li>
+                    <li>Multi-server Ollama configuration (localhost + network)</li>
+                    <li>Automatic server startup on query failure</li>
+                    <li>Guest session management with UUID tracking</li>
+                    <li>Comprehensive logging with debug support</li>
+                </ul>
+                <p>
+                    <strong>Ollama Model Support:</strong> Utilizes <code>Comserv::Model::Ollama</code> for LLM interaction.
+                    Supports various models including llama3.1, mistral, neural-chat, and custom models.
+                </p>
+            </section>
+            
+            <section id="authentication">
+                <h2>Authentication & Guest Sessions</h2>
+                
+                <h3>Authentication Model</h3>
+                <p>
+                    The AI controller implements a <strong>guest-first</strong> authentication model:
+                </p>
+                <ul>
+                    <li><strong>Authenticated Users:</strong> Full access with user_id from session</li>
+                    <li><strong>Guest Users:</strong> Full access with auto-assigned guest session ID (UUID)</li>
+                    <li><strong>No Authentication Blocks:</strong> All endpoints accessible to both authenticated and guest users</li>
+                </ul>
+                
+                <h3>Guest Session Management</h3>
+                <p>
+                    Guest users are automatically created and tracked:
+                </p>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Field</th>
+                        <th>Value</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>user_id</code></td>
+                        <td>199</td>
+                        <td>Fixed guest user ID in database (must exist)</td>
+                    </tr>
+                    <tr>
+                        <td><code>guest_session_id</code></td>
+                        <td>UUID string</td>
+                        <td>Unique session identifier (created once per browser session)</td>
+                    </tr>
+                    <tr>
+                        <td><code>username</code></td>
+                        <td>Guest-XXXXXXXX</td>
+                        <td>Display name (first 8 chars of UUID)</td>
+                    </tr>
+                </table>
+                
+                <div class="alert alert-warning">
+                    <strong>⚠ Important:</strong> Guest user with ID 199 must exist in users table for conversation persistence to work.
+                    Verify with: <code>SELECT COUNT(*) FROM users WHERE id = 199;</code>
+                </div>
+            </section>
+            
+            <section id="main-interface">
+                <h2>Main Interface & Configuration</h2>
+                
+                <h3>Index Action</h3>
+                <p><strong>Route:</strong> <code>GET /ai</code></p>
+                <p>
+                    Main AI interface page displaying:
+                </p>
+                <ul>
+                    <li>Interactive query form for single-shot AI queries</li>
+                    <li>Current Ollama configuration (host, port, model)</li>
+                    <li>Available models (installed + catalog)</li>
+                    <li>Model/server selection controls (admin-only)</li>
+                </ul>
+                
+                <h3>Configuration Helper</h3>
+                <p>
+                    <code>_get_current_ollama_config($c, $can_select_model)</code>
+                </p>
+                <p>
+                    Initializes Ollama configuration with:
+                </p>
+                <ul>
+                    <li>Current host and port from session or config</li>
+                    <li>Default model selection</li>
+                    <li>List of installed models from server</li>
+                    <li>Permission-based UI adjustments (admin vs user views)</li>
+                </ul>
+            </section>
+            
+            <section id="api-endpoints">
+                <h2>JSON API Endpoints</h2>
+                
+                <p>
+                    API endpoints accept and return JSON, supporting programmatic AI integration.
+                    All endpoints support both authenticated users and guests.
+                </p>
+                
+                <h3>Generate Endpoint</h3>
+                <p><strong>Route:</strong> <code>POST /ai/generate</code></p>
+                <p><strong>Content-Type:</strong> application/json (or form data)</p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>prompt</code></td>
+                        <td>string</td>
+                        <td>✅ Yes</td>
+                        <td>User's question or prompt to AI</td>
+                    </tr>
+                    <tr>
+                        <td><code>format</code></td>
+                        <td>string</td>
+                        <td>❌ No</td>
+                        <td>'json' for JSON response format, text otherwise</td>
+                    </tr>
+                    <tr>
+                        <td><code>system</code></td>
+                        <td>string</td>
+                        <td>❌ No</td>
+                        <td>System prompt to override default AI behavior</td>
+                    </tr>
+                    <tr>
+                        <td><code>page_context</code></td>
+                        <td>string</td>
+                        <td>❌ No</td>
+                        <td>Context of page where request originated (e.g., 'docs', 'help')</td>
+                    </tr>
+                    <tr>
+                        <td><code>conversation_id</code></td>
+                        <td>integer</td>
+                        <td>❌ No</td>
+                        <td>Existing conversation to continue (omit for new conversation)</td>
+                    </tr>
+                    <tr>
+                        <td><code>agent_id</code></td>
+                        <td>string</td>
+                        <td>❌ No</td>
+                        <td>ID of AI agent/assistant handling request</td>
+                    </tr>
+                </table>
+                
+                <h3>Response Format</h3>
+                <pre><code>
+{
+  "success": true,
+  "response": "AI's answer to prompt",
+  "conversation_id": 42,
+  "message_id": 123,
+  "model_used": "llama3.1",
+  "processing_time_ms": 2500,
+  "is_new_conversation": false
+}
+                </code></pre>
+                
+                <h3>Automatic Server Startup</h3>
+                <p>
+                    If Ollama server is not running on localhost:11434:
+                </p>
+                <ol>
+                    <li>System detects connection failure</li>
+                    <li>Calls <code>start_server()</code> to start Ollama</li>
+                    <li>Automatically retries query after startup</li>
+                    <li>Returns response or error if startup fails</li>
+                </ol>
+                
+                <h3>Chat Endpoint</h3>
+                <p><strong>Route:</strong> <code>POST /ai/chat</code></p>
+                <p>
+                    Multi-turn conversation endpoint supporting conversation history and persistence.
+                </p>
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>prompt</code></td>
+                        <td>string</td>
+                        <td>✅ Yes</td>
+                        <td>User's message</td>
+                    </tr>
+                    <tr>
+                        <td><code>model</code></td>
+                        <td>string</td>
+                        <td>❌ No</td>
+                        <td>Model to use (default: configured model)</td>
+                    </tr>
+                    <tr>
+                        <td><code>conversation_id</code></td>
+                        <td>integer</td>
+                        <td>❌ No</td>
+                        <td>Existing conversation to continue</td>
+                    </tr>
+                    <tr>
+                        <td><code>history</code></td>
+                        <td>array</td>
+                        <td>❌ No</td>
+                        <td>Previous messages for context (optional, for stateless API clients)</td>
+                    </tr>
+                </table>
+                
+                <h3>Conversations Endpoint</h3>
+                <p><strong>Route:</strong> <code>GET /ai/conversations</code></p>
+                <p>
+                    Retrieve user's conversation history.
+                </p>
+                <p><strong>Response:</strong> Array of conversation objects with metadata and message counts</p>
+            </section>
+            
+            <section id="form-endpoints">
+                <h2>Web Form Endpoints</h2>
+                
+                <h3>Query Form</h3>
+                <p><strong>Route:</strong> <code>GET /ai/query_form</code></p>
+                <p>
+                    Displays HTML form for single-shot AI queries. Requires authentication.
+                </p>
+                
+                <h3>Result Handler</h3>
+                <p><strong>Route:</strong> <code>POST /ai/result</code></p>
+                <p>
+                    Processes form submissions and displays AI response in template.
+                </p>
+                <p>
+                    Parameters: prompt (required), format (optional), system (optional)
+                </p>
+                
+                <div class="alert alert-info">
+                    <strong>ℹ Form Endpoints:</strong> Require authenticated user. Guests should use JSON API endpoints instead.
+                </div>
+            </section>
+            
+            <section id="conversations">
+                <h2>Conversation Management</h2>
+                
+                <h3>Multi-Turn Conversations</h3>
+                <p>
+                    The AI controller supports persistent, multi-turn conversations with history:
+                </p>
+                
+                <h3>Conversation Workflow</h3>
+                <ol>
+                    <li>User sends first message → New <code>AiConversation</code> created</li>
+                    <li>System creates <code>AiMessage</code> record for user message</li>
+                    <li>AI responds and creates <code>AiMessage</code> record for AI response</li>
+                    <li>User sends follow-up with <code>conversation_id</code> → Message added to existing conversation</li>
+                    <li>Conversation history retrieved automatically for context</li>
+                </ol>
+                
+                <h3>Conversation Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>conversations</code></td>
+                        <td>GET /ai/conversations</td>
+                        <td>List all conversations for user</td>
+                    </tr>
+                    <tr>
+                        <td><code>reset_conversation</code></td>
+                        <td>POST /ai/reset_conversation</td>
+                        <td>Clear conversation history (hard reset)</td>
+                    </tr>
+                </table>
+                
+                <h3>Database Tables</h3>
+                <p>
+                    Conversation data persisted in:
+                </p>
+                <ul>
+                    <li><code>ai_conversations</code> - One row per conversation (id, user_id, created_at, updated_at)</li>
+                    <li><code>ai_messages</code> - One row per message (id, conversation_id, user_id, role, content, created_at)</li>
+                </ul>
+                
+                <div class="alert alert-warning">
+                    <strong>⚠ Database Issue (Tracked):</strong> Conversation records not persisting despite code presence.
+                    See <a href="#database-blocker">Database Blocker</a> section below.
+                </div>
+            </section>
+            
+            <section id="model-management">
+                <h2>Model Management</h2>
+                
+                <h3>Model Browser</h3>
+                <p><strong>Route:</strong> <code>GET /ai/models</code></p>
+                <p>
+                    Display available and installed Ollama models across configured servers.
+                </p>
+                
+                <h3>Model Operations</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>pull_model</code></td>
+                        <td>POST /ai/pull_model</td>
+                        <td>Download and install model from registry</td>
+                    </tr>
+                    <tr>
+                        <td><code>test_model</code></td>
+                        <td>POST /ai/test_model</td>
+                        <td>Test loaded model with sample prompt</td>
+                    </tr>
+                    <tr>
+                        <td><code>remove_model</code></td>
+                        <td>POST /ai/remove_model</td>
+                        <td>Unload and delete model from server</td>
+                    </tr>
+                </table>
+                
+                <h3>Model Status</h3>
+                <p><strong>Route:</strong> <code>GET /ai/check_status</code></p>
+                <p>
+                    Real-time status of Ollama server and loaded models.
+                </p>
+                
+                <div class="alert alert-info">
+                    <strong>ℹ Admin-Only:</strong> Model management requires admin, developer, or editor role.
+                    Regular users can only query models.
+                </div>
+            </section>
+            
+            <section id="server-management">
+                <h2>Server Management</h2>
+                
+                <h3>Server Configuration</h3>
+                <p>
+                    AI controller supports multiple Ollama servers:
+                </p>
+                <ul>
+                    <li><strong>localhost:11434</strong> - Local development/testing</li>
+                    <li><strong>192.168.1.171:11434</strong> - Network AI server (production)</li>
+                </ul>
+                
+                <h3>Server Configuration Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>set_host</code></td>
+                        <td>POST /ai/set_host</td>
+                        <td>Configure active Ollama server (admin-only)</td>
+                    </tr>
+                    <tr>
+                        <td><code>start_server</code></td>
+                        <td>POST /ai/start_server</td>
+                        <td>Start Ollama service on local machine</td>
+                    </tr>
+                    <tr>
+                        <td><code>server_status</code></td>
+                        <td>GET /ai/server_status</td>
+                        <td>Get connection status and diagnostics</td>
+                    </tr>
+                </table>
+                
+                <h3>Permission-Based UI</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>User Role</th>
+                        <th>Can Select Server</th>
+                        <th>Can See Details</th>
+                        <th>Server Options</th>
+                    </tr>
+                    <tr>
+                        <td>Admin/Developer/Editor</td>
+                        <td>✅ Yes</td>
+                        <td>✅ Yes (host:port)</td>
+                        <td>Local + Network</td>
+                    </tr>
+                    <tr>
+                        <td>Regular User</td>
+                        <td>❌ No</td>
+                        <td>❌ No (hidden)</td>
+                        <td>Network only (unlabeled)</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <section id="implementation-details">
+                <h2>Implementation Details</h2>
+                
+                <h3>JSON Body Parsing</h3>
+                <p>
+                    Robust JSON body parsing with fallback to form parameters:
+                </p>
+                <ol>
+                    <li>Check Content-Type for application/json</li>
+                    <li>Try $c->req->content() method (preferred)</li>
+                    <li>Fallback to $c->req->body() if needed</li>
+                    <li>Log body length and first 200 chars for debugging</li>
+                    <li>Parse JSON with error handling</li>
+                    <li>Fall back to form parameters if JSON parsing fails</li>
+                </ol>
+                
+                <h3>Logging</h3>
+                <p>
+                    Comprehensive debug logging enabled:
+                </p>
+                <ul>
+                    <li>Method entry/exit logging</li>
+                    <li>Parameter validation logging</li>
+                    <li>User/guest session tracking</li>
+                    <li>Ollama connection attempts and results</li>
+                    <li>Conversation creation/retrieval logging</li>
+                    <li>Error logging with stack traces</li>
+                </ul>
+                <p>
+                    <strong>Enable Debug Mode:</strong> Add <code>?debug=1</code> to URL or check <code>$c->session->{debug_mode}</code>
+                </p>
+                
+                <h3 id="database-blocker">Database Recording Blocker (Known Issue)</h3>
+                <div style="background-color: #fff3cd; border-left: 4px solid #ff6b6b; padding: 15px; margin: 15px 0; border-radius: 4px;">
+                    <strong>🔴 CRITICAL:</strong> Conversation and message database records not persisting despite code execution.
+                    
+                    <p><strong>Symptoms:</strong></p>
+                    <ul>
+                        <li>Code executes without errors in logs</li>
+                        <li>AiConversation/AiMessage create() calls complete</li>
+                        <li>No records appear in database tables</li>
+                        <li>Next queries fail to find conversation</li>
+                    </ul>
+                    
+                    <p><strong>Probable Causes (Priority):</strong></p>
+                    <ol>
+                        <li>Table name mismatch: Result classes declare <code>ai_conversations</code>/<code>ai_messages</code>, actual tables may differ</li>
+                        <li>Schema not deployed: Tables don't exist in database</li>
+                        <li>Foreign key constraint: Guest user (id=199) missing from users table</li>
+                        <li>Silent exception in database layer</li>
+                    </ol>
+                    
+                    <p><strong>Verification Queries:</strong></p>
+                    <pre><code>SHOW TABLES LIKE '%ai%';
+DESCRIBE ai_conversations;
+DESCRIBE ai_messages;
+SELECT COUNT(*) FROM ai_conversations;
+SELECT * FROM users WHERE id = 199;
+                    </code></pre>
+                </div>
+            </section>
+            
+            <section id="methods-reference">
+                <h2>Complete Methods Reference</h2>
+                
+                <h3>Main Actions (Routed Endpoints)</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Route</th>
+                        <th>Type</th>
+                        <th>Auth</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>index</code></td>
+                        <td>GET /ai</td>
+                        <td>Page</td>
+                        <td>None</td>
+                        <td>Main AI interface with query form</td>
+                    </tr>
+                    <tr>
+                        <td><code>generate</code></td>
+                        <td>POST /ai/generate</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>Single-shot AI query with response</td>
+                    </tr>
+                    <tr>
+                        <td><code>query_form</code></td>
+                        <td>GET /ai/query_form</td>
+                        <td>Page</td>
+                        <td>Authenticated</td>
+                        <td>Display query form template</td>
+                    </tr>
+                    <tr>
+                        <td><code>result</code></td>
+                        <td>POST /ai/result</td>
+                        <td>Page</td>
+                        <td>Authenticated</td>
+                        <td>Process form submission, show results</td>
+                    </tr>
+                    <tr>
+                        <td><code>chat</code></td>
+                        <td>POST /ai/chat</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>Multi-turn conversation endpoint</td>
+                    </tr>
+                    <tr>
+                        <td><code>models</code></td>
+                        <td>GET /ai/models</td>
+                        <td>Page</td>
+                        <td>Authenticated</td>
+                        <td>Model browser and management interface</td>
+                    </tr>
+                    <tr>
+                        <td><code>pull_model</code></td>
+                        <td>POST /ai/pull_model</td>
+                        <td>API JSON</td>
+                        <td>Admin</td>
+                        <td>Download and install new model</td>
+                    </tr>
+                    <tr>
+                        <td><code>test_model</code></td>
+                        <td>POST /ai/test_model</td>
+                        <td>API JSON</td>
+                        <td>Admin</td>
+                        <td>Test model with sample prompt</td>
+                    </tr>
+                    <tr>
+                        <td><code>remove_model</code></td>
+                        <td>POST /ai/remove_model</td>
+                        <td>API JSON</td>
+                        <td>Admin</td>
+                        <td>Unload and delete model</td>
+                    </tr>
+                    <tr>
+                        <td><code>check_status</code></td>
+                        <td>GET /ai/check_status</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>Get Ollama server status</td>
+                    </tr>
+                    <tr>
+                        <td><code>set_host</code></td>
+                        <td>POST /ai/set_host</td>
+                        <td>API JSON</td>
+                        <td>Admin</td>
+                        <td>Configure active Ollama server</td>
+                    </tr>
+                    <tr>
+                        <td><code>start_server</code></td>
+                        <td>POST /ai/start_server</td>
+                        <td>API JSON</td>
+                        <td>Admin</td>
+                        <td>Start Ollama service</td>
+                    </tr>
+                    <tr>
+                        <td><code>server_status</code></td>
+                        <td>GET /ai/server_status</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>Get server connection status and diagnostics</td>
+                    </tr>
+                    <tr>
+                        <td><code>conversations</code></td>
+                        <td>GET /ai/conversations</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>List user's conversation history</td>
+                    </tr>
+                    <tr>
+                        <td><code>reset_conversation</code></td>
+                        <td>POST /ai/reset_conversation</td>
+                        <td>API JSON</td>
+                        <td>None</td>
+                        <td>Clear conversation history</td>
+                    </tr>
+                </table>
+                
+                <h3>Helper Methods</h3>
+                <table class="table table-bordered">
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                    </tr>
+                    <tr>
+                        <td><code>_get_current_ollama_config($c, $can_select)</code></td>
+                        <td>Initialize Ollama config with host, port, model, and available models list</td>
+                    </tr>
+                </table>
+            </section>
+            
+            <div class="last-updated" style="margin-top: 40px; padding: 10px; background-color: var(--background-color); border-left: 4px solid var(--primary-color); color: var(--text-color);">
+                <strong>Last Updated:</strong> <span id="update-date">2026-01-05</span> (v1.10 - Comprehensive rewrite documenting all 16 methods and conversation system)
+            </div>
+        </div>
+    </div>
+</div>
 
-<h2>Implementation Steps</h2>
-<ol>
-    <li>Research and select appropriate AI frameworks and libraries.</li>
-    <li>Integrate AI components into the existing architecture.</li>
-    <li>Test AI functionalities in a controlled environment.</li>
-    <li>Deploy AI features in production and monitor performance.</li>
-</ol>
-
-<h2>Future Enhancements</h2>
-<p>Explore additional AI capabilities such as predictive analytics and automated content generation.</p>
+<style>
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -10px;
+    }
+    
+    .col-md-12 {
+        flex: 0 0 100%;
+        padding: 10px;
+    }
+    
+    section {
+        margin-bottom: 30px;
+    }
+    
+    h1, h2, h3 {
+        color: var(--text-color);
+        margin-top: 25px;
+    }
+    
+    h1 {
+        border-bottom: 3px solid var(--primary-color);
+        padding-bottom: 10px;
+    }
+    
+    h2 {
+        border-left: 4px solid var(--primary-color);
+        padding-left: 10px;
+        margin-top: 25px;
+    }
+    
+    h3 {
+        color: var(--secondary-color);
+        margin-top: 15px;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        background-color: var(--background-color);
+    }
+    
+    table th {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 10px;
+        text-align: left;
+        font-weight: bold;
+    }
+    
+    table td {
+        padding: 10px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    table tr:hover {
+        background-color: var(--hover-color);
+    }
+    
+    code {
+        background-color: var(--code-background);
+        color: var(--code-color);
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+    }
+    
+    pre {
+        background-color: var(--code-background);
+        color: var(--code-color);
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .alert {
+        padding: 15px;
+        margin: 15px 0;
+        border-radius: 5px;
+        border-left: 4px solid;
+    }
+    
+    .alert-info {
+        background-color: rgba(23, 162, 184, 0.1);
+        border-color: var(--info-color);
+        color: var(--text-color);
+    }
+    
+    .alert-warning {
+        background-color: rgba(255, 193, 7, 0.1);
+        border-color: var(--warning-color);
+        color: var(--text-color);
+    }
+    
+    ul, ol {
+        margin: 10px 0 10px 20px;
+        color: var(--text-color);
+    }
+    
+    li {
+        margin: 5px 0;
+        line-height: 1.6;
+    }
+    
+    .last-updated {
+        margin-top: 40px;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    
+    #toc {
+        background-color: rgba(23, 162, 184, 0.1);
+        border: 1px solid var(--border-color);
+        padding: 15px;
+        margin: 20px 0;
+    }
+    
+    #toc ul {
+        margin: 10px 0 0 20px;
+    }
+    
+    #toc a {
+        color: var(--link-color);
+        text-decoration: none;
+    }
+    
+    #toc a:hover {
+        text-decoration: underline;
+    }
+</style>

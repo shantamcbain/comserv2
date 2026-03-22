@@ -1,0 +1,878 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# COMSERV COMPREHENSIVE CODING STANDARDS
+# ═══════════════════════════════════════════════════════════════════════════
+# 
+# **STATUS**: 🟢 ACTIVE - Primary Authoritative Source (Version 2.0 - Consolidated)
+# **CREATED**: 2025-12-06
+# **CONSOLIDATES**: 
+#   - application_tt_template.tt (353 lines)
+#   - documentation_tt_template.tt (196 lines)
+#   - guidelines.tt (141 lines)
+#   - controller_routing_guidelines.tt (89 lines)
+#   - coding-standards-comserv.yaml v1.0 (136 lines - DEPRECATED)
+# **TOTAL CONSOLIDATED**: 915+ lines merged into single authoritative source
+#
+# **PURPOSE**: Single source of truth for all Comserv development standards
+# **AUDIENCE**: Developers, AI assistants, code reviewers, new team members
+# **USAGE**: Reference for all development work; enforce via pre-commit hooks
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+---
+
+metadata:
+  title: "Comserv Comprehensive Coding Standards"
+  version: "2.1-with-filename-conventions"
+  last_updated: "2025-12-28T16:59:00Z"
+  previous_versions:
+    "1.0": "Initial partial standards (deprecated 2025-12-06)"
+  consolidation_status: "Complete - all scattered guidelines merged"
+  related_files:
+    zencoder_standards: "/.zencoder/coding-standards.yaml (Zencoder IDE integration, agents, execution protocol)"
+    comserv_standards: "This file (Comserv development, Perl/TT/SQL, project-specific)"
+    templates: "/Comserv/root/Documentation/[application|documentation]_tt_template.tt"
+    deprecated: "/Comserv/root/coding-standards-comserv-v1-deprecated.yaml (archived)"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 1: PROJECT OVERVIEW
+# ═══════════════════════════════════════════════════════════════════════════
+
+project_overview:
+  name: "Comserv - Business Operations Management System"
+  tagline: "Comprehensive web application for project management, documentation, site administration, and user management"
+  
+  technical_stack:
+    language: "Perl"
+    language_version: "5.40.0+ (via Perlbrew)"
+    framework: "Catalyst (MVC Web Framework)"
+    web_server: "Catalyst development server / Apache/Nginx with FastCGI"
+    orm: "DBIx::Class"
+    templating: "Template Toolkit (.tt files)"
+    database: "MySQL/PostgreSQL (via DBIx::Class)"
+    
+  key_modules:
+    - "Catalyst::Runtime (5.90130+)"
+    - "Moose (OOP framework)"
+    - "DBIx::Class (ORM)"
+    - "Template (Template Toolkit)"
+    - "Email::Sender::Simple"
+    - "JSON"
+    - "YAML::XS"
+    - "DateTime"
+    - "Log::Log4perl"
+    - "Try::Tiny (error handling)"
+  
+  directory_structure:
+    code: "/Comserv/lib/Comserv/ - Application code (Controllers, Models, etc.)"
+    views: "/Comserv/root/ - Template Toolkit (.tt) files and static assets"
+    tests: "/Comserv/t/ - Test suite"
+    config: "/Comserv/config/ - Configuration files"
+    scripts: "/Comserv/script/ - Utility scripts"
+    docs: "/Comserv/root/Documentation/ - System documentation (.tt format ONLY)"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 1A: FILENAME & RESOURCE NAMING CONVENTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+filename_conventions:
+  
+  primary_standard: "PascalCase for ALL files"
+  
+  description: |
+    All new files MUST use PascalCase naming (CapitalizedWords, NoSpaces, NoHyphens, NoUnderscores).
+    This removes ambiguity between hyphens (-) and underscores (_) and creates a single, 
+    unambiguous naming convention across all file types and directories.
+  
+  format_specification:
+    pattern: "PascalCase"
+    examples:
+      - "✅ CleanupAgentRole.md"
+      - "✅ VirtualMachineDataFetch.tt"
+      - "✅ NetworkDeviceManager.pm"
+      - "✅ CreateSupervisorConfig.sh"
+      - "✅ DailyAuditReport.yaml"
+      - "❌ cleanup-agent-role.md (hyphenated - avoid)"
+      - "❌ virtual_machine_data_fetch.tt (underscores - avoid)"
+      - "❌ create_supervisor_config.sh (underscores - avoid)"
+    
+    edge_cases:
+      acronyms: "Keep acronyms in PascalCase - AIController.pm (NOT AIcontroller or AIController)"
+      single_words: "Single words are lowercase first letter - controller.pm (NOT Controller.pm)"
+      multi_acronyms: "AIConfigSQLManager.pm (each acronym capitalized)"
+  
+  enforcement_scope:
+    new_files: "MANDATORY - All files created after 2025-12-28 MUST use PascalCase"
+    existing_files: "Optional - Existing files retain current naming; rename only during major refactors"
+    rationale: |
+      Lower-risk rollout: New files follow standard immediately. Existing files migrate gradually
+      as they're modified, preventing large renaming commits that create git history noise.
+  
+  file_types_affected:
+    documentation: ".tt files (Template Toolkit), .md files (Markdown)"
+    code: ".pm files (Perl modules), .pl files (Perl scripts)"
+    configuration: ".yaml files (YAML config), .json files (JSON config), .sh files (Shell scripts)"
+    all_types: "Consistent PascalCase across entire codebase"
+  
+  implementation_guidance:
+    for_zencoder_agents: |
+      - Check filename against standard before creating any new files
+      - If filename uses hyphens (-) or underscores (_), rename to PascalCase
+      - Document the filename in audit logs when creating new files
+    
+    for_developers: |
+      - When adding new features, create files in PascalCase
+      - Pre-commit hooks will enforce this (see 'ENFORCEMENT' section below)
+      - Existing legacy filenames do NOT require immediate renaming
+    
+    for_ai_assistants: |
+      - **CRITICAL**: Always verify filename format BEFORE writing files
+      - Use this checklist: Is filename PascalCase? Does it contain NO hyphens? NO underscores?
+      - If uncertain, ask user for clarification on intended filename
+  
+  migration_strategy:
+    phase_1_new_standard: "2025-12-28 onwards - All new files use PascalCase"
+    phase_2_active_refactor: "Next 2-4 weeks - When editing existing files, rename to PascalCase"
+    phase_3_batch_migration: "Q1 2026 - Batch rename remaining legacy files (via git commit)"
+    phase_4_verification: "Q1 2026 - Verify all files follow standard; document grandfathered exceptions"
+
+filename_enforcement:
+  
+  pre_commit_hook:
+    status: "🟡 PLANNED - To be implemented via .githooks/"
+    description: "Automatically reject commits with new files using hyphens or underscores"
+    trigger: "File creation or rename with - or _ in name"
+    action: "Warn user; request PascalCase rename before commit"
+  
+  ai_assistant_enforcement:
+    zencoder: |
+      MANDATORY ENFORCEMENT (this is a CRITICAL Cleanup Agent responsibility):
+      1. Before creating any file: Check filename is PascalCase
+      2. If not: Rename file to PascalCase standard
+      3. Document all filename decisions in audit logs
+      4. Flag any legacy filenames encountered during work
+    
+    continue: |
+      Recommended: Same enforcement as Zencoder for consistency
+        # Zencoder does NOT manage external tool settings (Continue, Cursor)
+    
+    other_tools: |
+      Coordinate with teams using Cursor, Ollama, or other AI tools
+      See: /.zencoder/coding-standards.yaml for cross-tool standards
+  
+  repository_metadata:
+    rules_file: "/.zencoder/coding-standards.yaml (Central source of truth)"
+    tracking_file: "/Comserv/root/Documentation/session_history/prompts_log.yaml (Audit trail)"
+    contact: "See Cleanup Agent responsibilities in /.zencoder/coding-standards.yaml"
+
+example_migrations:
+  existing_to_new:
+    - "cleanup-agent-role.md → CleanupAgentRole.md"
+    - "virtual_machine_data_fetch.tt → VirtualMachineDataFetch.tt"
+    - "add_network_device.tt → AddNetworkDevice.tt"
+    - "git_pull.tt → GitPull.tt"
+    - "list_migrations.tt → ListMigrations.tt"
+    - "create_supervisor_config.sh → CreateSupervisorConfig.sh"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 2: ARCHITECTURE & STRUCTURE
+# ═══════════════════════════════════════════════════════════════════════════
+
+architecture:
+  pattern: "MVC (Model-View-Controller) - STRICTLY ENFORCED"
+  
+  controllers:
+    location: "/Comserv/lib/Comserv/Controller/"
+    standards:
+      - "Use RESTful routing principles where applicable"
+      - "Keep business logic OUT of controllers - delegate to models"
+      - "Use explicit namespace declarations (e.g., `__PACKAGE__->config(namespace => 'MyController')`)"
+      - "[CRITICAL] NEVER use `:Path('/')` in site-specific controllers (causes all sites to return same content)"
+      - "Use `:Local` or `:Chained` for safer routing"
+      - "Always forward to view explicitly: `$c->forward($c->view('TT'))`"
+      - "Include proper logging in auto() method"
+      - "Implement role-based access control (check_user_roles)"
+    
+    routing_guidelines:
+      attribute_path: "Use `:Path` with caution - `:Path('/')` captures root for ALL domains (⚠️ AVOID IN SITE-SPECIFIC)"
+      attribute_local: "Safer - appends method name to controller namespace"
+      attribute_chained: "Best for complex apps - creates action chain"
+      root_controller: "ONLY Comserv::Controller::Root should handle root path `/`"
+      site_specific: "Set namespace to site name (e.g., 'USBM'); use `:Path` without args or `:Local`"
+    
+    [ISSUE_MARKER_ROUTING]: "CONSTRAINT: This routing behavior is critical - multiple recent bugs caused by `:Path('/')` usage"
+  
+  models:
+    location: "/Comserv/lib/Comserv/Model/"
+    standards:
+      - "Use DBIx::Class for database access (ORM pattern)"
+      - "Keep models focused - one model per logical entity"
+      - "Move all business logic to models, NOT controllers"
+      - "Use Moose for OOP structure"
+      - "Schema changes ONLY via DBSchemaManager.pm (NEVER create .sql files)"
+    
+    database_schema_manager:
+      location: "/Comserv/lib/Comserv/Model/DBSchemaManager.pm"
+      usage: "[MANDATORY] All database schema operations go through DBSchemaManager methods"
+      violation: "[CRITICAL] Creating .sql files directly violates this standard - they get deleted immediately"
+      approach: "Use DBSchemaManager methods programmatically for all table creation, modification, migration"
+  
+  views:
+    location: "/Comserv/root/"
+    format: "Template Toolkit (.tt files ONLY)"
+    standards:
+      - "All view files must be .tt format (Template Toolkit)"
+      - "Use application_tt_template.tt for application pages (interactive features)"
+      - "Use documentation_tt_template.tt for documentation pages (static content)"
+      - "[DUPLICATE] Both template files define structure - see TEMPLATE STANDARDS section for details"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 3: TEMPLATE STANDARDS (Merged from both .tt template files)
+# ═══════════════════════════════════════════════════════════════════════════
+
+template_standards:
+  
+  metadata_requirements:
+    description: "Every .tt file MUST have META block at top"
+    required_fields:
+      title: "Page/component title"
+      description: "Brief description of content"
+      roles: "Required roles to view (comma-separated: admin,developer,editor,user)"
+      page_version: "Semantic version (0.01, 0.02, 1.01, etc.) - increment on each edit"
+      last_updated: "Current date/time stamp (see timestamp_format below)"
+      site_specific: "boolean - is this site-specific? (use 'false' for global)"
+      category: "Content category (templates, features, administration, etc.)"
+      TemplateType: "Type (Documentation or Application)"
+    
+    example_meta_block: |
+      [% META
+         title = "Page Title"
+         description = "What this page does"
+         roles = "admin,developer"
+         page_version = "0.01"
+         last_updated = "2025-12-06T22:51:00Z"
+         site_specific = "false"
+         category = "Documentation"
+         TemplateType = "Documentation"
+      %]
+    
+    [DUPLICATE]: "Both application_tt_template.tt and documentation_tt_template.tt define similar META blocks"
+  
+  version_tracking:
+    rcs_line: "[MANDATORY] Include RCS line after META block for version tracking"
+    format: |
+      [% PageVersion = 'Path/to/file.tt,v VERSION TIMESTAMP AUTHOR STATUS' %]
+      Example: [% PageVersion = 'Documentation/guidelines.tt,v 0.02 2025/12/06 08:30:00 shanta Exp' %]
+    increment_rules:
+      - "Increment minor version (0.01 → 0.02 → 0.03) for each edit"
+      - "Jump to major version (0.99 → 1.00) for significant changes/restructuring"
+      - "Always update TIMESTAMP when making changes (use system date command)"
+    
+    debug_display: "Include conditional display of PageVersion for debugging: `[% IF c.session.debug_mode == 1 %] [% PageVersion %] [% END %]`"
+  
+  theme_compliance:
+    [CONSOLIDATED_FROM]: "documentation_tt_template.tt theme compliance notes"
+    
+    css_variables:
+      description: "ALL styling MUST use CSS custom properties - NEVER hardcode colors or fonts"
+      required_variables:
+        text_colors:
+          - "--text-color (primary text)"
+          - "--text-muted-color (secondary/muted text)"
+          - "--background-color"
+        fonts:
+          - "--header-font (h1-h6 styling)"
+          - "--body-font (paragraph/default text)"
+        sizing:
+          - "--font-size-small"
+          - "--font-size-base"
+          - "--font-size-large"
+        spacing:
+          - "--spacing-small"
+          - "--spacing-medium"
+          - "--spacing-large"
+        ui_colors:
+          - "--primary-color (main action color)"
+          - "--secondary-color (alternate action)"
+          - "--warning-color (warnings/cautions)"
+          - "--success-color (success states)"
+          - "--info-color (informational)"
+          - "--border-color"
+          - "--table-header-bg"
+      
+      example_usage: |
+        ✅ CORRECT:
+        <h1 style="color: var(--text-color); font-family: var(--header-font);">Title</h1>
+        
+        ❌ WRONG (hardcoded):
+        <h1 style="color: #000000; font-family: Arial;">Title</h1>
+    
+    cross_theme_compatibility:
+      description: "Templates must work across multiple themes without modification"
+      supported_themes:
+        - "Default theme (standard blue/white)"
+        - "CSC theme (cyan backgrounds)"
+        - "USBM theme (green accent colors)"
+        - "APIS theme (yellow/orange beekeeping theme)"
+        - "Future themes (added via theme_definitions.json)"
+      verification: "Test with multiple themes to ensure variable-based styling works everywhere"
+  
+  application_templates:
+    [SOURCE]: "application_tt_template.tt (353 lines)"
+    purpose: "Interactive application pages with forms, data display, user interactions"
+    
+    structure:
+      main_container: "<div class=\"app-container\"> - Main application page wrapper"
+      header: "<div class=\"page-header\"> - Page title and optional subtitle"
+      breadcrumbs: "<div class=\"breadcrumb-container\"> - Navigation breadcrumbs (optional)"
+      content_area: "<div class=\"content-container\"> - All content goes here"
+      primary_content: "<div class=\"content-primary\"> - Main content area"
+      sidebar: "<div class=\"content-sidebar\"> - Sidebar (optional)"
+      footer: "<div class=\"page-footer\"> - Footer with actions (optional)"
+      admin_only: "[% IF c.check_user_roles('admin') %] - Admin-only content"
+      developer_only: "[% IF c.check_user_roles('developer') %] - Developer-only content"
+    
+    form_patterns:
+      container: "<div class=\"form-container\">"
+      section: "<div class=\"form-section\"> - Grouped related fields"
+      row: "<div class=\"form-row\"> - Single row of form fields"
+      field: "<div class=\"form-field\"> - Individual field wrapper"
+      input: "<input class=\"form-input\"> - Input field styling"
+      actions: "<div class=\"form-actions\"> - Submit/Cancel buttons"
+    
+    data_display_patterns:
+      container: "<div class=\"data-container\">"
+      table_container: "<div class=\"table-container\">"
+      table: "<table class=\"data-table\">"
+      action_cell: "<td class=\"action-cell\"> - Edit/Delete action buttons"
+      empty_state: "<div class=\"empty-state\"> - Message when no data"
+    
+    global_css_classes: |
+      Containers: app-container, content-container, form-container, data-container, 
+                  table-container, sidebar-container
+      Layout: page-header, page-subtitle, content-primary, content-sidebar, 
+              page-footer, breadcrumb-container
+      Forms: app-form, form-section, form-row, form-field, form-input, form-actions
+      Data: data-table, action-cell, empty-state, sidebar-list, sidebar-section
+      Buttons: btn, btn-primary, btn-secondary, btn-sm, btn-edit, btn-delete
+      State: admin-only, developer-only, user-only, loading, error, success
+    
+    template_variables:
+      description: "Common variables set in controller and used in application templates"
+      common_variables:
+        title: "Page title"
+        subtitle: "Optional subtitle"
+        show_form: "boolean - show form section?"
+        show_data: "boolean - show data display section?"
+        show_sidebar: "boolean - show sidebar?"
+        show_footer: "boolean - show footer?"
+        form_action: "URL for form submission"
+        form_data: "Hash of form field values"
+        data_items: "Array of data to display"
+        breadcrumbs: "Array of breadcrumb objects"
+        back_url: "URL for back button"
+    
+    catalyst_patterns: |
+      Loop with alternating rows:
+        [% FOREACH item IN items %]
+          <div class="[% loop.count % 2 ? 'row-even' : 'row-odd' %]">
+      
+      Conditional content:
+        [% IF items.size %]
+          Found [% items.size %] items
+        [% ELSE %]
+          No items found
+        [% END %]
+      
+      Include common templates:
+        [% INCLUDE 'common/error_messages.tt' %]
+        [% INCLUDE 'common/success_messages.tt' %]
+      
+      Role-based visibility:
+        [% IF c.check_user_roles('admin','developer') %]
+          <div class="admin-actions">...
+      
+      Safe HTML output (prevent XSS):
+        <input value="[% user_input | html %]">
+      
+      URL generation:
+        <a href="[% c.uri_for('/controller/action', item.id) %]">
+  
+  documentation_templates:
+    [SOURCE]: "documentation_tt_template.tt (196 lines)"
+    purpose: "Static documentation and reference pages (no forms/interactions)"
+    
+    recommended_sections:
+      1_overview: "Brief 1-2 sentence explanation of what this documents"
+      2_prerequisites: "What's needed before using (requirements, system access, etc.)"
+      2_key_features: "What this feature/system provides"
+      3_getting_started: "Step-by-step setup instructions with code examples"
+      4_advanced_usage: "Advanced features and integration points"
+      5_troubleshooting: "Common problems and solutions (color-coded: warning/info blocks)"
+      6_configuration_reference: "Parameter table with defaults and descriptions"
+      7_see_also: "Links to related documentation (success block)"
+      8_footer: "Support contact info and metadata"
+    
+    color_coded_blocks:
+      warning_block: "Light background + warning-color left border - for warnings/cautions"
+      info_block: "Light background + info-color left border - for informational content"
+      success_block: "Light background + success-color left border - for 'See Also' section"
+      code_block: "Monospace font background for code examples"
+    
+    layout_system:
+      container: "<div class=\"container\"> - Main content wrapper"
+      row: "<div class=\"row\"> - Horizontal grouping"
+      col_100: "<div class=\"col-100\"> - Full width"
+      col_50: "<div class=\"col-50\"> - Half width (sidebar layout)"
+      responsive: "Layout automatically adapts on mobile via layout.css media queries"
+    
+    configuration_table:
+      structure: "HTML table with Parameter, Type, Default, Description columns"
+      styling: "CSS classes data-table with var(--table-header-bg) and theme colors"
+      stripe_rows: "Alternate rows with var(--secondary-color) background"
+    
+    [DUPLICATE]: "Both application and documentation templates show similar grid/container structure"
+  
+  universal_patterns:
+    description: "Patterns used in BOTH application and documentation templates"
+    
+    metadata_header:
+      - "Both require META block"
+      - "Both include PageVersion RCS line"
+      - "Both use same version tracking format"
+    
+    theme_compliance:
+      - "Both use CSS variables exclusively"
+      - "Both must work across multiple themes"
+      - "Both reference theme_definitions.json"
+    
+    catalyst_integration:
+      - "Both can include Catalyst objects (c.uri_for, c.check_user_roles, etc.)"
+      - "Both can access stash variables set in controllers"
+      - "Both use Template Toolkit language features ([% ... %])"
+    
+    html_structure:
+      - "Both use semantic HTML5 elements"
+      - "Both use .container/.row/.col-XX grid system"
+      - "Both maintain heading hierarchy (h1→h6)"
+      - "Both include accessibility features (ARIA labels, alt text)"
+    
+    [CONSOLIDATION_NOTE]: "Both templates share ~60% structural similarity - see templates for specifics"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 4: CATALYST FRAMEWORK STANDARDS
+# ═══════════════════════════════════════════════════════════════════════════
+
+catalyst_framework:
+  [SOURCE]: "guidelines.tt + controller_routing_guidelines.tt"
+  
+  core_principles:
+    - "Use Moose for object-oriented programming"
+    - "Keep controllers slim - move business logic to models"
+    - "Use clear and descriptive names for actions and methods"
+    - "Implement error handling gracefully"
+    - "Log important operations and errors"
+  
+  controller_design:
+    namespaces:
+      requirement: "[MANDATORY] Every controller MUST have explicit namespace declaration"
+      format: "__PACKAGE__->config(namespace => 'ControllerName');"
+      purpose: "Ensures controller only responds to paths starting with /ControllerName"
+      example: |
+        # In Comserv::Controller::Admin
+        __PACKAGE__->config(namespace => 'Admin');
+        # Now responds to /Admin/... paths only
+    
+    action_attributes:
+      path_attribute:
+        dangerous: "`:Path('/')` - Captures root path for ALL domains ⚠️ NEVER USE in site-specific controllers"
+        safe_absolute: "`:Path('/specific')` - Captures specific absolute path"
+        namespace_based: "`:Path` (no args) - Captures controller's namespace path"
+      local_attribute:
+        description: "Appends method name to controller namespace (SAFER than :Path)"
+        example: "sub method :Local → Captures /Namespace/method"
+      chained_attribute:
+        description: "Best for complex apps - creates action chain"
+        use_case: "Multi-step workflows, complex routing logic"
+    
+    [CRITICAL_CONSTRAINT]: "`:Path('/')` in site-specific controllers causes 'all sites return USBM home page' bug"
+  
+  logging_requirement:
+    [SOURCE]: "controller_routing_guidelines.tt"
+    mandatory: "Every controller MUST include logging"
+    implementation: |
+      use Comserv::Util::Logging;
+      
+      has 'logging' => (
+          is => 'ro',
+          default => sub { Comserv::Util::Logging->instance }
+      );
+      
+      sub auto :Private {
+          my ($self, $c) = @_;
+          $self->logging->log_with_details(
+              $c, 'info', __FILE__, __LINE__, 'auto',
+              "Controller auto method called"
+          );
+          return 1;
+      }
+  
+  view_forwarding:
+    requirement: "[MANDATORY] Always explicitly forward to view"
+    implementation: |
+      $c->stash(template => 'MyTemplate.tt');
+      $c->forward($c->view('TT'));
+    purpose: "Ensures template rendering happens in expected order"
+  
+  site_specific_controllers:
+    naming: "Name controller after site (e.g., Comserv::Controller::USBM for USBM site)"
+    namespace: "Set namespace to site name: `__PACKAGE__->config(namespace => 'USBM');`"
+    routing: "Use `:Path` without arguments OR `:Local` for index method"
+    constraint: "[CRITICAL] Do NOT use `:Path('/')` - only Root controller should handle root path"
+    root_controller_role: "ONLY Comserv::Controller::Root should handle root path (/)"
+  
+  testing_controllers:
+    requirement: "Test controllers with multiple domains to ensure correct routing"
+    common_bug: "Controllers with `:Path('/')` incorrectly capture all site routes"
+    verification: "After creating/modifying controller, test across all domains"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 5: DEVELOPMENT STANDARDS
+# ═══════════════════════════════════════════════════════════════════════════
+
+development_standards:
+  [SOURCE]: "guidelines.tt"
+  
+  code_format:
+    patch_format: "Use `+-` patch format for code returns (prevents overwriting existing functions)"
+    clarity: "Changes should be clear and maintainable"
+    documentation: "All code returns should be well-commented"
+  
+  error_handling:
+    library: "Try::Tiny for error handling"
+    logging: "Log all errors via Log::Log4perl"
+    security: "NEVER expose secrets/keys/passwords in logs or error messages"
+    user_messages: "Create meaningful error messages for end users"
+    example: |
+      use Try::Tiny;
+      
+      try {
+          # Code that might fail
+      } catch {
+          # Handle error
+          $self->logging->log_error($c, "Error occurred: $_");
+          $c->stash(error => "An error occurred. Please try again.");
+      };
+  
+  database:
+    orm: "Use DBIx::Class for all database operations"
+    schema_management: "[MANDATORY] Use DBSchemaManager.pm ONLY - never create .sql files"
+    migrations: "Use DBSchemaManager methods programmatically"
+    queries: "Use parameterized queries (DBIx::Class handles this automatically)"
+    location: "/Comserv/lib/Comserv/Model/DBSchemaManager.pm"
+  
+  perl_style:
+    best_practices: "Follow PBP (Perl Best Practices)"
+    modern_perl: "Use Modern Perl style conventions"
+    strict_warnings: "Always use: use strict; use warnings;"
+    version_target: "Target Perl 5.40.0+ features"
+    modules: "Use Module::Install for package management"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 6: TESTING STANDARDS
+# ═══════════════════════════════════════════════════════════════════════════
+
+testing:
+  [SOURCE]: "guidelines.tt"
+  [DUPLICATE]: "Similar testing guidelines appear in comserv-ai-guidelines-consolidated.yaml"
+  
+  framework: "Test::More (Perl standard testing framework)"
+  additional_frameworks:
+    - "Catalyst::Test (for controller testing)"
+    - "Test::WWW::Mechanize::Catalyst (for integration testing)"
+    - "Test::Exception (for exception testing)"
+    - "Test::MockObject (for mocking)"
+  
+  test_types:
+    unit_tests: "Test individual functions and methods in isolation"
+    integration_tests: "Test how application components work together"
+    template_tests: "Review .tt templates for syntax and verify variables are passed correctly"
+    automated_tests: "Use testing frameworks to catch regressions early"
+  
+  test_suite:
+    location: "/Comserv/t/"
+    run_command: "perl -t or prove t/"
+    requirements:
+      - "Write tests alongside code changes"
+      - "Run full suite after modifications"
+      - "Verify all tests pass before completing task"
+      - "Check for test coverage regressions"
+  
+  coverage_goal: "80%+ code coverage"
+  
+  template_testing_checklist:
+    - "Review .tt templates for proper syntax"
+    - "Ensure all necessary variables are passed from controller"
+    - "Test with multiple theme settings"
+    - "Verify responsive design on mobile"
+    - "Check accessibility (heading hierarchy, ARIA labels)"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 7: DOCUMENTATION STANDARDS
+# ═══════════════════════════════════════════════════════════════════════════
+
+documentation_standards:
+  [SOURCE]: "guidelines.tt + template files"
+  [CONSOLIDATION]: "See TEMPLATE STANDARDS section for .tt file format requirements"
+  
+  principle: "Keep documentation up-to-date and comprehensive"
+  sync_with_code: "Ensure all code changes are reflected in documentation sections"
+  
+  documentation_requirements:
+    when_code_added:
+      controller: "Create /Documentation/controllers/controller_name.tt"
+      model: "Create /Documentation/models/model_name.tt"
+      feature: "Create /Documentation/features/feature_name.tt"
+      change: "Update existing documentation when modifying features"
+    
+    format_requirement: "ONLY Template Toolkit (.tt) format in /Documentation/"
+    location_requirement: "All documentation goes in /Comserv/root/Documentation/"
+    [ISSUE_MARKER_FORMAT]: "Ensure .tt format ONLY - no .md files should exist in /Documentation/"
+  
+  cross_referencing: "Code and documentation must reference each other for maintainability"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 8: GIT WORKFLOW & VERSION CONTROL
+# ═══════════════════════════════════════════════════════════════════════════
+
+git_workflow:
+  [SOURCE]: "guidelines.tt"
+  [CONSOLIDATION]: "Complete git workflow strategy from guidelines.tt"
+  
+  branching_strategy:
+    feature_branches:
+      creation: "Create new feature branch for each feature/bug fix"
+      isolation: "Helps isolate changes and manage code easier"
+      experimental: "Use feature branches for experimental work not ready for production"
+      starting_point: "Start from latest version of main development branch"
+    
+    naming_conventions:
+      descriptive: "Use names that reflect purpose (feature/login-page, bugfix/user-authentication)"
+      identifiers: "Include ticket numbers if applicable (feature/1234-login-page)"
+      consistency: "Maintain consistency to avoid confusion"
+  
+  merging_workflow:
+    pre_merge_checks:
+      - "Ensure feature branch is up-to-date with main branch"
+      - "Pull latest changes regularly"
+      - "Resolve any conflicts before merging"
+    
+    code_review:
+      - "Conduct code reviews before merging"
+      - "Obtain necessary approvals"
+      - "Use pull requests to facilitate discussion"
+      - "Review for quality and consistency"
+    
+    post_merge_decisions:
+      delete_if: "Feature is complete and no further changes expected"
+      delete_if: "Keeping the branch would clutter the repository"
+      keep_if: "Further development anticipated"
+      keep_if: "Branch serves as reference for ongoing work"
+  
+  commit_messages:
+    format: "Write clear and informative commit messages"
+    content: "Explain purpose and scope of each change"
+    importance: "Messages become historical record of project evolution"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 9: SECURITY GUIDELINES
+# ═══════════════════════════════════════════════════════════════════════════
+
+security:
+  [SOURCE]: "guidelines.tt (section stub - partially filled)"
+  
+  secrets_and_keys:
+    requirement: "[CRITICAL] Never commit secrets, keys, or passwords to repository"
+    enforcement: "Use environment variables or .env files (gitignored)"
+    files_to_protect: "API keys, database passwords, private keys, tokens"
+  
+  logging_security:
+    requirement: "[CRITICAL] Never log sensitive data"
+    prohibited: "Passwords, tokens, API keys, credit card numbers, SSN, PII"
+    approach: "Always sanitize/mask sensitive data before logging"
+    example: |
+      ✅ CORRECT:
+      Log: "User login attempted: user123"
+      
+      ❌ WRONG:
+      Log: "User login with password: [PASSWORD]"
+  
+  input_validation:
+    requirement: "[MANDATORY] Validate all user inputs"
+    approach: "Check type, length, format before processing"
+    parameterized_queries: "Use parameterized queries (DBIx::Class handles automatically)"
+    xss_prevention: "Use HTML escaping in templates: `[% value | html %]`"
+  
+  role_based_access:
+    requirement: "Implement role-based access control"
+    catalyst_check: "Use `$c->check_user_roles('admin')` in templates/controllers"
+    enforcement: "Verify user has permission before showing/processing data"
+  
+  [ISSUE_MARKER_INCOMPLETE]: "Security guidelines are partial stub - should be expanded"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 10: ISSUE TRACKING & CONSOLIDATION NOTES
+# ═══════════════════════════════════════════════════════════════════════════
+
+consolidation_issues:
+  [ISSUE_1_DUPLICATION]:
+    category: "Duplication"
+    description: "Testing guidelines were duplicated across legacy files"
+    source: "guidelines.tt lines 34-41"
+    impact: "Resolved by consolidation into this YAML"
+    resolution_status: "✅ RESOLVED"
+  
+  [ISSUE_2_CONTRADICTION]:
+    category: "Contradiction"
+    description: "coding-standards-comserv.yaml v1.0 marked as deprecated but guidelines.tt still references it"
+    source: "guidelines.tt line 31: 'Reference: /Documentation/controller_routing_guidelines.tt'"
+    impact: "Unclear which file is authoritative - could confuse developers"
+    resolution_status: "✅ RESOLVED - Consolidated YAML now marked as authoritative source"
+    action_required: "Update all references to point to this file (coding-standards-comserv.yaml v2.0)"
+  
+  [ISSUE_3_OUTDATED_FORMAT]:
+    category: "Outdated"
+    description: "controller_routing_guidelines.tt uses Markdown-like format (.md syntax) instead of YAML"
+    source: "controller_routing_guidelines.tt (89 lines of markdown-style headings and lists)"
+    impact: "Inconsistent format with other standards files"
+    resolution_status: "✅ CONVERTED - Content merged into YAML structure (Section 4)"
+    action_required: "Deprecate controller_routing_guidelines.tt file; redirect references to this file"
+  
+  [ISSUE_4_FORMAT_MISMATCH]:
+    category: "Format Mismatch"
+    description: "Templates are .tt files containing both HTML and documentation"
+    source: "application_tt_template.tt and documentation_tt_template.tt"
+    impact: "Mixed format makes it hard to extract pure standards"
+    resolution_status: "✅ CONSOLIDATED - Standards content extracted to YAML"
+    action_required: "Keep .tt files as working templates; this YAML becomes reference"
+  
+  [ISSUE_5_MISSING_CONSOLIDATION]:
+    category: "Consolidation Gap"
+    description: "AI guidelines (comserv-ai-guidelines-consolidated.yaml) separate from coding standards"
+    source_a: "This file (coding standards)"
+    source_b: "comserv-ai-guidelines-consolidated.yaml (AI-specific)"
+    impact: "Developers need to reference TWO files; overlapping content"
+    resolution_status: "🟡 PARTIAL - Kept separate for now; cross-referenced"
+    action_required: "Decide: merge AI into this file OR keep separate with clear hierarchy"
+  
+  [ISSUE_6_STRUCTURE_HIERARCHY]:
+    category: "Structural Clarity"
+    description: "No clear authority hierarchy - multiple files claim to be authoritative"
+    sources:
+      - "coding-standards-comserv.yaml v1.0 (marked deprecated)"
+      - "comserv-ai-guidelines-consolidated.yaml v2.1 (AI guidelines)"
+      - "guidelines.tt (general guidelines)"
+      - "controller_routing_guidelines.tt (routing specifics)"
+    impact: "Developers uncertain which file to check first"
+    resolution_status: "✅ RESOLVED - This file (v2.0-consolidated) now primary source"
+    action_required: "All other files should reference this YAML as authoritative"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 11: IMPLEMENTATION ROADMAP
+# ═══════════════════════════════════════════════════════════════════════════
+
+implementation_roadmap:
+  
+  phase_1_activate_this_yaml:
+    status: "🔴 NOT STARTED"
+    actions:
+      - "Announce this file as primary authoritative source"
+      - "Update all references in code, docs, PRs to point here"
+      - "Create redirect/deprecation notices in old files"
+      - "Brief team on new structure"
+    timeline: "2025-12-07"
+  
+  phase_2_deprecate_scattered_files:
+    status: "🔴 NOT STARTED"
+    actions:
+      - "Mark guidelines.tt as deprecated with redirect to this file"
+      - "Mark controller_routing_guidelines.tt as deprecated"
+      - "Archive original coding-standards-comserv-v1.yaml"
+      - "Add deprecation notices with transition period"
+    deprecation_period: "2 weeks (through 2025-12-20)"
+    timeline: "2025-12-07 to 2025-12-20"
+  
+  phase_3_resolve_duplications:
+    status: "✅ COMPLETE"
+    actions:
+      - "Removed comserv-ai-guidelines-consolidated.yaml"
+      - "Centralized all Zencoder rules in /.zencoder/coding-standards.yaml"
+    timeline: "2026-01-16"
+  
+  phase_4_verify_and_enforce:
+    status: "🔴 NOT STARTED"
+    actions:
+      - "Update pre-commit hooks to validate against this file"
+      - "Add linting/validation rules for standards compliance"
+      - "Create developer onboarding checklist referencing this file"
+    timeline: "Ongoing - Week of 2025-12-23"
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 12: RELATED FILES & REFERENCES
+# ═══════════════════════════════════════════════════════════════════════════
+
+related_files:
+  
+  authoritative_sources:
+    this_file: "/Comserv/root/coding-standards-comserv.yaml (PRIMARY - v2.0 consolidated)"
+    ai_guidelines: "/Comserv/root/comserv-ai-guidelines-consolidated.yaml (AI-specific standards - v2.1)"
+  
+  templates_and_examples:
+    application_template: "/Comserv/root/Documentation/application_tt_template.tt (working example)"
+    documentation_template: "/Comserv/root/Documentation/documentation_tt_template.tt (working example)"
+  
+  deprecated_files:
+    coding_standards_v1: "/Comserv/root/coding-standards-comserv-v1-deprecated.yaml (archived 2025-12-06)"
+    guidelines: "/Comserv/root/Documentation/guidelines.tt (DEPRECATED - see this file instead)"
+    routing_guidelines: "/Comserv/root/Documentation/controller_routing_guidelines.tt (DEPRECATED - see Section 4)"
+  
+  related_documentation:
+    database_schema: "/Comserv/lib/Comserv/Model/DBSchemaManager.pm"
+    logging_util: "/Comserv/lib/Comserv/Util/Logging.pm"
+    session_history: "/Comserv/root/Documentation/session_history/ (audit & cleanup tracking)"
+    audit_file: "/Comserv/root/Documentation/session_history/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md"
+
+---
+
+**END OF COMSERV COMPREHENSIVE CODING STANDARDS v2.0-consolidated**
+
+Consolidated on: 2025-12-06T22:51:00Z  
+Consolidation effort: Merged 915+ lines from 5 source files  
+Issues marked for follow-up: 6 major issues (see Section 10)  
+Next review: 2025-12-21 after deprecation period
+

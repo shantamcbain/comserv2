@@ -1,0 +1,152 @@
+[% META title = 'Edit Category' %]
+
+<style>
+.config-manager {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.section {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.role-checkbox {
+    display: inline-block;
+    margin-right: 15px;
+    margin-bottom: 5px;
+}
+
+.role-checkbox input {
+    margin-right: 5px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.current-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border-left: 4px solid #667eea;
+}
+
+.current-info h3 {
+    margin-top: 0;
+    color: #495057;
+    font-size: 16px;
+}
+</style>
+
+<div class="config-manager">
+    <div class="section">
+        <h2>Edit Category</h2>
+
+        <div class="current-info">
+            <h3>Current Category Information</h3>
+            <p><strong>Key:</strong> [% category_key %]</p>
+            <p><strong>Title:</strong> [% category.title %]</p>
+            [% IF category.description %]
+                <p><strong>Description:</strong> [% category.description %]</p>
+            [% END %]
+            [% IF category.icon %]
+                <p><strong>Icon:</strong> <i class="[% category.icon %]"></i> [% category.icon %]</p>
+            [% END %]
+            [% IF category.roles && category.roles.size > 0 %]
+                <p><strong>Roles:</strong> [% category.roles.join(', ') %]</p>
+            [% END %]
+        </div>
+
+        <form method="POST" action="[% c.uri_for('/Documentation/save_config') %]">
+            <input type="hidden" name="action" value="update_category">
+            <input type="hidden" name="category_key" value="[% category_key %]">
+
+            <div class="form-group">
+                <label>Title:</label>
+                <input type="text" name="category_title" value="[% category.title %]" required>
+            </div>
+
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea name="category_description" rows="3">[% category.description %]</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Icon:</label>
+                <input type="text" name="category_icon" value="[% category.icon || 'fas fa-file-alt' %]">
+            </div>
+
+            <div class="form-group">
+                <label>Roles:</label>
+                [% FOREACH role IN available_roles %]
+                    <label class="role-checkbox">
+                        <input type="checkbox" name="category_roles" value="[% role %]"
+                            [% IF category.roles && category.roles.grep(role).size > 0 %]checked[% END %]>
+                        [% role | ucfirst %]
+                    </label>
+                [% END %]
+            </div>
+
+            <button type="submit" class="btn btn-success">Save Changes</button>
+            <a href="[% c.uri_for('/Documentation/add_category') %]" class="btn btn-secondary">Back to Add Category</a>
+            <a href="[% c.uri_for('/Documentation/manage_config') %]" class="btn">Cancel</a>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,268 @@
+[% META
+   title = "SchemaComparison Controller Documentation"
+   description = "Database schema comparison and bidirectional synchronization controller for Comserv—Compare Result files with database tables, sync field changes, generate Result files from tables, and maintain consistency across schemas"
+   roles = "admin,devops,developer"
+   TemplateType = "controller"
+   category = "controllers,infrastructure,schema,database"
+   page_version = "0.03"
+   last_updated = "Sat Jan 11 2026"
+   site_specific = "false"
+%]
+[% PageVersion = 'Documentation/controllers/SchemaComparison.tt,v 0.03 2026/01/11 DocumentationSyncAgent Exp shanta - Enhanced with recent commits, improved API documentation, error handling patterns, authentication details' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">SchemaComparison Controller Documentation</h1>
+    
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2026-01-11 | 
+        Version: 0.03 | 
+        Author: DocumentationSyncAgent | 
+        Status: Active | 
+        Methods: 13 (3 core + 10 helpers) | 
+        Enhancement: Detailed error handling, auth patterns, recent commits
+    </div>
+
+    <!-- TABLE OF CONTENTS SECTION -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Features</a>
+                <a href="#core-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Core Methods</a>
+                <a href="#helper-methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Helpers</a>
+                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API</a>
+                <a href="#usage-examples" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Examples</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                The <strong>SchemaComparison controller</strong> handles database schema comparison and bidirectional synchronization between database tables and DBIx::Class Result files. It was recovered from the git schema branch and restored as a dedicated subcontroller under Admin (Chat 40, 6-phase recovery). Now fully integrated as Admin/SchemaComparison.pm (738 lines).
+            </p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                <strong>Key Responsibility</strong>: Maintain consistency between database schema (tables/fields) and ORM Result class definitions, enabling seamless schema migrations and debugging.
+            </p>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                <strong>Architecture</strong>: Moose-based Catalyst subcontroller with admin authentication checks, logging integration, and JSON API endpoints. Follows the same pattern as Admin/Backup.pm for consistency.
+            </p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+                <strong>v0.03 Updates (2026-01-11)</strong>: Version consolidation update. Verified all 13 methods against HEAD commits. Helper method table format validated. No API signature changes detected in recent commits.
+                <br/><br/>
+                <strong>v0.02 Updates (2026-01-09)</strong>: Enhanced API documentation with detailed error handling patterns. Added authentication flow documentation. Documented Try::Tiny error handling integration across all methods. Reference recent git commits affecting schema operations.
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- KEY FEATURES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="features" style="color: var(--text-color); font-family: var(--header-font);">Key Features</h2>
+            <div class="row">
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Bidirectional Synchronization</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Table → Result Sync</strong>: Propagate database field changes to Result files</li>
+                        <li><strong>Result → Table Sync</strong>: Capture Result file changes for schema migration</li>
+                        <li><strong>Automatic Generation</strong>: Create Result files from existing database tables</li>
+                        <li><strong>Change Detection</strong>: Identify discrepancies between DB and ORM</li>
+                    </ul>
+                </div>
+                <div class="col-50">
+                    <h3 style="color: var(--text-color); font-family: var(--header-font);">Schema Inspection</h3>
+                    <ul style="color: var(--text-color); font-family: var(--body-font);">
+                        <li><strong>Field Metadata</strong>: Extract table/field type, size, constraints</li>
+                        <li><strong>Result Analysis</strong>: Parse Result file declarations and relationships</li>
+                        <li><strong>Mapping Generation</strong>: Build table-to-Result-file mappings</li>
+                        <li><strong>Multi-Schema Support</strong>: Handle ENCY, BMaster, and custom schemas</li>
+                    </ul>
+                </div>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- CORE METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="core-methods" style="color: var(--text-color); font-family: var(--header-font);">Core Methods (Actions)</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">1. sync_table_to_result <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:43]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_table_to_result</span></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Synchronize database table field changes to Result file.</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, field_name, database (JSON body)</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required ($c->user_exists + check_user_roles('admin'))</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Error Handling</strong>: Try::Tiny catches JSON errors (400), missing params (400), sync errors (500). Returns JSON with success flag and error messages.</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Logging</strong>: All operations logged via Comserv::Util::Logging with file/line context</p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">2. sync_result_to_table <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:113]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/sync_result_to_table</span></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Synchronize Result file field changes back to database table (logs intent; actual ALTER TABLE handled separately).</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, field_name, database (JSON body)</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Error Handling</strong>: Same Try::Tiny pattern as sync_table_to_result</p>
+            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-small); margin: var(--spacing-small) 0; font-size: var(--font-size-small);">
+                <strong>⚠️ Note</strong>: This method logs the intent to update the database but does NOT execute ALTER TABLE directly. Database schema changes must be executed separately via migration scripts to ensure proper backup and rollback procedures.
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">3. create_result_from_table <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:183]</code></h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Route</strong>: <span style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">POST /schema-comparison/create_result_from_table</span></p>
+            <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Generate a new Result file from an existing database table schema.</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Required Params</strong>: table_name, database (JSON body)</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Auth</strong>: Admin role required</p>
+            <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>Process</strong>: Queries table schema → generates Perl Result file code → writes to filesystem → returns success/error status</p>
+            
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- HELPER METHODS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="helper-methods" style="color: var(--text-color); font-family: var(--header-font);">Helper Methods (Internal)</h2>
+            
+            <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                <thead style="background: #f5f5f5;">
+                    <tr>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Method</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_table_field_info()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Query database for field metadata (type, size, constraints)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_result_field_info()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Parse Result file for field declarations and attributes</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>update_result_field_from_table()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Modify Result file content based on table schema changes</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>update_table_field_from_result()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Log intent to update database table from Result file</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>generate_result_file()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Create Result file structure on filesystem</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>generate_result_file_content()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Generate Perl code for Result file based on table schema</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>build_result_table_mapping()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Build mapping of database tables to Result file locations</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_ency_table_schema()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Query ENCY database schema metadata</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_forager_table_schema()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Query Forager database schema metadata</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_result_file_path()</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Calculate filesystem path for Result file</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- API ENDPOINTS SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="api-endpoints" style="color: var(--text-color); font-family: var(--header-font);">API Endpoints</h2>
+            
+            <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                <thead style="background: #f5f5f5;">
+                    <tr>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Endpoint</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Method</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/sync_table_to_result</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Sync database table field to Result file</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/sync_result_to_table</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Sync Result file field to database table</td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/create_result_from_table</code></td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">Generate Result file from database table</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- USAGE EXAMPLES SECTION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">Usage Examples</h2>
+            
+            <h3 style="color: var(--text-color); font-family: var(--header-font);">Example 1: Create Result File from Table</h3>
+            <div style="background-color: var(--code-bg-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; margin: var(--spacing-medium) 0;">
+                <pre style="margin: 0; font-family: monospace; font-size: 12px;"><code>curl -X POST http://localhost:3000/schema-comparison/create_result_from_table \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table_name": "ai_model_config",
+    "database": "ency"
+  }'</code></pre>
+            </div>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Example 2: Sync Table Field to Result</h3>
+            <div style="background-color: var(--code-bg-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; margin: var(--spacing-medium) 0;">
+                <pre style="margin: 0; font-family: monospace; font-size: 12px;"><code>curl -X POST http://localhost:3000/schema-comparison/sync_table_to_result \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table_name": "ai_model_config",
+    "field_name": "model_type",
+    "database": "ency"
+  }'</code></pre>
+            </div>
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SEE ALSO SECTION -->
+    <div style="background-color: var(--success-bg-color); padding: 20px; border-left: 4px solid var(--success-color); border-radius: 4px; margin: 20px 0;">
+        <div class="row">
+            <div class="col-100">
+                <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;" id="see-also">See Also</h2>
+                <ul style="color: var(--text-color); font-family: var(--body-font);">
+                    <li><a href="/Documentation/system/SchemaNamingStandardizationPlan.tt" style="color: var(--link-color);">Schema Naming Standardization Plan</a> - Plan to fix Result file naming conventions (Chat 41)</li>
+                    <li><a href="/Documentation/controllers/Admin.tt" style="color: var(--link-color);">Admin Controller</a> - Parent controller for schema operations</li>
+                    <li><a href="/Documentation/controllers/Backup.tt" style="color: var(--link-color);">Backup Controller</a> - Similar Moose pattern for reference</li>
+                    <li><strong>DBIx::Class</strong> - ORM framework documentation</li>
+                    <li><strong>Catalyst::Controller</strong> - Web framework controller documentation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div>

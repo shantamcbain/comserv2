@@ -11,8 +11,6 @@ use Data::Dumper;
 use JSON;
 use Comserv::Util::Logging;
 
-# Don't extend Catalyst::Model - make this a standalone utility class
-
 has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
@@ -40,180 +38,316 @@ has 'selected_connection' => (
 use FindBin;
 use File::Spec;
 
-# Load configuration lazily when first needed
 sub _load_config {
     my ($self) = @_;
     
-    return if keys %{$self->config}; # Already loaded
+    return if keys %{$self->config};
     
-    # Load the database configuration
     my $config;
     try {
-        use File::Basename;
+        $config = $self->_load_from_k8s_secrets();
+        if ($config && keys %$config) {
+            warn "[RemoteDB] Successfully loaded configuration from K8s Secrets\n";
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Configuration loaded from K8s Secrets mount point");
+            $self->config($config);
+            return;
+        }
         
-        # Use fixed path to database config - we know where it is
-        my $config_file = "/home/shanta/PycharmProjects/comserv2/Comserv/db_config.json";
-        # Read and decode the JSON config
+        $config = $self->_load_from_env_variables();
+        if ($config && keys %$config) {
+            warn "[RemoteDB] Successfully loaded configuration from environment variables\n";
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Configuration loaded from environment variables (COMSERV_DB_*)");
+            $self->config($config);
+            return;
+        }
         
-        local $/;
-        open my $fh, "<", $config_file or die "Could not open $config_file: $!";
-        my $json_text = <$fh>;
-        close $fh;
-        $config = decode_json($json_text);
+        my $config_file = $self->_find_db_config_file();
+        if ($config_file) {
+            warn "[RemoteDB] Loading config from db_config.json (DEPRECATED - migrate to K8s Secrets)\n";
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                "Using db_config.json fallback - MIGRATE TO K8S SECRETS for production security");
 
-        # Store the raw config and expose a normalized contract via get_all_connections
-        $self->config($config);
+            local $/;
+            open my $fh, "<", $config_file or die "Could not open $config_file: $!";
+            my $json_text = <$fh>;
+            close $fh;
+            $config = decode_json($json_text);
 
-        # Lightweight logging
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'RemoteDB::_load_config',
-            "Loaded config from $config_file with keys: " . join(', ', keys %$config));
+            $self->config($config);
+
+            if (!$self->{k8s_secrets_found}) {
+                $self->{configuration_status} = 'FALLBACK';
+                $self->{configuration_error} = 'Using db_config.json fallback - K8s Secrets not found. Please migrate to K8s Secrets for production security.';
+                $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+                    "Configuration status set to FALLBACK - K8s Secrets not found, using db_config.json");
+            }
+
+            return;
+        }
+        
+        warn "[RemoteDB] CONFIGURATION NOT FOUND - Admin setup required\n";
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'RemoteDB::_load_config',
+            "No configuration found in K8s Secrets, environment variables, or db_config.json");
+        
+        $self->{configuration_status} = 'MISSING';
+        $self->{configuration_error} = "Could not locate configuration in any source (K8s Secrets, env vars, or db_config.json)";
+        $self->config({});
+        return;
         
     } catch {
+        warn "[RemoteDB] Configuration load exception: $_\n";
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'RemoteDB::_load_config',
             "Failed to load database configuration: $_");
-        die "RemoteDB: Cannot continue without database configuration";
+        
+        $self->{configuration_status} = 'ERROR';
+        $self->{configuration_error} = "Exception during configuration load: $_";
+        $self->config({});
+        return;
     };
 }
 
-# Public API: return all configured connections in a stable contract
-sub get_all_connections {
+sub _load_from_k8s_secrets {
     my ($self) = @_;
-    $self->_load_config();
-    my $config = $self->config or return {};
-
-    # Normalize into a stable contract: servers with databases
-    my %servers;
-    foreach my $conn_name (keys %$config) {
-        next if $conn_name =~ /^_/;
-
-        my $conn = $config->{$conn_name};
-        next unless ref $conn eq 'HASH';
-
-        # Skip obviously placeholder/test entries
-        if (exists $conn->{host} && defined $conn->{host}) {
-            if ($conn->{host} =~ /YOUR_|PLACEHOLDER/i) {
-                $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_all_connections',
-                    "Skipping placeholder connection '$conn_name' (host: $conn->{host})");
-                next;
+    
+    my %k8s_config = ();
+    my $k8s_secrets_found = 0;
+    
+    my $home = $ENV{HOME} || '/tmp';
+    my @secret_paths = (
+        "$home/.comserv/secrets",
+        "$FindBin::Bin/../secrets",
+        '/var/run/secrets/comserv/',
+        '/opt/secrets/',
+        '/var/run/secrets/default/',
+    );
+    
+    foreach my $base_path (@secret_paths) {
+        next unless -d $base_path;
+        
+        $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
+            "Checking K8s Secret mount point: $base_path");
+        
+        my $dbi_path = "$base_path/dbi";
+        
+        if (-d $dbi_path) {
+            opendir(my $dh, $dbi_path) or next;
+            my @secret_files = readdir($dh);
+            closedir($dh);
+            
+            foreach my $file (@secret_files) {
+                next if $file =~ /^\./;
+                
+                my $secret_file = "$dbi_path/$file";
+                next unless -f $secret_file;
+                
+                eval {
+                    local $/;
+                    open my $fh, "<", $secret_file or die "Cannot read $secret_file: $!";
+                    my $json_text = <$fh>;
+                    close $fh;
+                    
+                    my $loaded = decode_json($json_text);
+                    if (ref $loaded eq 'HASH') {
+                        %k8s_config = (%k8s_config, %$loaded);
+                        $k8s_secrets_found = 1;
+                        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                            "Loaded K8s Secret from: $secret_file (found " . scalar(keys %$loaded) . " connections)");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                        "Could not parse secret file $secret_file as JSON: $@");
+                }
             }
         }
-        # End skip
+        
+        if (keys %k8s_config) {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_k8s_secrets',
+                "Successfully loaded " . scalar(keys %k8s_config) . " database connections from K8s Secrets");
+            $self->{k8s_secrets_found} = 1;
+            return \%k8s_config;
+        }
+    }
+    
+    $self->{k8s_secrets_found} = $k8s_secrets_found;
+    $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, '_load_from_k8s_secrets',
+        "No K8s Secrets found in standard mount points");
+    return undef;
+}
 
-        # Determine server group
-        my $server_group = 'other';
-        if ($conn_name =~ /^production/) { $server_group = 'production' }
-        elsif ($conn_name =~ /^zerotier/) { $server_group = 'zerotier' }
-        elsif ($conn_name =~ /^local/) { $server_group = 'local' }
-        elsif ($conn_name =~ /^sqlite/) { $server_group = 'sqlite' }
-        elsif ($conn_name =~ /^backup/) { $server_group = 'backup' }
+sub _load_from_env_variables {
+    my ($self) = @_;
+    
+    my %env_config = ();
+    
+    foreach my $env_var (sort keys %ENV) {
+        next unless $env_var =~ /^COMSERV_DB_(.+?)_([A-Z_]+)$/;
+        
+        my $conn_name_upper = $1;
+        my $field_upper = $2;
+        my $conn_name = lc($conn_name_upper);
+        my $field = lc($field_upper);
+        my $value = $ENV{$env_var};
+        
+        $env_config{$conn_name} ||= {};
+        
+        if ($field eq 'host') {
+            $env_config{$conn_name}->{host} = $value;
+        } elsif ($field eq 'port') {
+            $env_config{$conn_name}->{port} = $value;
+        } elsif ($field eq 'username') {
+            $env_config{$conn_name}->{username} = $value;
+        } elsif ($field eq 'password') {
+            $env_config{$conn_name}->{password} = $value;
+        } elsif ($field eq 'database') {
+            $env_config{$conn_name}->{database} = $value;
+        } elsif ($field eq 'db_type') {
+            $env_config{$conn_name}->{db_type} = $value;
+        } elsif ($field eq 'priority') {
+            $env_config{$conn_name}->{priority} = $value;
+        } elsif ($field eq 'environment') {
+            $env_config{$conn_name}->{environment} = $value;
+        }
+    }
+    
+    if (keys %env_config) {
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_from_env_variables',
+            "Loaded " . scalar(keys %env_config) . " database connections from environment variables");
+        return \%env_config;
+    }
+    
+    return undef;
+}
 
-        $servers{$server_group}->{display_name} ||= ucfirst($server_group) . " Server";
-        $servers{$server_group}->{host} ||= $conn->{host} || 'localhost';
-        $servers{$server_group}->{connection_type} ||= $conn->{db_type} || 'mysql';
-        $servers{$server_group}->{priority} ||= $conn->{priority} || 999;
-        $servers{$server_group}->{databases} ||= {};
+sub _find_db_config_file {
+    my ($self) = @_;
+    
+    my @search_paths = (
+        "$FindBin::Bin/db_config.json",
+        "$FindBin::Bin/../db_config.json",
+        "$FindBin::Bin/../../db_config.json",
+        "/opt/comserv/db_config.json",
+        "/opt/comserv/Comserv/db_config.json",
+        "$ENV{HOME}/db_config.json",
+    );
+    
+    foreach my $path (@search_paths) {
+        if (-f $path && -r $path) {
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_find_db_config_file',
+                "Found db_config.json at: $path");
+            return $path;
+        }
+    }
+    
+    $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, '_find_db_config_file',
+        "db_config.json not found in any search location");
+    return undef;
+}
 
-        my $database_name = $conn->{database} || $conn->{database_path} || $conn_name;
-        $servers{$server_group}->{databases}{$conn_name} = {
-            display_name => $conn->{description} || ucfirst($conn_name),
-            database_name => $database_name,
-            connected => 0,
-            table_count => 0,
-            table_comparisons => [],
-            connection_info => {
-                host => $conn->{host} || 'localhost',
-                port => $conn->{port} || '',
-                database => $database_name,
-                username => $conn->{username} || '',
-                priority => $conn->{priority} || 999,
-                db_type => $conn->{db_type} || 'mysql'
-            },
+sub _apply_env_overrides {
+    my ($self, $config) = @_;
+    
+    return $config;
+}
+
+sub get_all_connections {
+    my ($self) = @_;
+    
+    $self->_load_config();
+    my $config = $self->config;
+    
+    my %connections = ();
+    
+    foreach my $conn_name (keys %$config) {
+        next if $conn_name =~ /^_/;
+        my $conn_config = $config->{$conn_name};
+        next unless ref $conn_config eq 'HASH';
+        
+        my $priority = $conn_config->{priority} // 999;
+        my $db_type = $conn_config->{db_type} // 'mysql';
+        my $description = $conn_config->{description} // '';
+        my $environment = $conn_config->{environment} // 'unknown';
+        
+        $connections{$conn_name} = {
+            config => $conn_config,
+            priority => $priority,
+            db_type => $db_type,
+            description => $description,
+            environment => $environment,
+            connection_name => $conn_name,
         };
     }
-
-    return { %servers };
+    
+    return \%connections;
 }
 
-# Test database connectivity
 sub test_connection {
-    my ($self, $connection_config) = @_;
+    my ($self, $conn_name) = @_;
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection', 
-        "Testing connection: " . ($connection_config->{description} || 'Unknown'));
+    $self->_load_config();
+    my $config = $self->config;
     
-    my $success = 0;
-    
-    eval {
-        require DBI;
-        my $dsn;
-        my $dbh;
-        
-        if ($connection_config->{db_type} eq 'sqlite') {
-            # SQLite connection
-            $dsn = "dbi:SQLite:dbname=" . $connection_config->{database_path};
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-                "SQLite DSN: $dsn");
-            $dbh = DBI->connect($dsn, "", "", {
-                RaiseError => 0,
-                PrintError => 0,
-                sqlite_timeout => 5000,
-            });
-        } else {
-            # MySQL connection
-            $dsn = "dbi:mysql:database=" . $connection_config->{database} . 
-                   ";host=" . $connection_config->{host} . 
-                   ";port=" . $connection_config->{port};
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-                "MySQL DSN: $dsn with user: " . $connection_config->{username});
-            $dbh = DBI->connect($dsn, $connection_config->{username}, $connection_config->{password}, {
-                RaiseError => 0,
-                PrintError => 0,
-                mysql_connect_timeout => 5,
-            });
-        }
-        
-        if ($dbh) {
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-                "Connection SUCCESSFUL for: " . ($connection_config->{description} || 'Unknown'));
-            $dbh->disconnect();
-            $success = 1;
-        } else {
-            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
-                "Connection FAILED for: " . ($connection_config->{description} || 'Unknown') . " - Error: " . ($DBI::errstr || 'Unknown error'));
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
-            "Exception during connection test: $@");
+    unless (exists $config->{$conn_name}) {
+        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'test_connection',
+            "Connection '$conn_name' not found in configuration");
+        return 0;
     }
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
-        "Connection test result for " . ($connection_config->{description} || 'Unknown') . ": " . ($success ? 'SUCCESS' : 'FAILED'));
+    my $conn_config = $config->{$conn_name};
+    my $db_type = $conn_config->{db_type} // 'mysql';
     
-    return $success;
+    my $dsn;
+    my $username = $conn_config->{username} // '';
+    my $password = $conn_config->{password} // '';
+    
+    if ($db_type eq 'sqlite') {
+        $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } else {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 3306;
+        my $database = $conn_config->{database} // '';
+        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
+    }
+    
+    try {
+        my $dbh = DBI->connect($dsn, $username, $password, {
+            RaiseError => 1,
+            PrintError => 0,
+            AutoCommit => 1,
+        });
+        
+        $dbh->disconnect();
+        
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'test_connection',
+            "Connection test successful for '$conn_name'");
+        
+        return 1;
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'test_connection',
+            "Connection test failed for '$conn_name': $_");
+        return 0;
+    };
 }
 
-# Select the best database connection for a specific database name
 sub select_connection {
     my ($self, $database_name) = @_;
     
-    $self->_load_config(); # Ensure config is loaded
+    $self->_load_config();
     my $config = $self->config;
     
-    # Get all connections that serve the specified database
     my @matching_connections = grep {
         my $conn = $config->{$_};
         $conn && ref $conn eq 'HASH' &&
         (($conn->{database} && $conn->{database} eq $database_name) ||
-         ($conn->{db_type} eq 'sqlite' && $_ =~ /\Q$database_name\E/))
+         ((defined $conn->{db_type} && $conn->{db_type} eq 'sqlite') && $_ =~ /\Q$database_name\E/))
     } keys %$config;
 
-    # Sort by priority
     @matching_connections = sort {
         ($config->{$a}{priority} // 999) <=> ($config->{$b}{priority} // 999)
     } @matching_connections;
     
-    # Debug: Show the connection priority order
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
         "RemoteDB Connection Selection for '$database_name' - Testing in priority order:");
     foreach my $conn_name (@matching_connections) {
@@ -223,100 +357,90 @@ sub select_connection {
             "  Priority $priority: $conn_name - $desc");
     }
 
-    # Try connections in priority order
+    my @failed_attempts;
+    
     foreach my $conn_name (@matching_connections) {
         my $conn = $config->{$conn_name};
+        my $host = $conn->{host} || 'N/A';
+        my $port = $conn->{port} || 'N/A';
 
-        # Skip if required fields are missing, empty, or contain placeholders
         my $skip = 0;
+        my $skip_reason = '';
         
-        # Different required fields for different database types
-        my @required_fields;
-        if ($conn->{db_type} eq 'sqlite') {
-            @required_fields = qw/database_path/;
-        } else {
-            @required_fields = qw/host port username database/;
+        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb)$/i) {
+            $skip = 1;
+            $skip_reason = "Invalid db_type";
+        }
+        if ($conn->{db_type} !~ /^sqlite$/i && (!$conn->{host} || $conn->{host} =~ /^(YOUR_|PLACEHOLDER|EXAMPLE)/i)) {
+            $skip = 1;
+            $skip_reason = "Host is placeholder or missing";
+        }
+        if ($conn->{db_type} !~ /^sqlite$/i && (!$conn->{database} || $conn->{database} =~ /^(YOUR_|PLACEHOLDER|EXAMPLE)/i)) {
+            $skip = 1;
+            $skip_reason = "Database name is placeholder or missing";
         }
         
-        foreach my $field (@required_fields) {
-            if (!exists $conn->{$field} ||
-                !defined $conn->{$field} ||
-                $conn->{$field} =~ /^\s*$/) {
-                warn "Skipping $conn_name: Missing required field '$field'";
-                $skip = 1;
-                last;
-            }
-            if ($conn->{$field} =~ /YOUR_|PLACEHOLDER/i) {
-                warn "Skipping $conn_name: Field '$field' contains placeholder value";
-                $skip = 1;
-                last;
-            }
+        if ($skip) {
+            my $priority = $conn->{priority} // 999;
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'select_connection',
+                "Skipping Priority $priority ($conn_name): $skip_reason");
+            next;
         }
-        next if $skip;
 
-        # Try the connection
-        if ($self->test_connection($conn)) {
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
-                "RemoteDB: Selected connection $conn_name for database '$database_name' (" . 
-                ($conn->{description} || 'no description') . ")");
-
-            # Store the selected connection info
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+            "Attempting Priority " . ($conn->{priority} // 999) . " ($conn_name): $host:$port");
+        
+        if ($self->test_connection($conn_name)) {
             my $connection_info = {
                 connection_name => $conn_name,
                 config => $conn,
-                database_name => $database_name
+                database_name => $database_name,
             };
+            
             $self->selected_connection->{$database_name} = $connection_info;
             
+            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'select_connection',
+                "SUCCESS: Selected connection '$conn_name' (Priority " . ($conn->{priority} // 999) . ") for database '$database_name'");
+            
             return $connection_info;
+        } else {
+            push @failed_attempts, {
+                connection_name => $conn_name,
+                priority => $conn->{priority} // 999,
+                reason => "Connection test failed"
+            };
         }
     }
 
-    # If we get here, no connection worked
-    die "RemoteDB: No working database connection found for '$database_name' database after trying " .
-        scalar(@matching_connections) . " connections";
+    my $error_msg = "Failed to find working connection for database '$database_name'. Attempted:\n";
+    foreach my $attempt (@failed_attempts) {
+        $error_msg .= "  Priority " . $attempt->{priority} . " ($attempt->{connection_name}): $attempt->{reason}\n";
+    }
+    $error_msg .= "No valid connections available for '$database_name'";
+    
+    $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'select_connection', $error_msg);
+    die $error_msg;
 }
 
-# Get connection info for a database (select if not already selected)
 sub get_connection_info {
     my ($self, $database_name) = @_;
     
-    # Return cached connection if available
     if (exists $self->selected_connection->{$database_name}) {
         return $self->selected_connection->{$database_name};
     }
     
-    # Otherwise select a new connection
     return $self->select_connection($database_name);
 }
 
-# ============================================================================
-# DATABASE SELECTION INFRASTRUCTURE - Future User-Configurable Capability
-# ============================================================================
-# The following methods provide infrastructure for implementing user-selectable
-# database connections in the future. Currently, automatic selection based on
-# priority is used. These methods allow for override capability when needed.
-# ============================================================================
-
-# Get user's preferred database connection from session
-# FUTURE: Call this from get_connection_info to support user preferences
 sub get_user_preferred_connection {
     my ($self, $c, $database_name) = @_;
     
-    # Not yet implemented - prepared for future use
     return undef;
-    
-    # Planned implementation:
-    # return $c->session->{preferred_connection}->{$database_name}
-    #     if exists $c->session->{preferred_connection}->{$database_name};
 }
 
-# Set user's preferred database connection in session
-# FUTURE: Call from admin interface to store user database preference
 sub set_user_preferred_connection {
     my ($self, $c, $database_name, $connection_name) = @_;
     
-    # Validate connection exists
     $self->_load_config();
     my $config = $self->config;
     
@@ -326,7 +450,6 @@ sub set_user_preferred_connection {
         return 0;
     }
     
-    # Store in session
     $c->session->{preferred_connection} ||= {};
     $c->session->{preferred_connection}->{$database_name} = $connection_name;
     
@@ -336,7 +459,6 @@ sub set_user_preferred_connection {
     return 1;
 }
 
-# Clear user's database connection preference
 sub clear_user_preferred_connection {
     my ($self, $c, $database_name) = @_;
     
@@ -351,55 +473,35 @@ sub clear_user_preferred_connection {
     return 0;
 }
 
-# Select connection with optional user preference override
-# FUTURE: Replace select_connection calls with this to support user preferences
 sub select_connection_with_preference {
     my ($self, $c, $database_name) = @_;
     
-    # Check for user preference (when fully implemented)
-    my $preferred_connection = $self->get_user_preferred_connection($c, $database_name);
+    my $preferred = $self->get_user_preferred_connection($c, $database_name);
     
-    if ($preferred_connection) {
+    if ($preferred) {
         $self->_load_config();
         my $config = $self->config;
         
-        # Try the preferred connection first
-        if (exists $config->{$preferred_connection}) {
+        if (exists $config->{$preferred}) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'select_connection_with_preference',
-                "Attempting to use user-preferred connection: $preferred_connection for $database_name");
+                "Using user preferred connection '$preferred' for database '$database_name'");
             
-            my $preferred_config = $config->{$preferred_connection};
-            
-            # Verify it's for the right database
-            if (($preferred_config->{database} && $preferred_config->{database} eq $database_name) ||
-                ($preferred_config->{db_type} eq 'sqlite' && $preferred_connection =~ /\Q$database_name\E/)) {
-                
-                if ($self->test_connection($preferred_config)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'select_connection_with_preference',
-                        "Successfully using preferred connection: $preferred_connection");
-                    
-                    my $connection_info = {
-                        connection_name => $preferred_connection,
-                        config => $preferred_config,
-                        database_name => $database_name
-                    };
-                    $self->selected_connection->{$database_name} = $connection_info;
-                    return $connection_info;
-                }
-            }
-            
-            # Preferred connection failed, log and fall through to automatic selection
+            return {
+                connection_name => $preferred,
+                config => $config->{$preferred},
+                database_name => $database_name,
+                using_preference => 1,
+            };
+        } else {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'select_connection_with_preference',
-                "Preferred connection $preferred_connection failed. Falling back to automatic selection.");
+                "User preferred connection '$preferred' not found, falling back to automatic selection");
+            $self->clear_user_preferred_connection($c, $database_name);
         }
     }
     
-    # No preference or preferred connection failed - use automatic selection
-    return $self->select_connection($database_name);
+    return $self->get_connection_info($database_name);
 }
 
-# Get all available connections for a database (for future UI/selection)
-# Useful for building a UI dropdown to let users choose
 sub get_available_connections_for_database {
     my ($self, $database_name) = @_;
     
@@ -413,85 +515,85 @@ sub get_available_connections_for_database {
         my $conn = $config->{$conn_name};
         next unless ref $conn eq 'HASH';
         
-        # Check if this connection serves the database
-        if (($conn->{database} && $conn->{database} eq $database_name) ||
-            ($conn->{db_type} eq 'sqlite' && $conn_name =~ /\Q$database_name\E/)) {
-            
-            # Test the connection to get current status
-            my $is_available = $self->test_connection($conn);
-            
+        my $db_field = $conn->{database} || $conn->{database_path};
+        if ($db_field && ($db_field eq $database_name || (defined $conn->{db_type} && $conn->{db_type} eq 'sqlite' && $conn_name =~ /\Q$database_name\E/))) {
             push @available, {
                 connection_name => $conn_name,
-                description => $conn->{description} || $conn_name,
-                host => $conn->{host} || 'SQLite',
-                priority => $conn->{priority} || 999,
-                is_available => $is_available,
-                db_type => $conn->{db_type} || 'mysql'
+                priority => $conn->{priority} // 999,
+                db_type => $conn->{db_type} // 'mysql',
+                description => $conn->{description} // '',
+                host => $conn->{host} || 'N/A',
+                port => $conn->{port} || 'N/A',
             };
         }
     }
     
-    # Sort by priority
     @available = sort { $a->{priority} <=> $b->{priority} } @available;
     
     return \@available;
 }
 
-# Add a new remote database connection
 sub add_connection {
     my ($self, $conn_name, $conn_config) = @_;
     
-    # Store the connection config
-    $self->connections->{$conn_name} = {
-        config => $conn_config,
-        dbh    => undef,
-    };
+    $self->_load_config();
+    my $config = $self->config;
+    
+    $config->{$conn_name} = $conn_config;
+    $self->config($config);
+    
+    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'add_connection',
+        "Added new connection: $conn_name");
     
     return 1;
 }
 
-# Get a database handle for a remote connection
 sub get_connection {
     my ($self, $c, $conn_name) = @_;
     
-    # Check if the connection exists
-    unless (exists $self->connections->{$conn_name}) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection', 
-            "Remote connection '$conn_name' does not exist");
+    $self->_load_config();
+    my $config = $self->config;
+    
+    unless (exists $config->{$conn_name}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection',
+            "Connection '$conn_name' does not exist");
         return;
     }
     
-    my $conn = $self->connections->{$conn_name};
+    my $conn_config = $config->{$conn_name};
+    my $db_type = $conn_config->{db_type} // 'mysql';
     
-    # If we already have an active connection, return it
-    if ($conn->{dbh} && $conn->{dbh}->ping) {
-        return $conn->{dbh};
+    my $dsn;
+    my $username = $conn_config->{username} // '';
+    my $password = $conn_config->{password} // '';
+    
+    if ($db_type eq 'sqlite') {
+        $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } else {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 3306;
+        my $database = $conn_config->{database} // '';
+        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
     }
     
-    # Otherwise, create a new connection
-    my $config = $conn->{config};
-    # Fixed DSN format for MySQL - most common format
-    my $dsn = "DBI:mysql:database=$config->{database};host=$config->{host};port=$config->{port}";
-    
     try {
-        $conn->{dbh} = DBI->connect($dsn, $config->{username}, $config->{password}, {
+        my $dbh = DBI->connect($dsn, $username, $password, {
             RaiseError => 1,
-            AutoCommit => 1,
             PrintError => 0,
+            AutoCommit => 1,
         });
         
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection', 
-            "Successfully connected to remote database '$conn_name'");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_connection',
+            "Successfully connected to database connection '$conn_name'");
         
-        return $conn->{dbh};
+        return $dbh;
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection', 
-            "Failed to connect to remote database '$conn_name': $_");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_connection',
+            "Failed to connect to database connection '$conn_name': $_");
         return;
     };
 }
 
-# Execute a query on a remote database
 sub execute_query {
     my ($self, $c, $conn_name, $query, $params) = @_;
     
@@ -504,7 +606,6 @@ sub execute_query {
         my $sth = $dbh->prepare($query);
         $sth->execute(@$params);
         
-        # For SELECT queries, fetch and return the results
         if ($query =~ /^\s*SELECT/i) {
             my @results;
             while (my $row = $sth->fetchrow_hashref) {
@@ -513,16 +614,14 @@ sub execute_query {
             return \@results;
         }
         
-        # For non-SELECT queries, return success
         return { success => 1, rows_affected => $sth->rows };
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_query', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'execute_query',
             "Query execution failed on '$conn_name': $_");
         return { error => $_ };
     };
 }
 
-# List tables in a remote database
 sub list_tables {
     my ($self, $c, $conn_name) = @_;
     
@@ -535,13 +634,12 @@ sub list_tables {
         my $tables = $dbh->tables(undef, undef, '%', 'TABLE');
         return [map { s/^.*\.//; $_ } @$tables];
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_tables', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_tables',
             "Failed to list tables for '$conn_name': $_");
         return;
     };
 }
 
-# Get table schema for a remote database table
 sub get_table_schema {
     my ($self, $c, $conn_name, $table_name) = @_;
     
@@ -563,132 +661,86 @@ sub get_table_schema {
         }
         return \@columns;
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_table_schema', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_table_schema',
             "Failed to get schema for table '$table_name' in '$conn_name': $_");
         return;
     };
 }
 
-# Schema Comparison Specific Methods
-# ===================================
-
-# Get schema comparison database status - checks both ency and forager databases
 sub get_schema_comparison_status {
-    my ($self) = @_;
+    my ($self, $c) = @_;
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-        "Checking schema comparison database requirements (ency + forager)");
-    
-    my $status = {
-        ency_status => 'disconnected',
-        forager_status => 'disconnected',
-        both_connected => 0,
+    my $comparison_status = {
         ency_connection => undef,
         forager_connection => undef,
-        error_messages => []
+        status => 'UNKNOWN',
     };
     
     try {
-        # Check for ency database connection
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-            "About to search for ENCY database connection");
-        my $ency_conn = $self->find_database_connection('ency');
+        my $ency_conn = $self->find_database_connection($c, 'ency');
         if ($ency_conn) {
-            $status->{ency_status} = 'connected';
-            $status->{ency_connection} = $ency_conn;
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-                "ENCY database connection found: " . $ency_conn->{connection_name});
+            $comparison_status->{ency_connection} = $ency_conn;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
+                "Found Ency connection: $ency_conn->{connection_name}");
         } else {
-            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_schema_comparison_status',
-                "ENCY database connection NOT found - will be marked as disconnected");
-            push @{$status->{error_messages}}, "ENCY database connection not found or not accessible";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_schema_comparison_status',
+                "Could not find Ency database connection");
         }
         
-        # Check for forager database connection  
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-            "About to search for Forager database connection");
-        my $forager_conn = $self->find_database_connection('shanta_forager');
+        my $forager_conn = $self->find_database_connection($c, 'shanta_forager');
         if ($forager_conn) {
-            $status->{forager_status} = 'connected';
-            $status->{forager_connection} = $forager_conn;
-            $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-                "Forager database connection found: " . $forager_conn->{connection_name});
+            $comparison_status->{forager_connection} = $forager_conn;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
+                "Found Forager connection: $forager_conn->{connection_name}");
         } else {
-            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_schema_comparison_status',
-                "Forager database connection NOT found - will be marked as disconnected");
-            push @{$status->{error_messages}}, "Forager database connection not found or not accessible";
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_schema_comparison_status',
+                "Could not find Forager database connection");
         }
         
-        # Set overall status
-        $status->{both_connected} = ($status->{ency_status} eq 'connected' && $status->{forager_status} eq 'connected');
-        
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_status',
-            sprintf("Schema comparison status: ENCY=%s, Forager=%s, Both=%s", 
-                   $status->{ency_status}, $status->{forager_status}, 
-                   $status->{both_connected} ? 'YES' : 'NO'));
-        
+        if ($ency_conn && $forager_conn) {
+            $comparison_status->{status} = 'READY';
+        } elsif ($ency_conn || $forager_conn) {
+            $comparison_status->{status} = 'PARTIAL';
+        } else {
+            $comparison_status->{status} = 'UNAVAILABLE';
+        }
     } catch {
-        my $error = "Exception in schema comparison status check: $_";
-        push @{$status->{error_messages}}, $error;
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'get_schema_comparison_status', $error);
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_schema_comparison_status',
+            "Error during schema comparison status check: $_");
+        $comparison_status->{status} = 'ERROR';
+        $comparison_status->{error} = $_;
     };
     
-    return $status;
+    return $comparison_status;
 }
 
-# Find a working database connection for a specific database name
 sub find_database_connection {
-    my ($self, $database_name) = @_;
-    
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'find_database_connection',
-        "Searching for database connection: $database_name");
-    
-    my $connection_info;
-    my $error_msg;
+    my ($self, $c, $database_name) = @_;
     
     try {
-        # Use the existing select_connection method which handles priority and connection testing
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'find_database_connection',
-            "Calling select_connection for database: $database_name");
-        $connection_info = $self->select_connection($database_name);
-        
+        return $self->get_connection_info($database_name);
     } catch {
-        $error_msg = $_;
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'find_database_connection',
-            "Exception in find_database_connection for '$database_name': $_");
-    };
-    
-    if ($connection_info) {
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'find_database_connection',
-            "Found working connection for '$database_name': " . $connection_info->{connection_name});
-        return $connection_info;
-    } else {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'find_database_connection',
-            "No working connection found for '$database_name'" . ($error_msg ? " (error: $error_msg)" : ""));
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'find_database_connection',
+            "Could not find connection for database '$database_name': $_");
         return undef;
-    }
+    };
 }
 
-# Get enhanced connection info with schema comparison context
 sub get_schema_comparison_connections {
-    my ($self) = @_;
+    my ($self, $c) = @_;
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
-        "Building schema comparison connection info");
+    my $comparison_status = $self->get_schema_comparison_status($c);
     
-    my $comparison_status = $self->get_schema_comparison_status();
     my $connections = {};
     
-    # Build connection info for schema comparison system
     if ($comparison_status->{ency_connection}) {
         my $conn = $comparison_status->{ency_connection};
         
-        # Get actual table list for ENCY database
         my ($tables, $table_count) = $self->_get_table_list($conn);
         
         $connections->{$conn->{connection_name}} = {
             connected => 1,
-            display_name => "ENCY Database",
+            display_name => "Ency Database",
             database_name => 'ency',
             config_key => $conn->{connection_name},
             host => $conn->{config}->{host} || 'localhost',
@@ -706,14 +758,13 @@ sub get_schema_comparison_connections {
             }
         };
         
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
-            "ENCY database: found $table_count tables");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
+            "Ency database: found $table_count tables");
     }
     
     if ($comparison_status->{forager_connection}) {
         my $conn = $comparison_status->{forager_connection};
         
-        # Get actual table list for Forager database
         my ($tables, $table_count) = $self->_get_table_list($conn);
         
         $connections->{$conn->{connection_name}} = {
@@ -736,11 +787,11 @@ sub get_schema_comparison_connections {
             }
         };
         
-        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
             "Forager database: found $table_count tables");
     }
     
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_schema_comparison_connections',
         "Schema comparison connections built: " . scalar(keys %$connections) . " databases available");
     
     return {
@@ -749,7 +800,6 @@ sub get_schema_comparison_connections {
     };
 }
 
-# Get table list from a database connection
 sub _get_table_list {
     my ($self, $conn) = @_;
     
@@ -759,7 +809,6 @@ sub _get_table_list {
     try {
         my $dbh = $self->_connect_to_database($conn);
         if ($dbh) {
-            # Query to get all tables from the database
             my $sth = $dbh->prepare("SHOW TABLES");
             $sth->execute();
             
@@ -785,13 +834,11 @@ sub _get_table_list {
     return ($tables, $table_count);
 }
 
-# Build table comparisons with result file status
 sub _build_table_comparisons {
     my ($self, $tables, $database_name) = @_;
     
     my @table_comparisons = ();
     
-    # For each table, check if there's a corresponding Result file
     foreach my $table_name (@$tables) {
         my $result_file_exists = $self->_check_result_file_exists($table_name, $database_name);
         
@@ -799,7 +846,6 @@ sub _build_table_comparisons {
             name => $table_name,
             has_result_file => $result_file_exists,
             daname => $database_name,
-            # These will be populated when doing detailed comparisons
             differences_count => 0,
             sync_status => $result_file_exists ? 'unknown' : 'missing_result'
         };
@@ -811,49 +857,40 @@ sub _build_table_comparisons {
     return \@table_comparisons;
 }
 
-# Check if a result file exists for a given table
 sub _check_result_file_exists {
     my ($self, $table_name, $database_name) = @_;
     
-    # Determine which database directory to check
     my $db_dir;
     if ($database_name eq 'ency') {
         $db_dir = 'Ency';
     } elsif ($database_name eq 'shanta_forager') {
         $db_dir = 'Forager';
     } else {
-        # Default fallback
         $db_dir = 'Ency';
     }
     
     my $result_dir = "/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Model/Schema/$db_dir/Result/";
     
-    # Get all .pm files in the result directory
     opendir(my $dh, $result_dir) or return 0;
     my @result_files = grep { /\.pm$/ && -f "$result_dir$_" } readdir($dh);
     closedir($dh);
     
-    # Create mappings from Result class names to possible table names
     my %table_mappings = ();
     foreach my $file (@result_files) {
         my $class_name = $file;
         $class_name =~ s/\.pm$//;
         
-        # Direct lowercase match
         $table_mappings{lc($class_name)} = 1;
         
-        # Convert PascalCase to snake_case
         my $snake_case = $class_name;
         $snake_case =~ s/([A-Z])/_$1/g;
         $snake_case =~ s/^_//;
         $snake_case = lc($snake_case);
         $table_mappings{$snake_case} = 1;
         
-        # Try pluralized versions (e.g. Category -> categories)
         my $plural = lc($class_name) . 's';
         $table_mappings{$plural} = 1;
         
-        # Try singular version (e.g. Files -> file)  
         my $singular = lc($class_name);
         $singular =~ s/s$// if $singular =~ /[^s]s$/;
         $table_mappings{$singular} = 1;
@@ -862,18 +899,15 @@ sub _check_result_file_exists {
     return exists $table_mappings{$table_name} ? 1 : 0;
 }
 
-# Convert table name to Result class name (e.g. user_profiles -> UserProfiles)
 sub _table_name_to_result_class {
     my ($self, $table_name) = @_;
     
-    # Convert snake_case to PascalCase
     my @words = split /_/, $table_name;
     my $class_name = join('', map { ucfirst(lc($_)) } @words);
     
     return $class_name;
 }
 
-# Connect to database using connection info
 sub _connect_to_database {
     my ($self, $conn) = @_;
     
@@ -889,7 +923,8 @@ sub _connect_to_database {
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=$database";
     } else {
-        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
+        my $driver = 'mysql';
+        $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
     }
     
     try {

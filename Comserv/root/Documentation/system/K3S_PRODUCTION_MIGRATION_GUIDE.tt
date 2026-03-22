@@ -1,0 +1,633 @@
+[% META
+        title = "K3s Production Database Migration - Implementation Guide"
+   description = "Step-by-step implementation guide for migrating production MariaDB (192.168.1.198) to K3s cluster with zero-downtime using Galera replication, stable hardware placement on proxmox720, and comprehensive rollback procedures"
+   roles = "admin,devops,developer"
+   TemplateType = "Documentation"
+   category = "infrastructure,deployment,kubernetes"
+   page_version = "0.01"
+   last_updated = "Wed Dec 24 2025"
+   site_specific = "false"
+%]
+[% PageVersion = 'root/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE.tt,v 0.01 2025/12/24 zencoder Exp - Integrated Grok K3s plan with stability focus, Galera HA, zero-downtime replication migration, and rollback procedures' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="container">
+    <h1 style="color: var(--text-color); font-family: var(--header-font);">K3s Production Database Migration Guide</h1>
+    <p style="color: var(--text-color); font-family: var(--body-font); font-size: 1.1em;"><strong>Zero-Downtime Migration: Bare-Metal MariaDB (192.168.1.198) → K3s Cluster with Galera HA</strong></p>
+
+    <div class="last-updated" style="color: var(--text-muted-color); font-size: var(--font-size-small);">
+        Last Updated: 2025-12-24 |
+        Version: 0.01 |
+        Status: 📋 Ready for Implementation |
+        Scope: K3s Phase 3-6 implementation with stability-first approach
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+        <div class="col-100">
+            <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
+                <a href="#phase3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 3: K3s Setup</a>
+                <a href="#phase4" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 4: Galera</a>
+                <a href="#phase5" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 5: Migration</a>
+                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Rollback</a>
+                <a href="#monitoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Monitoring</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREREQUISITES -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="prerequisites" style="color: var(--text-color); font-family: var(--header-font);">Prerequisites</h2>
+            <h3>Environment Requirements</h3>
+            <ul style="color: var(--text-color); font-family: var(--body-font);">
+                <li><strong>Docker Compose Phases Complete</strong> - Environment variables, volume mounts, and DB credentials validated</li>
+                <li><strong>Three Proxmox Hosts</strong> - proxmox720 (master, Dell R720), proxmoxws (workers), proxmoxt210 (light worker)</li>
+                <li><strong>LAN Access</strong> - All nodes on same network (192.168.1.0/24)</li>
+                <li><strong>Production DB Online</strong> - Bare-metal MariaDB at 192.168.1.198:3306 accessible from Proxmox hosts</li>
+                <li><strong>SSH Keys</strong> - SSH access to all Proxmox hosts for VM creation</li>
+                <li><strong>Resource Availability</strong> - At least 4 vCPU, 8GB RAM per VM; 50GB storage for master</li>
+            </ul>
+
+            <h3>Pre-Migration Checklist</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>[ ] Backup production database (mysqldump to external storage)
+[ ] Document current DB schema and data size
+[ ] Verify network connectivity: ping 192.168.1.198 from all Proxmox hosts
+[ ] Test MySQL credentials: mysql -h 192.168.1.198 -u user -p
+[ ] Document current DNS/IP mappings
+[ ] Schedule migration window (minimal user impact)
+[ ] Notify stakeholders of maintenance window (1-2 hour estimate)</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">Target Architecture</h2>
+            
+            <h3>Cluster Topology</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>┌─────────────────────────────────────────────────────────────┐
+│                    Proxmox Cluster (LAN: 192.168.1.0/24)      │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  proxmox720 (Dell R720 - STABLE)                            │
+│  ├─ K3s Master VM 100 (192.168.1.10)                        │
+│  │  └─ etcd, apiserver, control-plane                       │
+│  ├─ K3s Worker VM 101 (192.168.1.11)                        │
+│  └─ K3s Worker VM 102 (192.168.1.12)                        │
+│                                                               │
+│  proxmoxws (Workers)                                         │
+│  ├─ K3s Worker VM 103 (192.168.1.13)                        │
+│  └─ K3s Worker VM 104 (192.168.1.14)                        │
+│                                                               │
+│  proxmoxt210 (Light)                                         │
+│  └─ K3s Worker VM 105 (192.168.1.15) [small/edge jobs]      │
+│                                                               │
+│  Bare-Metal (Current - TO BE MIGRATED)                       │
+│  └─ Production MariaDB: 192.168.1.198:3306                  │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+            <h3>Galera Cluster Setup</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>K3s Namespace: production-db
+Service: mariadb-galera (headless for Galera)
+StatefulSet: mariadb-galera (3 replicas)
+├─ Pod 0: Primary (sync-full)
+├─ Pod 1: Secondary (catch-up)
+└─ Pod 2: Secondary (catch-up)
+
+PersistentVolume: 100GB (NFS or Longhorn)
+ClusterIP Service: mariadb-galera (internal clustering)
+LoadBalancer Service: mariadb-lb (external access, IP 192.168.1.200)</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 3: K3s SETUP -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase3" style="color: var(--text-color); font-family: var(--header-font);">Phase 3: K3s Cluster Rebuild (Week 1)</h2>
+
+            <h3>Step 3.1: Delete Old K3s VMs (If Existing)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmoxws (backup old config first)
+qm stop 100 && qm destroy 100 --purge 2>/dev/null || echo "VM 100 not found"
+qm stop 103 && qm destroy 103 --purge 2>/dev/null || echo "VM 103 not found"
+
+# On proxmox720
+qm stop 201 && qm destroy 201 --purge 2>/dev/null || echo "VM 201 not found"
+qm stop 202 && qm destroy 202 --purge 2>/dev/null || echo "VM 202 not found"
+
+# Verify cleanup
+qm list | grep -E "k3s|100|101|102|103|104|105"</code></pre>
+
+            <h3>Step 3.2: Create Master VM on proxmox720</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmox720 (IMPORTANT: Master on stable hardware)
+qm create 100 --name k3s-master --memory 8192 --cores 4 --net0 virtio,bridge=vmbr0
+qm set 100 --scsi0 local-lvm:50  # 50GB for master with etcd
+qm set 100 --ide2 local:cloudinit
+qm set 100 --ipconfig0 ip=192.168.1.10/24,gw=192.168.1.1
+qm set 100 --ciuser ubuntu --cipassword 'Comserv@2025!' --sshkey ~/.ssh/id_rsa.pub
+qm set 100 --onboot 1  # Start on host reboot
+qm start 100
+
+# Verify boot
+sleep 60 && ssh ubuntu@192.168.1.10 "echo 'Master SSH OK'"</code></pre>
+
+            <h3>Step 3.3: Clone Worker VMs</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Clone workers on proxmox720 (2 workers)
+qm clone 100 101 --name k3s-worker-1 --full
+qm set 101 --ipconfig0 ip=192.168.1.11/24,gw=192.168.1.1
+qm start 101
+
+qm clone 100 102 --name k3s-worker-2 --full
+qm set 102 --ipconfig0 ip=192.168.1.12/24,gw=192.168.1.1
+qm start 102
+
+# On proxmoxws (2 workers via SSH)
+ssh root@proxmoxws "qm clone 100 103 --name k3s-worker-3 --full && \
+  qm set 103 --ipconfig0 ip=192.168.1.13/24,gw=192.168.1.1 && \
+  qm start 103"
+
+ssh root@proxmoxws "qm clone 100 104 --name k3s-worker-4 --full && \
+  qm set 104 --ipconfig0 ip=192.168.1.14/24,gw=192.168.1.1 && \
+  qm start 104"
+
+# On proxmoxt210 (light worker)
+ssh root@proxmoxt210 "qm create 105 --name k3s-worker-light --memory 4096 --cores 2 --net0 virtio,bridge=vmbr0 && \
+  qm set 105 --scsi0 local-lvm:30 && \
+  qm set 105 --ipconfig0 ip=192.168.1.15/24,gw=192.168.1.1 && \
+  qm start 105"</code></pre>
+
+            <h3>Step 3.4: Prepare All Nodes</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Script to run on ALL nodes (create as prep-nodes.sh)
+for IP in 192.168.1.10 192.168.1.11 192.168.1.12 192.168.1.13 192.168.1.14 192.168.1.15; do
+  ssh ubuntu@$IP 'bash -x << EOF'
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install -y curl wget htop ntp
+    sudo swapoff -a
+    sudo sed -i '/ swap / s/^/#/' /etc/fstab
+    sudo modprobe overlay
+    sudo modprobe br_netfilter
+    sudo sysctl -w net.ipv4.ip_forward=1
+    sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
+    echo "✅ Node $IP ready"
+EOF
+done</code></pre>
+
+            <h3>Step 3.5: Install K3s</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On Master (VM 100)
+ssh ubuntu@192.168.1.10 'curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_VERSION=v1.28.4+k3s2 \
+  sh -s - server --node-ip=192.168.1.10 \
+  --bind-address=192.168.1.10 \
+  --advertise-address=192.168.1.10 \
+  --disable traefik'  # Disable traefik (use own ingress)
+
+# Get token
+K3S_TOKEN=$(ssh ubuntu@192.168.1.10 'sudo cat /var/lib/rancher/k3s/server/node-token')
+echo "K3S_TOKEN=$K3S_TOKEN"
+
+# On all workers (VMs 101-105)
+for IP in 192.168.1.11 192.168.1.12 192.168.1.13 192.168.1.14 192.168.1.15; do
+  ssh ubuntu@$IP "curl -sfL https://get.k3s.io | \
+    K3S_URL=https://192.168.1.10:6443 \
+    K3S_TOKEN=$K3S_TOKEN \
+    INSTALL_K3S_VERSION=v1.28.4+k3s2 \
+    sh -s - --node-ip=$IP"
+done
+
+# Verify cluster
+ssh ubuntu@192.168.1.10 'kubectl get nodes'</code></pre>
+
+            <h3>Step 3.6: Install MetalLB (External LoadBalancer)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On master
+ssh ubuntu@192.168.1.10 'kubectl apply -f \
+  https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml'
+
+# Wait for metallb pods
+sleep 30
+
+# Create ConfigMap for IP pool
+ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.1.200-192.168.1.250
+EOF
+
+kubectl get pods -n metallb-system</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 4: GALERA DEPLOYMENT -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase4" style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Deploy MariaDB Galera StatefulSet (Week 2)</h2>
+
+            <h3>Step 4.1: Create Namespace & Secrets</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production-db
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-root-password
+  namespace: production-db
+type: Opaque
+stringData:
+  password: "YourSecureRootPassword123!"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-user-password
+  namespace: production-db
+type: Opaque
+stringData:
+  username: "comserv_user"
+  password: "YourSecureUserPassword456!"
+EOF
+
+kubectl get secrets -n production-db</code></pre>
+
+            <h3>Step 4.2: Create Persistent Volumes (NFS Backend)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mariadb-pv-0
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    server: 192.168.1.198  # OR your NFS server
+    path: "/export/mariadb-0"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mariadb-pv-1
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    server: 192.168.1.198
+    path: "/export/mariadb-1"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mariadb-pv-2
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    server: 192.168.1.198
+    path: "/export/mariadb-2"
+EOF
+
+kubectl get pv</code></pre>
+
+            <h3>Step 4.3: Deploy Galera StatefulSet</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb-galera
+  namespace: production-db
+spec:
+  serviceName: mariadb-galera
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mariadb-galera
+  template:
+    metadata:
+      labels:
+        app: mariadb-galera
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.6
+        ports:
+        - name: mysql
+          containerPort: 3306
+        - name: galera
+          containerPort: 4567
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mariadb-root-password
+              key: password
+        - name: MYSQL_DATABASE
+          value: "ency"
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mariadb-user-password
+              key: username
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mariadb-user-password
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+      terminationGracePeriodSeconds: 30
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-galera
+  namespace: production-db
+spec:
+  clusterIP: None
+  ports:
+  - port: 3306
+    name: mysql
+  - port: 4567
+    name: galera
+  selector:
+    app: mariadb-galera
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-lb
+  namespace: production-db
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 3306
+    targetPort: 3306
+  selector:
+    app: mariadb-galera
+EOF
+
+# Wait for statefulset
+kubectl rollout status sts/mariadb-galera -n production-db --timeout=5m
+kubectl get svc -n production-db</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- PHASE 5: ZERO-DOWNTIME MIGRATION -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="phase5" style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Zero-Downtime Data Migration (Week 2-3)</h2>
+
+            <h3>Step 5.1: Verify K3s Galera is Healthy</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>kubectl get pods -n production-db
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p$ROOT_PASSWORD -e "SHOW STATUS LIKE 'wsrep%';"</code></pre>
+
+            <h3>Step 5.2: Set Bare-Metal as Master, K3s as Slave</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On bare-metal (192.168.1.198)
+mysql -u root -p << EOF
+RESET MASTER;
+SHOW MASTER STATUS;  # Note File & Position
+EOF
+
+# On K3s Galera Pod 0
+kubectl exec -it mariadb-galera-0 -n production-db -- mysql -u root -p'YourSecureRootPassword123!' << EOF
+CHANGE MASTER TO
+  MASTER_HOST='192.168.1.198',
+  MASTER_USER='replication_user',
+  MASTER_PASSWORD='replication_pass',
+  MASTER_LOG_FILE='mysql-bin.000001',
+  MASTER_LOG_POS=12345;  # From bare-metal SHOW MASTER STATUS
+START SLAVE;
+SHOW SLAVE STATUS\G
+EOF</code></pre>
+
+            <h3>Step 5.3: Wait for Replication Sync (Critical)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Monitor sync progress
+for i in {1..300}; do
+  SECONDS_BEHIND=$(kubectl exec -it mariadb-galera-0 -n production-db -- \
+    mysql -u root -p'YourSecureRootPassword123!' -e \
+    "SHOW SLAVE STATUS\G" | grep "Seconds_Behind_Master" | awk '{print $2}')
+  
+  if [ "$SECONDS_BEHIND" = "0" ] || [ "$SECONDS_BEHIND" = "NULL" ]; then
+    echo "✅ Replication COMPLETE - Seconds_Behind_Master: 0"
+    break
+  else
+    echo "⏳ Syncing... Seconds Behind: $SECONDS_BEHIND (attempt $i/300)"
+    sleep 10
+  fi
+done</code></pre>
+
+            <h3>Step 5.4: Verify Data Integrity</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Compare row counts
+echo "Bare-metal row counts:"
+mysql -h 192.168.1.198 -u root -p << EOF | grep -E "^[0-9]+" | awk '{s+=$1} END {print "Total:", s}'
+SELECT COUNT(*) FROM ency.table1;
+SELECT COUNT(*) FROM ency.table2;
+EOF
+
+echo "K3s row counts:"
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p'YourSecureRootPassword123!' << EOF | grep -E "^[0-9]+" | awk '{s+=$1} END {print "Total:", s}'
+SELECT COUNT(*) FROM ency.table1;
+SELECT COUNT(*) FROM ency.table2;
+EOF</code></pre>
+
+            <h3>Step 5.5: Final Cutover (During Maintenance Window)</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># 1. Stop application (if containerized in K3s)
+kubectl scale deployment/comserv-app --replicas=0 -n default
+
+# 2. Verify no writes to bare-metal
+sleep 5
+
+# 3. Stop replication on K3s
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p'YourSecureRootPassword123!' -e "STOP SLAVE;"
+
+# 4. Promote K3s to master
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p'YourSecureRootPassword123!' -e "RESET SLAVE ALL;"
+
+# 5. Update application config to point to K3s LoadBalancer IP (192.168.1.200)
+kubectl set env deployment/comserv-app DB_HOST=mariadb-lb.production-db -n default
+
+# 6. Restart application
+kubectl scale deployment/comserv-app --replicas=3 -n default
+
+# 7. Verify connectivity
+kubectl exec -it deployment/comserv-app -n default -- \
+  mysql -h mariadb-lb.production-db -u comserv_user -p'YourSecureUserPassword456!' -e "SELECT COUNT(*) FROM ency.Users;"
+
+echo "✅ Cutover Complete - Application now on K3s Galera"</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ROLLBACK -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="rollback" style="color: var(--text-color); font-family: var(--header-font);">Rollback Procedure (3-Day Window)</h2>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <strong>⚠️ Critical</strong>: Keep bare-metal database online and updated for 3 days post-cutover. If issues arise, revert to bare-metal within 72 hours.
+            </div>
+
+            <h3>Rollback Step 1: Reverse Replication</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On K3s (now master)
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p'YourSecureRootPassword123!' << EOF
+RESET MASTER;
+SHOW MASTER STATUS;  # Note new positions
+EOF
+
+# On bare-metal (revert to master)
+mysql -u root -p << EOF
+CHANGE MASTER TO
+  MASTER_HOST='mariadb-lb.production-db',  # K3s LoadBalancer DNS/IP
+  MASTER_USER='replication_user',
+  MASTER_PASSWORD='replication_pass',
+  MASTER_LOG_FILE='mysql-bin.000001',
+  MASTER_LOG_POS=<from-above>;
+START SLAVE;
+EOF</code></pre>
+
+            <h3>Rollback Step 2: Update Application Config</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Stop K3s deployment
+kubectl scale deployment/comserv-app --replicas=0 -n default
+
+# Update to bare-metal IP (or use DNS)
+kubectl set env deployment/comserv-app DB_HOST=192.168.1.198 -n default
+
+# Restart
+kubectl scale deployment/comserv-app --replicas=3 -n default
+
+# Verify
+kubectl exec -it deployment/comserv-app -n default -- \
+  mysql -h 192.168.1.198 -u comserv_user -p'YourSecureUserPassword456!' -e "SELECT COUNT(*) FROM ency.Users;"
+
+echo "✅ Rolled back to bare-metal"</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- MONITORING & MAINTENANCE -->
+    <div class="row">
+        <div class="col-100">
+            <h2 id="monitoring" style="color: var(--text-color); font-family: var(--header-font);">Monitoring & Maintenance</h2>
+
+            <h3>Health Checks</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Galera cluster status
+kubectl exec -it mariadb-galera-0 -n production-db -- \
+  mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_%';"
+
+# Pod status
+kubectl get pods -n production-db
+kubectl describe pod mariadb-galera-0 -n production-db
+
+# Service endpoints
+kubectl get ep mariadb-lb -n production-db
+kubectl get svc mariadb-lb -n production-db
+
+# Connection test from application
+kubectl exec -it deployment/comserv-app -n default -- \
+  mysql -h mariadb-lb.production-db -u comserv_user -p -e "SELECT 1;"</code></pre>
+
+            <h3>Backup Strategy</h3>
+            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Daily backup (run in K3s CronJob)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-backup
+  namespace: production-db
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: mysqldump
+            image: mariadb:10.6
+            command:
+            - /bin/sh
+            - -c
+            - |
+              mysqldump -h mariadb-galera-0.mariadb-galera -u root -p$ROOT_PASSWORD \
+                --all-databases > /backups/mysql-backup-$(date +%Y%m%d-%H%M%S).sql
+            env:
+            - name: ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-root-password
+                  key: password
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+          volumes:
+          - name: backups
+            nfs:
+              server: 192.168.1.198
+              path: "/export/backups"
+          restartPolicy: OnFailure</code></pre>
+
+            <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="row">
+        <div class="col-100">
+            <div style="margin-top: var(--spacing-large); padding-top: var(--spacing-medium); border-top: 1px solid var(--border-color); color: var(--text-muted-color); font-size: var(--font-size-small);">
+                <p><strong>Document Owner</strong>: Infrastructure Team + Grok (K3s design)</p>
+                <p><strong>Last Reviewed</strong>: 2025-12-24</p>
+                <p><em>Reference: DOCKER_KUBERNETES_MIGRATION_STRATEGY.tt (Phases 3-6), PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN.tt (Grok)</em></p>
+                <p><strong>Critical Notes</strong>:</p>
+                <ul style="font-size: 0.9em;">
+                    <li>All IP addresses are examples - substitute your actual network configuration</li>
+                    <li>Test entire procedure in staging environment first</li>
+                    <li>Maintain bare-metal database for minimum 3 days post-cutover</li>
+                    <li>Monitor Galera cluster health continuously during migration</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+</DOCUMENT>

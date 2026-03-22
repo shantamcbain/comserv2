@@ -1,0 +1,19 @@
+[% META title = 'Data Sources' %]
+[% PageVersion = 'Documentation/environment/DATA_SOURCES.tt,v 0.01 2025/11/14 Codebuddy Exp Codebuddy ' %]
+[% debug %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+    [%# INCLUDE 'debug.tt' %]
+[% END %]
+
+<div class="data-sources">
+    <h1>Data source references</h1>
+    <p>Notes on authoritative inventories and where they live (files, databases, secure vaults). Include links to source files and API endpoints if applicable.</p>
+    <ul>
+        <li>network_map.json</li>
+        <li>db_config.json</li>
+        <li>proxmox data sources</li>
+    </ul>
+</div>
+
+...rest of the code...
