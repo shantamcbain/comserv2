@@ -3415,18 +3415,44 @@ sub compose_email :Local :Args(1) {
         { workshop => $ws, count => $cnt }
     } @leader_workshops_raw;
 
-    # Compute unique email count across ALL leader workshops + primary (server-side dedup)
+    # Fetch ALL unique participants across primary + all leader workshops for the recipient checklist
     my @all_ids = ($id, map { $_->{workshop}->id } @leader_workshops);
-    my @all_emails = $c->model('DBEncy::Participant')->search(
+    my @all_participants_rs = $c->model('DBEncy::Participant')->search(
         { workshop_id => \@all_ids, status => 'registered' },
-        { columns => ['email'], distinct => 1 }
-    )->get_column('email')->all;
-    my $unique_total = scalar grep { $_ && $_ =~ /\@/ } @all_emails;
+        { prefetch => 'user', order_by => [\'me.name', \'me.email'] }
+    )->all;
+
+    # Deduplicate by email, keep best name
+    my %seen_email;
+    my @all_recipients;
+    for my $p (@all_participants_rs) {
+        my $email = $p->email || '';
+        next unless $email =~ /\@/;
+        next if $seen_email{lc $email}++;
+        my $name = '';
+        if ($p->user) {
+            $name = join(' ', grep { $_ } ($p->user->first_name, $p->user->last_name));
+            $name ||= $p->user->username || '';
+        }
+        $name ||= $p->name || '';
+        $name =~ s/^\s+|\s+$//g;
+        push @all_recipients, {
+            email       => $email,
+            name        => $name,
+            display     => $name ? "$name <$email>" : $email,
+            workshop_id => $p->workshop_id,
+        };
+    }
+    my $unique_total = scalar @all_recipients;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'compose_email',
+        "compose_email for workshop_id=$id: primary=$registered_count unique_total=$unique_total");
 
     $c->stash(
         workshop           => $workshop,
         recipient_count    => $registered_count,
         unique_total       => $unique_total,
+        all_recipients     => \@all_recipients,
         workshop_templates => \@workshop_templates,
         global_templates   => \@global_templates,
         leader_workshops   => \@leader_workshops,
@@ -3454,18 +3480,41 @@ sub send_email :Local :Args(1) {
     my $params = $c->request->body_parameters;
     my $subject      = $params->{subject};
     my $message_body = $params->{message_body} || '';
-    # If leader filled the "Full Email Body" override use it; otherwise use message_body as body
     my $body = $params->{body} || $message_body;
 
-    # Collect all workshop IDs to include (primary + any extras checked)
-    my @extra_ids;
-    if (ref $params->{extra_workshop_ids} eq 'ARRAY') {
-        @extra_ids = @{ $params->{extra_workshop_ids} };
-    } elsif ($params->{extra_workshop_ids}) {
-        @extra_ids = ($params->{extra_workshop_ids});
+    # Read selected recipients from form: values are "Name\x00email" pairs
+    my @selected_raw;
+    if (ref $params->{selected_recipient} eq 'ARRAY') {
+        @selected_raw = @{ $params->{selected_recipient} };
+    } elsif ($params->{selected_recipient}) {
+        @selected_raw = ($params->{selected_recipient});
     }
-    my @all_workshop_ids = ($id, @extra_ids);
-    
+
+    # Build deduplicated list of { email, name } from selected checkboxes
+    # Values are plain email addresses; look up participant name from DB
+    my @registered_participants;
+    my %seen_emails;
+    for my $raw (@selected_raw) {
+        my $email = $raw;
+        $email =~ s/^\s+|\s+$//g;
+        next unless $email && $email =~ /\@/;
+        next if $seen_emails{lc $email}++;
+        my $p = $c->model('DBEncy::Participant')->search(
+            { email => $email, status => 'registered' },
+            { rows => 1, prefetch => 'user' }
+        )->first;
+        my $name = '';
+        if ($p) {
+            if ($p->user) {
+                $name = join(' ', grep { $_ } ($p->user->first_name, $p->user->last_name));
+                $name ||= $p->user->username || '';
+            }
+            $name ||= $p->name || '';
+        }
+        $name =~ s/^\s+|\s+$//g;
+        push @registered_participants, { email => $email, name => $name };
+    }
+
     unless ($subject && $body) {
         $c->stash->{error_msg} = 'Subject and body are required.';
         my $registered_count = $c->model('DBEncy::Participant')->search({
@@ -3473,40 +3522,17 @@ sub send_email :Local :Args(1) {
             status => 'registered'
         })->count;
         $c->stash(
-            workshop => $workshop,
+            workshop        => $workshop,
             recipient_count => $registered_count,
-            form_data => $params,
-            template => 'WorkShops/ComposeEmail.tt',
+            form_data       => $params,
+            template        => 'WorkShops/ComposeEmail.tt',
         );
         return;
     }
-    
-    my @registered_participants = $c->model('DBEncy::Participant')->search(
-        {
-            workshop_id => \@all_workshop_ids,
-            'me.status' => 'registered'
-        },
-        { prefetch => 'user' }
-    )->all;
-    
+
     unless (@registered_participants) {
-        $c->flash->{error_msg} = 'No registered participants to email.';
-        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
-        return;
-    }
-    
-    my @recipient_emails;
-    my %seen_emails;
-    for my $participant (@registered_participants) {
-        my $email = $participant->email;
-        next unless $email && $email =~ /\@/;
-        next if $seen_emails{lc $email}++;
-        push @recipient_emails, $email;
-    }
-    
-    unless (@recipient_emails) {
-        $c->flash->{error_msg} = 'No valid email addresses found for registered participants.';
-        $c->response->redirect($c->uri_for($self->action_for('participants'), [$id]));
+        $c->flash->{error_msg} = 'No recipients selected — please tick at least one address.';
+        $c->response->redirect($c->uri_for($self->action_for('compose_email'), [$id]));
         return;
     }
     
@@ -3553,20 +3579,12 @@ sub send_email :Local :Args(1) {
     my @failed_log;
 
     for my $participant (@registered_participants) {
-        my $email = $participant->email;
+        my $email = $participant->{email};
         next unless $email && $email =~ /\@/;
         next if $sent_to{lc $email}++;
-        
-        my $user_name = '';
-        if ($participant->user) {
-            $user_name = $participant->user->first_name || $participant->user->username || '';
-            if ($participant->user->last_name) {
-                $user_name .= ' ' . $participant->user->last_name;
-            }
-        } elsif ($participant->name) {
-            $user_name = $participant->name;
-        }
-        $user_name =~ s/^\s+|\s+$//g if $user_name;
+
+        my $user_name  = $participant->{name} || '';
+        $user_name =~ s/^\s+|\s+$//g;
         my $first_name = (split /\s+/, $user_name)[0] || $user_name;
 
         # Process per-participant [[placeholders]] in body
