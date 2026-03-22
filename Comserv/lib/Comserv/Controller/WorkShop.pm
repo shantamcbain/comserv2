@@ -1139,9 +1139,9 @@ sub participants :Local :Args(1) {
     
     $c->stash(
         workshop => $workshop,
-        registered_participants => \@registered,
-        waitlist_participants => \@waitlist,
-        template => 'WorkShops/Participants.tt',
+        registered => \@registered,
+        waitlist   => \@waitlist,
+        template   => 'WorkShops/Participants.tt',
     );
 }
 
