@@ -3376,7 +3376,6 @@ sub compose_email :Local :Args(1) {
         { order_by => { -asc => 'name' } }
     )->all;
 
-    
     # Fetch all other workshops this leader owns (or all workshops for CSC admin)
     my $user_id    = $c->session->{user_id};
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -3394,7 +3393,6 @@ sub compose_email :Local :Args(1) {
         )->all;
     }
 
-    
     # Pre-compute participant counts — TT cannot call .search({}) on DBIC relationships
     my @leader_workshops = map {
         my $ws = $_;
@@ -3411,7 +3409,7 @@ sub compose_email :Local :Args(1) {
         { workshop_id => \@all_ids, status => 'registered' },
         { columns => ['email'], distinct => 1 }
     )->get_column('email')->all;
-    my $unique_total = scalar grep { $_ && $_ =~ /@/ } @all_emails;
+    my $unique_total = scalar grep { $_ && $_ =~ /\@/ } @all_emails;
 
     $c->stash(
         workshop           => $workshop,
@@ -3444,6 +3442,7 @@ sub send_email :Local :Args(1) {
     my $params = $c->request->body_parameters;
     my $subject      = $params->{subject};
     my $message_body = $params->{message_body} || '';
+    # If leader filled the "Full Email Body" override use it; otherwise use message_body as body
     my $body = $params->{body} || $message_body;
 
     # Collect all workshop IDs to include (primary + any extras checked)
@@ -3569,6 +3568,7 @@ sub send_email :Local :Args(1) {
         $processed_body =~ s/\[\[leader\.name\]\]/$leader_name/g;
         $processed_body =~ s/\[\[workshop\.url\]\]/$full_url/g;
 
+        my $send_err;
         eval {
             $c->stash->{email} = {
                 to       => $email,
@@ -3588,17 +3588,25 @@ sub send_email :Local :Args(1) {
                     message_body => $processed_body,
                 },
             };
-            
             $c->forward($c->view('Email::Template'), []);
-            $sent_count++;
         };
-        
-        if ($@) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'workshop', "Failed to send email to $email: $@");
+        $send_err = "$@" if $@;
+
+        if ($send_err) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_email',
+                "SEND FAILED to=$email subject='$processed_subject' error=$send_err");
             $failed_count++;
             push @failed_emails, $email;
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+                "SEND OK to=$email subject='$processed_subject' workshop_id=$id");
+            $sent_count++;
         }
     }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_email',
+        "Email send summary: workshop_id=$id sent=$sent_count failed=$failed_count" .
+        ($failed_count ? " failed_addresses=" . join(',', @failed_emails) : ''));
     
     my $email_status = 'sent';
     if ($failed_count > 0 && $sent_count == 0) {
@@ -3624,11 +3632,20 @@ sub send_email :Local :Args(1) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'workshop', "Failed to record email in database: $@");
     }
     
-    if ($failed_count > 0) {
+    # Detect if running in log-only mode (no real SMTP)
+    my $mail_mode = $c->config->{mail_mode} || '';
+    my $mode_note = ($mail_mode eq 'test' || !$c->config->{mail_host})
+        ? ' NOTE: Server is in test/log-only mode — emails were logged but NOT delivered via SMTP.'
+        : '';
+
+    if ($failed_count > 0 && $sent_count == 0) {
         my $failed_list = join(', ', @failed_emails);
-        $c->flash->{warning_msg} = "Email sent to $sent_count participant(s). Failed to send to $failed_count: $failed_list";
+        $c->flash->{error_msg} = "All $failed_count email(s) failed to send: $failed_list$mode_note";
+    } elsif ($failed_count > 0) {
+        my $failed_list = join(', ', @failed_emails);
+        $c->flash->{warning_msg} = "Email processed for $sent_count participant(s). Failed: $failed_count ($failed_list).$mode_note";
     } else {
-        $c->flash->{success_msg} = "Email sent successfully to $sent_count participant(s).";
+        $c->flash->{success_msg} = "Email processed for $sent_count participant(s).$mode_note";
     }
     
     $c->response->redirect($c->uri_for($self->action_for('email_history'), [$id]));
