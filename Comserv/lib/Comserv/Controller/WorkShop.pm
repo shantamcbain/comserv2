@@ -3432,8 +3432,9 @@ sub send_email :Local :Args(1) {
     }
     
     my $params = $c->request->body_parameters;
-    my $subject = $params->{subject};
-    my $body = $params->{body};
+    my $subject      = $params->{subject};
+    my $message_body = $params->{message_body} || '';
+    my $body = $params->{body} || $message_body;
 
     # Collect all workshop IDs to include (primary + any extras checked)
     my @extra_ids;
@@ -3547,6 +3548,7 @@ sub send_email :Local :Args(1) {
 
         # Process per-participant [[placeholders]] in body
         my $processed_body = $body;
+        $processed_body =~ s/\[\[message_body\]\]/$message_body/g;
         $processed_body =~ s/\[\[participant\.name\]\]/$user_name/g;
         $processed_body =~ s/\[\[participant\.first_name\]\]/$first_name/g;
         $processed_body =~ s/\[\[workshop\.title\]\]/${\($workshop->title || '')}/g;

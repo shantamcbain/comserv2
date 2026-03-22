@@ -118,9 +118,17 @@
                         
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="body">Message:</label>
-                                <textarea id="body" name="body" rows="15" cols="80" class="form-input" required>[% form_data.body OR '' %]</textarea>
-                                <small>This message will be sent to all registered participants of selected workshops.</small>
+                                <label for="message_body">Your Message:</label>
+                                <textarea id="message_body" name="message_body" rows="10" cols="80" class="form-input">[% form_data.message_body OR '' %]</textarea>
+                                <small>This text replaces <strong>[[message_body]]</strong> in your template. You can also write the full email here if not using a template.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="body">Full Email Body (optional override):</label>
+                                <textarea id="body" name="body" rows="8" cols="80" class="form-input">[% form_data.body OR '' %]</textarea>
+                                <small>Leave blank to use a loaded template. If filled, this overrides the template body entirely.</small>
                             </div>
                         </div>
                     </div>
