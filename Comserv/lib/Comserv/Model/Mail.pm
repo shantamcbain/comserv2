@@ -304,24 +304,43 @@ sub get_smtp_config {
 # Fallback SMTP configuration when database config is unavailable
 sub _get_fallback_smtp_config {
     my ($self, $c, $site_id) = @_;
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Using fallback SMTP config for site_id $site_id");
-    
-    # Provide default mail server configuration - relay through PMG
-    my $fallback_config = {
-        host => 'harper.whc.ca',  # outbound SMTP server
-        port => 465,
-        ssl  => 'ssl',
-        user => '',
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+        "No SMTP config for site_id '$site_id' — trying CSC (site_id=1) credentials as system fallback");
+
+    # Try to load CSC's (site_id=1) SMTP config from DB — it has real credentials for harper
+    if ($c && ref($c) && $c->can('model')) {
+        my %csc_config;
+        eval {
+            my $config_rs = $c->model('DBEncy')->resultset('SiteConfig');
+            for my $key (qw(host port user password from ssl)) {
+                my $db_key = "smtp_$key";
+                my $row = $config_rs->find({ site_id => 1, config_key => $db_key });
+                $row ||= $config_rs->find({ site_id => 1, config_key => 'smtp_username' })
+                    if $key eq 'user';
+                $csc_config{$key} = $row ? $row->config_value : '';
+            }
+        };
+        if (!$@ && $csc_config{host} && $csc_config{user} && $csc_config{password}) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+                "Using CSC SMTP credentials as fallback: host=$csc_config{host} port=$csc_config{port} user=$csc_config{user}");
+            return \%csc_config;
+        }
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config',
+            "CSC fallback also unavailable (DB error or missing keys)" . ($@ ? ": $@" : ''));
+    }
+
+    # Last resort: anonymous — will only work if harper allows unauthenticated relay (it doesn't)
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_get_fallback_smtp_config',
+        "No authenticated SMTP config available — anonymous fallback will fail on harper:465");
+    return {
+        host     => 'harper.whc.ca',
+        port     => 465,
+        ssl      => 'ssl',
+        user     => '',
         password => '',
-        from => "noreply\@computersystemconsulting.ca",
+        from     => 'noreply@computersystemconsulting.ca',
     };
-    
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_fallback_smtp_config', 
-        "Fallback config provided - mail server: " . $fallback_config->{host});
-    
-    return $fallback_config;
 }
 
 # New method to create mail accounts via Virtualmin API
